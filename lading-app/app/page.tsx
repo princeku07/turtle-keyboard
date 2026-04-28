@@ -174,7 +174,7 @@ export default function Home() {
           </div>
 
           {/* 3D scene */}
-          <div className="lg:col-span-5 relative aspect-square sm:aspect-auto h-auto sm:h-[520px] lg:h-[640px] min-h-[440px]">
+          <div className="lg:col-span-5 relative w-full h-[min(70vh,520px)] sm:h-[520px] lg:h-[640px]">
             <div className="absolute inset-0 rounded-[2rem] overflow-hidden border-2 border-ink bg-gradient-to-br from-cream via-cream to-lime/20 grain">
               <Scene />
             </div>

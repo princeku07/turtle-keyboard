@@ -158,65 +158,65 @@ function PictureFrame({ color, visible }: { color: THREE.Color; visible: boolean
   );
 }
 
-/* ---------- /sticker — Sticker Stack: layered die-cut cards with a peel ---------- */
+/* ---------- /sticker — single die-cut sticker with paper backing, glyph + curling peel ---------- */
 
 function StickerStack({ color, visible }: { color: THREE.Color; visible: boolean }) {
   const group = useRef<THREE.Group>(null);
-  const front = useRef<THREE.Group>(null);
   const peel = useRef<THREE.Mesh>(null);
+  const gloss = useRef<THREE.Mesh>(null);
 
   useFrame((state) => {
     const t = state.clock.getElapsedTime();
     if (group.current) {
-      group.current.rotation.y = Math.sin(t * 0.6) * 0.55;
-      group.current.rotation.x = Math.cos(t * 0.5) * 0.2;
-    }
-    if (front.current) {
-      front.current.position.z = 0.05 + Math.sin(t * 1.6) * 0.04;
+      group.current.rotation.y = Math.sin(t * 0.55) * 0.6;
+      group.current.rotation.x = Math.cos(t * 0.4) * 0.18;
     }
     if (peel.current) {
-      // gently flap the peeled corner
-      peel.current.rotation.x = -0.6 + Math.sin(t * 1.8) * 0.25;
-      colorLerp(peel.current.material, color, 0.08);
+      peel.current.rotation.x = -0.85 + Math.sin(t * 1.6) * 0.2;
     }
-    if (group.current) {
-      group.current.children.forEach((c) => {
-        c.traverse((n) => {
-          const m = (n as THREE.Mesh).material;
-          if (m && (m as THREE.MeshStandardMaterial).color) colorLerp(m, color, 0.06);
-        });
-      });
+    if (gloss.current) {
+      // gloss highlight slides across the sticker face
+      gloss.current.position.x = Math.sin(t * 0.8) * 0.45;
     }
   });
 
   return (
     <ShapeShell visible={visible} scale={1.0}>
       <group ref={group}>
-        {/* back sticker, offset and tilted */}
-        <group position={[0.22, -0.22, -0.22]} rotation={[0, 0, -0.18]}>
-          <RoundedBox args={[1.7, 1.7, 0.12]} radius={0.42} smoothness={5} castShadow>
-            <meshStandardMaterial color="#c8ff00" roughness={0.35} metalness={0.15} />
-          </RoundedBox>
-        </group>
+        {/* die-cut paper backing — slightly larger, cream, recessed */}
+        <RoundedBox args={[2.05, 2.05, 0.06]} radius={0.55} smoothness={5} position={[0, 0, -0.08]} castShadow receiveShadow>
+          <meshStandardMaterial color="#f5f0e1" roughness={0.85} metalness={0.0} />
+        </RoundedBox>
 
-        {/* mid sticker */}
-        <group position={[0.1, -0.1, -0.08]} rotation={[0, 0, -0.06]}>
-          <RoundedBox args={[1.75, 1.75, 0.13]} radius={0.42} smoothness={5} castShadow>
-            <meshStandardMaterial color="#c8ff00" roughness={0.35} metalness={0.15} emissive="#c8ff00" emissiveIntensity={0.15} />
-          </RoundedBox>
-        </group>
+        {/* main sticker face — chunky rounded blob */}
+        <RoundedBox args={[1.7, 1.7, 0.18]} radius={0.5} smoothness={5} castShadow>
+          <meshStandardMaterial color="#c8ff00" roughness={0.28} metalness={0.2} emissive="#c8ff00" emissiveIntensity={0.18} />
+        </RoundedBox>
 
-        {/* front sticker */}
-        <group ref={front} rotation={[0, 0, 0.08]}>
-          <RoundedBox args={[1.8, 1.8, 0.14]} radius={0.42} smoothness={5} castShadow>
-            <meshStandardMaterial color="#c8ff00" roughness={0.3} metalness={0.2} emissive="#c8ff00" emissiveIntensity={0.3} />
-          </RoundedBox>
-          {/* peeled corner */}
-          <mesh ref={peel} position={[-0.78, 0.78, 0.08]} rotation={[-0.6, 0, 0.78]} castShadow>
-            <planeGeometry args={[0.55, 0.55]} />
-            <meshStandardMaterial color="#c8ff00" side={THREE.DoubleSide} roughness={0.3} metalness={0.2} />
-          </mesh>
-        </group>
+        {/* gloss streak — thin transparent quad sliding across */}
+        <mesh ref={gloss} position={[0, 0.2, 0.1]} rotation={[0, 0, -0.4]}>
+          <planeGeometry args={[0.35, 1.6]} />
+          <meshBasicMaterial color="#ffffff" transparent opacity={0.18} />
+        </mesh>
+
+        {/* glyph on the face */}
+        <Text
+          position={[0, 0, 0.11]}
+          fontSize={1.05}
+          color="#0c0c0c"
+          anchorX="center"
+          anchorY="middle"
+          letterSpacing={-0.02}
+          fontWeight={900}
+        >
+          ✶
+        </Text>
+
+        {/* curling peeled corner — backside is paper-cream */}
+        <mesh ref={peel} position={[-0.78, 0.78, 0.1]} rotation={[-0.85, 0, 0.78]} castShadow>
+          <planeGeometry args={[0.6, 0.6]} />
+          <meshStandardMaterial color="#f5f0e1" side={THREE.DoubleSide} roughness={0.7} />
+        </mesh>
       </group>
     </ShapeShell>
   );
@@ -293,62 +293,84 @@ function EditCanvas({ color, visible }: { color: THREE.Color; visible: boolean }
   );
 }
 
-/* ---------- /avatar — Portrait Bust with style halo ---------- */
+/* ---------- /avatar — Profile bust inside a round frame, with multi-style chips orbiting ---------- */
+
+const AVATAR_STYLES = ["#ff4fa3", "#5b6cff", "#c8ff00", "#ff7a1a"]; // distinct chips imply restyles
 
 function AvatarBust({ color, visible }: { color: THREE.Color; visible: boolean }) {
   const group = useRef<THREE.Group>(null);
-  const halo = useRef<THREE.Mesh>(null);
+  const chips = useRef<THREE.Group>(null);
   const head = useRef<THREE.Mesh>(null);
   const shoulders = useRef<THREE.Mesh>(null);
+  const frame = useRef<THREE.Mesh>(null);
 
   useFrame((state) => {
     const t = state.clock.getElapsedTime();
     if (group.current) {
-      group.current.rotation.y = Math.sin(t * 0.6) * 0.6;
-      group.current.position.y = Math.sin(t * 1.2) * 0.05;
+      group.current.rotation.y = Math.sin(t * 0.55) * 0.55;
+      group.current.position.y = Math.sin(t * 1.1) * 0.04;
     }
-    if (halo.current) {
-      halo.current.rotation.z = t * 1.4;
-      halo.current.rotation.x = Math.PI / 2 + Math.sin(t * 0.6) * 0.25;
-      colorLerp(halo.current.material, color, 0.08);
-    }
+    if (chips.current) chips.current.rotation.z = t * 0.9;
     if (head.current) colorLerp(head.current.material, color, 0.08);
     if (shoulders.current) colorLerp(shoulders.current.material, color, 0.08);
+    if (frame.current) colorLerp(frame.current.material, color, 0.08);
   });
 
   return (
     <ShapeShell visible={visible} scale={1.0}>
       <group ref={group}>
-        {/* shoulders / torso — truncated cone */}
-        <mesh ref={shoulders} position={[0, -0.55, 0]} castShadow>
-          <cylinderGeometry args={[0.85, 0.45, 0.7, 32]} />
+        {/* round profile-pic frame disc, sits behind the bust */}
+        <mesh position={[0, 0.2, -0.4]} rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
+          <cylinderGeometry args={[1.15, 1.15, 0.12, 64]} />
+          <meshStandardMaterial color="#f5f0e1" roughness={0.7} metalness={0.05} />
+        </mesh>
+        {/* frame ring around the disc */}
+        <mesh ref={frame} position={[0, 0.2, -0.32]} rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[1.18, 0.06, 16, 80]} />
+          <meshStandardMaterial color="#ff7a1a" emissive="#ff7a1a" emissiveIntensity={0.5} roughness={0.3} metalness={0.4} />
+        </mesh>
+
+        {/* shoulders — cleaner trapezoidal silhouette */}
+        <mesh ref={shoulders} position={[0, -0.7, 0]} castShadow>
+          <cylinderGeometry args={[0.95, 0.55, 0.55, 32]} />
           <meshStandardMaterial color="#ff7a1a" roughness={0.45} metalness={0.2} />
+        </mesh>
+        {/* collar bevel */}
+        <mesh position={[0, -0.42, 0]} castShadow>
+          <cylinderGeometry args={[0.55, 0.55, 0.08, 32]} />
+          <meshStandardMaterial color="#ff7a1a" roughness={0.5} metalness={0.15} />
         </mesh>
         {/* neck */}
-        <mesh position={[0, -0.05, 0]} castShadow>
-          <cylinderGeometry args={[0.18, 0.22, 0.25, 24]} />
-          <meshStandardMaterial color="#ff7a1a" roughness={0.45} metalness={0.2} />
+        <mesh position={[0, -0.25, 0]} castShadow>
+          <cylinderGeometry args={[0.2, 0.22, 0.25, 24]} />
+          <meshStandardMaterial color="#ff7a1a" roughness={0.5} metalness={0.15} />
         </mesh>
-        {/* head */}
-        <mesh ref={head} position={[0, 0.55, 0]} castShadow>
+        {/* head — slightly egg-shaped via scale */}
+        <mesh ref={head} position={[0, 0.42, 0]} scale={[0.95, 1.08, 0.95]} castShadow>
           <sphereGeometry args={[0.55, 48, 48]} />
           <meshStandardMaterial color="#ff7a1a" roughness={0.4} metalness={0.25} emissive="#ff7a1a" emissiveIntensity={0.2} />
         </mesh>
-        {/* style halo */}
-        <mesh ref={halo} position={[0, 0.55, 0]}>
-          <torusGeometry args={[0.95, 0.04, 16, 96]} />
-          <meshStandardMaterial color="#ff7a1a" emissive="#ff7a1a" emissiveIntensity={0.8} />
-        </mesh>
-        {/* small floating "style" pucks orbiting the halo */}
-        {[0, 1, 2, 3].map((i) => {
-          const a = (i / 4) * Math.PI * 2;
-          return (
-            <mesh key={i} position={[Math.cos(a) * 0.95, 0.55 + Math.sin(a) * 0.1, Math.sin(a) * 0.95]}>
-              <sphereGeometry args={[0.08, 16, 16]} />
-              <meshStandardMaterial color="#ff7a1a" emissive="#ff7a1a" emissiveIntensity={0.9} />
-            </mesh>
-          );
-        })}
+
+        {/* orbiting style chips — distinct colors, each a different "restyle" */}
+        <group ref={chips} position={[0, 0.2, 0]}>
+          {AVATAR_STYLES.map((c, i) => {
+            const a = (i / AVATAR_STYLES.length) * Math.PI * 2;
+            const r = 1.45;
+            return (
+              <group key={c} position={[Math.cos(a) * r, Math.sin(a) * r, 0]}>
+                <mesh castShadow>
+                  <sphereGeometry args={[0.13, 24, 24]} />
+                  <meshStandardMaterial color={c} emissive={c} emissiveIntensity={0.8} roughness={0.3} metalness={0.3} />
+                </mesh>
+                {/* tiny ring around each chip — like a selected swatch */}
+                <mesh rotation={[Math.PI / 2, 0, 0]}>
+                  <torusGeometry args={[0.18, 0.012, 8, 24]} />
+                  <meshBasicMaterial color={c} transparent opacity={0.7} />
+                </mesh>
+              </group>
+            );
+          })}
+        </group>
       </group>
     </ShapeShell>
   );
@@ -501,14 +523,21 @@ function MorphingCore({ active }: { active: Cmd | null }) {
 const CONTENT_HALF_W = 2.7 + 1.5;
 const CONTENT_HALF_H = 2.4 + 1.4;
 
+// Float adds ~0.9 units of drift in each axis; pad the fit box so pills never clip.
+const FLOAT_PAD = 0.9;
+// Leave a small visual margin from the canvas edges.
+const EDGE_MARGIN = 0.92;
+
 function FitToViewport({ children }: { children: React.ReactNode }) {
   const group = useRef<THREE.Group>(null);
   const { viewport } = useThree();
   useFrame(() => {
     if (!group.current) return;
-    const sx = viewport.width  / (CONTENT_HALF_W * 2);
-    const sy = viewport.height / (CONTENT_HALF_H * 2);
-    const target = Math.min(sx, sy, 1);
+    const halfW = CONTENT_HALF_W + FLOAT_PAD;
+    const halfH = CONTENT_HALF_H + FLOAT_PAD;
+    const sx = viewport.width  / (halfW * 2);
+    const sy = viewport.height / (halfH * 2);
+    const target = Math.min(sx, sy, 1) * EDGE_MARGIN;
     const eased = lerp(group.current.scale.x, target, 0.2);
     group.current.scale.setScalar(eased);
   });
