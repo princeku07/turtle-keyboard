@@ -50,7 +50,7 @@ function CommandPill({
   const textColor = isLight ? "#0c0c0c" : "#ffffff";
 
   return (
-    <Float speed={1.4} rotationIntensity={0.25} floatIntensity={0.9} position={cmd.pos}>
+    <Float speed={1.4} rotationIntensity={0.25} floatIntensity={0.35} position={cmd.pos}>
       <group
         ref={group}
         rotation={[0, 0, cmd.rot]}
@@ -523,10 +523,8 @@ function MorphingCore({ active }: { active: Cmd | null }) {
 const CONTENT_HALF_W = 2.7 + 1.5;
 const CONTENT_HALF_H = 2.4 + 1.4;
 
-// Float adds ~0.9 units of drift in each axis; pad the fit box so pills never clip.
-const FLOAT_PAD = 0.9;
-// Leave a small visual margin from the canvas edges.
-const EDGE_MARGIN = 0.92;
+const FLOAT_PAD = 0.35;
+const EDGE_MARGIN = 0.98;
 
 function FitToViewport({ children }: { children: React.ReactNode }) {
   const group = useRef<THREE.Group>(null);
@@ -537,7 +535,8 @@ function FitToViewport({ children }: { children: React.ReactNode }) {
     const halfH = CONTENT_HALF_H + FLOAT_PAD;
     const sx = viewport.width  / (halfW * 2);
     const sy = viewport.height / (halfH * 2);
-    const target = Math.min(sx, sy, 1) * EDGE_MARGIN;
+    // Allow scaling up on tall/wide viewports so pills don't look tiny on phones.
+    const target = Math.min(sx, sy) * EDGE_MARGIN;
     const eased = lerp(group.current.scale.x, target, 0.2);
     group.current.scale.setScalar(eased);
   });
@@ -558,7 +557,7 @@ export default function Scene() {
       dpr={[1, 2]}
       camera={{ position: [0, 0, 6.2], fov: 45 }}
       gl={{ antialias: true, alpha: true }}
-      style={{ touchAction: "none" }}
+      style={{ touchAction: "pan-y" }}
     >
       <Suspense fallback={null}>
         <ambientLight intensity={0.7} />
