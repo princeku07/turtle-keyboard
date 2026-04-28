@@ -1,18 +1,16 @@
 package com.prince.turtlekeyboard;
 
-
 import android.app.Activity;
+import android.content.Context;
+import android.content.Intent;
 import android.os.Bundle;
-import android.widget.TextView;
+import android.provider.Settings;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.Toast;
 
 import com.prince.turtlekeyboard.databinding.ActivityMainBinding;
 
 public class MainActivity extends Activity {
-
-    // Used to load the 'turtlekeyboard' library on application startup.
-//    static {
-//        System.loadLibrary("turtlekeyboard");
-//    }
 
     private ActivityMainBinding binding;
 
@@ -23,14 +21,24 @@ public class MainActivity extends Activity {
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
-        // Example of a call to a native method
-        TextView tv = binding.sampleText;
-//        tv.setText(stringFromJNI());
+        binding.btnEnable.setOnClickListener(v -> openInputMethodSettings());
+        binding.btnChoose.setOnClickListener(v -> showInputMethodPicker());
     }
 
-    /**
-     * A native method that is implemented by the 'turtlekeyboard' native library,
-     * which is packaged with this application.
-     */
-//    public native String stringFromJNI();
+    private void openInputMethodSettings() {
+        try {
+            Intent intent = new Intent(Settings.ACTION_INPUT_METHOD_SETTINGS);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(intent);
+        } catch (Exception e) {
+            Toast.makeText(this, "Could not open keyboard settings", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void showInputMethodPicker() {
+        InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (imm != null) {
+            imm.showInputMethodPicker();
+        }
+    }
 }

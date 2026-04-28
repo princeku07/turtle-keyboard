@@ -1,0 +1,442 @@
+import Scene from "./components/SceneWrapper";
+
+const SLASH_COMMANDS = [
+  "/cap a golden retriever as a samurai",
+  "/fix",
+  "/tone flirty",
+  "/reply",
+  "/tl es",
+  "/meme monday mood",
+  "/sum",
+  "/code python fizzbuzz",
+  "/roast my last text",
+  "/explain",
+];
+
+const FEATURES = [
+  {
+    tag: "01",
+    title: "Slash. Don't switch.",
+    body: "Type / inside any text field — WhatsApp, Tinder, Gmail — and an AI lands the answer right where your cursor is. No app switching, no tab dance.",
+    color: "bg-lime",
+  },
+  {
+    tag: "02",
+    title: "Every model. One keyboard.",
+    body: "Flux for images, Claude for writing, GPT for code, Gemini for translation. We route each command to the model that's best at it. You don't pick. Unless you want to.",
+    color: "bg-pink",
+  },
+  {
+    tag: "03",
+    title: "Open source. Audit the keys.",
+    body: "The keyboard is MIT-licensed and on GitHub. Full Access scares you? Read the source. Or fork it. Trust is built, not declared.",
+    color: "bg-blue text-cream",
+  },
+  {
+    tag: "04",
+    title: "2-second images. 1-second words.",
+    body: "Flux Schnell ships images in ~1.5s. Haiku and Flash do text in under a second. The whole point is that it has to feel instant — or it dies.",
+    color: "bg-orange",
+  },
+];
+
+const COMMANDS_GRID = [
+  { cmd: "/cap",   tag: "image",  desc: "Custom image, 2 seconds, into the chat.", color: "bg-pink text-cream" },
+  { cmd: "/fix",   tag: "text",   desc: "Grammar + spelling, in place.",            color: "bg-lime" },
+  { cmd: "/tone",  tag: "rewrite",desc: "Formal, casual, flirty, warm, concise.",   color: "bg-cream border-2 border-ink" },
+  { cmd: "/reply", tag: "suggest",desc: "Three replies based on the last message.", color: "bg-blue text-cream" },
+  { cmd: "/tl",    tag: "translate",desc: "Inline translation, any language.",      color: "bg-orange" },
+  { cmd: "/meme",  tag: "soon",   desc: "Meme template + AI-written caption.",      color: "bg-ink text-cream" },
+];
+
+const FAQ = [
+  {
+    q: "Wait, isn't a third-party keyboard sketchy?",
+    a: "Reasonable concern. That's exactly why the keyboard is open source. You can read every line that touches your text — and we never log anything outside of slash commands. The closed part is the routing backend; the surface that sees your typing is fully auditable.",
+  },
+  {
+    q: "Why can't Apple or Google just build this?",
+    a: "They can build an AI keyboard. They can't build a model-agnostic one — Apple's keyboard exists to push Apple Intelligence; Gboard exists to push Gemini. The whole point of Turtle is that it routes to whichever model is actually best, and that's structurally off-limits for the platforms.",
+  },
+  {
+    q: "How fast is fast?",
+    a: "Target end-to-end: under 2 seconds for /cap, under 1.5s for text. The latency budget is the product. If a command can't hit that, it doesn't ship.",
+  },
+  {
+    q: "Do I have to pay?",
+    a: "Free tier covers 20 images and 100 text commands per day on standard models. Pro ($4.99/mo) unlocks premium models (Flux Pro, Claude Sonnet, GPT-4o), no watermark, and custom commands. Pro+ lets you bring your own keys.",
+  },
+];
+
+export default function Home() {
+  return (
+    <main className="min-h-screen w-full bg-cream text-ink overflow-x-clip">
+      {/* NAV */}
+      <header className="sticky top-0 z-40 backdrop-blur-md bg-cream/70 border-b-2 border-ink">
+        <div className="mx-auto max-w-[1400px] px-6 py-4 flex items-center justify-between">
+          <a href="#" className="flex items-center gap-2 font-mono font-bold text-lg">
+            <span className="inline-block w-7 h-7 rounded-full bg-lime border-2 border-ink" />
+            turtle<span className="text-pink">/</span>kbd
+          </a>
+          <nav className="hidden md:flex items-center gap-7 font-mono text-sm">
+            <a href="#commands" className="hover:underline underline-offset-4">commands</a>
+            <a href="#how"      className="hover:underline underline-offset-4">how it works</a>
+            <a href="#pricing"  className="hover:underline underline-offset-4">pricing</a>
+            <a href="#faq"      className="hover:underline underline-offset-4">faq</a>
+            <a href="https://github.com" target="_blank" rel="noreferrer"
+               className="hover:underline underline-offset-4">github ↗</a>
+          </nav>
+          <a href="#waitlist"
+             className="font-mono text-sm font-bold bg-ink text-cream px-4 py-2 rounded-full border-2 border-ink hover:bg-lime hover:text-ink transition-colors">
+            join waitlist →
+          </a>
+        </div>
+      </header>
+
+      {/* HERO */}
+      <section className="relative">
+        <div className="mx-auto max-w-[1400px] px-6 pt-12 pb-24 grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+          <div className="lg:col-span-7 relative z-10">
+            <div className="inline-flex items-center gap-2 font-mono text-xs uppercase tracking-widest bg-ink text-cream px-3 py-1.5 rounded-full mb-6">
+              <span className="w-2 h-2 rounded-full bg-lime animate-pulse" />
+              now in closed alpha · ios first
+            </div>
+
+            <h1 className="font-sans font-black tracking-[-0.04em] leading-[0.85] text-[clamp(3.2rem,9vw,8.5rem)]">
+              <span className="block">slash is</span>
+              <span className="block">
+                <span className="outline-text">the new</span>{" "}
+                <span className="relative inline-block">
+                  <span className="absolute inset-0 -rotate-2 bg-lime -z-10 rounded-md" />
+                  <span className="relative px-2">hey siri.</span>
+                </span>
+              </span>
+            </h1>
+
+            <p className="mt-8 max-w-xl text-lg md:text-xl leading-relaxed text-ink/80">
+              Turtle Keyboard is the open-source AI keyboard that puts every model — image,
+              text, voice — <em className="not-italic font-mono bg-pink text-cream px-1.5 rounded">one slash</em> away,
+              inside any app you already use.
+            </p>
+
+            <div className="mt-10 flex flex-wrap items-center gap-4">
+              <a href="#waitlist"
+                 className="group inline-flex items-center gap-3 bg-ink text-cream font-mono font-bold text-base px-6 py-4 rounded-full border-2 border-ink hover:bg-lime hover:text-ink transition-colors">
+                get early access
+                <span className="inline-block group-hover:translate-x-1 transition-transform">→</span>
+              </a>
+              <a href="#commands"
+                 className="inline-flex items-center gap-2 font-mono text-base px-6 py-4 rounded-full border-2 border-ink hover:bg-ink hover:text-cream transition-colors">
+                see commands
+              </a>
+            </div>
+
+            <div className="mt-10 flex items-center gap-6 font-mono text-xs text-ink/60">
+              <div className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-ink"/> open source</div>
+              <div className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-pink"/> model-agnostic</div>
+              <div className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-blue"/> ~2s images</div>
+            </div>
+          </div>
+
+          {/* 3D scene */}
+          <div className="lg:col-span-5 relative aspect-square sm:aspect-auto h-auto sm:h-[520px] lg:h-[640px] min-h-[440px]">
+            <div className="absolute inset-0 rounded-[2rem] overflow-hidden border-2 border-ink bg-gradient-to-br from-cream via-cream to-lime/20 grain">
+              <Scene />
+            </div>
+            <div className="absolute -bottom-4 -left-4 wobble bg-pink text-cream font-mono text-xs font-bold px-3 py-2 rounded-full border-2 border-ink shadow-[4px_4px_0_0_var(--ink)]">
+              live preview ✶
+            </div>
+            <div className="absolute -top-3 -right-3 float-y bg-lime font-mono text-xs font-bold px-3 py-2 rounded-full border-2 border-ink shadow-[4px_4px_0_0_var(--ink)]">
+              {"<1mb keyboard"}
+            </div>
+          </div>
+        </div>
+
+        {/* MARQUEE */}
+        <div className="border-y-2 border-ink bg-ink text-cream py-5 overflow-hidden">
+          <div className="flex animate-marquee whitespace-nowrap">
+            {[...SLASH_COMMANDS, ...SLASH_COMMANDS].map((cmd, i) => (
+              <span key={i} className="font-mono text-2xl md:text-3xl mx-8 inline-flex items-center gap-4">
+                <span className="text-lime">{cmd.split(" ")[0]}</span>
+                <span className="text-cream/80">{cmd.split(" ").slice(1).join(" ")}</span>
+                <span className="text-pink">✺</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* PROBLEM */}
+      <section className="mx-auto max-w-[1400px] px-6 py-24">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-end">
+          <div className="lg:col-span-7">
+            <div className="font-mono text-xs uppercase tracking-widest text-ink/60 mb-4">§ the problem</div>
+            <h2 className="font-sans font-black tracking-[-0.03em] leading-[0.95] text-[clamp(2.4rem,5vw,4.6rem)]">
+              Six steps to ask <span className="bg-pink text-cream px-2 -rotate-1 inline-block">an AI</span> a question.
+              Multiplied by 50 times a day.
+            </h2>
+          </div>
+          <div className="lg:col-span-5">
+            <p className="text-lg text-ink/80 leading-relaxed">
+              Stop. Open the AI app. Type. Wait. Copy. Switch back. Paste. Every time. The friction
+              tax kills the long tail of small daily wins — translations, tone fixes, a meme for
+              the group chat. Most users only invoke AI when the value is <em>obviously</em> high enough.
+            </p>
+            <p className="mt-4 font-mono text-sm text-ink/60">
+              Turtle removes the tax. The keyboard is the universal layer above every app.
+            </p>
+          </div>
+        </div>
+
+        {/* steps strip */}
+        <div className="mt-14 grid grid-cols-2 md:grid-cols-7 gap-2 font-mono text-xs">
+          {["stop","open app","type","wait","copy","switch","paste"].map((s, i) => (
+            <div key={s} className="border-2 border-ink rounded-full px-3 py-2 text-center bg-cream line-through decoration-pink decoration-[3px]">
+              {i+1}. {s}
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 flex justify-center">
+          <div className="font-mono text-sm bg-lime border-2 border-ink rounded-full px-4 py-2">
+            with turtle: <span className="font-bold">type / · done.</span>
+          </div>
+        </div>
+      </section>
+
+      {/* FEATURES */}
+      <section id="how" className="bg-ink text-cream py-24 border-y-2 border-ink">
+        <div className="mx-auto max-w-[1400px] px-6">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-14">
+            <div>
+              <div className="font-mono text-xs uppercase tracking-widest text-cream/60 mb-3">§ how it works</div>
+              <h2 className="font-sans font-black tracking-[-0.03em] leading-[0.95] text-[clamp(2.4rem,5vw,4.6rem)]">
+                A keyboard the platforms <span className="outline-text" style={{ ['--tw-text-opacity' as never]: 1 }}>can't ship.</span>
+              </h2>
+            </div>
+            <p className="max-w-md text-cream/70">
+              Apple's keyboard pushes Apple Intelligence. Gboard pushes Gemini. They will never route
+              to whichever model is best. We will. That's the whole point.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {FEATURES.map((f) => (
+              <div key={f.tag}
+                   className={`${f.color} text-ink rounded-3xl border-2 border-ink p-8 md:p-10 relative overflow-hidden`}>
+                <div className="font-mono text-xs uppercase tracking-widest opacity-70 mb-4">[ {f.tag} ]</div>
+                <h3 className="font-sans font-black tracking-tight text-2xl md:text-3xl leading-tight">{f.title}</h3>
+                <p className="mt-4 text-base leading-relaxed opacity-90">{f.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* COMMANDS */}
+      <section id="commands" className="mx-auto max-w-[1400px] px-6 py-24">
+        <div className="font-mono text-xs uppercase tracking-widest text-ink/60 mb-3">§ commands</div>
+        <h2 className="font-sans font-black tracking-[-0.03em] leading-[0.95] text-[clamp(2.4rem,5vw,4.6rem)] max-w-4xl">
+          Six v1 commands. <span className="bg-blue text-cream px-2 -rotate-1 inline-block">Hundreds</span> after that.
+        </h2>
+        <p className="mt-6 max-w-2xl text-lg text-ink/80">
+          Every command runs through the same dispatcher — invoke it by typing /, or by tapping
+          the Quick Panel (double-tap space). Power users build their own.
+        </p>
+
+        <div className="mt-14 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {COMMANDS_GRID.map((c, i) => (
+            <div key={c.cmd}
+                 className={`${c.color} rounded-3xl border-2 border-ink p-7 relative min-h-[230px] flex flex-col justify-between transition-transform hover:-translate-y-1 hover:shadow-[6px_6px_0_0_var(--ink)]`}>
+              <div className="flex items-start justify-between">
+                <span className="font-mono font-black text-3xl md:text-4xl tracking-tight">{c.cmd}</span>
+                <span className="font-mono text-[10px] uppercase tracking-widest border-2 border-current rounded-full px-2 py-0.5 opacity-80">
+                  {c.tag}
+                </span>
+              </div>
+              <div>
+                <div className="font-mono text-xs opacity-60 mb-2">no.{String(i+1).padStart(2,"0")}</div>
+                <p className="text-base leading-snug">{c.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-10 flex flex-wrap items-center gap-3 font-mono text-sm">
+          <span className="opacity-60">coming soon:</span>
+          {["/sum","/explain","/code","/voice","/roast","/jared (your custom)"].map((t) => (
+            <span key={t} className="border-2 border-ink rounded-full px-3 py-1.5 bg-cream">{t}</span>
+          ))}
+        </div>
+      </section>
+
+      {/* SHOW DON'T TELL — fake chat */}
+      <section className="mx-auto max-w-[1400px] px-6 pb-24">
+        <div className="rounded-[2rem] border-2 border-ink bg-cream p-6 md:p-10 grain">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
+            <div>
+              <div className="font-mono text-xs uppercase tracking-widest text-ink/60 mb-3">§ in the wild</div>
+              <h3 className="font-sans font-black text-3xl md:text-5xl leading-[0.95] tracking-[-0.02em]">
+                The moment doesn't <span className="line-through decoration-pink decoration-[4px]">die</span>{" "}
+                wait for a context switch.
+              </h3>
+              <p className="mt-5 text-ink/80 max-w-md">
+                The group chat is moving. Your reply needs to land in the next 8 seconds.
+                You type <span className="font-mono bg-ink text-cream px-1.5 rounded">/cap a samurai cat</span>.
+                Two seconds later, image is on the clipboard. Paste. Send. Status acquired.
+              </p>
+            </div>
+
+            {/* mock device */}
+            <div className="relative mx-auto w-full max-w-sm">
+              <div className="rounded-[2.5rem] border-2 border-ink bg-cream p-3 shadow-[10px_10px_0_0_var(--ink)]">
+                <div className="rounded-[2rem] border-2 border-ink bg-white overflow-hidden">
+                  {/* messages */}
+                  <div className="p-4 bg-[#e9e2d2] space-y-3 min-h-[320px] font-sans text-sm">
+                    <div className="flex"><div className="bg-white border border-ink/10 rounded-2xl rounded-bl-sm px-3 py-2 max-w-[70%]">jared just sent a samurai meme 😭</div></div>
+                    <div className="flex justify-end"><div className="bg-lime border-2 border-ink rounded-2xl rounded-br-sm px-3 py-2 max-w-[70%] font-mono">/cap a golden retriever as a samurai<span className="caret">▍</span></div></div>
+                    <div className="flex justify-end"><div className="bg-pink text-cream border-2 border-ink rounded-2xl rounded-br-sm p-2 max-w-[70%]">
+                      <div className="aspect-square w-44 rounded-xl bg-gradient-to-br from-orange via-pink to-blue grain border border-ink/30 flex items-center justify-center text-3xl">🐕‍🦺⚔️</div>
+                      <div className="font-mono text-[10px] mt-1 opacity-90">generated · 1.6s · flux schnell</div>
+                    </div></div>
+                    <div className="flex"><div className="bg-white border border-ink/10 rounded-2xl rounded-bl-sm px-3 py-2 max-w-[70%]">😂😂 send it everywhere</div></div>
+                  </div>
+                  {/* keyboard */}
+                  <div className="bg-[#d6d0c2] p-2 border-t-2 border-ink">
+                    <div className="flex gap-1.5 mb-1.5">
+                      <button className="flex-1 bg-pink text-cream border-2 border-ink rounded-md py-2 font-mono text-xs">/cap</button>
+                      <button className="flex-1 bg-lime border-2 border-ink rounded-md py-2 font-mono text-xs">/fix</button>
+                      <button className="flex-1 bg-blue text-cream border-2 border-ink rounded-md py-2 font-mono text-xs">/reply</button>
+                      <button className="flex-1 bg-orange border-2 border-ink rounded-md py-2 font-mono text-xs">/tone</button>
+                    </div>
+                    <div className="grid grid-cols-10 gap-1">
+                      {"qwertyuiopasdfghjkl_zxcvbnm__".split("").map((k, i) => (
+                        <div key={i} className={`h-6 rounded bg-white border border-ink/30 flex items-center justify-center text-[10px] font-mono ${k === "_" ? "opacity-0" : ""}`}>{k}</div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* PRICING */}
+      <section id="pricing" className="mx-auto max-w-[1400px] px-6 py-24">
+        <div className="font-mono text-xs uppercase tracking-widest text-ink/60 mb-3">§ pricing</div>
+        <h2 className="font-sans font-black tracking-[-0.03em] leading-[0.95] text-[clamp(2.4rem,5vw,4.6rem)]">
+          Free forever. <span className="outline-text">Pro if</span> you want the good stuff.
+        </h2>
+
+        <div className="mt-14 grid grid-cols-1 md:grid-cols-3 gap-5">
+          {[
+            { name: "Free", price: "$0", tag: "for everyone", color: "bg-cream border-2 border-ink",
+              perks: ["20 images/day", "100 text commands/day", "Standard models", "All v1 commands", "Watermark on /cap"] },
+            { name: "Pro", price: "$4.99", suffix: "/mo", tag: "★ most popular", color: "bg-lime border-2 border-ink relative",
+              perks: ["Unlimited usage", "Premium models (Flux Pro, Sonnet, GPT-4o)", "No watermark", "Priority queue", "Custom commands"] },
+            { name: "Pro+", price: "$9.99", suffix: "/mo", tag: "BYO keys", color: "bg-ink text-cream border-2 border-ink",
+              perks: ["Everything in Pro", "Bring your own API keys", "Cross-device sync", "Early access to new commands", "We charge zero margin on inference"] },
+          ].map((p) => (
+            <div key={p.name} className={`${p.color} rounded-3xl p-8 relative`}>
+              {p.tag && (
+                <span className="absolute -top-3 left-6 bg-pink text-cream font-mono text-[10px] uppercase tracking-widest border-2 border-ink rounded-full px-3 py-1">
+                  {p.tag}
+                </span>
+              )}
+              <div className="font-mono text-sm uppercase tracking-widest opacity-70 mb-4">{p.name}</div>
+              <div className="flex items-baseline gap-1 mb-6">
+                <span className="font-sans font-black text-6xl tracking-tight">{p.price}</span>
+                {p.suffix && <span className="font-mono opacity-70">{p.suffix}</span>}
+              </div>
+              <ul className="space-y-2 mb-8">
+                {p.perks.map((perk) => (
+                  <li key={perk} className="flex gap-2 text-sm">
+                    <span className="font-mono opacity-60">/</span>
+                    <span>{perk}</span>
+                  </li>
+                ))}
+              </ul>
+              <a href="#waitlist"
+                 className={`block text-center font-mono text-sm font-bold rounded-full py-3 border-2 border-ink ${p.name === "Pro+" ? "bg-cream text-ink" : "bg-ink text-cream"}`}>
+                {p.name === "Free" ? "start free" : "join waitlist"}
+              </a>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section id="faq" className="mx-auto max-w-[1400px] px-6 py-24">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+          <div className="lg:col-span-4">
+            <div className="font-mono text-xs uppercase tracking-widest text-ink/60 mb-3">§ faq</div>
+            <h2 className="font-sans font-black tracking-[-0.03em] leading-[0.95] text-[clamp(2.4rem,5vw,3.6rem)]">
+              The skeptical questions.
+            </h2>
+            <p className="mt-5 text-ink/70">
+              The ones we'd ask too. The honest answers.
+            </p>
+          </div>
+          <div className="lg:col-span-8 space-y-4">
+            {FAQ.map((item) => (
+              <details key={item.q} className="group border-2 border-ink rounded-3xl bg-cream p-6 [&_summary::-webkit-details-marker]:hidden">
+                <summary className="flex items-center justify-between cursor-pointer list-none">
+                  <span className="font-sans font-bold text-xl tracking-tight pr-4">{item.q}</span>
+                  <span className="font-mono text-2xl shrink-0 transition-transform group-open:rotate-45">+</span>
+                </summary>
+                <p className="mt-4 text-ink/80 leading-relaxed">{item.a}</p>
+              </details>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section id="waitlist" className="mx-auto max-w-[1400px] px-6 pb-24">
+        <div className="rounded-[2rem] border-2 border-ink bg-lime p-10 md:p-16 text-center relative overflow-hidden">
+          <div className="absolute -top-10 -left-10 w-40 h-40 rounded-full bg-pink border-2 border-ink wobble" />
+          <div className="absolute -bottom-12 -right-8 w-32 h-32 rounded-full bg-blue border-2 border-ink float-y" />
+          <div className="relative">
+            <div className="font-mono text-xs uppercase tracking-widest mb-4">§ join the alpha</div>
+            <h2 className="font-sans font-black tracking-[-0.04em] leading-[0.9] text-[clamp(2.6rem,7vw,6rem)] max-w-4xl mx-auto">
+              One keyboard. <span className="outline-text">Every AI.</span> Your choice.
+            </h2>
+            <form className="mt-10 flex flex-col sm:flex-row gap-3 max-w-xl mx-auto">
+              <input
+                type="email"
+                placeholder="you@somewhere.cool"
+                className="flex-1 bg-cream border-2 border-ink rounded-full px-5 py-4 font-mono text-base focus:outline-none focus:bg-white"
+              />
+              <button
+                type="submit"
+                className="bg-ink text-cream font-mono font-bold px-6 py-4 rounded-full border-2 border-ink hover:bg-pink hover:text-cream transition-colors">
+                grab my spot →
+              </button>
+            </form>
+            <div className="mt-6 font-mono text-xs opacity-70">
+              ~3,200 people in line · ios alpha rolling out monthly
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FOOTER */}
+      <footer className="border-t-2 border-ink">
+        <div className="mx-auto max-w-[1400px] px-6 py-10 flex flex-col md:flex-row items-center justify-between gap-6 font-mono text-sm">
+          <div className="flex items-center gap-3">
+            <span className="inline-block w-6 h-6 rounded-full bg-lime border-2 border-ink" />
+            <span className="font-bold">turtle/kbd</span>
+            <span className="opacity-60">© 2026 · MIT-licensed</span>
+          </div>
+          <div className="flex items-center gap-6">
+            <a href="#" className="hover:underline">github</a>
+            <a href="#" className="hover:underline">twitter</a>
+            <a href="#" className="hover:underline">privacy</a>
+            <a href="#" className="hover:underline">discord</a>
+          </div>
+          <div className="opacity-60">slow and steady. ✶</div>
+        </div>
+      </footer>
+    </main>
+  );
+}

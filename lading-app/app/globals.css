@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+:root {
+  --cream: #f4efe4;
+  --ink: #0c0c0c;
+  --lime: #c8ff00;
+  --pink: #ff4fa3;
+  --blue: #5b6cff;
+  --orange: #ff7a1a;
+}
+
+@theme inline {
+  --color-cream: var(--cream);
+  --color-ink: var(--ink);
+  --color-lime: var(--lime);
+  --color-pink: var(--pink);
+  --color-blue: var(--blue);
+  --color-orange: var(--orange);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html, body {
+  background: var(--cream);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: var(--lime); color: var(--ink); }
+
+@keyframes marquee {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.animate-marquee { animation: marquee 28s linear infinite; }
+
+@keyframes wobble {
+  0%, 100% { transform: rotate(-2deg); }
+  50%      { transform: rotate(2deg); }
+}
+.wobble { animation: wobble 4s ease-in-out infinite; }
+
+@keyframes blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+.caret { animation: blink 1s steps(1) infinite; }
+
+@keyframes float-y {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+.float-y { animation: float-y 5s ease-in-out infinite; }
+
+.grain {
+  background-image: radial-gradient(rgba(0,0,0,0.07) 1px, transparent 1px);
+  background-size: 3px 3px;
+}
+
+.outline-text {
+  -webkit-text-stroke: 2px var(--ink);
+  color: transparent;
+}

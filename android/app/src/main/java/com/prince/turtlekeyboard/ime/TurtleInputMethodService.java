@@ -3,10 +3,12 @@ package com.prince.turtlekeyboard.ime;
 import android.inputmethodservice.InputMethodService;
 import android.inputmethodservice.Keyboard;
 import android.inputmethodservice.KeyboardView;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
 import android.view.KeyEvent;
 import android.view.View;
-import android.widget.Toast;
+import android.widget.TextView;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 
@@ -16,6 +18,13 @@ public class TurtleInputMethodService extends InputMethodService
         implements KeyboardView.OnKeyboardActionListener {
 
     private KeyboardView keyboardView;
+    private TextView banner;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final Runnable hideBanner = new Runnable() {
+        @Override public void run() {
+            if (banner != null) banner.setVisibility(View.GONE);
+        }
+    };
     private Keyboard qwertyKeyboard;
     private Keyboard symbolsKeyboard;
     private Keyboard symbolsShiftKeyboard;
@@ -28,14 +37,16 @@ public class TurtleInputMethodService extends InputMethodService
 
     @Override
     public View onCreateInputView() {
-        keyboardView = (KeyboardView) View.inflate(this, R.layout.keyboard_view, null);
+        View root = View.inflate(this, R.layout.keyboard_view, null);
+        keyboardView = root.findViewById(R.id.keyboard_view);
+        banner = root.findViewById(R.id.banner);
         qwertyKeyboard = new Keyboard(this, R.xml.qwerty);
         symbolsKeyboard = new Keyboard(this, R.xml.symbols);
         symbolsShiftKeyboard = new Keyboard(this, R.xml.symbols_shift);
         keyboardView.setKeyboard(qwertyKeyboard);
         keyboardView.setOnKeyboardActionListener(this);
         keyboardView.setPreviewEnabled(false);
-        return keyboardView;
+        return root;
     }
 
     @Override
@@ -120,11 +131,19 @@ public class TurtleInputMethodService extends InputMethodService
     private void detectSpaceDoubleTap() {
         long now = System.currentTimeMillis();
         if (now - lastSpaceTapMs < DOUBLE_TAP_MS) {
-            Toast.makeText(this, "🐢 Double-tap detected", Toast.LENGTH_SHORT).show();
+            showBanner("🐢 Double-tap detected");
             lastSpaceTapMs = 0L;
         } else {
             lastSpaceTapMs = now;
         }
+    }
+
+    private void showBanner(String text) {
+        if (banner == null) return;
+        banner.setText(text);
+        banner.setVisibility(View.VISIBLE);
+        mainHandler.removeCallbacks(hideBanner);
+        mainHandler.postDelayed(hideBanner, 1500L);
     }
 
     @Override public void onPress(int primaryCode) {}

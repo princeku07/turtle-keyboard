@@ -1,11 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
-<android.inputmethodservice.KeyboardView
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/keyboard_view"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="#202124"
-    android:keyBackground="@android:color/transparent"
-    android:keyTextColor="#FFFFFF"
-    android:focusable="true"
-    android:focusableInTouchMode="true" />
+    android:orientation="vertical"
+    android:background="#1B5E20">
+
+    <TextView
+        android:id="@+id/banner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:padding="8dp"
+        android:textColor="#FFFFFF"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:background="#0D3F12"
+        android:visibility="gone" />
+
+    <android.inputmethodservice.KeyboardView
+        android:id="@+id/keyboard_view"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#1B5E20"
+        android:keyBackground="@android:color/transparent"
+        android:keyTextColor="#FFFFFF"
+        android:focusable="true"
+        android:focusableInTouchMode="true" />
+
+</LinearLayout>
