@@ -16,7 +16,7 @@ const FEATURES = [
     tag: "01",
     title: "Slash. Picture. Send.",
     body: "Type /cap inside any text field — WhatsApp, iMessage, Tinder, Gmail — and a custom image lands in your composer in under two seconds. No app switching, no screenshot dance.",
-    color: "bg-lime",
+    color: "bg-[#15803d]",
   },
   {
     tag: "02",
@@ -40,7 +40,7 @@ const FEATURES = [
 
 const COMMANDS_GRID = [
   { cmd: "/cap",     tag: "v1 · prompt",  desc: "Custom image from any prompt, ~1.5s, into the chat.",   color: "bg-pink text-cream" },
-  { cmd: "/sticker", tag: "v1 · cutout",  desc: "Transparent-bg sticker, sized for iMessage + WhatsApp.", color: "bg-lime" },
+  { cmd: "/sticker", tag: "v1 · cutout",  desc: "Transparent-bg sticker, sized for iMessage + WhatsApp.", color: "bg-[#15803d]" },
   { cmd: "/edit",    tag: "v1 · inpaint", desc: "Drop an image, describe the change. Edits in place.",   color: "bg-blue text-cream" },
   { cmd: "/avatar",  tag: "v1 · you",     desc: "Restyle your selfie — anime, oil paint, pixel, 3D.",    color: "bg-orange" },
   { cmd: "/scene",   tag: "v1 · compose", desc: "Combine subject + setting into one staged image.",      color: "bg-cream border-2 border-ink" },
@@ -71,13 +71,13 @@ export default function Home() {
     <main className="min-h-screen w-full bg-cream text-ink overflow-x-clip">
       {/* NAV */}
       <header className="sticky top-0 z-40 backdrop-blur-md bg-cream/70 border-b-2 border-ink">
-        <div className="mx-auto max-w-[1400px] px-6 py-4 flex items-center justify-between">
+        <div className="mx-auto max-w-[1400px] px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-3">
           <a
             href="#"
-            className="flex items-center gap-2 font-mono font-bold text-lg"
+            className="flex items-center gap-2 font-mono font-bold text-base sm:text-lg shrink-0"
           >
-            <span className="inline-block w-7 h-7 rounded-full bg-lime border-2 border-ink" />
-            turtle<span className="text-pink">/</span>kbd
+            <span className="text-2xl sm:text-3xl leading-none">🐢</span>
+            turtle
           </a>
           <nav className="hidden md:flex items-center gap-7 font-mono text-sm">
             <a href="#commands" className="hover:underline underline-offset-4">
@@ -101,12 +101,35 @@ export default function Home() {
               github ↗
             </a>
           </nav>
-          <a
-            href="#waitlist"
-            className="font-mono text-sm font-bold bg-ink text-cream px-4 py-2 rounded-full border-2 border-ink hover:bg-lime hover:text-ink transition-colors"
-          >
-            join waitlist →
-          </a>
+          <div className="flex items-center gap-2 shrink-0">
+            <a
+              href="#waitlist"
+              className="font-mono text-xs sm:text-sm font-bold bg-ink text-cream px-3 sm:px-4 py-2 rounded-full border-2 border-ink hover:bg-[#15803d] hover:text-ink transition-colors whitespace-nowrap"
+            >
+              join waitlist →
+            </a>
+            <details className="md:hidden relative [&_summary::-webkit-details-marker]:hidden">
+              <summary className="list-none cursor-pointer w-10 h-10 flex flex-col items-center justify-center gap-1 border-2 border-ink rounded-full bg-cream">
+                <span className="block w-4 h-0.5 bg-ink" />
+                <span className="block w-4 h-0.5 bg-ink" />
+                <span className="block w-4 h-0.5 bg-ink" />
+              </summary>
+              <nav className="absolute right-0 mt-2 w-56 bg-cream border-2 border-ink rounded-2xl p-3 font-mono text-sm flex flex-col gap-1 shadow-[4px_4px_0_0_var(--ink)]">
+                <a href="#commands" className="px-3 py-2 rounded-lg hover:bg-ink hover:text-cream">commands</a>
+                <a href="#how" className="px-3 py-2 rounded-lg hover:bg-ink hover:text-cream">how it works</a>
+                <a href="#pricing" className="px-3 py-2 rounded-lg hover:bg-ink hover:text-cream">pricing</a>
+                <a href="#faq" className="px-3 py-2 rounded-lg hover:bg-ink hover:text-cream">faq</a>
+                <a
+                  href="https://github.com/princeku07/turtle-keyboard"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-3 py-2 rounded-lg hover:bg-ink hover:text-cream"
+                >
+                  github ↗
+                </a>
+              </nav>
+            </details>
+          </div>
         </div>
       </header>
 
@@ -115,7 +138,7 @@ export default function Home() {
         <div className="mx-auto max-w-[1400px] px-6 pt-12 pb-24 grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
           <div className="lg:col-span-7 relative z-10">
             <div className="inline-flex items-center gap-2 font-mono text-xs uppercase tracking-widest bg-ink text-cream px-3 py-1.5 rounded-full mb-6">
-              <span className="w-2 h-2 rounded-full bg-lime animate-pulse" />
+              <span className="w-2 h-2 rounded-full bg-[#15803d] animate-pulse" />
               now in closed alpha · ios first
             </div>
 
@@ -124,8 +147,8 @@ export default function Home() {
               <span className="block">
                 <span className="outline-text">get an</span>{" "}
                 <span className="relative inline-block">
-                  <span className="absolute inset-0 -rotate-2 bg-lime -z-10 rounded-md" />
-                  <span className="relative px-2">image.</span>
+                  <span className="absolute inset-0 -rotate-2 bg-[#15803d] -z-10 rounded-md" />
+                  <span className="relative px-2 text-white">image.</span>
                 </span>
               </span>
             </h1>
@@ -143,7 +166,7 @@ export default function Home() {
             <div className="mt-10 flex flex-wrap items-center gap-4">
               <a
                 href="#waitlist"
-                className="group inline-flex items-center gap-3 bg-ink text-cream font-mono font-bold text-base px-6 py-4 rounded-full border-2 border-ink hover:bg-lime hover:text-ink transition-colors"
+                className="group inline-flex items-center gap-3 bg-ink text-cream font-mono font-bold text-base px-6 py-4 rounded-full border-2 border-ink hover:bg-[#15803d] hover:text-ink transition-colors"
               >
                 get early access
                 <span className="inline-block group-hover:translate-x-1 transition-transform">
@@ -155,6 +178,17 @@ export default function Home() {
                 className="inline-flex items-center gap-2 font-mono text-base px-6 py-4 rounded-full border-2 border-ink hover:bg-ink hover:text-cream transition-colors"
               >
                 see commands
+              </a>
+              <a
+                href="https://github.com/princeku07/turtle-keyboard"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 font-mono text-base px-6 py-4 rounded-full border-2 border-ink bg-cream hover:bg-ink hover:text-cream transition-colors"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" className="w-5 h-5 fill-current">
+                  <path d="M12 .5C5.73.5.5 5.73.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56 0-.27-.01-1.17-.02-2.12-3.2.7-3.87-1.36-3.87-1.36-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.76 2.69 1.25 3.35.96.1-.74.4-1.25.72-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.18-3.1-.12-.29-.51-1.46.11-3.05 0 0 .96-.31 3.15 1.18.91-.25 1.89-.38 2.86-.38.97 0 1.95.13 2.86.38 2.18-1.49 3.14-1.18 3.14-1.18.62 1.59.23 2.76.11 3.05.74.81 1.18 1.84 1.18 3.1 0 4.42-2.69 5.39-5.25 5.68.41.36.78 1.06.78 2.14 0 1.55-.01 2.79-.01 3.17 0 .31.21.68.8.56C20.21 21.39 23.5 17.07 23.5 12 23.5 5.73 18.27.5 12 .5z" />
+                </svg>
+                github ↗
               </a>
             </div>
 
@@ -181,21 +215,23 @@ export default function Home() {
             <div className="absolute -bottom-4 -left-4 wobble bg-pink text-cream font-mono text-xs font-bold px-3 py-2 rounded-full border-2 border-ink shadow-[4px_4px_0_0_var(--ink)]">
               live preview ✶
             </div>
-            <div className="absolute -top-3 -right-3 float-y bg-lime font-mono text-xs font-bold px-3 py-2 rounded-full border-2 border-ink shadow-[4px_4px_0_0_var(--ink)]">
+            <div className="absolute -top-3 -right-3 text-white float-y bg-[#15803d] font-mono text-xs font-bold px-3 py-2 rounded-full border-2 border-ink shadow-[4px_4px_0_0_var(--ink)]">
               {"<1mb keyboard"}
             </div>
           </div>
         </div>
 
         {/* MARQUEE */}
-        <div className="border-y-2 border-ink bg-ink text-cream py-5 overflow-hidden">
+        <div className="border-y-2 border-ink bg-ink text-cream py-2.5 sm:py-3 md:py-4 overflow-hidden">
           <div className="flex animate-marquee whitespace-nowrap">
             {[...SLASH_COMMANDS, ...SLASH_COMMANDS].map((cmd, i) => (
               <span
                 key={i}
-                className="font-mono text-2xl md:text-3xl mx-8 inline-flex items-center gap-4"
+                className="font-mono text-sm sm:text-base md:text-xl lg:text-2xl mx-4 sm:mx-6 md:mx-8 inline-flex items-center gap-2 sm:gap-3 md:gap-4"
               >
-                <span className="text-lime">{cmd.split(" ")[0]}</span>
+                <span className="text-cream font-bold">
+                  {cmd.split(" ")[0]}
+                </span>
                 <span className="text-cream/80">
                   {cmd.split(" ").slice(1).join(" ")}
                 </span>
@@ -256,7 +292,7 @@ export default function Home() {
           ))}
         </div>
         <div className="mt-3 flex justify-center">
-          <div className="font-mono text-sm bg-lime border-2 border-ink rounded-full px-4 py-2">
+          <div className="font-mono text-sm bg-[#15803d] text-white border-2 border-ink rounded-full px-4 py-2">
             with turtle:{" "}
             <span className="font-bold">/cap your prompt · paste · done.</span>
           </div>
@@ -412,7 +448,7 @@ export default function Home() {
                       </div>
                     </div>
                     <div className="flex justify-end">
-                      <div className="bg-lime border-2 border-ink rounded-2xl rounded-br-sm px-3 py-2 max-w-[70%] font-mono">
+                      <div className="bg-[#15803d] border-2 border-ink rounded-2xl rounded-br-sm px-3 py-2 max-w-[70%] font-mono">
                         /cap a golden retriever as a samurai
                         <span className="caret">▍</span>
                       </div>
@@ -439,7 +475,7 @@ export default function Home() {
                       <button className="flex-1 bg-pink text-cream border-2 border-ink rounded-md py-2 font-mono text-xs">
                         /cap
                       </button>
-                      <button className="flex-1 bg-lime border-2 border-ink rounded-md py-2 font-mono text-xs">
+                      <button className="flex-1 bg-[#15803d] text-cream border-2 border-ink rounded-md py-2 font-mono text-xs">
                         /fix
                       </button>
                       <button className="flex-1 bg-blue text-cream border-2 border-ink rounded-md py-2 font-mono text-xs">
@@ -499,7 +535,7 @@ export default function Home() {
               price: "$4.99",
               suffix: "/mo",
               tag: "★ most popular",
-              color: "bg-lime border-2 border-ink relative",
+              color: "bg-[#15803d] text-cream border-2 border-ink relative",
               perks: [
                 "Unlimited images",
                 "Flux Pro, SDXL, Ideogram",
@@ -598,7 +634,7 @@ export default function Home() {
 
       {/* CTA */}
       <section id="waitlist" className="mx-auto max-w-[1400px] px-6 pb-24">
-        <div className="rounded-[2rem] border-2 border-ink bg-lime p-10 md:p-16 text-center relative overflow-hidden">
+        <div className="rounded-[2rem] border-2 border-ink bg-[#15803d] text-cream p-10 md:p-16 text-center relative overflow-hidden">
           <div className="absolute -top-10 -left-10 w-40 h-40 rounded-full bg-pink border-2 border-ink wobble" />
           <div className="absolute -bottom-12 -right-8 w-32 h-32 rounded-full bg-blue border-2 border-ink float-y" />
           <div className="relative">
@@ -633,8 +669,8 @@ export default function Home() {
       <footer className="border-t-2 border-ink">
         <div className="mx-auto max-w-[1400px] px-6 py-10 flex flex-col md:flex-row items-center justify-between gap-6 font-mono text-sm">
           <div className="flex items-center gap-3">
-            <span className="inline-block w-6 h-6 rounded-full bg-lime border-2 border-ink" />
-            <span className="font-bold">turtle/kbd</span>
+            <span className="text-2xl leading-none">🐢</span>
+            <span className="font-bold">turtle</span>
             <span className="opacity-60">© 2026 · MIT-licensed</span>
           </div>
           <div className="flex items-center gap-6">

@@ -18,7 +18,7 @@ type Cmd = {
 // All v1 commands generate images. Each pill maps to a 3D shape that mimics what it ships.
 const COMMANDS: Cmd[] = [
   { label: "/cap",     color: "#ff4fa3", pos: [-2.4,  1.2,  0.0], rot: -0.18, shape: "frame"    },
-  { label: "/sticker", color: "#c8ff00", pos: [ 2.2,  1.6, -0.6], rot:  0.22, shape: "sticker"  },
+  { label: "/sticker", color: "#15803d", pos: [ 2.2,  1.6, -0.6], rot:  0.22, shape: "sticker"  },
   { label: "/edit",    color: "#5b6cff", pos: [-2.7, -1.4, -0.4], rot:  0.10, shape: "canvas"   },
   { label: "/avatar",  color: "#ff7a1a", pos: [ 2.7, -1.0,  0.2], rot: -0.14, shape: "bust"     },
   { label: "/scene",   color: "#f5f0e1", pos: [ 0.1,  2.4, -1.2], rot:  0.05, shape: "diorama"  },
@@ -46,7 +46,7 @@ function CommandPill({
     group.current.scale.z = lerp(group.current.scale.z, target, 0.15);
   });
 
-  const isLight = cmd.color === "#c8ff00" || cmd.color === "#f5f0e1";
+  const isLight = cmd.color === "#f5f0e1";
   const textColor = isLight ? "#0c0c0c" : "#ffffff";
 
   return (
@@ -190,7 +190,7 @@ function StickerStack({ color, visible }: { color: THREE.Color; visible: boolean
 
         {/* main sticker face — chunky rounded blob */}
         <RoundedBox args={[1.7, 1.7, 0.18]} radius={0.5} smoothness={5} castShadow>
-          <meshStandardMaterial color="#c8ff00" roughness={0.28} metalness={0.2} emissive="#c8ff00" emissiveIntensity={0.18} />
+          <meshStandardMaterial color="#15803d" roughness={0.28} metalness={0.2} emissive="#15803d" emissiveIntensity={0.18} />
         </RoundedBox>
 
         {/* gloss streak — thin transparent quad sliding across */}
@@ -295,7 +295,7 @@ function EditCanvas({ color, visible }: { color: THREE.Color; visible: boolean }
 
 /* ---------- /avatar — Profile bust inside a round frame, with multi-style chips orbiting ---------- */
 
-const AVATAR_STYLES = ["#ff4fa3", "#5b6cff", "#c8ff00", "#ff7a1a"]; // distinct chips imply restyles
+const AVATAR_STYLES = ["#ff4fa3", "#5b6cff", "#15803d", "#ff7a1a"]; // distinct chips imply restyles
 
 function AvatarBust({ color, visible }: { color: THREE.Color; visible: boolean }) {
   const group = useRef<THREE.Group>(null);
@@ -500,7 +500,7 @@ function MorphingCore({ active }: { active: Cmd | null }) {
   });
 
   const cap     = useColor("#ff4fa3");
-  const sticker = useColor("#c8ff00");
+  const sticker = useColor("#15803d");
   const edit    = useColor("#5b6cff");
   const avatar  = useColor("#ff7a1a");
   const scene   = useColor("#f5f0e1");

@@ -3,7 +3,7 @@
 :root {
   --cream: #f4efe4;
   --ink: #0c0c0c;
-  --lime: #c8ff00;
+  --lime: #15803d;
   --pink: #ff4fa3;
   --blue: #5b6cff;
   --orange: #ff7a1a;
@@ -32,7 +32,10 @@ html, body {
   0%   { transform: translateX(0); }
   100% { transform: translateX(-50%); }
 }
-.animate-marquee { animation: marquee 28s linear infinite; }
+.animate-marquee { animation: marquee 18s linear infinite; }
+@media (max-width: 768px) {
+  .animate-marquee { animation-duration: 12s; }
+}
 
 @keyframes wobble {
   0%, 100% { transform: rotate(-2deg); }
