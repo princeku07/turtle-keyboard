@@ -1,11 +1,11 @@
 "use client";
 
-import { Canvas, useFrame, ThreeEvent, useThree } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Float, RoundedBox, Text, Environment, MeshDistortMaterial } from "@react-three/drei";
 import { useRef, Suspense, useState, useMemo } from "react";
 import * as THREE from "three";
 
-type ShapeKind = "plasma" | "lattice" | "atom" | "spike" | "linked" | "swarm";
+type ShapeKind = "frame" | "sticker" | "canvas" | "bust" | "diorama" | "memecard";
 
 type Cmd = {
   label: string;
@@ -15,13 +15,14 @@ type Cmd = {
   shape: ShapeKind;
 };
 
+// All v1 commands generate images. Each pill maps to a 3D shape that mimics what it ships.
 const COMMANDS: Cmd[] = [
-  { label: "/cap",   color: "#ff4fa3", pos: [-2.4,  1.2,  0.0], rot: -0.18, shape: "plasma" },
-  { label: "/fix",   color: "#c8ff00", pos: [ 2.2,  1.6, -0.6], rot:  0.22, shape: "lattice" },
-  { label: "/reply", color: "#5b6cff", pos: [-2.7, -1.4, -0.4], rot:  0.10, shape: "atom"   },
-  { label: "/tone",  color: "#ff7a1a", pos: [ 2.7, -1.0,  0.2], rot: -0.14, shape: "spike"  },
-  { label: "/tl",    color: "#f5f0e1", pos: [ 0.1,  2.4, -1.2], rot:  0.05, shape: "linked" },
-  { label: "/meme",  color: "#0c0c0c", pos: [ 0.0, -2.4, -0.8], rot: -0.05, shape: "swarm"  },
+  { label: "/cap",     color: "#ff4fa3", pos: [-2.4,  1.2,  0.0], rot: -0.18, shape: "frame"    },
+  { label: "/sticker", color: "#c8ff00", pos: [ 2.2,  1.6, -0.6], rot:  0.22, shape: "sticker"  },
+  { label: "/edit",    color: "#5b6cff", pos: [-2.7, -1.4, -0.4], rot:  0.10, shape: "canvas"   },
+  { label: "/avatar",  color: "#ff7a1a", pos: [ 2.7, -1.0,  0.2], rot: -0.14, shape: "bust"     },
+  { label: "/scene",   color: "#f5f0e1", pos: [ 0.1,  2.4, -1.2], rot:  0.05, shape: "diorama"  },
+  { label: "/meme",    color: "#0c0c0c", pos: [ 0.0, -2.4, -0.8], rot: -0.05, shape: "memecard" },
 ];
 
 function lerp(a: number, b: number, t: number) { return a + (b - a) * t; }
@@ -55,7 +56,7 @@ function CommandPill({
         rotation={[0, 0, cmd.rot]}
         onPointerOver={(e) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = "pointer"; }}
         onPointerOut={(e)  => { e.stopPropagation(); setHovered(false); document.body.style.cursor = "auto"; }}
-        onClick={(e)       => { e.stopPropagation(); onClick(); }}
+        onPointerDown={(e) => { e.stopPropagation(); onClick(); }}
       >
         {isActive && (
           <mesh position={[0, 0, -0.18]}>
@@ -82,9 +83,8 @@ function CommandPill({
   );
 }
 
-/* ---------- shape primitives ---------- */
+/* ---------- helpers ---------- */
 
-// helpers
 function colorLerp(material: THREE.Material | THREE.Material[], target: THREE.Color, k = 0.08) {
   const apply = (m: THREE.Material) => {
     const sm = m as THREE.MeshStandardMaterial;
@@ -108,135 +108,244 @@ function ShapeShell({
   return <group ref={ref} scale={0.0001}>{children}</group>;
 }
 
-/* /cap — Plasma Orb: distort sphere + tiny orbiting satellites */
-function PlasmaOrb({ color, visible }: { color: THREE.Color; visible: boolean }) {
-  const orb = useRef<THREE.Mesh>(null);
-  const sat = useRef<THREE.Group>(null);
+/* ---------- /cap — Picture Frame: a frame with a generating image inside ---------- */
+
+function PictureFrame({ color, visible }: { color: THREE.Color; visible: boolean }) {
+  const group = useRef<THREE.Group>(null);
+  const inner = useRef<THREE.Mesh>(null);
+  const shutter = useRef<THREE.Mesh>(null);
+
   useFrame((state) => {
     const t = state.clock.getElapsedTime();
-    if (orb.current) {
-      orb.current.rotation.y = t * 0.4;
-      colorLerp(orb.current.material, color, 0.08);
-      const m = orb.current.material as THREE.MeshStandardMaterial;
-      m.emissiveIntensity = lerp(m.emissiveIntensity, visible ? 0.3 : 0.05, 0.1);
+    if (group.current) {
+      group.current.rotation.y = Math.sin(t * 0.5) * 0.5;
+      group.current.rotation.x = Math.cos(t * 0.4) * 0.18;
     }
-    if (sat.current) sat.current.rotation.y = t * 1.2;
+    if (inner.current) {
+      colorLerp(inner.current.material, color, 0.08);
+    }
+    if (shutter.current) {
+      shutter.current.rotation.z = t * 1.2;
+    }
   });
-  return (
-    <ShapeShell visible={visible} scale={1.1}>
-      <mesh ref={orb} castShadow>
-        <sphereGeometry args={[1.05, 96, 96]} />
-        <MeshDistortMaterial color="#ff4fa3" roughness={0.25} metalness={0.25} distort={0.55} speed={3.2} />
-      </mesh>
-      <group ref={sat}>
-        {[0, 1, 2].map((i) => {
-          const a = (i / 3) * Math.PI * 2;
-          return (
-            <mesh key={i} position={[Math.cos(a) * 1.7, Math.sin(a) * 0.4, Math.sin(a) * 1.7]} castShadow>
-              <sphereGeometry args={[0.13, 24, 24]} />
-              <meshStandardMaterial color="#ff4fa3" emissive="#ff4fa3" emissiveIntensity={0.6} />
-            </mesh>
-          );
-        })}
-      </group>
-    </ShapeShell>
+
+  const frameMat = (
+    <meshStandardMaterial color="#0c0c0c" roughness={0.5} metalness={0.3} />
   );
-}
-
-/* /fix — Lattice Cube: 4x4x4 grid of small cubes, structured + crisp */
-function LatticeCube({ color, visible }: { color: THREE.Color; visible: boolean }) {
-  const group = useRef<THREE.Group>(null);
-  const N = 4;
-  const step = 0.45;
-  const offset = ((N - 1) * step) / 2;
-  const positions = useMemo(() => {
-    const arr: [number, number, number][] = [];
-    for (let x = 0; x < N; x++)
-      for (let y = 0; y < N; y++)
-        for (let z = 0; z < N; z++)
-          if (x === 0 || x === N - 1 || y === 0 || y === N - 1 || z === 0 || z === N - 1) {
-            arr.push([x * step - offset, y * step - offset, z * step - offset]);
-          }
-    return arr;
-  }, []);
-
-  useFrame((state) => {
-    if (!group.current) return;
-    const t = state.clock.getElapsedTime();
-    group.current.rotation.x = t * 0.25;
-    group.current.rotation.y = t * 0.35;
-    group.current.children.forEach((mesh, i) => {
-      const m = (mesh as THREE.Mesh).material as THREE.MeshStandardMaterial;
-      colorLerp(m, color, 0.08);
-      m.emissiveIntensity = lerp(m.emissiveIntensity, visible ? 0.3 + Math.sin(t * 2 + i * 0.3) * 0.15 : 0.05, 0.1);
-      const s = visible ? 1 + Math.sin(t * 2 + i * 0.4) * 0.08 : 1;
-      mesh.scale.setScalar(s);
-    });
-  });
 
   return (
-    <ShapeShell visible={visible} scale={1.1}>
+    <ShapeShell visible={visible} scale={1.0}>
       <group ref={group}>
-        {positions.map((p, i) => (
-          <mesh key={i} position={p} castShadow>
-            <boxGeometry args={[0.28, 0.28, 0.28]} />
-            <meshStandardMaterial color="#c8ff00" emissive="#c8ff00" emissiveIntensity={0.3} roughness={0.4} metalness={0.2} />
-          </mesh>
-        ))}
+        {/* outer frame — 4 bars */}
+        <mesh position={[0,  1.05, 0]} castShadow><boxGeometry args={[2.30, 0.18, 0.20]} />{frameMat}</mesh>
+        <mesh position={[0, -1.05, 0]} castShadow><boxGeometry args={[2.30, 0.18, 0.20]} />{frameMat}</mesh>
+        <mesh position={[-1.06, 0, 0]} castShadow><boxGeometry args={[0.18, 2.10, 0.20]} />{frameMat}</mesh>
+        <mesh position={[ 1.06, 0, 0]} castShadow><boxGeometry args={[0.18, 2.10, 0.20]} />{frameMat}</mesh>
+
+        {/* the "image" — distort material to feel like it's still rendering */}
+        <mesh ref={inner} position={[0, 0, 0.04]}>
+          <planeGeometry args={[1.95, 1.95]} />
+          <MeshDistortMaterial color="#ff4fa3" roughness={0.3} metalness={0.2} distort={0.5} speed={3} />
+        </mesh>
+
+        {/* shutter aperture in the corner */}
+        <mesh ref={shutter} position={[0.78, 0.78, 0.13]}>
+          <torusGeometry args={[0.14, 0.04, 12, 24, Math.PI * 1.5]} />
+          <meshStandardMaterial color="#ff4fa3" emissive="#ff4fa3" emissiveIntensity={0.7} />
+        </mesh>
       </group>
     </ShapeShell>
   );
 }
 
-/* /reply — Atom: three orthogonal torus rings + 3 orbiting balls (3 reply options) */
-function Atom({ color, visible }: { color: THREE.Color; visible: boolean }) {
+/* ---------- /sticker — Sticker Stack: layered die-cut cards with a peel ---------- */
+
+function StickerStack({ color, visible }: { color: THREE.Color; visible: boolean }) {
   const group = useRef<THREE.Group>(null);
-  const balls = useRef<THREE.Group>(null);
+  const front = useRef<THREE.Group>(null);
+  const peel = useRef<THREE.Mesh>(null);
+
   useFrame((state) => {
-    if (!group.current) return;
     const t = state.clock.getElapsedTime();
-    group.current.rotation.y = t * 0.4;
-    group.current.rotation.x = Math.sin(t * 0.3) * 0.3;
-    group.current.children.forEach((c) => {
-      const mesh = c as THREE.Mesh;
-      if (mesh.material) colorLerp(mesh.material, color, 0.08);
-    });
-    if (balls.current) {
-      balls.current.rotation.z = t * 1.3;
-      balls.current.children.forEach((c) => {
-        const mesh = c as THREE.Mesh;
-        if (mesh.material) colorLerp(mesh.material, color, 0.08);
+    if (group.current) {
+      group.current.rotation.y = Math.sin(t * 0.6) * 0.55;
+      group.current.rotation.x = Math.cos(t * 0.5) * 0.2;
+    }
+    if (front.current) {
+      front.current.position.z = 0.05 + Math.sin(t * 1.6) * 0.04;
+    }
+    if (peel.current) {
+      // gently flap the peeled corner
+      peel.current.rotation.x = -0.6 + Math.sin(t * 1.8) * 0.25;
+      colorLerp(peel.current.material, color, 0.08);
+    }
+    if (group.current) {
+      group.current.children.forEach((c) => {
+        c.traverse((n) => {
+          const m = (n as THREE.Mesh).material;
+          if (m && (m as THREE.MeshStandardMaterial).color) colorLerp(m, color, 0.06);
+        });
       });
     }
   });
-  const ringMat = <meshStandardMaterial color="#5b6cff" emissive="#5b6cff" emissiveIntensity={0.4} roughness={0.3} metalness={0.3} />;
+
   return (
-    <ShapeShell visible={visible} scale={1.05}>
+    <ShapeShell visible={visible} scale={1.0}>
       <group ref={group}>
-        <mesh castShadow>
-          <torusGeometry args={[1.15, 0.06, 20, 80]} />
-          {ringMat}
-        </mesh>
-        <mesh castShadow rotation={[Math.PI / 2, 0, 0]}>
-          <torusGeometry args={[1.15, 0.06, 20, 80]} />
-          {ringMat}
-        </mesh>
-        <mesh castShadow rotation={[0, 0, Math.PI / 2]}>
-          <torusGeometry args={[1.15, 0.06, 20, 80]} />
-          {ringMat}
-        </mesh>
-        <mesh>
-          <sphereGeometry args={[0.4, 32, 32]} />
-          <meshStandardMaterial color="#5b6cff" emissive="#5b6cff" emissiveIntensity={0.7} roughness={0.2} />
-        </mesh>
+        {/* back sticker, offset and tilted */}
+        <group position={[0.22, -0.22, -0.22]} rotation={[0, 0, -0.18]}>
+          <RoundedBox args={[1.7, 1.7, 0.12]} radius={0.42} smoothness={5} castShadow>
+            <meshStandardMaterial color="#c8ff00" roughness={0.35} metalness={0.15} />
+          </RoundedBox>
+        </group>
+
+        {/* mid sticker */}
+        <group position={[0.1, -0.1, -0.08]} rotation={[0, 0, -0.06]}>
+          <RoundedBox args={[1.75, 1.75, 0.13]} radius={0.42} smoothness={5} castShadow>
+            <meshStandardMaterial color="#c8ff00" roughness={0.35} metalness={0.15} emissive="#c8ff00" emissiveIntensity={0.15} />
+          </RoundedBox>
+        </group>
+
+        {/* front sticker */}
+        <group ref={front} rotation={[0, 0, 0.08]}>
+          <RoundedBox args={[1.8, 1.8, 0.14]} radius={0.42} smoothness={5} castShadow>
+            <meshStandardMaterial color="#c8ff00" roughness={0.3} metalness={0.2} emissive="#c8ff00" emissiveIntensity={0.3} />
+          </RoundedBox>
+          {/* peeled corner */}
+          <mesh ref={peel} position={[-0.78, 0.78, 0.08]} rotation={[-0.6, 0, 0.78]} castShadow>
+            <planeGeometry args={[0.55, 0.55]} />
+            <meshStandardMaterial color="#c8ff00" side={THREE.DoubleSide} roughness={0.3} metalness={0.2} />
+          </mesh>
+        </group>
       </group>
-      <group ref={balls}>
-        {[0, 1, 2].map((i) => {
-          const a = (i / 3) * Math.PI * 2;
+    </ShapeShell>
+  );
+}
+
+/* ---------- /edit — Canvas + brush + selection marquee ---------- */
+
+function EditCanvas({ color, visible }: { color: THREE.Color; visible: boolean }) {
+  const group = useRef<THREE.Group>(null);
+  const brush = useRef<THREE.Group>(null);
+  const marquee = useRef<THREE.Mesh>(null);
+  const canvasInner = useRef<THREE.Mesh>(null);
+
+  useFrame((state) => {
+    const t = state.clock.getElapsedTime();
+    if (group.current) {
+      group.current.rotation.y = Math.sin(t * 0.45) * 0.5;
+      group.current.rotation.x = -0.1 + Math.cos(t * 0.4) * 0.12;
+    }
+    if (brush.current) {
+      // brush hovers in a small loop above the marquee
+      brush.current.position.x = 0.25 + Math.cos(t * 1.4) * 0.45;
+      brush.current.position.y = 0.15 + Math.sin(t * 1.4) * 0.32;
+      brush.current.rotation.z = 0.4 + Math.sin(t * 1.4) * 0.1;
+      brush.current.traverse((n) => {
+        const m = (n as THREE.Mesh).material;
+        if (m && (m as THREE.MeshStandardMaterial).color) colorLerp(m, color, 0.08);
+      });
+    }
+    if (marquee.current) {
+      const pulse = 0.5 + Math.sin(t * 3) * 0.4;
+      (marquee.current.material as THREE.MeshBasicMaterial).opacity = pulse;
+      colorLerp(marquee.current.material, color, 0.08);
+    }
+    if (canvasInner.current) colorLerp(canvasInner.current.material, color, 0.04);
+  });
+
+  return (
+    <ShapeShell visible={visible} scale={1.0}>
+      <group ref={group}>
+        {/* canvas backing */}
+        <RoundedBox args={[2.2, 1.7, 0.12]} radius={0.06} smoothness={4} castShadow>
+          <meshStandardMaterial color="#f5f0e1" roughness={0.6} metalness={0.05} />
+        </RoundedBox>
+        {/* painted region — distort */}
+        <mesh ref={canvasInner} position={[0, 0, 0.07]}>
+          <planeGeometry args={[2.05, 1.55]} />
+          <MeshDistortMaterial color="#5b6cff" roughness={0.4} metalness={0.15} distort={0.25} speed={1.6} />
+        </mesh>
+
+        {/* selection marquee — outlined rectangle, pulsing */}
+        <mesh ref={marquee} position={[0.1, 0.05, 0.09]}>
+          <torusGeometry args={[0.55, 0.018, 8, 4]} />
+          <meshBasicMaterial color="#5b6cff" transparent opacity={0.7} />
+        </mesh>
+
+        {/* brush — handle (cylinder) + ferrule (small) + tip (cone) */}
+        <group ref={brush} position={[0.25, 0.15, 0.55]} rotation={[0, 0, 0.4]}>
+          <mesh castShadow>
+            <cylinderGeometry args={[0.07, 0.07, 0.85, 16]} />
+            <meshStandardMaterial color="#5b6cff" roughness={0.4} metalness={0.4} />
+          </mesh>
+          <mesh position={[0, -0.45, 0]} castShadow>
+            <cylinderGeometry args={[0.085, 0.085, 0.08, 16]} />
+            <meshStandardMaterial color="#0c0c0c" metalness={0.7} roughness={0.3} />
+          </mesh>
+          <mesh position={[0, -0.6, 0]} castShadow>
+            <coneGeometry args={[0.085, 0.22, 16]} />
+            <meshStandardMaterial color="#5b6cff" emissive="#5b6cff" emissiveIntensity={0.5} />
+          </mesh>
+        </group>
+      </group>
+    </ShapeShell>
+  );
+}
+
+/* ---------- /avatar — Portrait Bust with style halo ---------- */
+
+function AvatarBust({ color, visible }: { color: THREE.Color; visible: boolean }) {
+  const group = useRef<THREE.Group>(null);
+  const halo = useRef<THREE.Mesh>(null);
+  const head = useRef<THREE.Mesh>(null);
+  const shoulders = useRef<THREE.Mesh>(null);
+
+  useFrame((state) => {
+    const t = state.clock.getElapsedTime();
+    if (group.current) {
+      group.current.rotation.y = Math.sin(t * 0.6) * 0.6;
+      group.current.position.y = Math.sin(t * 1.2) * 0.05;
+    }
+    if (halo.current) {
+      halo.current.rotation.z = t * 1.4;
+      halo.current.rotation.x = Math.PI / 2 + Math.sin(t * 0.6) * 0.25;
+      colorLerp(halo.current.material, color, 0.08);
+    }
+    if (head.current) colorLerp(head.current.material, color, 0.08);
+    if (shoulders.current) colorLerp(shoulders.current.material, color, 0.08);
+  });
+
+  return (
+    <ShapeShell visible={visible} scale={1.0}>
+      <group ref={group}>
+        {/* shoulders / torso — truncated cone */}
+        <mesh ref={shoulders} position={[0, -0.55, 0]} castShadow>
+          <cylinderGeometry args={[0.85, 0.45, 0.7, 32]} />
+          <meshStandardMaterial color="#ff7a1a" roughness={0.45} metalness={0.2} />
+        </mesh>
+        {/* neck */}
+        <mesh position={[0, -0.05, 0]} castShadow>
+          <cylinderGeometry args={[0.18, 0.22, 0.25, 24]} />
+          <meshStandardMaterial color="#ff7a1a" roughness={0.45} metalness={0.2} />
+        </mesh>
+        {/* head */}
+        <mesh ref={head} position={[0, 0.55, 0]} castShadow>
+          <sphereGeometry args={[0.55, 48, 48]} />
+          <meshStandardMaterial color="#ff7a1a" roughness={0.4} metalness={0.25} emissive="#ff7a1a" emissiveIntensity={0.2} />
+        </mesh>
+        {/* style halo */}
+        <mesh ref={halo} position={[0, 0.55, 0]}>
+          <torusGeometry args={[0.95, 0.04, 16, 96]} />
+          <meshStandardMaterial color="#ff7a1a" emissive="#ff7a1a" emissiveIntensity={0.8} />
+        </mesh>
+        {/* small floating "style" pucks orbiting the halo */}
+        {[0, 1, 2, 3].map((i) => {
+          const a = (i / 4) * Math.PI * 2;
           return (
-            <mesh key={i} position={[Math.cos(a) * 1.15, Math.sin(a) * 1.15, 0]}>
-              <sphereGeometry args={[0.14, 24, 24]} />
-              <meshStandardMaterial color="#5b6cff" emissive="#5b6cff" emissiveIntensity={0.9} />
+            <mesh key={i} position={[Math.cos(a) * 0.95, 0.55 + Math.sin(a) * 0.1, Math.sin(a) * 0.95]}>
+              <sphereGeometry args={[0.08, 16, 16]} />
+              <meshStandardMaterial color="#ff7a1a" emissive="#ff7a1a" emissiveIntensity={0.9} />
             </mesh>
           );
         })}
@@ -245,150 +354,113 @@ function Atom({ color, visible }: { color: THREE.Color; visible: boolean }) {
   );
 }
 
-/* /tone — Spike Star: dodeca with cones radiating along fibonacci sphere directions */
-function SpikeStar({ color, visible }: { color: THREE.Color; visible: boolean }) {
+/* ---------- /scene — Diorama: layered picture planes with parallax ---------- */
+
+function SceneDiorama({ color, visible }: { color: THREE.Color; visible: boolean }) {
   const group = useRef<THREE.Group>(null);
-  const directions = useMemo(() => {
-    const N = 32;
-    const arr: { pos: [number, number, number]; rot: [number, number, number] }[] = [];
-    const phi = Math.PI * (Math.sqrt(5) - 1);
-    for (let i = 0; i < N; i++) {
-      const y = 1 - (i / (N - 1)) * 2;
-      const r = Math.sqrt(1 - y * y);
-      const theta = phi * i;
-      const x = Math.cos(theta) * r;
-      const z = Math.sin(theta) * r;
-      const dir = new THREE.Vector3(x, y, z);
-      const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-      const e = new THREE.Euler().setFromQuaternion(q);
-      arr.push({ pos: [x * 1.05, y * 1.05, z * 1.05], rot: [e.x, e.y, e.z] });
-    }
-    return arr;
-  }, []);
+  const back = useRef<THREE.Mesh>(null);
+  const mid = useRef<THREE.Mesh>(null);
+  const front = useRef<THREE.Mesh>(null);
+
   useFrame((state) => {
-    if (!group.current) return;
     const t = state.clock.getElapsedTime();
-    group.current.rotation.y = t * 0.4;
-    group.current.rotation.x = t * 0.18;
-    const breath = 1 + Math.sin(t * 1.5) * (visible ? 0.06 : 0.0);
-    group.current.scale.setScalar(breath);
-    group.current.children.forEach((c) => {
-      const m = (c as THREE.Mesh).material as THREE.MeshStandardMaterial;
-      if (m) colorLerp(m, color, 0.08);
+    if (group.current) {
+      // gentle parallax sway around Y so layers separate visually
+      group.current.rotation.y = Math.sin(t * 0.6) * 0.65;
+      group.current.rotation.x = Math.cos(t * 0.4) * 0.12;
+    }
+    // each layer drifts at a different rate
+    if (back.current)  back.current.position.x  = Math.sin(t * 0.4) *  0.08;
+    if (mid.current)   mid.current.position.x   = Math.sin(t * 0.7) * -0.18;
+    if (front.current) front.current.position.x = Math.sin(t * 1.0) *  0.30;
+
+    [back.current, mid.current, front.current].forEach((m) => {
+      if (m) colorLerp(m.material, color, 0.06);
     });
   });
+
   return (
     <ShapeShell visible={visible} scale={1.0}>
       <group ref={group}>
-        <mesh castShadow>
-          <dodecahedronGeometry args={[0.85, 0]} />
-          <meshStandardMaterial color="#ff7a1a" emissive="#ff7a1a" emissiveIntensity={0.25} roughness={0.4} metalness={0.15} flatShading />
+        {/* sky / back */}
+        <mesh ref={back} position={[0, 0, -0.6]} castShadow receiveShadow>
+          <planeGeometry args={[2.6, 1.8]} />
+          <meshStandardMaterial color="#f5f0e1" roughness={0.7} metalness={0.05} />
         </mesh>
-        {directions.map((d, i) => (
-          <mesh key={i} position={d.pos} rotation={d.rot} castShadow>
-            <coneGeometry args={[0.12, 0.55, 12]} />
-            <meshStandardMaterial color="#ff7a1a" emissive="#ff7a1a" emissiveIntensity={0.4} roughness={0.35} metalness={0.2} />
-          </mesh>
-        ))}
-      </group>
-    </ShapeShell>
-  );
-}
-
-/* /tl — Linked Rings: two interlocked tori at perpendicular tilts (bridge between languages) */
-function LinkedRings({ color, visible }: { color: THREE.Color; visible: boolean }) {
-  const group = useRef<THREE.Group>(null);
-  const a = useRef<THREE.Mesh>(null);
-  const b = useRef<THREE.Mesh>(null);
-  const core = useRef<THREE.Mesh>(null);
-  useFrame((state) => {
-    const t = state.clock.getElapsedTime();
-    if (group.current) group.current.rotation.y = t * 0.3;
-    if (a.current) {
-      a.current.rotation.y = t * 0.9;
-      colorLerp(a.current.material, color, 0.08);
-    }
-    if (b.current) {
-      b.current.rotation.x = t * 0.9;
-      colorLerp(b.current.material, color, 0.08);
-    }
-    if (core.current) {
-      const s = 1 + Math.sin(t * 2) * (visible ? 0.1 : 0);
-      core.current.scale.setScalar(s);
-      colorLerp(core.current.material, color, 0.08);
-    }
-  });
-  return (
-    <ShapeShell visible={visible} scale={1.05}>
-      <group ref={group}>
-        <mesh ref={a} castShadow rotation={[0, 0, 0]} position={[-0.35, 0, 0]}>
-          <torusGeometry args={[0.95, 0.12, 32, 96]} />
-          <meshStandardMaterial color="#f5f0e1" emissive="#f5f0e1" emissiveIntensity={0.3} roughness={0.25} metalness={0.5} />
+        {/* mid layer — hills */}
+        <mesh ref={mid} position={[-0.2, -0.15, 0.0]} castShadow receiveShadow>
+          <planeGeometry args={[1.9, 1.0]} />
+          <meshStandardMaterial color="#f5f0e1" roughness={0.55} metalness={0.1} emissive="#f5f0e1" emissiveIntensity={0.05} />
         </mesh>
-        <mesh ref={b} castShadow rotation={[Math.PI / 2, 0, 0]} position={[0.35, 0, 0]}>
-          <torusGeometry args={[0.95, 0.12, 32, 96]} />
-          <meshStandardMaterial color="#f5f0e1" emissive="#f5f0e1" emissiveIntensity={0.3} roughness={0.25} metalness={0.5} />
+        {/* foreground subject */}
+        <mesh ref={front} position={[0.45, -0.4, 0.55]} castShadow receiveShadow>
+          <planeGeometry args={[0.9, 0.7]} />
+          <meshStandardMaterial color="#f5f0e1" roughness={0.35} metalness={0.25} emissive="#f5f0e1" emissiveIntensity={0.2} />
         </mesh>
-        <mesh ref={core}>
-          <icosahedronGeometry args={[0.32, 1]} />
-          <meshStandardMaterial color="#f5f0e1" emissive="#f5f0e1" emissiveIntensity={0.7} roughness={0.2} />
+        {/* small frame outline around the whole thing */}
+        <mesh position={[0, 0, -0.7]}>
+          <torusGeometry args={[1.4, 0.02, 8, 4]} />
+          <meshBasicMaterial color="#0c0c0c" transparent opacity={0.4} />
         </mesh>
       </group>
     </ShapeShell>
   );
 }
 
-/* /meme — Swarm: cluster of distorted icosahedra in chaotic orbit */
-function Swarm({ color, visible }: { color: THREE.Color; visible: boolean }) {
+/* ---------- /meme — Meme card with top/bottom text bars ---------- */
+
+function MemeCard({ color, visible }: { color: THREE.Color; visible: boolean }) {
   const group = useRef<THREE.Group>(null);
-  const N = 22;
-  const seeds = useMemo(() => {
-    return Array.from({ length: N }, (_, i) => {
-      const r = 0.6 + Math.random() * 0.9;
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos(2 * Math.random() - 1);
-      return {
-        baseR: r,
-        theta,
-        phi,
-        speed: 0.4 + Math.random() * 1.2,
-        size: 0.16 + Math.random() * 0.22,
-        offset: Math.random() * Math.PI * 2,
-        i,
-      };
-    });
-  }, []);
+  const image = useRef<THREE.Mesh>(null);
+  const topBar = useRef<THREE.Mesh>(null);
+  const bottomBar = useRef<THREE.Mesh>(null);
+
   useFrame((state) => {
-    if (!group.current) return;
     const t = state.clock.getElapsedTime();
-    group.current.rotation.y = t * 0.25;
-    group.current.children.forEach((c, idx) => {
-      const seed = seeds[idx];
-      if (!seed) return;
-      const r = seed.baseR + Math.sin(t * seed.speed + seed.offset) * 0.3;
-      const theta = seed.theta + t * seed.speed * 0.4;
-      const phi = seed.phi + Math.sin(t * 0.7 + seed.offset) * 0.4;
-      c.position.x = r * Math.sin(phi) * Math.cos(theta);
-      c.position.y = r * Math.cos(phi);
-      c.position.z = r * Math.sin(phi) * Math.sin(theta);
-      c.rotation.x = t * seed.speed;
-      c.rotation.y = t * seed.speed * 0.7;
-      const m = (c as THREE.Mesh).material as THREE.MeshStandardMaterial;
-      if (m) {
-        colorLerp(m, color, 0.08);
-        m.emissiveIntensity = lerp(m.emissiveIntensity, visible ? 0.4 : 0.05, 0.1);
-      }
-    });
+    if (group.current) {
+      group.current.rotation.y = Math.sin(t * 0.55) * 0.55;
+      group.current.rotation.z = Math.sin(t * 0.35) * 0.06;
+    }
+    if (image.current) colorLerp(image.current.material, color, 0.06);
+    // text bars wiggle slightly to suggest a typed caption
+    if (topBar.current)    topBar.current.scale.x    = 1 + Math.sin(t * 2.2) * 0.03;
+    if (bottomBar.current) bottomBar.current.scale.x = 1 + Math.cos(t * 2.5) * 0.04;
   });
+
   return (
     <ShapeShell visible={visible} scale={1.0}>
       <group ref={group}>
-        {seeds.map((s) => (
-          <mesh key={s.i} castShadow>
-            <icosahedronGeometry args={[s.size, 0]} />
-            <meshStandardMaterial color="#0c0c0c" emissive="#0c0c0c" emissiveIntensity={0.4} roughness={0.5} metalness={0.2} flatShading />
-          </mesh>
-        ))}
+        {/* card backing */}
+        <RoundedBox args={[1.95, 2.1, 0.14]} radius={0.05} smoothness={4} castShadow>
+          <meshStandardMaterial color="#0c0c0c" roughness={0.6} metalness={0.15} />
+        </RoundedBox>
+
+        {/* image strip in the middle */}
+        <mesh ref={image} position={[0, 0, 0.08]}>
+          <planeGeometry args={[1.7, 1.2]} />
+          <MeshDistortMaterial color="#0c0c0c" roughness={0.4} metalness={0.2} distort={0.35} speed={2.4} />
+        </mesh>
+
+        {/* top text bar (impact-meme style) */}
+        <mesh ref={topBar} position={[0, 0.78, 0.09]}>
+          <boxGeometry args={[1.55, 0.22, 0.02]} />
+          <meshStandardMaterial color="#f5f0e1" emissive="#f5f0e1" emissiveIntensity={0.4} />
+        </mesh>
+        {/* bottom text bar */}
+        <mesh ref={bottomBar} position={[0, -0.78, 0.09]}>
+          <boxGeometry args={[1.55, 0.22, 0.02]} />
+          <meshStandardMaterial color="#f5f0e1" emissive="#f5f0e1" emissiveIntensity={0.4} />
+        </mesh>
+
+        {/* tiny "TOP TEXT / BOTTOM TEXT" simulated as inset bars */}
+        <mesh position={[-0.35, 0.78, 0.105]}>
+          <boxGeometry args={[0.7, 0.06, 0.005]} />
+          <meshBasicMaterial color="#0c0c0c" />
+        </mesh>
+        <mesh position={[0.25, -0.78, 0.105]}>
+          <boxGeometry args={[0.9, 0.06, 0.005]} />
+          <meshBasicMaterial color="#0c0c0c" />
+        </mesh>
       </group>
     </ShapeShell>
   );
@@ -398,83 +470,45 @@ function Swarm({ color, visible }: { color: THREE.Color; visible: boolean }) {
 
 function MorphingCore({ active }: { active: Cmd | null }) {
   const ref = useRef<THREE.Group>(null);
-  const haloColor = useColor(active?.color ?? "#c8ff00");
-  const haloMatRef = useRef<THREE.MeshBasicMaterial>(null);
 
   useFrame((state) => {
     if (!ref.current) return;
     const t = state.clock.getElapsedTime();
-    ref.current.rotation.y = t * 0.2;
-    if (haloMatRef.current) {
-      haloMatRef.current.color.lerp(haloColor, 0.08);
-      haloMatRef.current.opacity = lerp(haloMatRef.current.opacity, active ? 0.55 : 0.28, 0.08);
-    }
+    ref.current.rotation.y = t * 0.05;
   });
 
-  const idleColor = useColor("#0c0c0c");
-  const cap   = useColor("#ff4fa3");
-  const fix   = useColor("#c8ff00");
-  const reply = useColor("#5b6cff");
-  const tone  = useColor("#ff7a1a");
-  const tl    = useColor("#f5f0e1");
-  const meme  = useColor("#0c0c0c");
+  const cap     = useColor("#ff4fa3");
+  const sticker = useColor("#c8ff00");
+  const edit    = useColor("#5b6cff");
+  const avatar  = useColor("#ff7a1a");
+  const scene   = useColor("#f5f0e1");
+  const meme    = useColor("#0c0c0c");
 
   return (
     <group ref={ref}>
-      {/* idle shape — only visible when nothing is active */}
-      <IdleCore visible={!active} color={idleColor} />
-
-      <PlasmaOrb   color={cap}   visible={active?.shape === "plasma"} />
-      <LatticeCube color={fix}   visible={active?.shape === "lattice"} />
-      <Atom        color={reply} visible={active?.shape === "atom"} />
-      <SpikeStar   color={tone}  visible={active?.shape === "spike"} />
-      <LinkedRings color={tl}    visible={active?.shape === "linked"} />
-      <Swarm       color={meme}  visible={active?.shape === "swarm"} />
-
-      {/* halo wireframe */}
-      <mesh scale={1.45}>
-        <icosahedronGeometry args={[1.06, 1]} />
-        <meshBasicMaterial ref={haloMatRef} color="#c8ff00" wireframe transparent opacity={0.28} />
-      </mesh>
+      <PictureFrame  color={cap}     visible={active?.shape === "frame"} />
+      <StickerStack  color={sticker} visible={active?.shape === "sticker"} />
+      <EditCanvas    color={edit}    visible={active?.shape === "canvas"} />
+      <AvatarBust    color={avatar}  visible={active?.shape === "bust"} />
+      <SceneDiorama  color={scene}   visible={active?.shape === "diorama"} />
+      <MemeCard      color={meme}    visible={active?.shape === "memecard"} />
     </group>
-  );
-}
-
-function IdleCore({ visible, color }: { visible: boolean; color: THREE.Color }) {
-  const ref = useRef<THREE.Mesh>(null);
-  useFrame((state) => {
-    if (!ref.current) return;
-    const t = state.clock.getElapsedTime();
-    ref.current.rotation.y = t * 0.35;
-    ref.current.rotation.x = Math.sin(t * 0.5) * 0.15;
-    const target = visible ? 1.0 : 0.0001;
-    ref.current.scale.x = lerp(ref.current.scale.x, target, 0.14);
-    ref.current.scale.y = lerp(ref.current.scale.y, target, 0.14);
-    ref.current.scale.z = lerp(ref.current.scale.z, target, 0.14);
-    colorLerp(ref.current.material, color, 0.08);
-  });
-  return (
-    <mesh ref={ref} castShadow scale={1}>
-      <icosahedronGeometry args={[1.05, 1]} />
-      <meshStandardMaterial color="#0c0c0c" flatShading roughness={0.6} metalness={0.1} />
-    </mesh>
   );
 }
 
 /* ---------- Responsive fit ---------- */
 
-// Pills span x ±2.7, y ±2.4 in world units, plus ~1.0 pill half-width padding.
-const CONTENT_HALF_W = 2.7 + 1.1;
-const CONTENT_HALF_H = 2.4 + 0.5;
+const CONTENT_HALF_W = 2.7 + 1.5;
+const CONTENT_HALF_H = 2.4 + 1.4;
 
 function FitToViewport({ children }: { children: React.ReactNode }) {
   const group = useRef<THREE.Group>(null);
-  const { viewport } = useThree(); // viewport at z=0 in world units; updates on resize
+  const { viewport } = useThree();
   useFrame(() => {
     if (!group.current) return;
     const sx = viewport.width  / (CONTENT_HALF_W * 2);
     const sy = viewport.height / (CONTENT_HALF_H * 2);
-    const target = Math.min(sx, sy, 1); // never upscale past designed size
+    const target = Math.min(sx, sy, 1);
     const eased = lerp(group.current.scale.x, target, 0.2);
     group.current.scale.setScalar(eased);
   });
@@ -483,9 +517,11 @@ function FitToViewport({ children }: { children: React.ReactNode }) {
 
 /* ---------- Scene ---------- */
 
+const DEFAULT_LABEL = "/cap";
+
 export default function Scene() {
-  const [activeLabel, setActiveLabel] = useState<string | null>(null);
-  const active = COMMANDS.find((c) => c.label === activeLabel) ?? null;
+  const [activeLabel, setActiveLabel] = useState<string>(DEFAULT_LABEL);
+  const active = COMMANDS.find((c) => c.label === activeLabel) ?? COMMANDS[0];
 
   return (
     <Canvas
@@ -493,7 +529,7 @@ export default function Scene() {
       dpr={[1, 2]}
       camera={{ position: [0, 0, 6.2], fov: 45 }}
       gl={{ antialias: true, alpha: true }}
-      onPointerMissed={() => setActiveLabel(null)}
+      style={{ touchAction: "none" }}
     >
       <Suspense fallback={null}>
         <ambientLight intensity={0.7} />
@@ -505,8 +541,8 @@ export default function Scene() {
             <CommandPill
               key={c.label}
               cmd={c}
-              isActive={active?.label === c.label}
-              onClick={() => setActiveLabel((prev) => (prev === c.label ? null : c.label))}
+              isActive={active.label === c.label}
+              onClick={() => setActiveLabel(c.label)}
             />
           ))}
         </FitToViewport>

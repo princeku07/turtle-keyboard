@@ -2,28 +2,26 @@ import Scene from "./components/SceneWrapper";
 
 const SLASH_COMMANDS = [
   "/cap a golden retriever as a samurai",
-  "/fix",
-  "/tone flirty",
-  "/reply",
-  "/tl es",
-  "/meme monday mood",
-  "/sum",
-  "/code python fizzbuzz",
-  "/roast my last text",
-  "/explain",
+  "/cap monday mood as a renaissance painting",
+  "/cap my cat but cyberpunk",
+  "/cap a sticker that says 'on my way'",
+  "/cap moody polaroid of a rainy window",
+  "/cap birthday card for jared",
+  "/cap a meme template for late replies",
+  "/cap pixel-art coffee cup",
 ];
 
 const FEATURES = [
   {
     tag: "01",
-    title: "Slash. Don't switch.",
-    body: "Type / inside any text field — WhatsApp, Tinder, Gmail — and an AI lands the answer right where your cursor is. No app switching, no tab dance.",
+    title: "Slash. Picture. Send.",
+    body: "Type /cap inside any text field — WhatsApp, iMessage, Tinder, Gmail — and a custom image lands in your composer in under two seconds. No app switching, no screenshot dance.",
     color: "bg-lime",
   },
   {
     tag: "02",
-    title: "Every model. One keyboard.",
-    body: "Flux for images, Claude for writing, GPT for code, Gemini for translation. We route each command to the model that's best at it. You don't pick. Unless you want to.",
+    title: "Every image model. One keyboard.",
+    body: "Flux Schnell for speed, Flux Pro for the polished hero shot, SDXL for stylised stuff. We route each prompt to the model that's actually best at it. You don't pick. Unless you want to.",
     color: "bg-pink",
   },
   {
@@ -34,19 +32,19 @@ const FEATURES = [
   },
   {
     tag: "04",
-    title: "2-second images. 1-second words.",
-    body: "Flux Schnell ships images in ~1.5s. Haiku and Flash do text in under a second. The whole point is that it has to feel instant — or it dies.",
+    title: "2-second images, then everything else.",
+    body: "v1 ships /cap — images in ~1.5s, into your chat. Text commands (/fix, /tone, /reply, /tl) follow once the image loop feels truly instant. We'd rather ship one thing that flies than five that limp.",
     color: "bg-orange",
   },
 ];
 
 const COMMANDS_GRID = [
-  { cmd: "/cap",   tag: "image",  desc: "Custom image, 2 seconds, into the chat.", color: "bg-pink text-cream" },
-  { cmd: "/fix",   tag: "text",   desc: "Grammar + spelling, in place.",            color: "bg-lime" },
-  { cmd: "/tone",  tag: "rewrite",desc: "Formal, casual, flirty, warm, concise.",   color: "bg-cream border-2 border-ink" },
-  { cmd: "/reply", tag: "suggest",desc: "Three replies based on the last message.", color: "bg-blue text-cream" },
-  { cmd: "/tl",    tag: "translate",desc: "Inline translation, any language.",      color: "bg-orange" },
-  { cmd: "/meme",  tag: "soon",   desc: "Meme template + AI-written caption.",      color: "bg-ink text-cream" },
+  { cmd: "/cap",     tag: "v1 · prompt",  desc: "Custom image from any prompt, ~1.5s, into the chat.",   color: "bg-pink text-cream" },
+  { cmd: "/sticker", tag: "v1 · cutout",  desc: "Transparent-bg sticker, sized for iMessage + WhatsApp.", color: "bg-lime" },
+  { cmd: "/edit",    tag: "v1 · inpaint", desc: "Drop an image, describe the change. Edits in place.",   color: "bg-blue text-cream" },
+  { cmd: "/avatar",  tag: "v1 · you",     desc: "Restyle your selfie — anime, oil paint, pixel, 3D.",    color: "bg-orange" },
+  { cmd: "/scene",   tag: "v1 · compose", desc: "Combine subject + setting into one staged image.",      color: "bg-cream border-2 border-ink" },
+  { cmd: "/meme",    tag: "v1 · remix",   desc: "Meme template + AI-written caption, ready to paste.",   color: "bg-ink text-cream" },
 ];
 
 const FAQ = [
@@ -60,11 +58,11 @@ const FAQ = [
   },
   {
     q: "How fast is fast?",
-    a: "Target end-to-end: under 2 seconds for /cap, under 1.5s for text. The latency budget is the product. If a command can't hit that, it doesn't ship.",
+    a: "Target end-to-end: under 2 seconds for /cap, measured from the last keystroke to the image sitting in your composer. The latency budget is the product. If we can't hit that, it doesn't ship — which is exactly why text commands aren't in v1 yet.",
   },
   {
     q: "Do I have to pay?",
-    a: "Free tier covers 20 images and 100 text commands per day on standard models. Pro ($4.99/mo) unlocks premium models (Flux Pro, Claude Sonnet, GPT-4o), no watermark, and custom commands. Pro+ lets you bring your own keys.",
+    a: "Free tier covers 20 images per day on Flux Schnell. Pro ($4.99/mo) unlocks premium image models (Flux Pro, SDXL, Ideogram for text-in-image), no watermark, priority queue, and custom commands. Pro+ lets you bring your own keys.",
   },
 ];
 
@@ -74,20 +72,39 @@ export default function Home() {
       {/* NAV */}
       <header className="sticky top-0 z-40 backdrop-blur-md bg-cream/70 border-b-2 border-ink">
         <div className="mx-auto max-w-[1400px] px-6 py-4 flex items-center justify-between">
-          <a href="#" className="flex items-center gap-2 font-mono font-bold text-lg">
+          <a
+            href="#"
+            className="flex items-center gap-2 font-mono font-bold text-lg"
+          >
             <span className="inline-block w-7 h-7 rounded-full bg-lime border-2 border-ink" />
             turtle<span className="text-pink">/</span>kbd
           </a>
           <nav className="hidden md:flex items-center gap-7 font-mono text-sm">
-            <a href="#commands" className="hover:underline underline-offset-4">commands</a>
-            <a href="#how"      className="hover:underline underline-offset-4">how it works</a>
-            <a href="#pricing"  className="hover:underline underline-offset-4">pricing</a>
-            <a href="#faq"      className="hover:underline underline-offset-4">faq</a>
-            <a href="https://github.com" target="_blank" rel="noreferrer"
-               className="hover:underline underline-offset-4">github ↗</a>
+            <a href="#commands" className="hover:underline underline-offset-4">
+              commands
+            </a>
+            <a href="#how" className="hover:underline underline-offset-4">
+              how it works
+            </a>
+            <a href="#pricing" className="hover:underline underline-offset-4">
+              pricing
+            </a>
+            <a href="#faq" className="hover:underline underline-offset-4">
+              faq
+            </a>
+            <a
+              href="https://github.com/princeku07/turtle-keyboard"
+              target="_blank"
+              rel="noreferrer"
+              className="hover:underline underline-offset-4"
+            >
+              github ↗
+            </a>
           </nav>
-          <a href="#waitlist"
-             className="font-mono text-sm font-bold bg-ink text-cream px-4 py-2 rounded-full border-2 border-ink hover:bg-lime hover:text-ink transition-colors">
+          <a
+            href="#waitlist"
+            className="font-mono text-sm font-bold bg-ink text-cream px-4 py-2 rounded-full border-2 border-ink hover:bg-lime hover:text-ink transition-colors"
+          >
             join waitlist →
           </a>
         </div>
@@ -103,38 +120,56 @@ export default function Home() {
             </div>
 
             <h1 className="font-sans font-black tracking-[-0.04em] leading-[0.85] text-[clamp(3.2rem,9vw,8.5rem)]">
-              <span className="block">slash is</span>
+              <span className="block">type a slash.</span>
               <span className="block">
-                <span className="outline-text">the new</span>{" "}
+                <span className="outline-text">get an</span>{" "}
                 <span className="relative inline-block">
                   <span className="absolute inset-0 -rotate-2 bg-lime -z-10 rounded-md" />
-                  <span className="relative px-2">hey siri.</span>
+                  <span className="relative px-2">image.</span>
                 </span>
               </span>
             </h1>
 
             <p className="mt-8 max-w-xl text-lg md:text-xl leading-relaxed text-ink/80">
-              Turtle Keyboard is the open-source AI keyboard that puts every model — image,
-              text, voice — <em className="not-italic font-mono bg-pink text-cream px-1.5 rounded">one slash</em> away,
-              inside any app you already use.
+              Turtle is the open-source AI keyboard that turns any text field
+              into a generator. Type{" "}
+              <em className="not-italic font-mono bg-pink text-cream px-1.5 rounded">
+                /cap a samurai cat
+              </em>{" "}
+              and a custom image lands in your composer in ~1.5 seconds. Text
+              commands come next.
             </p>
 
             <div className="mt-10 flex flex-wrap items-center gap-4">
-              <a href="#waitlist"
-                 className="group inline-flex items-center gap-3 bg-ink text-cream font-mono font-bold text-base px-6 py-4 rounded-full border-2 border-ink hover:bg-lime hover:text-ink transition-colors">
+              <a
+                href="#waitlist"
+                className="group inline-flex items-center gap-3 bg-ink text-cream font-mono font-bold text-base px-6 py-4 rounded-full border-2 border-ink hover:bg-lime hover:text-ink transition-colors"
+              >
                 get early access
-                <span className="inline-block group-hover:translate-x-1 transition-transform">→</span>
+                <span className="inline-block group-hover:translate-x-1 transition-transform">
+                  →
+                </span>
               </a>
-              <a href="#commands"
-                 className="inline-flex items-center gap-2 font-mono text-base px-6 py-4 rounded-full border-2 border-ink hover:bg-ink hover:text-cream transition-colors">
+              <a
+                href="#commands"
+                className="inline-flex items-center gap-2 font-mono text-base px-6 py-4 rounded-full border-2 border-ink hover:bg-ink hover:text-cream transition-colors"
+              >
                 see commands
               </a>
             </div>
 
             <div className="mt-10 flex items-center gap-6 font-mono text-xs text-ink/60">
-              <div className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-ink"/> open source</div>
-              <div className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-pink"/> model-agnostic</div>
-              <div className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-blue"/> ~2s images</div>
+              <div className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-ink" /> open source
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-pink" />{" "}
+                image-first launch
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue" /> ~1.5s
+                end-to-end
+              </div>
             </div>
           </div>
 
@@ -156,9 +191,14 @@ export default function Home() {
         <div className="border-y-2 border-ink bg-ink text-cream py-5 overflow-hidden">
           <div className="flex animate-marquee whitespace-nowrap">
             {[...SLASH_COMMANDS, ...SLASH_COMMANDS].map((cmd, i) => (
-              <span key={i} className="font-mono text-2xl md:text-3xl mx-8 inline-flex items-center gap-4">
+              <span
+                key={i}
+                className="font-mono text-2xl md:text-3xl mx-8 inline-flex items-center gap-4"
+              >
                 <span className="text-lime">{cmd.split(" ")[0]}</span>
-                <span className="text-cream/80">{cmd.split(" ").slice(1).join(" ")}</span>
+                <span className="text-cream/80">
+                  {cmd.split(" ").slice(1).join(" ")}
+                </span>
                 <span className="text-pink">✺</span>
               </span>
             ))}
@@ -170,62 +210,102 @@ export default function Home() {
       <section className="mx-auto max-w-[1400px] px-6 py-24">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-end">
           <div className="lg:col-span-7">
-            <div className="font-mono text-xs uppercase tracking-widest text-ink/60 mb-4">§ the problem</div>
+            <div className="font-mono text-xs uppercase tracking-widest text-ink/60 mb-4">
+              § the problem
+            </div>
             <h2 className="font-sans font-black tracking-[-0.03em] leading-[0.95] text-[clamp(2.4rem,5vw,4.6rem)]">
-              Six steps to ask <span className="bg-pink text-cream px-2 -rotate-1 inline-block">an AI</span> a question.
-              Multiplied by 50 times a day.
+              Seven steps to drop{" "}
+              <span className="bg-pink text-cream px-2 -rotate-1 inline-block">
+                one image
+              </span>{" "}
+              in the chat. The moment's already gone.
             </h2>
           </div>
           <div className="lg:col-span-5">
             <p className="text-lg text-ink/80 leading-relaxed">
-              Stop. Open the AI app. Type. Wait. Copy. Switch back. Paste. Every time. The friction
-              tax kills the long tail of small daily wins — translations, tone fixes, a meme for
-              the group chat. Most users only invoke AI when the value is <em>obviously</em> high enough.
+              Stop. Open Midjourney or ChatGPT. Type the prompt. Wait.
+              Long-press. Save. Switch back. Attach. By then the group chat has
+              moved on three messages. The friction tax kills the long tail of
+              small daily wins — birthday cards, stickers, the perfect reply
+              meme.
             </p>
             <p className="mt-4 font-mono text-sm text-ink/60">
-              Turtle removes the tax. The keyboard is the universal layer above every app.
+              Turtle removes the tax. The keyboard is the universal layer above
+              every app.
             </p>
           </div>
         </div>
 
         {/* steps strip */}
         <div className="mt-14 grid grid-cols-2 md:grid-cols-7 gap-2 font-mono text-xs">
-          {["stop","open app","type","wait","copy","switch","paste"].map((s, i) => (
-            <div key={s} className="border-2 border-ink rounded-full px-3 py-2 text-center bg-cream line-through decoration-pink decoration-[3px]">
-              {i+1}. {s}
+          {[
+            "stop",
+            "open mj",
+            "prompt",
+            "wait",
+            "save",
+            "switch",
+            "attach",
+          ].map((s, i) => (
+            <div
+              key={s}
+              className="border-2 border-ink rounded-full px-3 py-2 text-center bg-cream line-through decoration-pink decoration-[3px]"
+            >
+              {i + 1}. {s}
             </div>
           ))}
         </div>
         <div className="mt-3 flex justify-center">
           <div className="font-mono text-sm bg-lime border-2 border-ink rounded-full px-4 py-2">
-            with turtle: <span className="font-bold">type / · done.</span>
+            with turtle:{" "}
+            <span className="font-bold">/cap your prompt · paste · done.</span>
           </div>
         </div>
       </section>
 
       {/* FEATURES */}
-      <section id="how" className="bg-ink text-cream py-24 border-y-2 border-ink">
+      <section
+        id="how"
+        className="bg-ink text-cream py-24 border-y-2 border-ink"
+      >
         <div className="mx-auto max-w-[1400px] px-6">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-14">
             <div>
-              <div className="font-mono text-xs uppercase tracking-widest text-cream/60 mb-3">§ how it works</div>
+              <div className="font-mono text-xs uppercase tracking-widest text-cream/60 mb-3">
+                § how it works
+              </div>
               <h2 className="font-sans font-black tracking-[-0.03em] leading-[0.95] text-[clamp(2.4rem,5vw,4.6rem)]">
-                A keyboard the platforms <span className="outline-text" style={{ ['--tw-text-opacity' as never]: 1 }}>can't ship.</span>
+                A keyboard the platforms{" "}
+                <span
+                  className="outline-text"
+                  style={{ ["--tw-text-opacity" as never]: 1 }}
+                >
+                  can't ship.
+                </span>
               </h2>
             </div>
             <p className="max-w-md text-cream/70">
-              Apple's keyboard pushes Apple Intelligence. Gboard pushes Gemini. They will never route
-              to whichever model is best. We will. That's the whole point.
+              Apple's keyboard pushes Apple Intelligence. Gboard pushes Gemini.
+              They will never route to whichever model is best. We will. That's
+              the whole point.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {FEATURES.map((f) => (
-              <div key={f.tag}
-                   className={`${f.color} text-ink rounded-3xl border-2 border-ink p-8 md:p-10 relative overflow-hidden`}>
-                <div className="font-mono text-xs uppercase tracking-widest opacity-70 mb-4">[ {f.tag} ]</div>
-                <h3 className="font-sans font-black tracking-tight text-2xl md:text-3xl leading-tight">{f.title}</h3>
-                <p className="mt-4 text-base leading-relaxed opacity-90">{f.body}</p>
+              <div
+                key={f.tag}
+                className={`${f.color} text-ink rounded-3xl border-2 border-ink p-8 md:p-10 relative overflow-hidden`}
+              >
+                <div className="font-mono text-xs uppercase tracking-widest opacity-70 mb-4">
+                  [ {f.tag} ]
+                </div>
+                <h3 className="font-sans font-black tracking-tight text-2xl md:text-3xl leading-tight">
+                  {f.title}
+                </h3>
+                <p className="mt-4 text-base leading-relaxed opacity-90">
+                  {f.body}
+                </p>
               </div>
             ))}
           </div>
@@ -234,27 +314,40 @@ export default function Home() {
 
       {/* COMMANDS */}
       <section id="commands" className="mx-auto max-w-[1400px] px-6 py-24">
-        <div className="font-mono text-xs uppercase tracking-widest text-ink/60 mb-3">§ commands</div>
+        <div className="font-mono text-xs uppercase tracking-widest text-ink/60 mb-3">
+          § commands
+        </div>
         <h2 className="font-sans font-black tracking-[-0.03em] leading-[0.95] text-[clamp(2.4rem,5vw,4.6rem)] max-w-4xl">
-          Six v1 commands. <span className="bg-blue text-cream px-2 -rotate-1 inline-block">Hundreds</span> after that.
+          Six image commands at launch.{" "}
+          <span className="bg-blue text-cream px-2 -rotate-1 inline-block">
+            Text
+          </span>{" "}
+          right after.
         </h2>
         <p className="mt-6 max-w-2xl text-lg text-ink/80">
-          Every command runs through the same dispatcher — invoke it by typing /, or by tapping
-          the Quick Panel (double-tap space). Power users build their own.
+          v1 is laser-focused on pictures: prompt, sticker, edit, avatar, scene,
+          meme — all invoked by typing /, or tapping the Quick Panel (double-tap
+          space). Text commands ship once the image loop is bulletproof.
         </p>
 
         <div className="mt-14 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {COMMANDS_GRID.map((c, i) => (
-            <div key={c.cmd}
-                 className={`${c.color} rounded-3xl border-2 border-ink p-7 relative min-h-[230px] flex flex-col justify-between transition-transform hover:-translate-y-1 hover:shadow-[6px_6px_0_0_var(--ink)]`}>
+            <div
+              key={c.cmd}
+              className={`${c.color} rounded-3xl border-2 border-ink p-7 relative min-h-[230px] flex flex-col justify-between transition-transform hover:-translate-y-1 hover:shadow-[6px_6px_0_0_var(--ink)]`}
+            >
               <div className="flex items-start justify-between">
-                <span className="font-mono font-black text-3xl md:text-4xl tracking-tight">{c.cmd}</span>
+                <span className="font-mono font-black text-3xl md:text-4xl tracking-tight">
+                  {c.cmd}
+                </span>
                 <span className="font-mono text-[10px] uppercase tracking-widest border-2 border-current rounded-full px-2 py-0.5 opacity-80">
                   {c.tag}
                 </span>
               </div>
               <div>
-                <div className="font-mono text-xs opacity-60 mb-2">no.{String(i+1).padStart(2,"0")}</div>
+                <div className="font-mono text-xs opacity-60 mb-2">
+                  no.{String(i + 1).padStart(2, "0")}
+                </div>
                 <p className="text-base leading-snug">{c.desc}</p>
               </div>
             </div>
@@ -262,9 +355,21 @@ export default function Home() {
         </div>
 
         <div className="mt-10 flex flex-wrap items-center gap-3 font-mono text-sm">
-          <span className="opacity-60">coming soon:</span>
-          {["/sum","/explain","/code","/voice","/roast","/jared (your custom)"].map((t) => (
-            <span key={t} className="border-2 border-ink rounded-full px-3 py-1.5 bg-cream">{t}</span>
+          <span className="opacity-60">on the roadmap:</span>
+          {[
+            "/fix",
+            "/tone",
+            "/reply",
+            "/tl",
+            "/sum",
+            "/jared (your custom)",
+          ].map((t) => (
+            <span
+              key={t}
+              className="border-2 border-ink rounded-full px-3 py-1.5 bg-cream"
+            >
+              {t}
+            </span>
           ))}
         </div>
       </section>
@@ -274,15 +379,24 @@ export default function Home() {
         <div className="rounded-[2rem] border-2 border-ink bg-cream p-6 md:p-10 grain">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
             <div>
-              <div className="font-mono text-xs uppercase tracking-widest text-ink/60 mb-3">§ in the wild</div>
+              <div className="font-mono text-xs uppercase tracking-widest text-ink/60 mb-3">
+                § in the wild
+              </div>
               <h3 className="font-sans font-black text-3xl md:text-5xl leading-[0.95] tracking-[-0.02em]">
-                The moment doesn't <span className="line-through decoration-pink decoration-[4px]">die</span>{" "}
+                The moment doesn't{" "}
+                <span className="line-through decoration-pink decoration-[4px]">
+                  die
+                </span>{" "}
                 wait for a context switch.
               </h3>
               <p className="mt-5 text-ink/80 max-w-md">
-                The group chat is moving. Your reply needs to land in the next 8 seconds.
-                You type <span className="font-mono bg-ink text-cream px-1.5 rounded">/cap a samurai cat</span>.
-                Two seconds later, image is on the clipboard. Paste. Send. Status acquired.
+                The group chat is moving. Your reply needs to land in the next 8
+                seconds. You type{" "}
+                <span className="font-mono bg-ink text-cream px-1.5 rounded">
+                  /cap a samurai cat
+                </span>
+                . Two seconds later, image is on the clipboard. Paste. Send.
+                Status acquired.
               </p>
             </div>
 
@@ -292,25 +406,59 @@ export default function Home() {
                 <div className="rounded-[2rem] border-2 border-ink bg-white overflow-hidden">
                   {/* messages */}
                   <div className="p-4 bg-[#e9e2d2] space-y-3 min-h-[320px] font-sans text-sm">
-                    <div className="flex"><div className="bg-white border border-ink/10 rounded-2xl rounded-bl-sm px-3 py-2 max-w-[70%]">jared just sent a samurai meme 😭</div></div>
-                    <div className="flex justify-end"><div className="bg-lime border-2 border-ink rounded-2xl rounded-br-sm px-3 py-2 max-w-[70%] font-mono">/cap a golden retriever as a samurai<span className="caret">▍</span></div></div>
-                    <div className="flex justify-end"><div className="bg-pink text-cream border-2 border-ink rounded-2xl rounded-br-sm p-2 max-w-[70%]">
-                      <div className="aspect-square w-44 rounded-xl bg-gradient-to-br from-orange via-pink to-blue grain border border-ink/30 flex items-center justify-center text-3xl">🐕‍🦺⚔️</div>
-                      <div className="font-mono text-[10px] mt-1 opacity-90">generated · 1.6s · flux schnell</div>
-                    </div></div>
-                    <div className="flex"><div className="bg-white border border-ink/10 rounded-2xl rounded-bl-sm px-3 py-2 max-w-[70%]">😂😂 send it everywhere</div></div>
+                    <div className="flex">
+                      <div className="bg-white border border-ink/10 rounded-2xl rounded-bl-sm px-3 py-2 max-w-[70%]">
+                        jared just sent a samurai meme 😭
+                      </div>
+                    </div>
+                    <div className="flex justify-end">
+                      <div className="bg-lime border-2 border-ink rounded-2xl rounded-br-sm px-3 py-2 max-w-[70%] font-mono">
+                        /cap a golden retriever as a samurai
+                        <span className="caret">▍</span>
+                      </div>
+                    </div>
+                    <div className="flex justify-end">
+                      <div className="bg-pink text-cream border-2 border-ink rounded-2xl rounded-br-sm p-2 max-w-[70%]">
+                        <div className="aspect-square w-44 rounded-xl bg-gradient-to-br from-orange via-pink to-blue grain border border-ink/30 flex items-center justify-center text-3xl">
+                          🐕‍🦺⚔️
+                        </div>
+                        <div className="font-mono text-[10px] mt-1 opacity-90">
+                          generated · 1.6s · flux schnell
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex">
+                      <div className="bg-white border border-ink/10 rounded-2xl rounded-bl-sm px-3 py-2 max-w-[70%]">
+                        😂😂 send it everywhere
+                      </div>
+                    </div>
                   </div>
                   {/* keyboard */}
                   <div className="bg-[#d6d0c2] p-2 border-t-2 border-ink">
                     <div className="flex gap-1.5 mb-1.5">
-                      <button className="flex-1 bg-pink text-cream border-2 border-ink rounded-md py-2 font-mono text-xs">/cap</button>
-                      <button className="flex-1 bg-lime border-2 border-ink rounded-md py-2 font-mono text-xs">/fix</button>
-                      <button className="flex-1 bg-blue text-cream border-2 border-ink rounded-md py-2 font-mono text-xs">/reply</button>
-                      <button className="flex-1 bg-orange border-2 border-ink rounded-md py-2 font-mono text-xs">/tone</button>
+                      <button className="flex-1 bg-pink text-cream border-2 border-ink rounded-md py-2 font-mono text-xs">
+                        /cap
+                      </button>
+                      <button className="flex-1 bg-lime border-2 border-ink rounded-md py-2 font-mono text-xs">
+                        /fix
+                      </button>
+                      <button className="flex-1 bg-blue text-cream border-2 border-ink rounded-md py-2 font-mono text-xs">
+                        /reply
+                      </button>
+                      <button className="flex-1 bg-orange border-2 border-ink rounded-md py-2 font-mono text-xs">
+                        /tone
+                      </button>
                     </div>
                     <div className="grid grid-cols-10 gap-1">
                       {"qwertyuiopasdfghjkl_zxcvbnm__".split("").map((k, i) => (
-                        <div key={i} className={`h-6 rounded bg-white border border-ink/30 flex items-center justify-center text-[10px] font-mono ${k === "_" ? "opacity-0" : ""}`}>{k}</div>
+                        <div
+                          key={i}
+                          className={`h-6 rounded bg-white border border-ink/30 flex items-center justify-center text-[10px] font-mono ${
+                            k === "_" ? "opacity-0" : ""
+                          }`}
+                        >
+                          {k}
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -323,19 +471,57 @@ export default function Home() {
 
       {/* PRICING */}
       <section id="pricing" className="mx-auto max-w-[1400px] px-6 py-24">
-        <div className="font-mono text-xs uppercase tracking-widest text-ink/60 mb-3">§ pricing</div>
+        <div className="font-mono text-xs uppercase tracking-widest text-ink/60 mb-3">
+          § pricing
+        </div>
         <h2 className="font-sans font-black tracking-[-0.03em] leading-[0.95] text-[clamp(2.4rem,5vw,4.6rem)]">
-          Free forever. <span className="outline-text">Pro if</span> you want the good stuff.
+          Free forever. <span className="outline-text">Pro if</span> you want
+          the good stuff.
         </h2>
 
         <div className="mt-14 grid grid-cols-1 md:grid-cols-3 gap-5">
           {[
-            { name: "Free", price: "$0", tag: "for everyone", color: "bg-cream border-2 border-ink",
-              perks: ["20 images/day", "100 text commands/day", "Standard models", "All v1 commands", "Watermark on /cap"] },
-            { name: "Pro", price: "$4.99", suffix: "/mo", tag: "★ most popular", color: "bg-lime border-2 border-ink relative",
-              perks: ["Unlimited usage", "Premium models (Flux Pro, Sonnet, GPT-4o)", "No watermark", "Priority queue", "Custom commands"] },
-            { name: "Pro+", price: "$9.99", suffix: "/mo", tag: "BYO keys", color: "bg-ink text-cream border-2 border-ink",
-              perks: ["Everything in Pro", "Bring your own API keys", "Cross-device sync", "Early access to new commands", "We charge zero margin on inference"] },
+            {
+              name: "Free",
+              price: "$0",
+              tag: "for everyone",
+              color: "bg-cream border-2 border-ink",
+              perks: [
+                "20 images/day",
+                "Flux Schnell (~1.5s)",
+                "/cap, /sticker, /meme, /edit",
+                "Small watermark",
+                "Free forever",
+              ],
+            },
+            {
+              name: "Pro",
+              price: "$4.99",
+              suffix: "/mo",
+              tag: "★ most popular",
+              color: "bg-lime border-2 border-ink relative",
+              perks: [
+                "Unlimited images",
+                "Flux Pro, SDXL, Ideogram",
+                "No watermark",
+                "Priority queue",
+                "Custom image commands",
+              ],
+            },
+            {
+              name: "Pro+",
+              price: "$9.99",
+              suffix: "/mo",
+              tag: "BYO keys",
+              color: "bg-ink text-cream border-2 border-ink",
+              perks: [
+                "Everything in Pro",
+                "Bring your own API keys",
+                "Cross-device sync",
+                "First access when text commands ship",
+                "We charge zero margin on inference",
+              ],
+            },
           ].map((p) => (
             <div key={p.name} className={`${p.color} rounded-3xl p-8 relative`}>
               {p.tag && (
@@ -343,10 +529,16 @@ export default function Home() {
                   {p.tag}
                 </span>
               )}
-              <div className="font-mono text-sm uppercase tracking-widest opacity-70 mb-4">{p.name}</div>
+              <div className="font-mono text-sm uppercase tracking-widest opacity-70 mb-4">
+                {p.name}
+              </div>
               <div className="flex items-baseline gap-1 mb-6">
-                <span className="font-sans font-black text-6xl tracking-tight">{p.price}</span>
-                {p.suffix && <span className="font-mono opacity-70">{p.suffix}</span>}
+                <span className="font-sans font-black text-6xl tracking-tight">
+                  {p.price}
+                </span>
+                {p.suffix && (
+                  <span className="font-mono opacity-70">{p.suffix}</span>
+                )}
               </div>
               <ul className="space-y-2 mb-8">
                 {p.perks.map((perk) => (
@@ -356,8 +548,12 @@ export default function Home() {
                   </li>
                 ))}
               </ul>
-              <a href="#waitlist"
-                 className={`block text-center font-mono text-sm font-bold rounded-full py-3 border-2 border-ink ${p.name === "Pro+" ? "bg-cream text-ink" : "bg-ink text-cream"}`}>
+              <a
+                href="#waitlist"
+                className={`block text-center font-mono text-sm font-bold rounded-full py-3 border-2 border-ink ${
+                  p.name === "Pro+" ? "bg-cream text-ink" : "bg-ink text-cream"
+                }`}
+              >
                 {p.name === "Free" ? "start free" : "join waitlist"}
               </a>
             </div>
@@ -369,7 +565,9 @@ export default function Home() {
       <section id="faq" className="mx-auto max-w-[1400px] px-6 py-24">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
           <div className="lg:col-span-4">
-            <div className="font-mono text-xs uppercase tracking-widest text-ink/60 mb-3">§ faq</div>
+            <div className="font-mono text-xs uppercase tracking-widest text-ink/60 mb-3">
+              § faq
+            </div>
             <h2 className="font-sans font-black tracking-[-0.03em] leading-[0.95] text-[clamp(2.4rem,5vw,3.6rem)]">
               The skeptical questions.
             </h2>
@@ -379,10 +577,17 @@ export default function Home() {
           </div>
           <div className="lg:col-span-8 space-y-4">
             {FAQ.map((item) => (
-              <details key={item.q} className="group border-2 border-ink rounded-3xl bg-cream p-6 [&_summary::-webkit-details-marker]:hidden">
+              <details
+                key={item.q}
+                className="group border-2 border-ink rounded-3xl bg-cream p-6 [&_summary::-webkit-details-marker]:hidden"
+              >
                 <summary className="flex items-center justify-between cursor-pointer list-none">
-                  <span className="font-sans font-bold text-xl tracking-tight pr-4">{item.q}</span>
-                  <span className="font-mono text-2xl shrink-0 transition-transform group-open:rotate-45">+</span>
+                  <span className="font-sans font-bold text-xl tracking-tight pr-4">
+                    {item.q}
+                  </span>
+                  <span className="font-mono text-2xl shrink-0 transition-transform group-open:rotate-45">
+                    +
+                  </span>
                 </summary>
                 <p className="mt-4 text-ink/80 leading-relaxed">{item.a}</p>
               </details>
@@ -397,9 +602,12 @@ export default function Home() {
           <div className="absolute -top-10 -left-10 w-40 h-40 rounded-full bg-pink border-2 border-ink wobble" />
           <div className="absolute -bottom-12 -right-8 w-32 h-32 rounded-full bg-blue border-2 border-ink float-y" />
           <div className="relative">
-            <div className="font-mono text-xs uppercase tracking-widest mb-4">§ join the alpha</div>
+            <div className="font-mono text-xs uppercase tracking-widest mb-4">
+              § join the alpha
+            </div>
             <h2 className="font-sans font-black tracking-[-0.04em] leading-[0.9] text-[clamp(2.6rem,7vw,6rem)] max-w-4xl mx-auto">
-              One keyboard. <span className="outline-text">Every AI.</span> Your choice.
+              One slash. <span className="outline-text">Any image.</span> In
+              your chat.
             </h2>
             <form className="mt-10 flex flex-col sm:flex-row gap-3 max-w-xl mx-auto">
               <input
@@ -409,7 +617,8 @@ export default function Home() {
               />
               <button
                 type="submit"
-                className="bg-ink text-cream font-mono font-bold px-6 py-4 rounded-full border-2 border-ink hover:bg-pink hover:text-cream transition-colors">
+                className="bg-ink text-cream font-mono font-bold px-6 py-4 rounded-full border-2 border-ink hover:bg-pink hover:text-cream transition-colors"
+              >
                 grab my spot →
               </button>
             </form>
@@ -429,10 +638,18 @@ export default function Home() {
             <span className="opacity-60">© 2026 · MIT-licensed</span>
           </div>
           <div className="flex items-center gap-6">
-            <a href="#" className="hover:underline">github</a>
-            <a href="#" className="hover:underline">twitter</a>
-            <a href="#" className="hover:underline">privacy</a>
-            <a href="#" className="hover:underline">discord</a>
+            <a href="#" className="hover:underline">
+              github
+            </a>
+            <a href="#" className="hover:underline">
+              twitter
+            </a>
+            <a href="#" className="hover:underline">
+              privacy
+            </a>
+            <a href="#" className="hover:underline">
+              discord
+            </a>
           </div>
           <div className="opacity-60">slow and steady. ✶</div>
         </div>
