@@ -1,6 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import type { MutableRefObject } from "react";
+import type { PressMap } from "./Scene";
 
 const Scene = dynamic(() => import("./Scene"), {
   ssr: false,
@@ -11,6 +13,14 @@ const Scene = dynamic(() => import("./Scene"), {
   ),
 });
 
-export default function SceneWrapper() {
-  return <Scene />;
+export default function SceneWrapper({
+  pressedRef,
+  flat,
+  onKeyTap,
+}: {
+  pressedRef: MutableRefObject<PressMap>;
+  flat?: boolean;
+  onKeyTap?: (id: string) => void;
+}) {
+  return <Scene pressedRef={pressedRef} flat={flat} onKeyTap={onKeyTap} />;
 }

@@ -37,4 +37,25 @@
         android:layout_marginTop="12dp"
         android:text="2. Switch to Turtle Keyboard" />
 
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="32dp"
+        android:text="Try it here"
+        android:textStyle="bold"
+        android:textSize="16sp" />
+
+    <EditText
+        android:id="@+id/playground"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:minHeight="120dp"
+        android:gravity="top|start"
+        android:padding="12dp"
+        android:background="#11000000"
+        android:hint="Tap here and type — try /fix, /reply, /cap a samurai cat"
+        android:inputType="textMultiLine"
+        android:importantForAutofill="no" />
+
 </LinearLayout>

@@ -1,0 +1,40 @@
+name: Parity check
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - "commands/**"
+      - "android/**"
+      - "ios/**"
+      - ".github/scripts/parity-check.mjs"
+      - ".github/workflows/parity.yml"
+
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install deps
+        run: npm install --no-save js-yaml ajv
+
+      - name: Run parity check
+        run: node .github/scripts/parity-check.mjs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}

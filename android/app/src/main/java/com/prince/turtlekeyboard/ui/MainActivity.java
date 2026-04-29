@@ -1,4 +1,4 @@
-package com.prince.turtlekeyboard;
+package com.prince.turtlekeyboard.ui;
 
 import android.app.Activity;
 import android.content.Context;
@@ -10,6 +10,10 @@ import android.widget.Toast;
 
 import com.prince.turtlekeyboard.databinding.ActivityMainBinding;
 
+/**
+ * Host app entry point — currently the two-step onboarding (PRD §6.2). Future surfaces
+ * (Playground, History, Settings) plug in here as separate activities/fragments.
+ */
 public class MainActivity extends Activity {
 
     private ActivityMainBinding binding;
@@ -37,8 +41,6 @@ public class MainActivity extends Activity {
 
     private void showInputMethodPicker() {
         InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-        if (imm != null) {
-            imm.showInputMethodPicker();
-        }
+        if (imm != null) imm.showInputMethodPicker();
     }
 }

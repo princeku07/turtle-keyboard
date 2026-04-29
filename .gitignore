@@ -1,0 +1,23 @@
+# macOS
+.DS_Store
+
+# Signing keys — never commit. Maintainers store the release keystore in CI
+# secrets; contributors don't need one (Gradle auto-generates a debug keystore).
+KEYSTORE
+*.keystore
+*.jks
+keystore.properties
+
+# Local Android config (path to the keystore on the maintainer's machine, etc.)
+local.properties
+
+# Transient root-level Node artifacts produced by running the parity check
+# locally. The actual app's Node deps live under lading-app/.
+/node_modules/
+/package.json
+/package-lock.json
+
+# Editor scratch
+.idea/
+.vscode/
+*.swp
