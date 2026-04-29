@@ -1,3 +1,25 @@
+# IDE
+.idea/
+*.iml
+
+# Android
+android/build/
+android/app/build/
+android/local.properties
+android/.gradle/
+
+# iOS
+ios/build/
+ios/*.xcworkspace/xcuserdata/
+ios/*.xcodeproj/xcuserdata/
+ios/DerivedData/
+
+# macOS
+.DS_Store
+
+# Node
+lading-app/node_modules/
+lading-app/.next/
 # macOS
 .DS_Store
 
