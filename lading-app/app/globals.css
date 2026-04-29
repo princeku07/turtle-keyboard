@@ -64,3 +64,10 @@ html, body {
   -webkit-text-stroke: 2px var(--ink);
   color: transparent;
 }
+
+@keyframes gen-card-pop {
+  0%   { opacity: 0; transform: translateY(-8px) scale(0.96) rotate(-1.5deg); }
+  60%  { opacity: 1; transform: translateY(2px)  scale(1.01) rotate(0.5deg); }
+  100% { opacity: 1; transform: translateY(0)    scale(1)    rotate(0); }
+}
+.gen-card-pop { animation: gen-card-pop 0.32s cubic-bezier(0.22, 1, 0.36, 1) both; }

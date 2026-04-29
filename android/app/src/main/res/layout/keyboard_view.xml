@@ -1,11 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<com.prince.turtlekeyboard.ime.view.KeyboardRootView
+    xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:background="#1B5E20">
+    android:background="#1B5E20"
+    android:paddingTop="2dp"
+    android:paddingBottom="6dp">
 
-    <TextView
+    <com.prince.turtlekeyboard.ime.view.SuggestionStripView
+        android:id="@+id/suggestion_strip"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:visibility="gone" />
+
+    <com.prince.turtlekeyboard.ime.view.CommandPanelView
+        android:id="@+id/command_panel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#0D3F12"
+        android:visibility="gone" />
+
+    <com.prince.turtlekeyboard.ime.view.BannerView
         android:id="@+id/banner"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -22,9 +40,17 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="#1B5E20"
-        android:keyBackground="@android:color/transparent"
+        android:keyBackground="@drawable/key_background_selector"
         android:keyTextColor="#FFFFFF"
+        android:keyTextSize="20sp"
+        android:labelTextSize="16sp"
+        android:shadowColor="#00000000"
+        android:shadowRadius="0"
+        android:paddingLeft="3dp"
+        android:paddingRight="3dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp"
         android:focusable="true"
         android:focusableInTouchMode="true" />
 
-</LinearLayout>
+</com.prince.turtlekeyboard.ime.view.KeyboardRootView>
