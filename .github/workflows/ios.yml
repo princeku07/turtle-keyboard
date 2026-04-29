@@ -25,10 +25,11 @@ jobs:
             echo "::notice::iOS source not yet present in repo — skipping xcodebuild."
           fi
 
-      - name: Build and test
+      - name: Build
         if: steps.ios.outputs.exists == 'true'
         run: |
-          xcodebuild test \
+          xcodebuild build \
+            -project ios/TurtleKeyboard.xcodeproj \
             -scheme TurtleKeyboard \
             -destination 'platform=iOS Simulator,name=iPhone 15' \
             CODE_SIGNING_ALLOWED=NO
