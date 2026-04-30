@@ -14,7 +14,7 @@ The repo currently contains three sub-projects:
 | `ios/` | Native iOS keyboard (Swift, `UIInputViewController`) |
 | `lading-app/` | Marketing landing page (Next.js 16, React 19, Tailwind v4) |
 
-iOS keyboard does not live in this repo yet (separate repo or not started).
+See `ios/CLAUDE.md` for the full iOS breakdown — only 5 Swift/plist files matter; never touch `TurtleKeyboard.xcodeproj/`.
 
 ---
 
@@ -58,23 +58,12 @@ Two targets in the Xcode project:
 
 | Target | Bundle ID | Type |
 |---|---|---|
-| `TurtleKeyboard` | `com.prince.turtlekeyboard` | Host app (onboarding) |
-| `TurtleKeyboardExtension` | `com.prince.turtlekeyboard.keyboard` | Keyboard extension |
+| `TurtleKeyboard` | `com.turtlekeyboard` | Host app (onboarding) |
+| `TurtleKeyboardExtension` | `com.turtlekeyboard.keyboard` | Keyboard extension |
 
-### Architecture
+**Full iOS details → `ios/CLAUDE.md`** (file-by-file breakdown, invariants, build command). Do not read `TurtleKeyboard.xcodeproj/` — only the 5 Swift/plist source files matter.
 
-Mirrors the Android project 1-to-1:
-
-- **`TurtleKeyboard/AppDelegate.swift`** — UIKit app entry point; creates `ViewController` as the root.
-- **`TurtleKeyboard/ViewController.swift`** — Host app screen matching `MainActivity`. Two buttons: "Enable Turtle Keyboard" and "Switch to Turtle Keyboard" both deep-link to `UIApplication.openSettingsURLString`. (iOS has no programmatic IME picker equivalent to Android's `showInputMethodPicker()`; the user navigates Settings → General → Keyboard → Keyboards → Add New Keyboard.)
-- **`TurtleKeyboardExtension/KeyboardViewController.swift`** — The entire keyboard logic (`UIInputViewController` subclass). Programmatically builds all key rows with `UIButton` grids.
-  - Three keyboard modes: `.qwerty`, `.symbols`, `.symbolsShift` — same keys as the Android XML layouts.
-  - Double-tap shift → caps lock (300 ms window); single tap → shift-once (auto-unshifts after next letter).
-  - Double-tap space → `handleSpaceDoubleTap()` shows banner "🐢 Double-tap detected" and auto-hides after 1500 ms. **Quick Panel hook** — same as Android.
-  - Banner is a `UIView` above the keys; `preferredContentSize` is updated to include/exclude its 32 pt height.
-  - `RequestsOpenAccess = true` in `Info.plist` enables Full Access (required for future network calls to the backend API).
-
-The slash command parser, API calls, and command routing are **not yet implemented** in the iOS codebase, matching Android parity.
+The slash command parser, API calls, and command routing are **not yet implemented** in the iOS codebase.
 
 ---
 
