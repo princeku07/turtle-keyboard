@@ -33,7 +33,9 @@ public class CommandRegistry {
                 new Entry("tone", "Tone", "🎭", true),
                 new Entry("reply", "Reply", "💬", false),
                 new Entry("tl", "Translate", "🌐", true),
-                new Entry("search", "Search", "🔍", true)
+                new Entry("search", "Search", "🔍", true),
+                new Entry("ask", "Ask", "❓", true),
+                new Entry("org", "Organize", "🗂️", true)
         )) entries.put(e.name, e);
     }
 

@@ -1,13 +1,23 @@
 package com.prince.turtlekeyboard.ime;
 
+import android.content.ClipData;
+import android.content.ClipDescription;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.inputmethodservice.InputMethodService;
 import android.inputmethodservice.KeyboardView;
 import android.media.AudioManager;
+import android.net.Uri;
 import android.view.HapticFeedbackConstants;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputConnection;
+
+import androidx.core.view.inputmethod.InputConnectionCompat;
+import androidx.core.view.inputmethod.InputContentInfoCompat;
 
 import com.prince.turtlekeyboard.R;
+import com.prince.turtlekeyboard.ai.LmStudioAiClient;
 import com.prince.turtlekeyboard.ai.StubAiClient;
 import com.prince.turtlekeyboard.command.CommandComposer;
 import com.prince.turtlekeyboard.command.CommandDispatcher;
@@ -93,7 +103,18 @@ public class TurtleInputMethodService extends InputMethodService
                 root.panel().hide();
             }
         });
-        dispatcher = new CommandDispatcher(new StubAiClient(), committer, this);
+        // HostProvider returns the IME's SoftInputWindow decor so the HTML→image
+        // renderer can briefly attach a WebView to a real window. Using the
+        // IME's own decor keeps the WebView in this process and within a window
+        // that's actually attached when /org runs.
+        LmStudioAiClient.HostProvider hostProvider = () -> {
+            android.view.Window w = getWindow() == null ? null : getWindow().getWindow();
+            View decor = w == null ? null : w.getDecorView();
+            return decor instanceof android.view.ViewGroup ? (android.view.ViewGroup) decor : null;
+        };
+        dispatcher = new CommandDispatcher(
+                new LmStudioAiClient(this, hostProvider, new StubAiClient()),
+                committer, this);
         suggestionProvider = new BasicSuggestionProvider();
 
         root.panel().setOnGoListener(this::dispatchPromptPanel);
@@ -108,6 +129,7 @@ public class TurtleInputMethodService extends InputMethodService
         keyboard.setLayout(KeyboardController.Layout.QWERTY);
         shift.reset();
         root.banner().clear();
+        root.preview().hide();
         refreshSuggestions();
     }
 
@@ -221,6 +243,8 @@ public class TurtleInputMethodService extends InputMethodService
             case "tl":     return "text to translate…";
             case "tone":   return "rewrite tone (e.g. formal)…";
             case "cap":    return "describe the image…";
+            case "ask":    return "ask a question…";
+            case "org":    return "what to organize…";
             default:        return "type and tap →";
         }
     }
@@ -286,9 +310,87 @@ public class TurtleInputMethodService extends InputMethodService
         root.strip().setSuggestions(java.util.Arrays.asList(suggestions));
     }
 
-    @Override public void showImage(String imageUri) {
-        // Real impl: copy to clipboard + commitContent() per PRD §6.4 / §8.3.
-        root.banner().showAndAutoHide("Image ready — tap to paste", 2500L);
+    @Override public void showImage(String imagePayload) {
+        if (imagePayload == null || imagePayload.isEmpty()) {
+            root.banner().showAndAutoHide("Empty result", 1500L);
+            return;
+        }
+        java.io.File source;
+        int sep = imagePayload.indexOf('|');
+        if (sep > 0) {
+            source = new java.io.File(imagePayload.substring(sep + 1));
+        } else {
+            // No path provided — can't preview. Future remote-image commands will need
+            // to download to cache before reaching here.
+            root.banner().showAndAutoHide("No local preview available", 2000L);
+            return;
+        }
+        root.banner().clear();
+        if (!source.exists()) {
+            root.banner().showAndAutoHide("Preview file missing", 2000L);
+            return;
+        }
+        boolean ok = root.preview().show(source, new com.prince.turtlekeyboard.ime.view.ImagePreviewView.Listener() {
+            @Override public void onShare(com.prince.turtlekeyboard.ai.ImageVariants.Type type) {
+                root.preview().hide();
+                shareAs(source, type);
+            }
+            @Override public void onCancel() {
+                root.preview().hide();
+            }
+        });
+        if (!ok) root.banner().showAndAutoHide("Preview decode failed", 2000L);
+    }
+
+    /** Encode the source PNG into the user-picked format, then commitContent (or
+     *  fall back to clipboard) under the appropriate MIME. */
+    private void shareAs(java.io.File source, com.prince.turtlekeyboard.ai.ImageVariants.Type type) {
+        com.prince.turtlekeyboard.ai.ImageVariants.Variant v;
+        try {
+            java.io.File outDir = new java.io.File(getCacheDir(), "shared_images");
+            v = com.prince.turtlekeyboard.ai.ImageVariants.make(source, type, outDir);
+        } catch (Exception e) {
+            root.banner().showAndAutoHide("Encode failed: " + e.getMessage(), 2500L);
+            return;
+        }
+        Uri uri = androidx.core.content.FileProvider.getUriForFile(this,
+                getPackageName() + ".fileprovider", v.file);
+        if (!insertImage(uri, v.mime)) copyToClipboard(uri, v.mime);
+    }
+
+    /**
+     * Tries {@link InputConnectionCompat#commitContent} so apps that accept the chosen
+     * MIME (Gmail, WhatsApp, Messages, …) receive the file inline. Returns false if
+     * the host field doesn't advertise that MIME — caller falls back to clipboard.
+     */
+    private boolean insertImage(Uri uri, String mime) {
+        InputConnection ic = getCurrentInputConnection();
+        EditorInfo info = getCurrentInputEditorInfo();
+        if (ic == null || info == null) return false;
+        String[] mimes = androidx.core.view.inputmethod.EditorInfoCompat.getContentMimeTypes(info);
+        boolean accepts = false;
+        for (String m : mimes) {
+            if (ClipDescription.compareMimeTypes(m, mime)) { accepts = true; break; }
+        }
+        if (!accepts) return false;
+        InputContentInfoCompat content = new InputContentInfoCompat(
+                uri, new ClipDescription("turtle", new String[]{mime}), null);
+        int flags = InputConnectionCompat.INPUT_CONTENT_GRANT_READ_URI_PERMISSION;
+        boolean ok = InputConnectionCompat.commitContent(ic, info, content, flags, null);
+        if (ok) root.banner().showAndAutoHide("Inserted 🐢", 1500L);
+        return ok;
+    }
+
+    private void copyToClipboard(Uri uri, String mime) {
+        ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        if (cm == null) {
+            root.banner().showAndAutoHide("Clipboard unavailable", 2000L);
+            return;
+        }
+        ClipData clip = new ClipData(new ClipDescription("Turtle", new String[]{mime}),
+                new ClipData.Item(uri));
+        cm.setPrimaryClip(clip);
+        root.banner().showAndAutoHide("Copied — long-press → Paste 📋", 2500L);
     }
 
     @Override public void clearStatus() {

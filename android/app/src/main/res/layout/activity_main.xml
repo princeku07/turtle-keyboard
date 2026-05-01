@@ -1,17 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:gravity="center"
-    android:padding="24dp"
+    android:fillViewport="true"
     tools:context=".MainActivity">
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp">
 
     <TextView
         android:id="@+id/sample_text"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
         android:textSize="22sp"
         android:textStyle="bold"
         android:text="🐢 Turtle Keyboard" />
@@ -54,8 +58,119 @@
         android:gravity="top|start"
         android:padding="12dp"
         android:background="#11000000"
-        android:hint="Tap here and type — try /fix, /reply, /cap a samurai cat"
+        android:hint="Tap here and type — try /org, /ask, /reply, /cap"
         android:inputType="textMultiLine"
         android:importantForAutofill="no" />
 
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Received content"
+            android:textStyle="bold"
+            android:textSize="14sp" />
+        <Button
+            android:id="@+id/btn_clear_received"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:padding="8dp"
+            android:textSize="12sp"
+            android:text="Clear" />
+    </LinearLayout>
+
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp">
+        <LinearLayout
+            android:id="@+id/received_items"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal" />
+    </HorizontalScrollView>
+
+    <TextView
+        android:id="@+id/received_empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="12dp"
+        android:textSize="12sp"
+        android:textColor="#888888"
+        android:gravity="center"
+        android:text="Send an image, sticker, or GIF from the keyboard to test." />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="32dp"
+        android:text="HTML → Image tester"
+        android:textStyle="bold"
+        android:textSize="16sp" />
+
+    <EditText
+        android:id="@+id/html_input"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:minHeight="120dp"
+        android:gravity="top|start"
+        android:padding="12dp"
+        android:background="#11000000"
+        android:textSize="12sp"
+        android:fontFamily="monospace"
+        android:hint="Paste HTML fragment here…"
+        android:inputType="textMultiLine"
+        android:importantForAutofill="no" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal">
+        <Button
+            android:id="@+id/btn_render_html"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Render to image" />
+        <Button
+            android:id="@+id/btn_load_sample"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="Sample" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/render_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:textSize="11sp"
+        android:fontFamily="monospace"
+        android:textColor="#666666"
+        android:text="" />
+
+    <!-- WebView lives here while rendering: attached to a real window so
+         layout / draw actually produce pixels (the IME's detached WebView
+         did not). Kept tiny + hidden; we measure/layout/draw to a bitmap
+         offscreen-style without ever showing it to the user. -->
+    <ImageView
+        android:id="@+id/render_result"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:layout_gravity="center_horizontal"
+        android:background="#11000000"
+        android:contentDescription="Rendered HTML preview" />
+
 </LinearLayout>
+</ScrollView>
