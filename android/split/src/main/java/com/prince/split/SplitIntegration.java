@@ -69,11 +69,11 @@ public class SplitIntegration implements KeyboardIntegration {
     }
 
     private void handleSplits(String prompt, IntegrationContext ctx) {
-        SplitHistory history = new SplitHistory(ctx.store());
-        SplitHistoryView view = new SplitHistoryView(ctx.appContext());
+        final SplitHistory history = new SplitHistory(ctx.store());
+        final SplitHistoryView view = new SplitHistoryView(ctx.appContext());
         ctx.showPanel(view);
         ctx.hideChip();
-        view.show(history.all(), new SplitHistoryView.Listener() {
+        final SplitHistoryView.Listener listener = new SplitHistoryView.Listener() {
             @Override public void onCopy(SplitHistory.Entry e) {
                 copyToClipboard(ctx, summary(e));
                 ctx.showBanner("Copied 📋", 1200L);
@@ -88,6 +88,13 @@ public class SplitIntegration implements KeyboardIntegration {
             @Override public void onOpenReport() {
                 ctx.hidePanel();
                 ctx.openScreen("split-detail");
+            }
+        };
+        // Render local immediately, then refresh once the cloud pull lands.
+        view.show(history.all(), listener);
+        SplitCloudSync.syncFromCloud(ctx.store(), new SplitCloudSync.SyncCallback() {
+            @Override public void onComplete(boolean changed) {
+                if (changed) view.show(history.all(), listener);
             }
         });
     }

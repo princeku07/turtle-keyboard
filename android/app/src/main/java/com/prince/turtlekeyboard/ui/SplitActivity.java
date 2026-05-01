@@ -17,6 +17,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.prince.split.SplitCloudSync;
 import com.prince.split.SplitHistory;
 import com.prince.turtlekeyboard.settings.Prefs;
 
@@ -58,6 +59,8 @@ public class SplitActivity extends Activity {
         // Re-read on every entry so a save made from the keyboard (while this Activity is
         // backgrounded) reflects on return.
         render();
+        // Pull anything new from the sheet (other devices, manual edits) and re-render.
+        SplitCloudSync.syncFromCloud(prefs, changed -> { if (changed) render(); });
     }
 
     private View buildLayout() {

@@ -12,6 +12,7 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.NumberPicker;
 import android.widget.Toast;
 
+import com.prince.split.SplitCloudSync;
 import com.prince.split.SplitContract;
 import com.prince.split.SplitKeys;
 import com.prince.turtlekeyboard.databinding.ActivityMainBinding;
@@ -49,6 +50,14 @@ public class MainActivity extends Activity {
         if (getIntent() != null && getIntent().getBooleanExtra(EXTRA_REQUEST_MIC, false)) {
             requestMicPermission();
         }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Pull latest splits from the sheet on every app entry so the local cache stays
+        // in sync with edits made on other devices.
+        SplitCloudSync.syncFromCloud(prefs, null);
     }
 
     @Override

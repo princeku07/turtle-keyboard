@@ -33,7 +33,8 @@ public class SplitHistory {
     }
 
     public void add(double amount, int people) {
-        String line = amount + "|" + people + "|" + System.currentTimeMillis();
+        long ts = System.currentTimeMillis();
+        String line = amount + "|" + people + "|" + ts;
         String existing = store.getString(SplitKeys.HISTORY, "");
         StringBuilder next = new StringBuilder(line);
         if (!existing.isEmpty()) {
@@ -42,6 +43,7 @@ public class SplitHistory {
             for (int i = 0; i < keep; i++) next.append('\n').append(lines[i]);
         }
         store.putString(SplitKeys.HISTORY, next.toString());
+        SplitCloudSync.postSave(store, amount, people, ts);
     }
 
     public List<Entry> all() {
@@ -64,5 +66,6 @@ public class SplitHistory {
 
     public void clear() {
         store.putString(SplitKeys.HISTORY, "");
+        SplitCloudSync.postClear(store);
     }
 }
