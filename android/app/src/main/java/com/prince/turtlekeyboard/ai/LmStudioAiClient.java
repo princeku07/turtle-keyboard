@@ -86,8 +86,8 @@ public class LmStudioAiClient implements AiClient {
             try {
                 String content = callMistral(systemPrompt, prompt);
                 if (isOrg) {
-                    String html = stripCodeFences(content);
-                    main.post(() -> renderHtmlToImage(html, callback));
+                    String json = stripCodeFences(content);
+                    main.post(() -> renderJsonToImage(json, callback));
                 } else {
                     AiResult done = AiResult.text(content);
                     main.post(() -> callback.onResult(done));
@@ -99,39 +99,42 @@ public class LmStudioAiClient implements AiClient {
         });
     }
 
-    /** Hands the Mistral-produced HTML fragment to {@link AttachedHtmlRenderer}
-     *  using the IME's window decor as the brief render host, then saves the
-     *  resulting bitmap as a PNG and emits the {@code "<uri>|<path>"} payload
-     *  the share pipeline already expects. Must run on the main thread. */
-    private void renderHtmlToImage(String htmlFragment, Callback callback) {
-        ViewGroup host = hostProvider == null ? null : hostProvider.getRenderHost();
-        if (host == null) {
-            callback.onResult(AiResult.error("No render host"));
+    /** Renders the Mistral-produced JSON document to a 500×500 bitmap with
+     *  {@link NativeCardRenderer}, saves it as a WebP, and emits the
+     *  {@code "<uri>|<path>"} payload the share pipeline already expects.
+     *  No WebView, no {@code hostProvider} dependency — runs in ~10 ms.
+     *  Must be called on the main thread (Bitmap save is fast but the
+     *  callback contract upstream is main-thread). */
+    private void renderJsonToImage(String jsonText, Callback callback) {
+        Bitmap bitmap;
+        try {
+            JSONObject doc = new JSONObject(jsonText);
+            bitmap = NativeCardRenderer.render(doc);
+        } catch (Exception e) {
+            Log.w(TAG, "JSON render failed: " + e.getMessage() + " | raw=" + jsonText);
+            callback.onResult(AiResult.error("Bad JSON from model"));
             return;
         }
-        AttachedHtmlRenderer.render(appContext, host, htmlFragment, new AttachedHtmlRenderer.Callback() {
-            @Override public void onRendered(Bitmap bitmap) {
-                try {
-                    File dir = new File(appContext.getCacheDir(), "shared_images");
-                    if (!dir.exists() && !dir.mkdirs()) throw new Exception("cache dir unavailable");
-                    File png = new File(dir, "org_" + System.currentTimeMillis() + ".png");
-                    try (OutputStream os = new FileOutputStream(png)) {
-                        bitmap.compress(Bitmap.CompressFormat.PNG, 100, os);
-                    }
-                    bitmap.recycle();
-                    Uri uri = FileProvider.getUriForFile(appContext,
-                            appContext.getPackageName() + ".fileprovider", png);
-                    String payload = uri.toString() + "|" + png.getAbsolutePath();
-                    callback.onResult(AiResult.image(payload));
-                } catch (Exception e) {
-                    Log.w(TAG, "save failed", e);
-                    callback.onResult(AiResult.error("Save failed: " + e.getMessage()));
-                }
+        try {
+            File dir = new File(appContext.getCacheDir(), "shared_images");
+            if (!dir.exists() && !dir.mkdirs()) throw new Exception("cache dir unavailable");
+            File img = new File(dir, "org_" + System.currentTimeMillis() + ".webp");
+            try (OutputStream os = new FileOutputStream(img)) {
+                Bitmap.CompressFormat fmt =
+                        android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R
+                                ? Bitmap.CompressFormat.WEBP_LOSSY
+                                : Bitmap.CompressFormat.WEBP;
+                bitmap.compress(fmt, 90, os);
             }
-            @Override public void onError(String message) {
-                callback.onResult(AiResult.error("Render failed: " + message));
-            }
-        });
+            bitmap.recycle();
+            Uri uri = FileProvider.getUriForFile(appContext,
+                    appContext.getPackageName() + ".fileprovider", img);
+            String payload = uri.toString() + "|" + img.getAbsolutePath();
+            callback.onResult(AiResult.image(payload));
+        } catch (Exception e) {
+            Log.w(TAG, "save failed", e);
+            callback.onResult(AiResult.error("Save failed: " + e.getMessage()));
+        }
     }
 
     /** Loads the system prompt for {@code name} from

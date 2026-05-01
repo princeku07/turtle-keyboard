@@ -5,6 +5,7 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Rect;
+import android.os.SystemClock;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
@@ -12,6 +13,8 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
+
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * HTML → bitmap renderer that hosts the WebView inside a real window. Use this
@@ -27,7 +30,26 @@ public final class AttachedHtmlRenderer {
 
     private static final String TAG = "AttachedHtmlRenderer";
     private static final int OUTPUT_SIZE_PX = 500;
-    private static final long DRAW_DELAY_MS = 250L;
+    private static final long DRAW_DELAY_MS = 32L;
+
+    private static final AtomicInteger TRACE_SEQ = new AtomicInteger(0);
+
+    /** Per-render breadcrumb tracker. All times in ms since start. */
+    private static final class Trace {
+        final int id;
+        final long start = SystemClock.uptimeMillis();
+        long lastMark = start;
+        Trace(int id) { this.id = id; }
+        long total() { return SystemClock.uptimeMillis() - start; }
+        void mark(String phase) {
+            long now = SystemClock.uptimeMillis();
+            long sinceStart = now - start;
+            long sinceLast = now - lastMark;
+            lastMark = now;
+            Log.d(TAG, "[r" + id + " +" + sinceStart + "ms Δ" + sinceLast + "ms] " + phase);
+        }
+        void mark(String phase, String extra) { mark(phase + " | " + extra); }
+    }
 
     public interface Callback {
         void onRendered(Bitmap bitmap);
@@ -37,14 +59,17 @@ public final class AttachedHtmlRenderer {
     private AttachedHtmlRenderer() {}
 
     public static void render(Context ctx, ViewGroup host, String htmlFragment, Callback cb) {
-        Log.d(TAG, "render() html=" + (htmlFragment == null ? 0 : htmlFragment.length())
-                + " chars host=" + host.getClass().getSimpleName());
+        Trace t = new Trace(TRACE_SEQ.incrementAndGet());
+        int htmlLen = htmlFragment == null ? 0 : htmlFragment.length();
+        t.mark("render() entry", "htmlChars=" + htmlLen + " host=" + host.getClass().getSimpleName());
+
         // Render at OUTPUT_SIZE × density device px so CSS px maps ~1:1 to
         // device px in the laid-out content, then downscale to OUTPUT_SIZE.
         float density = ctx.getResources().getDisplayMetrics().density;
         final int captureSize = Math.max(OUTPUT_SIZE_PX, Math.round(OUTPUT_SIZE_PX * density));
 
         WebView webView = new WebView(ctx);
+        t.mark("WebView constructed", "captureSize=" + captureSize + " density=" + density);
         WebSettings s = webView.getSettings();
         s.setJavaScriptEnabled(false);
         s.setUseWideViewPort(false);
@@ -62,19 +87,24 @@ public final class AttachedHtmlRenderer {
         lp.topMargin = -captureSize;
         webView.setVisibility(View.INVISIBLE);
         host.addView(webView, lp);
+        t.mark("WebView attached to host (offscreen)");
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView view, String url) {
-                Log.d(TAG, "onPageFinished contentHeight=" + view.getContentHeight()
-                        + " w=" + view.getWidth() + " h=" + view.getHeight());
+                t.mark("onPageFinished",
+                        "contentH=" + view.getContentHeight()
+                                + " w=" + view.getWidth() + " h=" + view.getHeight());
                 view.postDelayed(() -> {
+                    t.mark("post-onPageFinished delay elapsed (" + DRAW_DELAY_MS + "ms target)");
                     try {
-                        Bitmap bmp = capture(view, captureSize);
+                        Bitmap bmp = capture(view, captureSize, t);
+                        t.mark("DONE", "bitmap=" + bmp.getWidth() + "x" + bmp.getHeight()
+                                + " totalElapsed=" + t.total() + "ms");
                         cb.onRendered(bmp);
-                    } catch (Throwable t) {
-                        Log.w(TAG, "capture failed", t);
-                        cb.onError(t.getMessage() == null ? t.toString() : t.getMessage());
+                    } catch (Throwable th) {
+                        Log.w(TAG, "[r" + t.id + "] capture failed at " + t.total() + "ms", th);
+                        cb.onError(th.getMessage() == null ? th.toString() : th.getMessage());
                     } finally {
                         host.removeView(view);
                         view.destroy();
@@ -83,19 +113,23 @@ public final class AttachedHtmlRenderer {
             }
         });
         webView.loadDataWithBaseURL(null, wrap(htmlFragment), "text/html", "utf-8", null);
+        t.mark("loadDataWithBaseURL returned (now waiting for onPageFinished)");
     }
 
-    private static Bitmap capture(WebView view, int captureSize) {
+    private static Bitmap capture(WebView view, int captureSize, Trace t) {
         view.measure(
                 View.MeasureSpec.makeMeasureSpec(captureSize, View.MeasureSpec.EXACTLY),
                 View.MeasureSpec.makeMeasureSpec(captureSize, View.MeasureSpec.EXACTLY));
         view.layout(0, 0, captureSize, captureSize);
-        Log.d(TAG, "layout " + captureSize + "x" + captureSize);
+        t.mark("measure+layout done", captureSize + "x" + captureSize);
 
         Bitmap full = Bitmap.createBitmap(captureSize, captureSize, Bitmap.Config.ARGB_8888);
+        t.mark("full bitmap allocated", "bytes=" + full.getByteCount());
+
         Canvas fullCanvas = new Canvas(full);
         fullCanvas.drawColor(Color.WHITE);
         view.draw(fullCanvas);
+        t.mark("view.draw(canvas) done");
 
         if (captureSize == OUTPUT_SIZE_PX) return full;
 
@@ -109,7 +143,7 @@ public final class AttachedHtmlRenderer {
                 new Rect(0, 0, OUTPUT_SIZE_PX, OUTPUT_SIZE_PX),
                 null);
         full.recycle();
-        Log.d(TAG, "downscaled " + captureSize + "→" + OUTPUT_SIZE_PX);
+        t.mark("downscaled " + captureSize + "→" + OUTPUT_SIZE_PX);
         return out;
     }
 

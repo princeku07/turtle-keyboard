@@ -10,6 +10,9 @@ public final class Keycodes {
     public static final int SPACE = 32;
     public static final int SLASH = 47;
     public static final int ENTER = 10;
+    /** Synthetic keycode for the dedicated mic key. Negative so it never collides
+     *  with a printable character or the framework's reserved negative codes. */
+    public static final int MIC = -10;
 
     private Keycodes() {}
 }
