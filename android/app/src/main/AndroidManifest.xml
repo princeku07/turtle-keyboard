@@ -9,6 +9,12 @@
         <intent>
             <action android:name="android.speech.RecognitionService" />
         </intent>
+        <!-- Required on Android 11+ to read display name & icon of host payment apps. -->
+        <package android:name="com.google.android.apps.nbu.paisa.user" />
+        <package android:name="com.phonepe.app" />
+        <package android:name="com.phonepe.app.preprod" />
+        <package android:name="net.one97.paytm" />
+        <package android:name="in.org.npci.upiapp" />
     </queries>
 
     <application
@@ -21,6 +27,12 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         tools:targetApi="31">
+        <activity
+            android:name=".ui.SplitActivity"
+            android:exported="false"
+            android:label="Splits"
+            android:parentActivityName=".ui.MainActivity" />
+
         <activity
             android:name=".ui.MainActivity"
             android:exported="true">

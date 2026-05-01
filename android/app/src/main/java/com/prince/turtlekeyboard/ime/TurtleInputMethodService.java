@@ -9,6 +9,8 @@ import android.inputmethodservice.InputMethodService;
 import android.inputmethodservice.KeyboardView;
 import android.media.AudioManager;
 import android.net.Uri;
+import android.text.InputType;
+import android.util.Log;
 import android.view.HapticFeedbackConstants;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
@@ -28,10 +30,16 @@ import com.prince.turtlekeyboard.command.SlashCommandDetector;
 import com.prince.turtlekeyboard.gesture.SpaceGestureHandler;
 import com.prince.turtlekeyboard.ime.view.KeyPreviewPopup;
 import com.prince.turtlekeyboard.ime.view.KeyboardRootView;
+import com.prince.split.SplitIntegration;
+import com.prince.split.kbd.IntegrationContext;
+import com.prince.split.kbd.KeyboardIntegration;
 import com.prince.turtlekeyboard.input.InputCommitter;
+import com.prince.turtlekeyboard.integration.IntegrationRegistry;
+import com.prince.turtlekeyboard.integration.KeyboardIntegrationContextImpl;
 import com.prince.turtlekeyboard.keyboard.KeyboardController;
 import com.prince.turtlekeyboard.keyboard.Keycodes;
 import com.prince.turtlekeyboard.keyboard.ShiftController;
+import com.prince.turtlekeyboard.settings.Prefs;
 import com.prince.turtlekeyboard.suggestion.BasicSuggestionProvider;
 import com.prince.turtlekeyboard.suggestion.SuggestionProvider;
 import com.prince.turtlekeyboard.theme.KeyboardTheme;
@@ -49,6 +57,8 @@ import java.util.List;
 public class TurtleInputMethodService extends InputMethodService
         implements KeyboardView.OnKeyboardActionListener, CommandDispatcher.ResultUi {
 
+    private static final String SPLIT_TAG = "SPLITTEST";
+
     private KeyboardRootView root;
     private KeyboardController keyboard;
     private ShiftController shift;
@@ -64,6 +74,7 @@ public class TurtleInputMethodService extends InputMethodService
     private KeyPreviewPopup preview;
     private KeyboardView keyboardView;
     private VoiceInputController voice;
+    private IntegrationRegistry integrations;
 
     @Override
     public View onCreateInputView() {
@@ -116,16 +127,44 @@ public class TurtleInputMethodService extends InputMethodService
             View decor = w == null ? null : w.getDecorView();
             return decor instanceof android.view.ViewGroup ? (android.view.ViewGroup) decor : null;
         };
-        dispatcher = new CommandDispatcher(
-                new LmStudioAiClient(this, hostProvider, new StubAiClient()),
-                committer, this);
         suggestionProvider = new BasicSuggestionProvider();
         voice = new VoiceInputController(this);
 
         root.panel().setOnGoListener(this::dispatchPromptPanel);
         root.strip().setOnPickListener(this::onSuggestionPicked);
+
+        // Build the integration context off the freshly inflated views, then construct the
+        // registry — its constructor pumps each integration's commands into the registry.
+        IntegrationContext integrationCtx = new KeyboardIntegrationContextImpl(
+                getApplicationContext(), root, committer, new Prefs(this));
+        java.util.List<KeyboardIntegration> integrationList = java.util.Arrays.asList(
+                new SplitIntegration());
+        integrations = new IntegrationRegistry(integrationList, integrationCtx, registry);
+
+        // Dispatcher now takes the registry + a context provider so integration-contributed
+        // slash commands can run locally without an AI round trip.
+        dispatcher = new CommandDispatcher(
+                new LmStudioAiClient(this, hostProvider, new StubAiClient()),
+                committer, this, registry, () -> integrationCtx);
+
         applyTheme();
         return root;
+    }
+
+    private void logHostContext(EditorInfo info) {
+        if (info == null) {
+            Log.d(SPLIT_TAG, "onStartInputView info=null");
+            return;
+        }
+        int cls = info.inputType & InputType.TYPE_MASK_CLASS;
+        int variation = info.inputType & InputType.TYPE_MASK_VARIATION;
+        Log.d(SPLIT_TAG, "host pkg=" + info.packageName
+                + " inputType=0x" + Integer.toHexString(info.inputType)
+                + " class=0x" + Integer.toHexString(cls)
+                + " variation=0x" + Integer.toHexString(variation)
+                + " hint=" + info.hintText
+                + " label=" + info.label
+                + " field=" + info.fieldName);
     }
 
     @Override
@@ -135,7 +174,29 @@ public class TurtleInputMethodService extends InputMethodService
         shift.reset();
         root.banner().clear();
         root.preview().hide();
+        logHostContext(info);
+        if (integrations != null) {
+            integrations.onInputStart(info);
+            // Field may already have text (e.g. user re-opened keyboard) — re-evaluate now.
+            integrations.onTextChanged(committer.textBeforeCursor(16), committer.textAfterCursor(16));
+        }
         refreshSuggestions();
+    }
+
+    @Override
+    public void onFinishInputView(boolean finishingInput) {
+        super.onFinishInputView(finishingInput);
+        if (integrations != null) integrations.onInputEnd();
+    }
+
+    @Override
+    public void onUpdateSelection(int oldSelStart, int oldSelEnd,
+                                  int newSelStart, int newSelEnd,
+                                  int candStart, int candEnd) {
+        super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candStart, candEnd);
+        if (integrations != null && committer != null) {
+            integrations.onTextChanged(committer.textBeforeCursor(16), committer.textAfterCursor(16));
+        }
     }
 
     @Override

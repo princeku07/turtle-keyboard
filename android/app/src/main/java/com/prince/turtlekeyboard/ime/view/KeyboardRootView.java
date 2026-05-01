@@ -3,6 +3,8 @@ package com.prince.turtlekeyboard.ime.view;
 import android.content.Context;
 import android.inputmethodservice.KeyboardView;
 import android.util.AttributeSet;
+import android.view.ViewGroup;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 
 import androidx.annotation.Nullable;
@@ -10,14 +12,16 @@ import androidx.annotation.Nullable;
 import com.prince.turtlekeyboard.R;
 import com.prince.turtlekeyboard.theme.KeyboardTheme;
 
-/** Container that holds the suggestion strip, status banner, and KeyboardView. Exposes
- *  typed accessors so the service doesn't reach into res-id internals. */
+/** Container that holds the suggestion strip, status banner, integration affordances, and
+ *  KeyboardView. Exposes typed accessors so the service doesn't reach into res-id internals. */
 public class KeyboardRootView extends LinearLayout {
 
     private SuggestionStripView strip;
     private CommandPanelView panel;
     private BannerView banner;
     private ImagePreviewView preview;
+    private IntegrationChipView chip;
+    private FrameLayout panelHost;
     private KeyboardView keyboard;
 
     public KeyboardRootView(Context context) { super(context); }
@@ -30,6 +34,8 @@ public class KeyboardRootView extends LinearLayout {
         panel = findViewById(R.id.command_panel);
         banner = findViewById(R.id.banner);
         preview = findViewById(R.id.image_preview);
+        chip = findViewById(R.id.integration_chip);
+        panelHost = findViewById(R.id.integration_panel_host);
         keyboard = findViewById(R.id.keyboard_view);
     }
 
@@ -37,6 +43,10 @@ public class KeyboardRootView extends LinearLayout {
     public CommandPanelView panel() { return panel; }
     public BannerView banner() { return banner; }
     public ImagePreviewView preview() { return preview; }
+    public IntegrationChipView chip() { return chip; }
+    /** Generic slot integrations attach panel views to. Visibility flips when content
+     *  is added/removed by callers. */
+    public ViewGroup panelHost() { return panelHost; }
     public KeyboardView keyboardView() { return keyboard; }
 
     public void applyTheme(KeyboardTheme theme) {

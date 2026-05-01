@@ -8,6 +8,18 @@
     android:paddingTop="2dp"
     android:paddingBottom="6dp">
 
+    <com.prince.turtlekeyboard.ime.view.IntegrationChipView
+        android:id="@+id/integration_chip"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone" />
+
+    <FrameLayout
+        android:id="@+id/integration_panel_host"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone" />
+
     <com.prince.turtlekeyboard.ime.view.SuggestionStripView
         android:id="@+id/suggestion_strip"
         android:layout_width="match_parent"

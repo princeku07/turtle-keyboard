@@ -1,12 +1,19 @@
 package com.prince.turtlekeyboard.command;
 
+import com.prince.split.kbd.IntegrationContext;
 import com.prince.turtlekeyboard.ai.AiClient;
 import com.prince.turtlekeyboard.ai.AiResult;
 import com.prince.turtlekeyboard.input.InputCommitter;
 
 /**
- * Glue between detection and execution. When invoked: strips the slash invocation from the
- * field (PRD §6.4 cursor-aware insertion), calls the AiClient, then writes the result back.
+ * Glue between detection and execution. Two paths:
+ *
+ * <ul>
+ *   <li>Built-in AI commands round-trip to the {@link AiClient} and the result is written
+ *       back into the host editor.</li>
+ *   <li>Integration-contributed commands (with a non-null handler) run locally — the
+ *       handler receives the parsed prompt and the live {@link IntegrationContext}.</li>
+ * </ul>
  */
 public class CommandDispatcher {
 
@@ -17,14 +24,23 @@ public class CommandDispatcher {
         void clearStatus();
     }
 
+    public interface ContextProvider {
+        IntegrationContext get();
+    }
+
     private final AiClient client;
     private final InputCommitter committer;
     private final ResultUi ui;
+    private final CommandRegistry registry;
+    private final ContextProvider contextProvider;
 
-    public CommandDispatcher(AiClient client, InputCommitter committer, ResultUi ui) {
+    public CommandDispatcher(AiClient client, InputCommitter committer, ResultUi ui,
+                             CommandRegistry registry, ContextProvider contextProvider) {
         this.client = client;
         this.committer = committer;
         this.ui = ui;
+        this.registry = registry;
+        this.contextProvider = contextProvider;
     }
 
     public void dispatch(SlashCommand cmd) {
@@ -39,6 +55,12 @@ public class CommandDispatcher {
     }
 
     private void run(SlashCommand cmd) {
+        CommandRegistry.Entry e = registry.get(cmd.name);
+        if (e != null && e.handler != null) {
+            // Local handler — runs synchronously, no AI round trip.
+            e.handler.handle(cmd.prompt == null ? "" : cmd.prompt, contextProvider.get());
+            return;
+        }
         ui.showStatus("/" + cmd.name + "…");
         client.execute(cmd, result -> handle(result));
     }

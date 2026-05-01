@@ -64,6 +64,7 @@ configurations.all {
 }
 
 dependencies {
+    implementation(project(":split"))
     implementation(libs.appcompat)
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)

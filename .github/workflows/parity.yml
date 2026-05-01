@@ -5,6 +5,7 @@ on:
     branches: [develop, main]
     paths:
       - "commands/**"
+      - "integrations/**"
       - "android/**"
       - "ios/**"
       - ".github/scripts/parity-check.mjs"

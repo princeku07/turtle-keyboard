@@ -1,0 +1,48 @@
+id: split
+name: Split
+summary: Save and split payments contextually inside known payment apps.
+
+description: |
+  Surfaces a chip in known payment apps (GPay, PhonePe, Paytm, BHIM) once the
+  user types an amount in a numeric, non-sensitive field. Tap → in-keyboard
+  panel for picking the number of people; saves to local history. Also ships
+  /split <amount> (open the panel for any typed amount) and /splits (open the
+  in-keyboard history list). The deep "Reports" screen — totals, full date /
+  time, share / copy — is opened via openScreen("split-detail").
+
+owner: "@turtle-team"
+tags: [payment, splitwise, contextual]
+
+surfaces:
+  - chip
+  - panel
+  - banner
+  - slash-command
+  - deep-screen
+  - storage
+
+activates_on:
+  host_packages:
+    - com.google.android.apps.nbu.paisa.user
+    - com.phonepe.app
+    - com.phonepe.app.preprod
+    - net.one97.paytm
+    - in.org.npci.upiapp
+  field_types: [number]
+
+commands:
+  - split
+  - splits
+
+deep_screens:
+  - split-detail
+
+support:
+  android:
+    state: in-progress
+    since: null
+    impl: android/split/src/main/java/com/prince/split/SplitIntegration.java
+  ios:
+    state: planned
+    since: null
+    impl: null
