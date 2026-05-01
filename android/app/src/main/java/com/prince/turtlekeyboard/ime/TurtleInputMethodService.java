@@ -4,6 +4,7 @@ import android.content.ClipData;
 import android.content.ClipDescription;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.Intent;
 import android.inputmethodservice.InputMethodService;
 import android.inputmethodservice.KeyboardView;
 import android.media.AudioManager;
@@ -35,6 +36,8 @@ import com.prince.turtlekeyboard.suggestion.BasicSuggestionProvider;
 import com.prince.turtlekeyboard.suggestion.SuggestionProvider;
 import com.prince.turtlekeyboard.theme.KeyboardTheme;
 import com.prince.turtlekeyboard.theme.ThemeManager;
+import com.prince.turtlekeyboard.ui.MainActivity;
+import com.prince.turtlekeyboard.voice.VoiceInputController;
 
 import java.util.List;
 
@@ -60,6 +63,7 @@ public class TurtleInputMethodService extends InputMethodService
     private AudioManager audio;
     private KeyPreviewPopup preview;
     private KeyboardView keyboardView;
+    private VoiceInputController voice;
 
     @Override
     public View onCreateInputView() {
@@ -116,6 +120,7 @@ public class TurtleInputMethodService extends InputMethodService
                 new LmStudioAiClient(this, hostProvider, new StubAiClient()),
                 committer, this);
         suggestionProvider = new BasicSuggestionProvider();
+        voice = new VoiceInputController(this);
 
         root.panel().setOnGoListener(this::dispatchPromptPanel);
         root.strip().setOnPickListener(this::onSuggestionPicked);
@@ -136,6 +141,13 @@ public class TurtleInputMethodService extends InputMethodService
     @Override
     public void onKey(int primaryCode, int[] keyCodes) {
         if (committer.connection() == null) return;
+
+        // Mic is global: works the same whether the user is mid-compose or
+        // typing into the host editor. The sink picks the destination.
+        if (primaryCode == Keycodes.MIC) {
+            toggleVoiceInput();
+            return;
+        }
 
         if (composer.isActive() && handleComposingKey(primaryCode)) return;
 
@@ -264,6 +276,53 @@ public class TurtleInputMethodService extends InputMethodService
         shift.onCharCommitted();
         slashDetector.onTextChanged();
         refreshSuggestions();
+    }
+
+    // -- Voice input ------------------------------------------------------
+
+    private void toggleVoiceInput() {
+        if (voice == null) return;
+        if (!VoiceInputController.hasMicPermission(this)) {
+            // IMEs cannot request runtime permissions directly; bounce the
+            // user to MainActivity which holds the permission flow.
+            root.banner().showAndAutoHide("Enable mic in Turtle app", 2000);
+            try {
+                Intent i = new Intent(this, MainActivity.class);
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                i.putExtra(MainActivity.EXTRA_REQUEST_MIC, true);
+                startActivity(i);
+            } catch (Exception ignored) {}
+            return;
+        }
+        voice.toggle(voiceSink);
+    }
+
+    private final VoiceInputController.Sink voiceSink = new VoiceInputController.Sink() {
+        @Override public void onListeningStarted() { root.banner().show("🎤 Listening…"); }
+        @Override public void onListeningStopped() { root.banner().clear(); }
+        @Override public void onPartial(String text) {
+            if (text != null && !text.isEmpty()) root.banner().show("🎤 " + text);
+        }
+        @Override public void onFinal(String text) {
+            if (text == null || text.isEmpty()) return;
+            if (composer.isActive()) {
+                // Route into whichever phase the composer is in (NAME / PROMPT).
+                for (int i = 0; i < text.length(); i++) composer.appendChar(text.charAt(i));
+            } else {
+                committer.commitText(text);
+                slashDetector.onTextChanged();
+                refreshSuggestions();
+            }
+        }
+        @Override public void onError(String userVisibleMessage) {
+            root.banner().showAndAutoHide(userVisibleMessage, 1500);
+        }
+    };
+
+    @Override
+    public void onDestroy() {
+        if (voice != null) { voice.destroy(); voice = null; }
+        super.onDestroy();
     }
 
     private void refreshSuggestions() {

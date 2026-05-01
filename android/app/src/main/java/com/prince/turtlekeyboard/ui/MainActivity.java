@@ -1,9 +1,11 @@
 package com.prince.turtlekeyboard.ui;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.ClipData;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.ImageDecoder;
 import android.graphics.drawable.AnimatedImageDrawable;
 import android.graphics.drawable.Drawable;
@@ -36,6 +38,11 @@ import com.prince.turtlekeyboard.databinding.ActivityMainBinding;
 public class MainActivity extends Activity {
 
     private static final String TAG = "MainActivity";
+    /** Set on the launching Intent when the IME bounces the user here to grant
+     *  the RECORD_AUDIO permission. {@link #onCreate} reads it and triggers the
+     *  request immediately, then finishes once the OS dialog returns. */
+    public static final String EXTRA_REQUEST_MIC = "extra_request_mic";
+    private static final int REQ_MIC = 4242;
     private static final String[] ACCEPTED_MIMES = {
             "image/png", "image/jpeg", "image/gif", "image/webp", "image/*",
             "video/mp4", "video/*"
@@ -58,6 +65,35 @@ public class MainActivity extends Activity {
 
         ViewCompat.setOnReceiveContentListener(binding.playground, ACCEPTED_MIMES, receiveListener);
         updateEmptyState();
+
+        if (getIntent() != null && getIntent().getBooleanExtra(EXTRA_REQUEST_MIC, false)) {
+            requestMicPermission();
+        }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (intent.getBooleanExtra(EXTRA_REQUEST_MIC, false)) requestMicPermission();
+    }
+
+    private void requestMicPermission() {
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(this, "Mic already enabled", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, REQ_MIC);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQ_MIC) {
+            boolean granted = grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+            Toast.makeText(this, granted ? "Mic enabled — switch back to keyboard" : "Mic denied",
+                    Toast.LENGTH_SHORT).show();
+        }
     }
 
     private final OnReceiveContentListener receiveListener = (view, payload) -> {
