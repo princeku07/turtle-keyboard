@@ -23,6 +23,12 @@
         android:background="#0D3F12"
         android:visibility="gone" />
 
+    <com.prince.turtlekeyboard.ime.view.ImagePreviewView
+        android:id="@+id/image_preview"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone" />
+
     <com.prince.turtlekeyboard.ime.view.BannerView
         android:id="@+id/banner"
         android:layout_width="match_parent"

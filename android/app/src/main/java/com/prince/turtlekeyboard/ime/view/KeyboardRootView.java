@@ -17,6 +17,7 @@ public class KeyboardRootView extends LinearLayout {
     private SuggestionStripView strip;
     private CommandPanelView panel;
     private BannerView banner;
+    private ImagePreviewView preview;
     private KeyboardView keyboard;
 
     public KeyboardRootView(Context context) { super(context); }
@@ -28,12 +29,14 @@ public class KeyboardRootView extends LinearLayout {
         strip = findViewById(R.id.suggestion_strip);
         panel = findViewById(R.id.command_panel);
         banner = findViewById(R.id.banner);
+        preview = findViewById(R.id.image_preview);
         keyboard = findViewById(R.id.keyboard_view);
     }
 
     public SuggestionStripView strip() { return strip; }
     public CommandPanelView panel() { return panel; }
     public BannerView banner() { return banner; }
+    public ImagePreviewView preview() { return preview; }
     public KeyboardView keyboardView() { return keyboard; }
 
     public void applyTheme(KeyboardTheme theme) {
@@ -44,6 +47,7 @@ public class KeyboardRootView extends LinearLayout {
             banner.setTextColor(theme.bannerText);
         }
         if (panel != null) panel.applyTheme(theme);
+        if (preview != null) preview.applyTheme(theme);
         if (keyboard != null) {
             keyboard.setBackgroundColor(theme.background);
         }
