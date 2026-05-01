@@ -25,6 +25,7 @@
 		HH000027HH000027HH000027 /* HTMLImageRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000026HH000026HH000026 /* HTMLImageRenderer.swift */; };
 		HH000029HH000029HH000029 /* org_template.html in Resources */ = {isa = PBXBuildFile; fileRef = HH000028HH000028HH000028 /* org_template.html */; };
 		HH000032HH000032HH000032 /* html-to-image.js in Resources */ = {isa = PBXBuildFile; fileRef = HH000031HH000031HH000031 /* html-to-image.js */; };
+		HH000034HH000034HH000034 /* OrgImageRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000033HH000033HH000033 /* OrgImageRenderer.swift */; };
 		FF000001FF000001FF000001 /* TurtleKeyboardExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = EE000005EE000005EE000005 /* TurtleKeyboardExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -73,6 +74,7 @@
 		HH000026HH000026HH000026 /* HTMLImageRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTMLImageRenderer.swift; sourceTree = "<group>"; };
 		HH000028HH000028HH000028 /* org_template.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = org_template.html; sourceTree = "<group>"; };
 		HH000031HH000031HH000031 /* html-to-image.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "html-to-image.js"; sourceTree = "<group>"; };
+		HH000033HH000033HH000033 /* OrgImageRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrgImageRenderer.swift; sourceTree = "<group>"; };
 		EE000004EE000004EE000004 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		EE000005EE000005EE000005 /* TurtleKeyboardExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = TurtleKeyboardExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -139,6 +141,7 @@
 				HH000026HH000026HH000026 /* HTMLImageRenderer.swift */,
 				HH000028HH000028HH000028 /* org_template.html */,
 				HH000031HH000031HH000031 /* html-to-image.js */,
+				HH000033HH000033HH000033 /* OrgImageRenderer.swift */,
 			);
 			path = AI;
 			sourceTree = "<group>";
@@ -300,6 +303,7 @@
 				HH000023HH000023HH000023 /* LMStudioProvider.swift in Sources */,
 				HH000025HH000025HH000025 /* PromptLoader.swift in Sources */,
 				HH000027HH000027HH000027 /* HTMLImageRenderer.swift in Sources */,
+				HH000034HH000034HH000034 /* OrgImageRenderer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

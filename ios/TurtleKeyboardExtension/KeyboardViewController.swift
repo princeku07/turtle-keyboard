@@ -51,6 +51,12 @@ class KeyboardViewController: UIInputViewController {
     private var isGenerating      = false
     private var pendingSuggestions: [String] = []
 
+    // While the user is composing a slash command, every keystroke is routed
+    // into this buffer instead of `textDocumentProxy.insertText`. The host app
+    // never sees `/ask …`; only the final result (or nothing, if cancelled)
+    // reaches the text field. nil = normal typing.
+    private var slashBuffer: String?
+
     // commandBar can show one of three things at a time
     private enum SuggestionMode { case none, slashCommand, replyResult, wordSuggestion }
     private var suggestionMode: SuggestionMode = .none
@@ -185,11 +191,6 @@ class KeyboardViewController: UIInputViewController {
         // collapses it to zero on iPad.
         suppressSystemShortcutBar()
 
-        // Pre-warm the HTML→image renderer so its WebView is ready well before
-        // /org is invoked. The WebView must live in the view hierarchy because
-        // html-to-image relies on requestAnimationFrame, which iOS pauses on
-        // detached WKWebViews.
-        HTMLImageRenderer.shared.attach(to: view)
     }
 
     private func suppressSystemShortcutBar() {
@@ -602,20 +603,28 @@ class KeyboardViewController: UIInputViewController {
     private func startBackspaceRepeat() {
         backspaceTimer?.invalidate()
         // Initial delete on press-and-hold start
-        handleBackspace()
-        updateCommandDetection()
+        performBackspaceTick()
         haptic.impactOccurred()
         // Repeat at ~12 deletes/sec until released
         backspaceTimer = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { [weak self] _ in
             guard let self = self else { return }
-            // Stop if there's nothing left to delete
-            let before = self.textDocumentProxy.documentContextBeforeInput ?? ""
-            guard !before.isEmpty else {
-                self.stopBackspaceRepeat()
-                return
+            // Stop if there's nothing left to delete (buffer or proxy)
+            if self.slashBuffer != nil {
+                if self.slashBuffer?.isEmpty ?? true { self.stopBackspaceRepeat(); return }
+            } else {
+                let before = self.textDocumentProxy.documentContextBeforeInput ?? ""
+                guard !before.isEmpty else { self.stopBackspaceRepeat(); return }
             }
-            self.handleBackspace()
-            self.updateCommandDetection()
+            self.performBackspaceTick()
+        }
+    }
+
+    private func performBackspaceTick() {
+        if slashBuffer != nil {
+            handleSlashBufferKey("⌫")
+        } else {
+            handleBackspace()
+            updateCommandDetection()
         }
     }
 
@@ -636,15 +645,10 @@ class KeyboardViewController: UIInputViewController {
         guard let key = sender.accessibilityLabel else { return }
         let proxy = textDocumentProxy
 
+        // Layout/mode keys always work, regardless of slash-buffer state.
         switch key {
-        case "🌐":  advanceToNextInputMode(); return
-        case "⇧":   handleShift(); return
-        case "↵":   proxy.insertText("\n"); hideCommandBar()
-        case "⌫":   handleBackspace(); updateCommandDetection()
-        case "space":
-            proxy.insertText(" ")
-            handleSpaceDoubleTap()
-            updateCommandDetection()
+        case "🌐":   advanceToNextInputMode(); return
+        case "⇧":    handleShift(); return
         case "?123":
             mode = .symbols; isCapsLock = false; isShiftedOnce = false
             rebuildKeyboard(); return
@@ -653,6 +657,36 @@ class KeyboardViewController: UIInputViewController {
             rebuildKeyboard(); return
         case "=\\<":
             mode = .symbolsShift; rebuildKeyboard(); return
+        default: break
+        }
+
+        // While composing a slash command, intercept everything — nothing
+        // reaches the host text field until send/cancel.
+        if slashBuffer != nil {
+            handleSlashBufferKey(key)
+            return
+        }
+
+        // Tapping "/" enters slash-buffer mode — but only when the cursor is at
+        // the start of the text field (empty or whitespace-only context). A
+        // mid-sentence "/" types as a normal character.
+        if key == "/" {
+            let pre = (proxy.documentContextBeforeInput ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if pre.isEmpty {
+                slashBuffer = "/"
+                updateCommandDetection()
+                return
+            }
+        }
+
+        switch key {
+        case "↵":   proxy.insertText("\n"); hideCommandBar()
+        case "⌫":   handleBackspace(); updateCommandDetection()
+        case "space":
+            proxy.insertText(" ")
+            handleSpaceDoubleTap()
+            updateCommandDetection()
         default:
             var text = key
             if mode == .qwerty, key.count == 1, key.first?.isLetter == true {
@@ -665,6 +699,44 @@ class KeyboardViewController: UIInputViewController {
                 }
             }
             proxy.insertText(text)
+            updateCommandDetection()
+        }
+    }
+
+    private func handleSlashBufferKey(_ key: String) {
+        switch key {
+        case "↵":
+            // Treat return as "send" if we have a valid command queued.
+            if activeCommand != nil { sendCommand() }
+            return
+        case "⌫":
+            guard var buf = slashBuffer else { return }
+            if !buf.isEmpty { buf.removeLast() }
+            if buf.isEmpty {
+                slashBuffer = nil
+                hideCommandBar()
+            } else {
+                slashBuffer = buf
+            }
+            updateCommandDetection()
+            return
+        case "space":
+            slashBuffer? += " "
+            updateCommandDetection()
+            return
+        default:
+            var text = key
+            if mode == .qwerty, key.count == 1, key.first?.isLetter == true {
+                text = (isCapsLock || isShiftedOnce) ? key.uppercased() : key
+                if isShiftedOnce && !isCapsLock {
+                    isShiftedOnce = false
+                    slashBuffer? += text
+                    updateCommandDetection()
+                    rebuildKeyboard()
+                    return
+                }
+            }
+            slashBuffer? += text
             updateCommandDetection()
         }
     }
@@ -697,24 +769,24 @@ class KeyboardViewController: UIInputViewController {
     // MARK: - Slash command detection
 
     private func updateCommandDetection() {
-        // First try slash command detection
-        if let context = textDocumentProxy.documentContextBeforeInput,
-           let slashIdx = context.lastIndex(of: "/") {
+        // The slash buffer is the only source of truth — we never put `/...`
+        // into the host text field, so we don't read it back from the proxy.
+        if let buf = slashBuffer, buf.hasPrefix("/") {
+            let body     = String(buf.dropFirst())
+            let spaceIdx = body.firstIndex(of: " ")
+            let cmdName  = spaceIdx.map { String(body[..<$0]) } ?? body
+            let prompt   = spaceIdx.map { String(body[body.index(after: $0)...]) } ?? ""
 
-            let candidate = String(context[slashIdx...])
-            if !candidate.contains("\n") {
-                let withoutSlash = String(candidate.dropFirst())
-                let spaceIdx     = withoutSlash.firstIndex(of: " ")
-                let cmdName      = spaceIdx.map { String(withoutSlash[..<$0]) } ?? withoutSlash
-                let prompt       = spaceIdx.map { String(withoutSlash[withoutSlash.index(after: $0)...]) } ?? ""
-
-                if let cmd = SlashCommand(rawValue: cmdName.lowercased()),
-                   spaceIdx != nil || !cmd.needsPrompt {
-                    commandPromptText = prompt
-                    showCommandBar(cmd)
-                    return
-                }
+            if let cmd = SlashCommand(rawValue: cmdName.lowercased()),
+               spaceIdx != nil || !cmd.needsPrompt {
+                commandPromptText = prompt
+                showCommandBar(cmd)
+            } else {
+                // Buffer doesn't match a known command yet — show a draft bar
+                // so the user can see what they're typing.
+                showDraftCommandBar(buffer: buf)
             }
+            return
         }
 
         // No active slash command — fall back to word suggestions
@@ -832,6 +904,34 @@ class KeyboardViewController: UIInputViewController {
         }
     }
 
+    // Shown while the buffer is `/` or `/xy` — i.e. the user is mid-typing a
+    // command name that doesn't yet match a known command. Gives them visible
+    // feedback for every keystroke.
+    private func showDraftCommandBar(buffer: String) {
+        activeCommand  = nil
+        suggestionMode = .slashCommand
+
+        [cmdPill, cmdPromptLabel, cmdSendButton, cmdCancelButton].forEach { $0.isHidden = false }
+        cmdSpinner.stopAnimating()
+        cmdSuggestionsStack.isHidden = true
+
+        cmdPill.text = "  /  "
+        if buffer.count <= 1 {
+            cmdPromptLabel.text      = "type a command…"
+            cmdPromptLabel.textColor = UIColor.white.withAlphaComponent(0.40)
+        } else {
+            cmdPromptLabel.text      = buffer
+            cmdPromptLabel.textColor = UIColor.white.withAlphaComponent(0.90)
+        }
+        cmdSendButton.setTitle("Send", for: .normal)
+
+        if commandBar.isHidden {
+            commandBar.alpha    = 0
+            commandBar.isHidden = false
+            UIView.animate(withDuration: 0.15) { self.commandBar.alpha = 1 }
+        }
+    }
+
     private func hideCommandBar() {
         guard !commandBar.isHidden, !isGenerating else { return }
         activeCommand = nil
@@ -847,10 +947,9 @@ class KeyboardViewController: UIInputViewController {
     }
 
     @objc private func cancelCommand() {
-        if let context = textDocumentProxy.documentContextBeforeInput,
-           let slashIdx = context.lastIndex(of: "/") {
-            for _ in String(context[slashIdx...]) { textDocumentProxy.deleteBackward() }
-        }
+        // Nothing was inserted into the host field, so nothing to delete —
+        // just drop the buffer.
+        slashBuffer = nil
         hideCommandBar()
     }
 
@@ -869,10 +968,9 @@ class KeyboardViewController: UIInputViewController {
         cmdSendButton.isHidden = true
         cmdSpinner.startAnimating()
 
-        if let context = textDocumentProxy.documentContextBeforeInput,
-           let slashIdx = context.lastIndex(of: "/") {
-            for _ in String(context[slashIdx...]) { textDocumentProxy.deleteBackward() }
-        }
+        // Buffer holds the slash text; nothing was typed into the host field,
+        // so there's nothing to delete from the proxy.
+        slashBuffer = nil
         executeCommand(cmd, prompt: commandPromptText)
     }
 
@@ -895,15 +993,10 @@ class KeyboardViewController: UIInputViewController {
                 case .text(let text):
                     if cmd == .org {
                         hideCommandBar()
-                        showBanner("📐 Rendering layout…")
-                        let cleaned = Self.stripCodeFences(text)
-                        HTMLImageRenderer.shared.render(html: cleaned) { [weak self] image in
-                            guard let self = self else { return }
-                            if let image = image {
-                                self.showImagePreview(image)
-                            } else {
-                                self.showBanner("⚠️ Layout render failed")
-                            }
+                        if let image = OrgImageRenderer.render(json: text) {
+                            showImagePreview(image)
+                        } else {
+                            showBanner("⚠️ Layout render failed")
                         }
                     } else {
                         textDocumentProxy.insertText(text)
@@ -946,11 +1039,12 @@ class KeyboardViewController: UIInputViewController {
         catch { throw ProviderError.unknown(error) }
     }
 
-    // Text before the slash — this is what /fix, /tone, /reply, /tl act on
+    // Text before the slash — this is what /fix, /tone, /reply, /tl act on.
+    // The slash itself never reaches the host field, so the entire pre-input
+    // context is fair game.
     private func contextBeforeSlash() -> String {
-        guard let full = textDocumentProxy.documentContextBeforeInput,
-              let slashIdx = full.lastIndex(of: "/") else { return "" }
-        return String(full[..<slashIdx]).trimmingCharacters(in: .whitespacesAndNewlines)
+        return (textDocumentProxy.documentContextBeforeInput ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private static func stripCodeFences(_ s: String) -> String {

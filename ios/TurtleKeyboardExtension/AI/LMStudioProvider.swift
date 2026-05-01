@@ -25,7 +25,7 @@ import Foundation
 final class LMStudioProvider: AIProvider {
     let id: ProviderID = .lmstudio
 
-    private let endpoint = URL(string: "http://192.168.1.10:1234/v1/chat/completions")!
+    private let endpoint = URL(string: "http://192.168.1.5:1234/v1/chat/completions")!
     private let temperature = 0.4
 
     private let session: URLSession = {
