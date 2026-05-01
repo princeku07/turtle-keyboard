@@ -18,17 +18,44 @@ class KeyboardViewController: UIInputViewController {
     // MARK: - Slash command state
 
     private enum SlashCommand: String {
-        case cap = "cap", fix = "fix", tone = "tone", reply = "reply", tl = "tl"
+        case cap   = "cap"
+        case fix   = "fix"
+        case tone  = "tone"
+        case reply = "reply"
+        case tl    = "tl"
+        case ask   = "ask"
+        case org   = "org"
+
         var emoji: String {
-            switch self { case .cap: "🎨"; case .fix: "✏️"; case .tone: "🎭"; case .reply: "💬"; case .tl: "🌐" }
+            switch self {
+            case .cap:   return "🎨"
+            case .fix:   return "✏️"
+            case .tone:  return "🎭"
+            case .reply: return "💬"
+            case .tl:    return "🌐"
+            case .ask:   return "❓"
+            case .org:   return "📐"
+            }
         }
-        var needsPrompt: Bool { self == .cap || self == .tone || self == .tl }
+        var needsPrompt: Bool {
+            switch self {
+            case .cap, .tone, .tl, .ask, .org: return true
+            case .fix, .reply:                 return false
+            }
+        }
         var buttonTitle: String { self == .cap ? "Generate" : "Send" }
     }
 
     private var activeCommand: SlashCommand?
     private var commandPromptText = ""
     private var isGenerating      = false
+    private var pendingSuggestions: [String] = []
+
+    // commandBar can show one of three things at a time
+    private enum SuggestionMode { case none, slashCommand, replyResult, wordSuggestion }
+    private var suggestionMode: SuggestionMode = .none
+
+    private let textChecker = UITextChecker()
 
     // MARK: - Layout
     //
@@ -39,10 +66,16 @@ class KeyboardViewController: UIInputViewController {
     // Show/hide the command bar via isHidden only — no size changes.
     // This guarantees the iOS system shortcut bar never overlaps our UI.
 
-    private let rowH:        CGFloat = 54
-    private let rowGap:      CGFloat = 12
+    // Layout dimensions vary by device:
+    // iPhone — 4 rows fit in ~334pt total (matches iOS native).
+    // iPad   — 5 rows (extra number row) must fit in iPad's input view height.
+    //          iOS only gives custom keyboards ~290pt portrait on smaller iPads
+    //          (mini), so we size for that worst case. Command bar shrinks too.
+    //          5*42 + 6*6 + 4 = 250 (rows) + 40 (commandBar) = 290pt total.
+    private var rowH:        CGFloat { isPad ? 42 : 54 }
+    private var rowGap:      CGFloat { isPad ? 6  : 12 }
+    private var commandBarH: CGFloat { isPad ? 40 : 52 }
     private let keyGap:      CGFloat = 8
-    private let commandBarH: CGFloat = 52
     private let bottomPad:   CGFloat = 4
 
     // Height of the four key rows (no command bar)
@@ -60,17 +93,23 @@ class KeyboardViewController: UIInputViewController {
 
     // MARK: - UI references
 
-    private var commandBar:        UIView!
-    private var cmdPill:           UILabel!
-    private var cmdPromptLabel:    UILabel!
-    private var cmdSendButton:     UIButton!
-    private var cmdCancelButton:   UIButton!
-    private var cmdSpinner:        UIActivityIndicatorView!
-    private var bannerContainer:   UIView!
-    private var bannerLabel:       UILabel!
-    private var keyboardContainer: UIView!
-    private var heightConstraint:  NSLayoutConstraint!
-    private var hideBannerTimer:   Timer?
+    private var commandBar:          UIView!
+    private var cmdPill:             UILabel!
+    private var cmdPromptLabel:      UILabel!
+    private var cmdSendButton:       UIButton!
+    private var cmdCancelButton:     UIButton!
+    private var cmdSpinner:          UIActivityIndicatorView!
+    private var cmdSuggestionsStack: UIStackView!
+    private var cmdSuggestionBtns:   [UIButton] = []
+    private var bannerContainer:     UIView!
+    private var bannerLabel:         UILabel!
+    private var keyboardContainer:   UIView!
+    private var heightConstraint:    NSLayoutConstraint!
+    private var hideBannerTimer:     Timer?
+    private var backspaceTimer:      Timer?
+    private var previewOverlay:      UIView?
+    private var previewImageView:    UIImageView?
+    private var pendingPreviewImage: UIImage?
 
     // MARK: - Palette
 
@@ -80,7 +119,11 @@ class KeyboardViewController: UIInputViewController {
     private let keyShiftOn = UIColor(red: 0.290, green: 0.580, blue: 0.305, alpha: 1.0)
     private let barBg      = UIColor(red: 0.045, green: 0.180, blue: 0.060, alpha: 1.0)
 
-    // MARK: - Key rows
+    // MARK: - Device
+
+    private var isPad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
+
+    // MARK: - Key rows  (iPhone — 4 rows)
 
     private let qwertyRows: [[String]] = [
         ["q","w","e","r","t","y","u","i","o","p"],
@@ -101,6 +144,30 @@ class KeyboardViewController: UIInputViewController {
         ["🌐","ABC",",","space",".","↵"]
     ]
 
+    // MARK: - Key rows  (iPad — 5 rows: numbers + 3 letter rows + modifier)
+
+    private let qwertyRowsPad: [[String]] = [
+        ["1","2","3","4","5","6","7","8","9","0","⌫"],
+        ["q","w","e","r","t","y","u","i","o","p"],
+        ["a","s","d","f","g","h","j","k","l","↵"],
+        ["⇧","z","x","c","v","b","n","m",",",".","⇧"],
+        ["🌐","?123","space","?123","↵"]
+    ]
+    private let symbolRowsPad: [[String]] = [
+        ["1","2","3","4","5","6","7","8","9","0","⌫"],
+        ["@","#","$","_","&","-","+","(",")","/"],
+        ["=","*","\"","'",":",";","!","?","€","↵"],
+        ["=\\<","~","`","|","%","^","[","]","{","}","⇧"],
+        ["🌐","ABC","space","ABC","↵"]
+    ]
+    private let symbolShiftRowsPad: [[String]] = [
+        ["1","2","3","4","5","6","7","8","9","0","⌫"],
+        ["~","`","|","•","√","π","÷","×","§","∆"],
+        ["%","^","€","£","¥","=","\\","{","}","↵"],
+        ["?123","_","—","[","]","<",">","!",".",",","⇧"],
+        ["🌐","ABC","space","ABC","↵"]
+    ]
+
     // MARK: - Lifecycle
 
     override func viewDidLoad() {
@@ -111,6 +178,131 @@ class KeyboardViewController: UIInputViewController {
         buildKeyboard()
         // Set once — never changed again anywhere in this file.
         preferredContentSize = CGSize(width: 0, height: totalH)
+
+        // Try to suppress the iPad system shortcut bar (undo / redo / clipboard).
+        // This bar is owned by the host app's UITextField; a keyboard extension
+        // cannot fully remove it, but emptying our own assistant item often
+        // collapses it to zero on iPad.
+        suppressSystemShortcutBar()
+
+        // Pre-warm the HTML→image renderer so its WebView is ready well before
+        // /org is invoked. The WebView must live in the view hierarchy because
+        // html-to-image relies on requestAnimationFrame, which iOS pauses on
+        // detached WKWebViews.
+        HTMLImageRenderer.shared.attach(to: view)
+    }
+
+    private func suppressSystemShortcutBar() {
+        inputAssistantItem.leadingBarButtonGroups  = []
+        inputAssistantItem.trailingBarButtonGroups = []
+    }
+
+    // MARK: - Image preview overlay
+    //
+    // After /org or /cap finishes, the resulting image is shown as a preview
+    // covering the keyboard area. The user inspects it and either taps
+    // "Copy to clipboard" (puts it on the pasteboard so they can long-press
+    // and paste in the chat field) or "Close" to discard.
+
+    private func showImagePreview(_ image: UIImage) {
+        if previewOverlay == nil { buildPreviewOverlay() }
+        pendingPreviewImage = image
+        previewImageView?.image = image
+        previewOverlay?.isHidden = false
+        if let overlay = previewOverlay {
+            keyboardContainer.bringSubviewToFront(overlay)
+        }
+        hideCommandBar()
+    }
+
+    private func dismissPreview() {
+        previewOverlay?.isHidden = true
+        pendingPreviewImage = nil
+    }
+
+    @objc private func previewCopyTapped() {
+        if let img = pendingPreviewImage {
+            UIPasteboard.general.image = img
+            showBanner("📋 Copied — long-press field to paste")
+        }
+        dismissPreview()
+    }
+
+    @objc private func previewCloseTapped() {
+        dismissPreview()
+    }
+
+    private func buildPreviewOverlay() {
+        let overlay = UIView()
+        overlay.backgroundColor = bgColor
+        overlay.translatesAutoresizingMaskIntoConstraints = false
+        keyboardContainer.addSubview(overlay)
+        NSLayoutConstraint.activate([
+            overlay.topAnchor.constraint(equalTo: keyboardContainer.topAnchor),
+            overlay.leadingAnchor.constraint(equalTo: keyboardContainer.leadingAnchor),
+            overlay.trailingAnchor.constraint(equalTo: keyboardContainer.trailingAnchor),
+            overlay.bottomAnchor.constraint(equalTo: keyboardContainer.bottomAnchor),
+        ])
+
+        let title = UILabel()
+        title.text = "Preview"
+        title.font = .boldSystemFont(ofSize: 13)
+        title.textColor = .white
+        title.translatesAutoresizingMaskIntoConstraints = false
+        overlay.addSubview(title)
+
+        let imageView = UIImageView()
+        imageView.contentMode = .scaleAspectFit
+        imageView.layer.cornerRadius = 8
+        imageView.clipsToBounds = true
+        imageView.backgroundColor = .white
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        overlay.addSubview(imageView)
+
+        let copyBtn = UIButton(type: .system)
+        copyBtn.setTitle("📋  Copy", for: .normal)
+        copyBtn.setTitleColor(UIColor(red: 0.106, green: 0.369, blue: 0.125, alpha: 1.0), for: .normal)
+        copyBtn.titleLabel?.font = .boldSystemFont(ofSize: 14)
+        copyBtn.backgroundColor = .white
+        copyBtn.layer.cornerRadius = 8
+        copyBtn.translatesAutoresizingMaskIntoConstraints = false
+        copyBtn.addTarget(self, action: #selector(previewCopyTapped), for: .touchUpInside)
+        overlay.addSubview(copyBtn)
+
+        let closeBtn = UIButton(type: .system)
+        closeBtn.setTitle("✕  Close", for: .normal)
+        closeBtn.setTitleColor(.white, for: .normal)
+        closeBtn.titleLabel?.font = .systemFont(ofSize: 14, weight: .medium)
+        closeBtn.backgroundColor = UIColor.white.withAlphaComponent(0.18)
+        closeBtn.layer.cornerRadius = 8
+        closeBtn.translatesAutoresizingMaskIntoConstraints = false
+        closeBtn.addTarget(self, action: #selector(previewCloseTapped), for: .touchUpInside)
+        overlay.addSubview(closeBtn)
+
+        NSLayoutConstraint.activate([
+            title.topAnchor.constraint(equalTo: overlay.topAnchor, constant: 8),
+            title.centerXAnchor.constraint(equalTo: overlay.centerXAnchor),
+
+            imageView.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 6),
+            imageView.centerXAnchor.constraint(equalTo: overlay.centerXAnchor),
+            imageView.bottomAnchor.constraint(equalTo: copyBtn.topAnchor, constant: -10),
+            imageView.widthAnchor.constraint(equalTo: imageView.heightAnchor),
+            imageView.leadingAnchor.constraint(greaterThanOrEqualTo: overlay.leadingAnchor, constant: 16),
+
+            copyBtn.leadingAnchor.constraint(equalTo: overlay.leadingAnchor, constant: 12),
+            copyBtn.trailingAnchor.constraint(equalTo: overlay.centerXAnchor, constant: -6),
+            copyBtn.bottomAnchor.constraint(equalTo: overlay.bottomAnchor, constant: -10),
+            copyBtn.heightAnchor.constraint(equalToConstant: 42),
+
+            closeBtn.leadingAnchor.constraint(equalTo: overlay.centerXAnchor, constant: 6),
+            closeBtn.trailingAnchor.constraint(equalTo: overlay.trailingAnchor, constant: -12),
+            closeBtn.bottomAnchor.constraint(equalTo: overlay.bottomAnchor, constant: -10),
+            closeBtn.heightAnchor.constraint(equalToConstant: 42),
+        ])
+
+        overlay.isHidden = true
+        previewOverlay = overlay
+        previewImageView = imageView
     }
 
     // MARK: - Container setup
@@ -189,6 +381,29 @@ class KeyboardViewController: UIInputViewController {
         cmdSendButton.translatesAutoresizingMaskIntoConstraints = false
         commandBar.addSubview(cmdSendButton)
 
+        // Suggestion chips — for /reply results (3 tappable options)
+        cmdSuggestionsStack = UIStackView()
+        cmdSuggestionsStack.axis         = .horizontal
+        cmdSuggestionsStack.distribution = .fillEqually
+        cmdSuggestionsStack.spacing      = 6
+        cmdSuggestionsStack.isHidden     = true
+        cmdSuggestionsStack.translatesAutoresizingMaskIntoConstraints = false
+        commandBar.addSubview(cmdSuggestionsStack)
+
+        for i in 0..<3 {
+            let btn = UIButton(type: .custom)
+            btn.tag = i
+            btn.titleLabel?.font          = .systemFont(ofSize: 12, weight: .medium)
+            btn.titleLabel?.lineBreakMode = .byTruncatingTail
+            btn.setTitleColor(.white, for: .normal)
+            btn.backgroundColor           = UIColor.white.withAlphaComponent(0.18)
+            btn.layer.cornerRadius        = 8
+            btn.contentEdgeInsets         = UIEdgeInsets(top: 0, left: 8, bottom: 0, right: 8)
+            btn.addTarget(self, action: #selector(suggestionTapped(_:)), for: .touchUpInside)
+            cmdSuggestionsStack.addArrangedSubview(btn)
+            cmdSuggestionBtns.append(btn)
+        }
+
         // ── Banner — overlays the command bar slot ────────────────────────────
         bannerContainer = UIView()
         bannerContainer.backgroundColor = UIColor(red: 0.051, green: 0.247, blue: 0.071, alpha: 1.0)
@@ -238,6 +453,12 @@ class KeyboardViewController: UIInputViewController {
 
             cmdSendButton.trailingAnchor.constraint(equalTo: commandBar.trailingAnchor, constant: -12),
             cmdSendButton.centerYAnchor.constraint(equalTo: commandBar.centerYAnchor),
+
+            // Suggestions stack fills the space to the right of the cancel button
+            cmdSuggestionsStack.leadingAnchor.constraint(equalTo: cmdCancelButton.trailingAnchor, constant: 6),
+            cmdSuggestionsStack.trailingAnchor.constraint(equalTo: commandBar.trailingAnchor, constant: -12),
+            cmdSuggestionsStack.centerYAnchor.constraint(equalTo: commandBar.centerYAnchor),
+            cmdSuggestionsStack.heightAnchor.constraint(equalToConstant: 36),
         ])
     }
 
@@ -267,9 +488,16 @@ class KeyboardViewController: UIInputViewController {
         var widths: [CGFloat]; var xOffset: CGFloat
 
         if isBottom {
-            let props: [CGFloat] = [8, 12, 7, 42, 7, 24]
+            // iPad bottom row: 5 keys [🌐, ?123, space, ?123, ↵]
+            // iPhone bottom row: 6 keys [🌐, ?123, ',', space, '.', ↵]
+            let props: [CGFloat]
+            switch keys.count {
+            case 5:  props = [9, 13, 48, 13, 17]                // iPad
+            default: props = [8, 12, 7, 42, 7, 24]              // iPhone
+            }
             let avail = w - keyGap * CGFloat(keys.count + 1)
-            widths = props.map { avail * $0 / 100 }; xOffset = keyGap
+            widths = props.map { avail * $0 / 100 }
+            xOffset = keyGap
         } else if isModifier {
             let sideW   = w * 0.135
             let avail   = w - 2 * sideW - keyGap * CGFloat(keys.count + 1)
@@ -344,7 +572,56 @@ class KeyboardViewController: UIInputViewController {
         btn.accessibilityLabel  = label
         btn.addTarget(self, action: #selector(keyTouchDown(_:)), for: .touchDown)
         btn.addTarget(self, action: #selector(keyTapped(_:)),    for: .touchUpInside)
+
+        // Press-and-hold to repeatedly delete (matches native keyboard behaviour)
+        if label == "⌫" {
+            let lp = UILongPressGestureRecognizer(target: self,
+                                                  action: #selector(backspaceLongPress(_:)))
+            lp.minimumPressDuration = 0.4
+            btn.addGestureRecognizer(lp)
+        }
         return btn
+    }
+
+    // MARK: - Backspace repeat
+
+    @objc private func backspaceLongPress(_ gesture: UILongPressGestureRecognizer) {
+        switch gesture.state {
+        case .began:
+            startBackspaceRepeat()
+        case .ended, .cancelled, .failed:
+            stopBackspaceRepeat()
+            // cancelsTouchesInView=true means touchUpInside won't fire — restore visual
+            if let btn = gesture.view as? UIButton {
+                UIView.animate(withDuration: 0.08) { btn.transform = .identity }
+            }
+        default: break
+        }
+    }
+
+    private func startBackspaceRepeat() {
+        backspaceTimer?.invalidate()
+        // Initial delete on press-and-hold start
+        handleBackspace()
+        updateCommandDetection()
+        haptic.impactOccurred()
+        // Repeat at ~12 deletes/sec until released
+        backspaceTimer = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            // Stop if there's nothing left to delete
+            let before = self.textDocumentProxy.documentContextBeforeInput ?? ""
+            guard !before.isEmpty else {
+                self.stopBackspaceRepeat()
+                return
+            }
+            self.handleBackspace()
+            self.updateCommandDetection()
+        }
+    }
+
+    private func stopBackspaceRepeat() {
+        backspaceTimer?.invalidate()
+        backspaceTimer = nil
     }
 
     // MARK: - Key press handling
@@ -420,22 +697,110 @@ class KeyboardViewController: UIInputViewController {
     // MARK: - Slash command detection
 
     private func updateCommandDetection() {
-        guard let context = textDocumentProxy.documentContextBeforeInput,
-              let slashIdx = context.lastIndex(of: "/") else { hideCommandBar(); return }
+        // First try slash command detection
+        if let context = textDocumentProxy.documentContextBeforeInput,
+           let slashIdx = context.lastIndex(of: "/") {
 
-        let candidate = String(context[slashIdx...])
-        guard !candidate.contains("\n") else { hideCommandBar(); return }
+            let candidate = String(context[slashIdx...])
+            if !candidate.contains("\n") {
+                let withoutSlash = String(candidate.dropFirst())
+                let spaceIdx     = withoutSlash.firstIndex(of: " ")
+                let cmdName      = spaceIdx.map { String(withoutSlash[..<$0]) } ?? withoutSlash
+                let prompt       = spaceIdx.map { String(withoutSlash[withoutSlash.index(after: $0)...]) } ?? ""
 
-        let withoutSlash = String(candidate.dropFirst())
-        let spaceIdx     = withoutSlash.firstIndex(of: " ")
-        let cmdName      = spaceIdx.map { String(withoutSlash[..<$0]) } ?? withoutSlash
-        let prompt       = spaceIdx.map { String(withoutSlash[withoutSlash.index(after: $0)...]) } ?? ""
+                if let cmd = SlashCommand(rawValue: cmdName.lowercased()),
+                   spaceIdx != nil || !cmd.needsPrompt {
+                    commandPromptText = prompt
+                    showCommandBar(cmd)
+                    return
+                }
+            }
+        }
 
-        guard let cmd = SlashCommand(rawValue: cmdName.lowercased()) else { hideCommandBar(); return }
-        guard spaceIdx != nil || !cmd.needsPrompt else { hideCommandBar(); return }
+        // No active slash command — fall back to word suggestions
+        if activeCommand != nil { hideCommandBar() }
+        updateWordSuggestions()
+    }
 
-        commandPromptText = prompt
-        showCommandBar(cmd)
+    // MARK: - Word suggestions (in-keyboard autocomplete strip)
+
+    private func updateWordSuggestions() {
+        guard activeCommand == nil, !isGenerating else { return }
+
+        let context = (textDocumentProxy.documentContextBeforeInput ?? "") as NSString
+        let range = context.range(of: "\\S+$", options: .regularExpression)
+
+        guard range.location != NSNotFound else {
+            if suggestionMode == .wordSuggestion { hideCommandBar() }
+            return
+        }
+        let currentWord = context.substring(with: range)
+
+        // Skip while user is composing a slash command
+        guard !currentWord.hasPrefix("/"), currentWord.count >= 2 else {
+            if suggestionMode == .wordSuggestion { hideCommandBar() }
+            return
+        }
+
+        let lang = "en"
+        let wordRange = NSRange(location: 0, length: currentWord.utf16.count)
+        let completions = textChecker.completions(forPartialWordRange: wordRange,
+                                                  in: currentWord,
+                                                  language: lang) ?? []
+        var picks = Array(completions.prefix(3))
+
+        // If typed token is a misspelling, also surface guesses
+        if picks.count < 3 {
+            let misspelled = textChecker.rangeOfMisspelledWord(in: currentWord,
+                                                               range: wordRange,
+                                                               startingAt: 0,
+                                                               wrap: false,
+                                                               language: lang)
+            if misspelled.location != NSNotFound {
+                let guesses = textChecker.guesses(forWordRange: misspelled,
+                                                  in: currentWord,
+                                                  language: lang) ?? []
+                for g in guesses where !picks.contains(g) {
+                    picks.append(g)
+                    if picks.count == 3 { break }
+                }
+            }
+        }
+
+        if picks.isEmpty {
+            if suggestionMode == .wordSuggestion { hideCommandBar() }
+        } else {
+            showWordSuggestions(picks)
+        }
+    }
+
+    private func showWordSuggestions(_ items: [String]) {
+        suggestionMode = .wordSuggestion
+        pendingSuggestions = items
+
+        for (i, btn) in cmdSuggestionBtns.enumerated() {
+            btn.setTitle(i < items.count ? items[i] : nil, for: .normal)
+            btn.isHidden = i >= items.count
+        }
+        // Hide normal command-bar controls; show only the chips
+        [cmdPill, cmdPromptLabel, cmdSendButton, cmdCancelButton].forEach { $0.isHidden = true }
+        cmdSuggestionsStack.isHidden = false
+
+        if commandBar.isHidden {
+            commandBar.alpha = 0
+            commandBar.isHidden = false
+            UIView.animate(withDuration: 0.15) { self.commandBar.alpha = 1 }
+        }
+    }
+
+    private func replaceCurrentWord(with replacement: String) {
+        let context = (textDocumentProxy.documentContextBeforeInput ?? "") as NSString
+        let range = context.range(of: "\\S+$", options: .regularExpression)
+        guard range.location != NSNotFound else { return }
+
+        let currentWord = context.substring(with: range)
+        for _ in 0..<currentWord.count { textDocumentProxy.deleteBackward() }
+        textDocumentProxy.insertText(replacement + " ")
     }
 
     // MARK: - Command bar  (isHidden only — height and preferredContentSize never change)
@@ -443,6 +808,11 @@ class KeyboardViewController: UIInputViewController {
     private func showCommandBar(_ cmd: SlashCommand) {
         guard !isGenerating else { return }
         activeCommand = cmd
+        suggestionMode = .slashCommand
+
+        // Coming from word-suggestion mode? Restore normal controls first.
+        [cmdPill, cmdPromptLabel, cmdSendButton, cmdCancelButton].forEach { $0.isHidden = false }
+        cmdSuggestionsStack.isHidden = true
 
         cmdPill.text = "  \(cmd.emoji) /\(cmd.rawValue)  "
         cmdSendButton.setTitle(cmd.buttonTitle, for: .normal)
@@ -465,11 +835,14 @@ class KeyboardViewController: UIInputViewController {
     private func hideCommandBar() {
         guard !commandBar.isHidden, !isGenerating else { return }
         activeCommand = nil
+        pendingSuggestions = []
+        suggestionMode = .none
         UIView.animate(withDuration: 0.15, animations: {
             self.commandBar.alpha = 0
         }, completion: { _ in
             self.commandBar.isHidden = true
             self.commandBar.alpha    = 1
+            self.resetCommandBarMode()
         })
     }
 
@@ -482,6 +855,11 @@ class KeyboardViewController: UIInputViewController {
     }
 
     @objc private func sendCommand() {
+        guard hasFullAccess else {
+            shake(commandBar)
+            showBanner("⚠️ Enable Full Access in Settings → Keyboard")
+            return
+        }
         guard let cmd = activeCommand, !isGenerating else { return }
         if cmd.needsPrompt && commandPromptText.trimmingCharacters(in: .whitespaces).isEmpty {
             shake(commandBar); showBanner("Type a prompt first ↑"); return
@@ -498,34 +876,153 @@ class KeyboardViewController: UIInputViewController {
         executeCommand(cmd, prompt: commandPromptText)
     }
 
-    // MARK: - Command execution (stub — replace body with POST /v1/command)
+    // MARK: - Command execution
 
     private func executeCommand(_ cmd: SlashCommand, prompt: String) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + (cmd == .cap ? 1.8 : 1.1)) { [weak self] in
-            guard let self else { return }
-            self.isGenerating = false
-            self.cmdSpinner.stopAnimating()
-            self.cmdSendButton.isHidden = false
-            self.hideCommandBar()
+        let context = contextBeforeSlash()
+        Task { @MainActor in
+            do {
+                let result = try await CommandRouter.shared.execute(
+                    command: cmd.rawValue,
+                    prompt: prompt,
+                    context: context
+                )
+                isGenerating = false
+                cmdSpinner.stopAnimating()
+                cmdSendButton.isHidden = false
 
-            switch cmd {
-            case .cap:
-                UIPasteboard.general.string = "[\(prompt)]"
-                self.showBanner("🎨 Image ready — long-press field to paste")
-            case .fix:
-                self.textDocumentProxy.insertText("[fixed text]")
-                self.showBanner("✏️ Grammar fixed")
-            case .tone:
-                self.textDocumentProxy.insertText("[rewritten: \(prompt)]")
-                self.showBanner("🎭 Tone applied")
-            case .reply:
-                self.textDocumentProxy.insertText("[suggested reply]")
-                self.showBanner("💬 Reply ready")
-            case .tl:
-                self.textDocumentProxy.insertText("[translated → \(prompt)]")
-                self.showBanner("🌐 Translated")
+                switch result {
+                case .text(let text):
+                    if cmd == .org {
+                        hideCommandBar()
+                        showBanner("📐 Rendering layout…")
+                        let cleaned = Self.stripCodeFences(text)
+                        HTMLImageRenderer.shared.render(html: cleaned) { [weak self] image in
+                            guard let self = self else { return }
+                            if let image = image {
+                                self.showImagePreview(image)
+                            } else {
+                                self.showBanner("⚠️ Layout render failed")
+                            }
+                        }
+                    } else {
+                        textDocumentProxy.insertText(text)
+                        hideCommandBar()
+                        showBanner(completionBanner(for: cmd))
+                    }
+
+                case .image(let urlString):
+                    hideCommandBar()
+                    do {
+                        let data = try await downloadImageData(from: urlString)
+                        if let image = UIImage(data: data) {
+                            showImagePreview(image)
+                        }
+                    } catch {
+                        showBanner("⚠️ Image download failed")
+                    }
+
+                case .suggestions(let items):
+                    showSuggestions(items)
+                }
+
+            } catch {
+                isGenerating = false
+                cmdSpinner.stopAnimating()
+                cmdSendButton.isHidden = false
+                showBanner("⚠️ " + (error.localizedDescription))
             }
         }
+    }
+
+    private func downloadImageData(from urlString: String) async throws -> Data {
+        guard let url = URL(string: urlString) else {
+            throw ProviderError.badResponse("Invalid image URL")
+        }
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            return data
+        } catch let e as URLError { throw ProviderError.network(e) }
+        catch { throw ProviderError.unknown(error) }
+    }
+
+    // Text before the slash — this is what /fix, /tone, /reply, /tl act on
+    private func contextBeforeSlash() -> String {
+        guard let full = textDocumentProxy.documentContextBeforeInput,
+              let slashIdx = full.lastIndex(of: "/") else { return "" }
+        return String(full[..<slashIdx]).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func stripCodeFences(_ s: String) -> String {
+        var t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+        if t.hasPrefix("```") {
+            if let nl = t.firstIndex(of: "\n") {
+                t = String(t[t.index(after: nl)...])
+            }
+            if t.hasSuffix("```") {
+                t = String(t.dropLast(3))
+            }
+        }
+        return t.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func completionBanner(for cmd: SlashCommand) -> String {
+        switch cmd {
+        case .cap:   return "🎨 Image ready — long-press field to paste"
+        case .fix:   return "✏️ Grammar fixed"
+        case .tone:  return "🎭 Tone applied"
+        case .reply: return "💬 Reply inserted"
+        case .tl:    return "🌐 Translated"
+        case .ask:   return "❓ Answer inserted"
+        case .org:   return "📐 Layout ready — long-press field to paste"
+        }
+    }
+
+    // MARK: - Suggestions UI  (/reply returns 3 tappable options)
+
+    private func showSuggestions(_ items: [String]) {
+        guard !items.isEmpty else {
+            showBanner("⚠️ No suggestions returned")
+            hideCommandBar()
+            return
+        }
+        pendingSuggestions = items
+
+        for (i, btn) in cmdSuggestionBtns.enumerated() {
+            btn.setTitle(i < items.count ? items[i] : nil, for: .normal)
+            btn.isHidden = i >= items.count
+        }
+        // Switch commandBar to suggestions mode
+        [cmdPill, cmdPromptLabel, cmdSendButton].forEach { $0.isHidden = true }
+        cmdSuggestionsStack.isHidden = false
+    }
+
+    @objc private func suggestionTapped(_ sender: UIButton) {
+        let i = sender.tag
+        guard i < pendingSuggestions.count else { return }
+        let pick = pendingSuggestions[i]
+
+        switch suggestionMode {
+        case .wordSuggestion:
+            replaceCurrentWord(with: pick)
+            pendingSuggestions = []
+            suggestionMode = .none
+            hideCommandBar()
+            // Re-evaluate suggestions after the replacement (cursor advanced)
+            updateWordSuggestions()
+        default:
+            // /reply suggestion → insert full reply
+            textDocumentProxy.insertText(pick)
+            pendingSuggestions = []
+            suggestionMode = .none
+            resetCommandBarMode()
+            hideCommandBar()
+        }
+    }
+
+    private func resetCommandBarMode() {
+        [cmdPill, cmdPromptLabel, cmdSendButton, cmdCancelButton].forEach { $0.isHidden = false }
+        cmdSuggestionsStack.isHidden = true
     }
 
     // MARK: - Banner
@@ -562,9 +1059,18 @@ class KeyboardViewController: UIInputViewController {
     // MARK: - Helpers
 
     private func currentRows() -> [[String]] {
-        switch mode {
-        case .qwerty: return qwertyRows; case .symbols: return symbolRows
-        case .symbolsShift: return symbolShiftRows
+        if isPad {
+            switch mode {
+            case .qwerty:       return qwertyRowsPad
+            case .symbols:      return symbolRowsPad
+            case .symbolsShift: return symbolShiftRowsPad
+            }
+        } else {
+            switch mode {
+            case .qwerty:       return qwertyRows
+            case .symbols:      return symbolRows
+            case .symbolsShift: return symbolShiftRows
+            }
         }
     }
 

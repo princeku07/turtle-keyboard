@@ -4,6 +4,23 @@
 <dict>
 	<key>CFBundleDisplayName</key>
 	<string>Turtle Keyboard</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Turtle Keyboard connects to AI servers running on your local network so you can use slash commands without sending text to the cloud.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>192.168.1.10</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+			</dict>
+		</dict>
+	</dict>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>

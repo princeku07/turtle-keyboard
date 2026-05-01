@@ -10,6 +10,21 @@
 		CC000003CC000003CC000003 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000002CC000002CC000002 /* AppDelegate.swift */; };
 		CC000005CC000005CC000005 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000004CC000004CC000004 /* ViewController.swift */; };
 		EE000003EE000003EE000003 /* KeyboardViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000002EE000002EE000002 /* KeyboardViewController.swift */; };
+		HH000002HH000002HH000002 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000001HH000001HH000001 /* APIClient.swift */; };
+		HH000004HH000004HH000004 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000003HH000003HH000003 /* Models.swift */; };
+		HH000014HH000014HH000014 /* AITypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000006HH000006HH000006 /* AITypes.swift */; };
+		HH000015HH000015HH000015 /* KeyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000007HH000007HH000007 /* KeyStore.swift */; };
+		HH000016HH000016HH000016 /* ModelRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000008HH000008HH000008 /* ModelRegistry.swift */; };
+		HH000017HH000017HH000017 /* CommandRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000009HH000009HH000009 /* CommandRouter.swift */; };
+		HH000018HH000018HH000018 /* FalProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000010HH000010HH000010 /* FalProvider.swift */; };
+		HH000019HH000019HH000019 /* AnthropicProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000011HH000011HH000011 /* AnthropicProvider.swift */; };
+		HH000020HH000020HH000020 /* GoogleProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000012HH000012HH000012 /* GoogleProvider.swift */; };
+		HH000021HH000021HH000021 /* OpenAIProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000013HH000013HH000013 /* OpenAIProvider.swift */; };
+		HH000023HH000023HH000023 /* LMStudioProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000022HH000022HH000022 /* LMStudioProvider.swift */; };
+		HH000025HH000025HH000025 /* PromptLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000024HH000024HH000024 /* PromptLoader.swift */; };
+		HH000027HH000027HH000027 /* HTMLImageRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000026HH000026HH000026 /* HTMLImageRenderer.swift */; };
+		HH000029HH000029HH000029 /* org_template.html in Resources */ = {isa = PBXBuildFile; fileRef = HH000028HH000028HH000028 /* org_template.html */; };
+		HH000032HH000032HH000032 /* html-to-image.js in Resources */ = {isa = PBXBuildFile; fileRef = HH000031HH000031HH000031 /* html-to-image.js */; };
 		FF000001FF000001FF000001 /* TurtleKeyboardExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = EE000005EE000005EE000005 /* TurtleKeyboardExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -43,6 +58,21 @@
 		CC000006CC000006CC000006 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		CC000007CC000007CC000007 /* TurtleKeyboard.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TurtleKeyboard.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		EE000002EE000002EE000002 /* KeyboardViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardViewController.swift; sourceTree = "<group>"; };
+		HH000001HH000001HH000001 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		HH000003HH000003HH000003 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		HH000006HH000006HH000006 /* AITypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITypes.swift; sourceTree = "<group>"; };
+		HH000007HH000007HH000007 /* KeyStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyStore.swift; sourceTree = "<group>"; };
+		HH000008HH000008HH000008 /* ModelRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelRegistry.swift; sourceTree = "<group>"; };
+		HH000009HH000009HH000009 /* CommandRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandRouter.swift; sourceTree = "<group>"; };
+		HH000010HH000010HH000010 /* FalProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FalProvider.swift; sourceTree = "<group>"; };
+		HH000011HH000011HH000011 /* AnthropicProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnthropicProvider.swift; sourceTree = "<group>"; };
+		HH000012HH000012HH000012 /* GoogleProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleProvider.swift; sourceTree = "<group>"; };
+		HH000013HH000013HH000013 /* OpenAIProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIProvider.swift; sourceTree = "<group>"; };
+		HH000022HH000022HH000022 /* LMStudioProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LMStudioProvider.swift; sourceTree = "<group>"; };
+		HH000024HH000024HH000024 /* PromptLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptLoader.swift; sourceTree = "<group>"; };
+		HH000026HH000026HH000026 /* HTMLImageRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTMLImageRenderer.swift; sourceTree = "<group>"; };
+		HH000028HH000028HH000028 /* org_template.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = org_template.html; sourceTree = "<group>"; };
+		HH000031HH000031HH000031 /* html-to-image.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "html-to-image.js"; sourceTree = "<group>"; };
 		EE000004EE000004EE000004 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		EE000005EE000005EE000005 /* TurtleKeyboardExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = TurtleKeyboardExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -93,10 +123,33 @@
 			path = TurtleKeyboard;
 			sourceTree = "<group>";
 		};
+		HH000005HH000005HH000005 /* AI */ = {
+			isa = PBXGroup;
+			children = (
+				HH000006HH000006HH000006 /* AITypes.swift */,
+				HH000007HH000007HH000007 /* KeyStore.swift */,
+				HH000008HH000008HH000008 /* ModelRegistry.swift */,
+				HH000009HH000009HH000009 /* CommandRouter.swift */,
+				HH000010HH000010HH000010 /* FalProvider.swift */,
+				HH000011HH000011HH000011 /* AnthropicProvider.swift */,
+				HH000012HH000012HH000012 /* GoogleProvider.swift */,
+				HH000013HH000013HH000013 /* OpenAIProvider.swift */,
+				HH000022HH000022HH000022 /* LMStudioProvider.swift */,
+				HH000024HH000024HH000024 /* PromptLoader.swift */,
+				HH000026HH000026HH000026 /* HTMLImageRenderer.swift */,
+				HH000028HH000028HH000028 /* org_template.html */,
+				HH000031HH000031HH000031 /* html-to-image.js */,
+			);
+			path = AI;
+			sourceTree = "<group>";
+		};
 		EE000001EE000001EE000001 /* TurtleKeyboardExtension */ = {
 			isa = PBXGroup;
 			children = (
 				EE000002EE000002EE000002 /* KeyboardViewController.swift */,
+				HH000001HH000001HH000001 /* APIClient.swift */,
+				HH000003HH000003HH000003 /* Models.swift */,
+				HH000005HH000005HH000005 /* AI */,
 				EE000004EE000004EE000004 /* Info.plist */,
 			);
 			path = TurtleKeyboardExtension;
@@ -131,6 +184,7 @@
 				DD000005DD000005DD000005 /* Sources */,
 				DD000007DD000007DD000007 /* Frameworks */,
 				DD000006DD000006DD000006 /* Resources */,
+				HH000030HH000030HH000030 /* Copy shared command prompts */,
 			);
 			buildRules = (
 			);
@@ -190,10 +244,33 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				HH000029HH000029HH000029 /* org_template.html in Resources */,
+				HH000032HH000032HH000032 /* html-to-image.js in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		HH000030HH000030HH000030 /* Copy shared command prompts */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/../commands/prompts/ask.txt",
+				"$(SRCROOT)/../commands/prompts/org.txt",
+			);
+			name = "Copy shared command prompts";
+			outputPaths = (
+				"$(BUILT_PRODUCTS_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ask.txt",
+				"$(BUILT_PRODUCTS_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/org.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\nSRC=\"${SRCROOT}/../commands/prompts\"\nDEST=\"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\"\nmkdir -p \"$DEST\"\nfor f in \"$SRC\"/*.txt; do\n  [ -e \"$f\" ] || continue\n  cp \"$f\" \"$DEST/\"\ndone\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		BB000005BB000005BB000005 /* Sources */ = {
@@ -210,6 +287,19 @@
 			buildActionMask = 2147483647;
 			files = (
 				EE000003EE000003EE000003 /* KeyboardViewController.swift in Sources */,
+				HH000002HH000002HH000002 /* APIClient.swift in Sources */,
+				HH000004HH000004HH000004 /* Models.swift in Sources */,
+				HH000014HH000014HH000014 /* AITypes.swift in Sources */,
+				HH000015HH000015HH000015 /* KeyStore.swift in Sources */,
+				HH000016HH000016HH000016 /* ModelRegistry.swift in Sources */,
+				HH000017HH000017HH000017 /* CommandRouter.swift in Sources */,
+				HH000018HH000018HH000018 /* FalProvider.swift in Sources */,
+				HH000019HH000019HH000019 /* AnthropicProvider.swift in Sources */,
+				HH000020HH000020HH000020 /* GoogleProvider.swift in Sources */,
+				HH000021HH000021HH000021 /* OpenAIProvider.swift in Sources */,
+				HH000023HH000023HH000023 /* LMStudioProvider.swift in Sources */,
+				HH000025HH000025HH000025 /* PromptLoader.swift in Sources */,
+				HH000027HH000027HH000027 /* HTMLImageRenderer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
