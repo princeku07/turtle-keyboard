@@ -6,7 +6,7 @@ import android.graphics.drawable.Drawable;
 import android.util.Log;
 import android.view.View;
 
-import com.prince.turtlekeyboard.ui.SplitActivity;
+import com.prince.split.ui.SplitActivity;
 
 import androidx.annotation.Nullable;
 

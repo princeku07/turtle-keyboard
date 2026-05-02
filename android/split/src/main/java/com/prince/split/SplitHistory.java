@@ -32,7 +32,8 @@ public class SplitHistory {
         this.store = store;
     }
 
-    public void add(double amount, int people) {
+    /** @return the timestamp stamped on the new entry, so callers can mirror to the cloud. */
+    public long add(double amount, int people) {
         long ts = System.currentTimeMillis();
         String line = amount + "|" + people + "|" + ts;
         String existing = store.getString(SplitKeys.HISTORY, "");
@@ -43,7 +44,7 @@ public class SplitHistory {
             for (int i = 0; i < keep; i++) next.append('\n').append(lines[i]);
         }
         store.putString(SplitKeys.HISTORY, next.toString());
-        SplitCloudSync.postSave(store, amount, people, ts);
+        return ts;
     }
 
     public List<Entry> all() {
@@ -66,6 +67,5 @@ public class SplitHistory {
 
     public void clear() {
         store.putString(SplitKeys.HISTORY, "");
-        SplitCloudSync.postClear(store);
     }
 }

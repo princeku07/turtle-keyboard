@@ -1,21 +1,16 @@
 package com.prince.split;
 
+import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
 
 import androidx.annotation.Nullable;
 
-import org.json.JSONArray;
-import org.json.JSONObject;
-
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.net.URLEncoder;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -24,140 +19,199 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Local-first cloud mirror for {@link SplitHistory}. The on-device store remains the
- * source of truth (the panel reads/writes it synchronously); this class fires a fire-and-
- * forget POST to a Google Apps Script web app after each save / clear so the rows show
- * up in a Google Sheet too.
+ * Orchestrates cloud sync for {@link SplitHistory} against the user's own Google Sheet.
+ * Local SharedPreferences remains the source of truth for the keyboard panel; this class
+ * mirrors saves to the cloud and pulls remote rows on demand.
  *
- * <p>Endpoint + token are read from the {@link SplitStore} (keys in {@link SplitKeys}).
- * If either is missing the sync is a no-op — the SDK still works fully offline.
+ * <p>All cloud calls are no-ops unless the user is signed in via {@link SplitAuth} and a
+ * sheet has been provisioned by {@link #ensureSheet}.
  */
 public final class SplitCloudSync {
 
-    /** Result delivered to {@link SyncCallback#onComplete} on the main thread. */
     public interface SyncCallback {
         /** @param changed true if local history was modified by the merge */
         void onComplete(boolean changed);
     }
 
-    /** Default Apps Script web app — overridable via {@link SplitKeys#CLOUD_ENDPOINT}. */
-    private static final String DEFAULT_ENDPOINT =
-            "https://script.google.com/macros/s/AKfycbzlXzBkPxb0MRgBnBMlvrTux7mPZobVEqImjgmiCEWZe2yE2KZXE0BqPAsik59lc5qE/exec";
-
-    /** Default shared token — overridable via {@link SplitKeys#CLOUD_TOKEN}.
-     *  Empty string means the deployed script does not enforce a token. */
-    private static final String DEFAULT_TOKEN = "agwgwour9ww5wjls533";
-
     private static final ExecutorService EXEC = Executors.newSingleThreadExecutor();
-    private static final int CONNECT_TIMEOUT_MS = 4000;
-    private static final int READ_TIMEOUT_MS = 4000;
+    private static final Handler MAIN = new Handler(Looper.getMainLooper());
 
     private SplitCloudSync() {}
 
-    static void postSave(SplitStore store, double amount, int people, long timestampMs) {
-        String endpoint = endpoint(store);
-        if (endpoint.isEmpty()) return;
-        String token = token(store);
-        String deviceId = ensureDeviceId(store);
-        String body = "{"
-                + "\"action\":\"save\","
-                + "\"token\":" + jsonString(token) + ","
-                + "\"deviceId\":" + jsonString(deviceId) + ","
-                + "\"amount\":" + amount + ","
-                + "\"people\":" + people + ","
-                + "\"timestampMs\":" + timestampMs
-                + "}";
-        post(endpoint, body);
+    /**
+     * Ensures the user has a "Turtle Splits" spreadsheet in their Drive, creating one if
+     * needed and migrating any pre-existing local rows on first run. Safe to call on
+     * every app launch — short-circuits when already provisioned.
+     */
+    public static void ensureSheet(final Context ctx, final SplitStore store,
+                                   @Nullable final SyncCallback cb) {
+        final SplitAuth auth = new SplitAuth(ctx, store);
+        if (!auth.isSignedIn()) {
+            deliver(cb, false);
+            return;
+        }
+        if (!store.getString(SplitKeys.SHEET_ID, "").isEmpty()
+                && "1".equals(store.getString(SplitKeys.MIGRATED_LOCAL, ""))) {
+            deliver(cb, false);
+            return;
+        }
+        withFreshToken(auth, null, new TokenAction() {
+            @Override public void run(String token) {
+                EXEC.execute(new Runnable() {
+                    @Override public void run() {
+                        try {
+                            String sheetId = store.getString(SplitKeys.SHEET_ID, "");
+                            if (sheetId.isEmpty()) {
+                                sheetId = SplitSheetsClient.createSpreadsheet(token);
+                                store.putString(SplitKeys.SHEET_ID, sheetId);
+                            }
+                            if (!"1".equals(store.getString(SplitKeys.MIGRATED_LOCAL, ""))) {
+                                migrateLocalRows(token, sheetId, store);
+                                store.putString(SplitKeys.MIGRATED_LOCAL, "1");
+                            }
+                            deliver(cb, true);
+                        } catch (Exception e) {
+                            deliver(cb, false);
+                        }
+                    }
+                });
+            }
+            @Override public void onError() { deliver(cb, false); }
+        });
     }
 
-    static void postClear(SplitStore store) {
-        String endpoint = endpoint(store);
-        if (endpoint.isEmpty()) return;
-        String token = token(store);
-        String deviceId = ensureDeviceId(store);
-        String body = "{"
-                + "\"action\":\"clear\","
-                + "\"token\":" + jsonString(token) + ","
-                + "\"deviceId\":" + jsonString(deviceId)
-                + "}";
-        post(endpoint, body);
+    /** Mirrors a save to the user's sheet. Fire-and-forget; local write already happened. */
+    public static void pushSave(final Context ctx, final SplitStore store,
+                                final double amount, final int people, final long timestampMs) {
+        final SplitAuth auth = new SplitAuth(ctx, store);
+        if (!auth.isSignedIn()) return;
+        final String sheetId = store.getString(SplitKeys.SHEET_ID, "");
+        if (sheetId.isEmpty()) return;
+        final String deviceId = ensureDeviceId(store);
+        withFreshToken(auth, null, new TokenAction() {
+            @Override public void run(String token) {
+                EXEC.execute(new Runnable() {
+                    @Override public void run() {
+                        try {
+                            SplitSheetsClient.appendRows(token, sheetId,
+                                    Collections.singletonList(buildRow(amount, people, timestampMs, deviceId)));
+                        } catch (Exception ignored) {}
+                    }
+                });
+            }
+            @Override public void onError() { /* silent */ }
+        });
+    }
+
+    /** Mirrors a clear — removes only this device's rows from the sheet. */
+    public static void pushClear(final Context ctx, final SplitStore store) {
+        final SplitAuth auth = new SplitAuth(ctx, store);
+        if (!auth.isSignedIn()) return;
+        final String sheetId = store.getString(SplitKeys.SHEET_ID, "");
+        if (sheetId.isEmpty()) return;
+        final String deviceId = ensureDeviceId(store);
+        withFreshToken(auth, null, new TokenAction() {
+            @Override public void run(String token) {
+                EXEC.execute(new Runnable() {
+                    @Override public void run() {
+                        try {
+                            SplitSheetsClient.deleteRowsForDevice(token, sheetId, deviceId);
+                        } catch (Exception ignored) {}
+                    }
+                });
+            }
+            @Override public void onError() { /* silent */ }
+        });
     }
 
     /**
-     * Pulls all rows from the sheet, merges anything new into the local history (dedupe by
-     * {@code (timestampMs, amount, people)}), and dispatches {@code cb} on the main thread.
-     * Safe to call frequently — silent no-op when the endpoint isn't configured or the
-     * network call fails.
+     * Pulls all rows from the sheet, dedupes against local by
+     * {@code (timestampMs, amount, people)}, writes anything new, and fires {@code cb}
+     * on the main thread.
      */
-    public static void syncFromCloud(final SplitStore store, @Nullable final SyncCallback cb) {
-        final Handler main = new Handler(Looper.getMainLooper());
-        final String endpoint = endpoint(store);
-        if (endpoint.isEmpty()) {
-            deliver(main, cb, false);
-            return;
-        }
-        final String token = token(store);
-        EXEC.execute(new Runnable() {
-            @Override public void run() {
-                List<RemoteRow> rows = fetchRows(endpoint, token);
-                if (rows == null) {
-                    deliver(main, cb, false);
-                    return;
-                }
-                boolean changed = mergeIntoLocal(store, rows);
-                deliver(main, cb, changed);
+    public static void fetchAndMerge(final Context ctx, final SplitStore store,
+                                     @Nullable final SyncCallback cb) {
+        final SplitAuth auth = new SplitAuth(ctx, store);
+        if (!auth.isSignedIn()) { deliver(cb, false); return; }
+        final String sheetId = store.getString(SplitKeys.SHEET_ID, "");
+        if (sheetId.isEmpty()) { deliver(cb, false); return; }
+        withFreshToken(auth, null, new TokenAction() {
+            @Override public void run(final String token) {
+                EXEC.execute(new Runnable() {
+                    @Override public void run() {
+                        try {
+                            List<SplitSheetsClient.Row> remote =
+                                    SplitSheetsClient.listRows(token, sheetId);
+                            boolean changed = mergeIntoLocal(store, remote);
+                            deliver(cb, changed);
+                        } catch (Exception e) {
+                            deliver(cb, false);
+                        }
+                    }
+                });
+            }
+            @Override public void onError() { deliver(cb, false); }
+        });
+    }
+
+    // -- internals ------------------------------------------------------------
+
+    private interface TokenAction {
+        void run(String token);
+        void onError();
+    }
+
+    private static void withFreshToken(SplitAuth auth, @Nullable android.app.Activity activity,
+                                       final TokenAction action) {
+        auth.freshAccessToken(activity, new SplitAuth.AuthCallback() {
+            @Override public void onToken(String accessToken) { action.run(accessToken); }
+            @Override public void onError(String reason, @Nullable SplitAuth.PendingUi pendingUi) {
+                action.onError();
             }
         });
     }
 
-    @Nullable
-    private static List<RemoteRow> fetchRows(String endpoint, String token) {
-        HttpURLConnection conn = null;
-        try {
-            String url = endpoint + "?action=list&token="
-                    + URLEncoder.encode(token, "UTF-8");
-            conn = (HttpURLConnection) new URL(url).openConnection();
-            conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
-            conn.setReadTimeout(READ_TIMEOUT_MS);
-            conn.setRequestMethod("GET");
-            conn.setInstanceFollowRedirects(true);
-            int code = conn.getResponseCode();
-            if (code < 200 || code >= 300) return null;
-            BufferedReader r = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
-            StringBuilder sb = new StringBuilder();
-            String line;
-            while ((line = r.readLine()) != null) sb.append(line);
-            r.close();
-            JSONObject obj = new JSONObject(sb.toString());
-            if (!obj.optBoolean("ok")) return null;
-            JSONArray arr = obj.optJSONArray("rows");
-            if (arr == null) return Collections.emptyList();
-            List<RemoteRow> out = new ArrayList<>(arr.length());
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject e = arr.getJSONObject(i);
-                out.add(new RemoteRow(
-                        e.optDouble("amount", 0),
-                        e.optInt("people", 0),
-                        e.optLong("timestampMs", 0)));
-            }
-            return out;
-        } catch (Exception ignored) {
-            return null;
-        } finally {
-            if (conn != null) conn.disconnect();
+    private static void migrateLocalRows(String token, String sheetId, SplitStore store)
+            throws IOException {
+        String existing = store.getString(SplitKeys.HISTORY, "");
+        if (existing.isEmpty()) return;
+        String deviceId = ensureDeviceId(store);
+        List<List<Object>> rows = new ArrayList<>();
+        for (String line : existing.split("\n")) {
+            String[] parts = line.split("\\|");
+            if (parts.length != 3) continue;
+            try {
+                double amount = Double.parseDouble(parts[0]);
+                int people = Integer.parseInt(parts[1]);
+                long ts = Long.parseLong(parts[2]);
+                rows.add(buildRow(amount, people, ts, deviceId));
+            } catch (NumberFormatException ignored) {}
         }
+        if (!rows.isEmpty()) SplitSheetsClient.appendRows(token, sheetId, rows);
     }
 
-    private static boolean mergeIntoLocal(SplitStore store, List<RemoteRow> remote) {
+    private static List<Object> buildRow(double amount, int people, long timestampMs,
+                                         String deviceId) {
+        double per = people > 0 ? amount / people : amount;
+        return Arrays.asList(
+                java.text.DateFormat.getDateTimeInstance().format(new java.util.Date(timestampMs)),
+                timestampMs,
+                deviceId,
+                amount,
+                people,
+                per);
+    }
+
+    private static boolean mergeIntoLocal(SplitStore store, List<SplitSheetsClient.Row> remote) {
         String existing = store.getString(SplitKeys.HISTORY, "");
         Set<String> seen = new HashSet<>();
-        List<RemoteRow> merged = new ArrayList<>();
+        List<LocalRow> merged = new ArrayList<>();
         if (!existing.isEmpty()) {
             for (String line : existing.split("\n")) {
                 String[] parts = line.split("\\|");
                 if (parts.length != 3) continue;
                 try {
-                    RemoteRow row = new RemoteRow(
+                    LocalRow row = new LocalRow(
                             Double.parseDouble(parts[0]),
                             Integer.parseInt(parts[1]),
                             Long.parseLong(parts[2]));
@@ -166,15 +220,16 @@ public final class SplitCloudSync {
             }
         }
         boolean changed = false;
-        for (RemoteRow r : remote) {
-            if (seen.add(r.dedupeKey())) {
-                merged.add(r);
+        for (SplitSheetsClient.Row r : remote) {
+            LocalRow row = new LocalRow(r.amount, r.people, r.timestampMs);
+            if (seen.add(row.dedupeKey())) {
+                merged.add(row);
                 changed = true;
             }
         }
         if (!changed) return false;
-        Collections.sort(merged, new java.util.Comparator<RemoteRow>() {
-            @Override public int compare(RemoteRow a, RemoteRow b) {
+        Collections.sort(merged, new Comparator<LocalRow>() {
+            @Override public int compare(LocalRow a, LocalRow b) {
                 return Long.compare(b.timestampMs, a.timestampMs);
             }
         });
@@ -182,41 +237,12 @@ public final class SplitCloudSync {
             merged = merged.subList(0, SplitHistory.MAX);
         }
         StringBuilder out = new StringBuilder();
-        for (RemoteRow row : merged) {
+        for (LocalRow row : merged) {
             if (out.length() > 0) out.append('\n');
             out.append(row.amount).append('|').append(row.people).append('|').append(row.timestampMs);
         }
         store.putString(SplitKeys.HISTORY, out.toString());
         return true;
-    }
-
-    private static void deliver(Handler main, @Nullable final SyncCallback cb, final boolean changed) {
-        if (cb == null) return;
-        main.post(new Runnable() {
-            @Override public void run() { cb.onComplete(changed); }
-        });
-    }
-
-    private static final class RemoteRow {
-        final double amount;
-        final int people;
-        final long timestampMs;
-        RemoteRow(double amount, int people, long timestampMs) {
-            this.amount = amount;
-            this.people = people;
-            this.timestampMs = timestampMs;
-        }
-        String dedupeKey() { return timestampMs + "|" + amount + "|" + people; }
-    }
-
-    private static String endpoint(SplitStore store) {
-        String override = store.getString(SplitKeys.CLOUD_ENDPOINT, "");
-        return override.isEmpty() ? DEFAULT_ENDPOINT : override;
-    }
-
-    private static String token(SplitStore store) {
-        String override = store.getString(SplitKeys.CLOUD_TOKEN, "");
-        return override.isEmpty() ? DEFAULT_TOKEN : override;
     }
 
     private static String ensureDeviceId(SplitStore store) {
@@ -228,51 +254,23 @@ public final class SplitCloudSync {
         return id;
     }
 
-    private static void post(final String endpoint, final String body) {
-        EXEC.execute(new Runnable() {
-            @Override public void run() {
-                HttpURLConnection conn = null;
-                try {
-                    URL url = new URL(endpoint);
-                    conn = (HttpURLConnection) url.openConnection();
-                    conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
-                    conn.setReadTimeout(READ_TIMEOUT_MS);
-                    conn.setRequestMethod("POST");
-                    conn.setDoOutput(true);
-                    conn.setInstanceFollowRedirects(true);
-                    conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-                    OutputStream os = conn.getOutputStream();
-                    os.write(body.getBytes("UTF-8"));
-                    os.flush();
-                    os.close();
-                    conn.getResponseCode(); // drain — we don't surface failures, this is best-effort
-                } catch (Exception ignored) {
-                    // Local copy is the source of truth; cloud failures are silent by design.
-                } finally {
-                    if (conn != null) conn.disconnect();
-                }
-            }
+    private static void deliver(@Nullable final SyncCallback cb, final boolean changed) {
+        if (cb == null) return;
+        MAIN.post(new Runnable() {
+            @Override public void run() { cb.onComplete(changed); }
         });
     }
 
-    private static String jsonString(@Nullable String s) {
-        if (s == null) return "\"\"";
-        StringBuilder sb = new StringBuilder(s.length() + 2);
-        sb.append('"');
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            switch (c) {
-                case '"':  sb.append("\\\""); break;
-                case '\\': sb.append("\\\\"); break;
-                case '\n': sb.append("\\n"); break;
-                case '\r': sb.append("\\r"); break;
-                case '\t': sb.append("\\t"); break;
-                default:
-                    if (c < 0x20) sb.append(String.format("\\u%04x", (int) c));
-                    else sb.append(c);
-            }
+    private static final class LocalRow {
+        final double amount;
+        final int people;
+        final long timestampMs;
+        LocalRow(double amount, int people, long timestampMs) {
+            this.amount = amount;
+            this.people = people;
+            this.timestampMs = timestampMs;
         }
-        sb.append('"');
-        return sb.toString();
+        String dedupeKey() { return timestampMs + "|" + amount + "|" + people; }
     }
+
 }

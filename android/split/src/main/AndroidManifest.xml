@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <application>
+        <activity
+            android:name="com.prince.split.ui.SplitActivity"
+            android:exported="false"
+            android:label="Splits"
+            android:theme="@style/Theme.AppCompat.DayNight.NoActionBar" />
+    </application>
 </manifest>
