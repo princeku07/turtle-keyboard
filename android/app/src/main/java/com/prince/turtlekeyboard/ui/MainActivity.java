@@ -17,6 +17,7 @@ import androidx.activity.result.IntentSenderRequest;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.prince.notion.ui.NotionConnectActivity;
 import com.prince.split.SplitAuth;
 import com.prince.split.SplitCloudSync;
 import com.prince.split.SplitContract;
@@ -61,6 +62,10 @@ public class MainActivity extends AppCompatActivity {
         binding.btnSetSplit.setOnClickListener(v -> showSplitPicker());
         binding.btnViewSplits.setOnClickListener(v ->
                 startActivity(new Intent(this, SplitActivity.class)));
+        binding.btnAppPersonalization.setOnClickListener(v ->
+                startActivity(new Intent(this, AppPersonalizationActivity.class)));
+        binding.btnConnectNotion.setOnClickListener(v ->
+                startActivity(new Intent(this, NotionConnectActivity.class)));
 
         refreshSplitStatus();
 

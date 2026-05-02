@@ -30,12 +30,16 @@ import com.prince.turtlekeyboard.command.SlashCommandDetector;
 import com.prince.turtlekeyboard.gesture.SpaceGestureHandler;
 import com.prince.turtlekeyboard.ime.view.KeyPreviewPopup;
 import com.prince.turtlekeyboard.ime.view.KeyboardRootView;
+import com.prince.notion.NotionIntegration;
 import com.prince.split.SplitIntegration;
 import com.prince.split.kbd.IntegrationContext;
 import com.prince.split.kbd.KeyboardIntegration;
 import com.prince.turtlekeyboard.input.InputCommitter;
+import androidx.annotation.Nullable;
+
 import com.prince.turtlekeyboard.integration.IntegrationRegistry;
 import com.prince.turtlekeyboard.integration.KeyboardIntegrationContextImpl;
+import com.prince.turtlekeyboard.integration.PersistentAppProfileRegistry;
 import com.prince.turtlekeyboard.keyboard.KeyboardController;
 import com.prince.turtlekeyboard.keyboard.Keycodes;
 import com.prince.turtlekeyboard.keyboard.ShiftController;
@@ -68,6 +72,9 @@ public class TurtleInputMethodService extends InputMethodService
     private CommandRegistry registry;
     private CommandComposer composer;
     private CommandDispatcher dispatcher;
+    @Nullable private String currentPkg;
+    private com.prince.turtlekeyboard.integration.PersistentAppProfileRegistry appProfiles;
+    private com.prince.turtlekeyboard.integration.EnrolledShortcutsManager enrolledShortcuts;
     private SuggestionProvider suggestionProvider;
     private ThemeManager themes;
     private AudioManager audio;
@@ -103,9 +110,11 @@ public class TurtleInputMethodService extends InputMethodService
             @Override public void onNameChanged(String displayed) {
                 root.panel().hide();
                 root.banner().show(displayed);
+                refreshCommandSuggestions(displayed);
             }
             @Override public void onPromptStart(String commandName) {
                 root.banner().clear();
+                root.cmdSuggestions().hide();
                 CommandRegistry.Entry e = registry.get(commandName);
                 String label = (e != null ? e.emoji + " " + e.label : "/" + commandName);
                 root.panel().show(label, hintFor(commandName), "");
@@ -115,6 +124,7 @@ public class TurtleInputMethodService extends InputMethodService
             }
             @Override public void onComposeEnd() {
                 root.banner().clear();
+                root.cmdSuggestions().hide();
                 root.panel().hide();
             }
         });
@@ -132,20 +142,37 @@ public class TurtleInputMethodService extends InputMethodService
 
         root.panel().setOnGoListener(this::dispatchPromptPanel);
         root.strip().setOnPickListener(this::onSuggestionPicked);
+        root.cmdSuggestions().setOnPickListener(this::onCommandSuggestionPicked);
 
         // Build the integration context off the freshly inflated views, then construct the
         // registry — its constructor pumps each integration's commands into the registry.
+        Prefs prefs = new Prefs(this);
+        appProfiles = new PersistentAppProfileRegistry(getApplicationContext(), prefs);
+        // One AiClient drives both the slash-command dispatcher and the module-side
+        // LLM service — saves duplicate construction and keeps /notion talking to the
+        // same backend as /cap, /fix, etc.
+        LmStudioAiClient ai = new LmStudioAiClient(this, hostProvider, new StubAiClient());
+        com.prince.split.kbd.LlmService llm =
+                new com.prince.turtlekeyboard.integration.AiClientLlmService(ai);
         IntegrationContext integrationCtx = new KeyboardIntegrationContextImpl(
-                getApplicationContext(), root, committer, new Prefs(this));
+                getApplicationContext(), root, committer, prefs, appProfiles, llm);
         java.util.List<KeyboardIntegration> integrationList = java.util.Arrays.asList(
-                new SplitIntegration());
+                new SplitIntegration(),
+                new NotionIntegration());
         integrations = new IntegrationRegistry(integrationList, integrationCtx, registry);
+
+        // Replay shortcut registrations for every enrolled app. Runs after module
+        // commands are registered, so per-app suggestions sit alongside (not on top of)
+        // module-owned triggers like /split.
+        enrolledShortcuts = new com.prince.turtlekeyboard.integration.EnrolledShortcutsManager(
+                appProfiles, registry,
+                new com.prince.turtlekeyboard.integration.StaticSuggestedShortcutSource());
+        enrolledShortcuts.registerAllEnrolled();
 
         // Dispatcher now takes the registry + a context provider so integration-contributed
         // slash commands can run locally without an AI round trip.
         dispatcher = new CommandDispatcher(
-                new LmStudioAiClient(this, hostProvider, new StubAiClient()),
-                committer, this, registry, () -> integrationCtx);
+                ai, committer, this, registry, () -> integrationCtx);
 
         applyTheme();
         return root;
@@ -174,12 +201,14 @@ public class TurtleInputMethodService extends InputMethodService
         shift.reset();
         root.banner().clear();
         root.preview().hide();
+        currentPkg = info == null ? null : info.packageName;
         logHostContext(info);
         if (integrations != null) {
             integrations.onInputStart(info);
             // Field may already have text (e.g. user re-opened keyboard) — re-evaluate now.
             integrations.onTextChanged(committer.textBeforeCursor(16), committer.textAfterCursor(16));
         }
+        maybeOfferEnrollment(info);
         refreshSuggestions();
     }
 
@@ -187,6 +216,7 @@ public class TurtleInputMethodService extends InputMethodService
     public void onFinishInputView(boolean finishingInput) {
         super.onFinishInputView(finishingInput);
         if (integrations != null) integrations.onInputEnd();
+        hideEnrollmentBanner();
     }
 
     @Override
@@ -318,7 +348,12 @@ public class TurtleInputMethodService extends InputMethodService
             case "cap":    return "describe the image…";
             case "ask":    return "ask a question…";
             case "org":    return "what to organize…";
-            default:        return "type and tap →";
+            case "fix":    return "tap → to fix grammar";
+            case "reply":  return "tap → to draft a reply";
+            case "splits": return "tap → to view history";
+            default:
+                CommandRegistry.Entry e = registry.get(commandName);
+                return (e != null && !e.needsPrompt) ? "tap → to run" : "type and tap →";
         }
     }
 
@@ -405,10 +440,133 @@ public class TurtleInputMethodService extends InputMethodService
         refreshSuggestions();
     }
 
+    private void maybeOfferEnrollment(@Nullable EditorInfo info) {
+        // Decline early under any condition where a personalization prompt would be wrong:
+        // missing/system app, sensitive field (passwords, PIN, OTP), enrolled, suppressed.
+        if (info == null || info.packageName == null) { hideEnrollmentBanner(); return; }
+        String pkg = info.packageName;
+        if (isSystemPackage(pkg)) { hideEnrollmentBanner(); return; }
+        if (com.prince.split.EditorFieldHeuristics.looksSensitive(info)) {
+            hideEnrollmentBanner(); return;
+        }
+        if (appProfiles == null) return;
+        if (appProfiles.statusFor(pkg) != com.prince.split.kbd.AppProfileRegistry.Status.UNKNOWN) {
+            hideEnrollmentBanner(); return;
+        }
+
+        com.prince.split.kbd.AppProfile profile = appProfiles.get(pkg);
+        if (profile == null) { hideEnrollmentBanner(); return; }
+
+        android.graphics.drawable.Drawable icon;
+        try {
+            icon = getApplicationContext().getPackageManager().getApplicationIcon(pkg);
+        } catch (android.content.pm.PackageManager.NameNotFoundException e) {
+            icon = null;
+        }
+        com.prince.turtlekeyboard.ime.view.AppEnrollmentBannerView b = root.enrollmentBanner();
+        b.applyTheme(themes.current());
+        b.show(icon, profile.displayName, new com.prince.turtlekeyboard.ime.view.AppEnrollmentBannerView.Listener() {
+            @Override public void onAccept() {
+                appProfiles.enroll(pkg);
+                if (enrolledShortcuts != null) enrolledShortcuts.registerFor(pkg);
+                hideEnrollmentBanner();
+                root.banner().showAndAutoHide("Added " + profile.displayName, 1200L);
+            }
+            @Override public void onDismiss() {
+                appProfiles.suppress(pkg);
+                hideEnrollmentBanner();
+            }
+        });
+    }
+
+    private void hideEnrollmentBanner() {
+        if (root != null && root.enrollmentBanner() != null) root.enrollmentBanner().hide();
+    }
+
+    private static boolean isSystemPackage(String pkg) {
+        // Only filter true system surfaces (system UI, settings, launcher, IMEs and our
+        // own host) — *not* arbitrary "com.android.*" packages, since Chrome ships as
+        // com.android.chrome and several Google apps use that prefix.
+        if (pkg.equals("com.prince.turtlekeyboard")) return true;
+        if (pkg.equals("com.android.systemui")) return true;
+        if (pkg.equals("com.android.settings")) return true;
+        if (pkg.equals("com.android.launcher") || pkg.equals("com.android.launcher3")) return true;
+        if (pkg.equals("com.google.android.apps.nexuslauncher")) return true;
+        if (pkg.startsWith("com.android.inputmethod.")) return true;
+        if (pkg.equals("com.google.android.inputmethod.latin")) return true;
+        return false;
+    }
+
     private void onDoubleTapSpace() {
-        // PRD §6.6: double-tap-space opens the Quick Panel. Banner is a stand-in until
-        // QuickPanelView ships.
-        root.banner().showAndAutoHide("🐢 Quick Panel (coming soon)", 1500L);
+        // PRD §6.6: double-tap-space toggles the Quick Panel — a 2-col grid of slash
+        // commands that *replaces* the key area. A tile tap never writes "/<name>" to the
+        // host editor; it hands off to the same composer the typed-slash flow uses, so
+        // picking from the panel and typing the command produce identical UX.
+        if (isQuickPanelVisible()) {
+            hideQuickPanel();
+            return;
+        }
+        showQuickPanel();
+    }
+
+    private boolean isQuickPanelVisible() {
+        return root.quickPanelHost().getVisibility() == View.VISIBLE;
+    }
+
+    private void showQuickPanel() {
+        android.view.ViewGroup host = root.quickPanelHost();
+        com.prince.turtlekeyboard.ime.view.QuickPanelView panel =
+                new com.prince.turtlekeyboard.ime.view.QuickPanelView(this);
+        panel.applyTheme(themes.current());
+        panel.show(registry.allSortedFor(currentPkg), this::onQuickPanelPick, this::hideQuickPanel);
+
+        // Match the keyboard's measured height so the grid sits in the same vertical band
+        // the keys occupied — no jump in IME height when toggling.
+        android.inputmethodservice.KeyboardView keys = root.keyboardView();
+        int targetHeight = keys.getHeight();
+        host.removeAllViews();
+        android.widget.FrameLayout.LayoutParams lp = new android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                targetHeight > 0 ? targetHeight : android.widget.FrameLayout.LayoutParams.WRAP_CONTENT);
+        host.addView(panel, lp);
+        host.setVisibility(View.VISIBLE);
+        keys.setVisibility(View.GONE);
+    }
+
+    private void hideQuickPanel() {
+        root.quickPanelHost().removeAllViews();
+        root.quickPanelHost().setVisibility(View.GONE);
+        root.keyboardView().setVisibility(View.VISIBLE);
+    }
+
+    private void refreshCommandSuggestions(String displayed) {
+        // displayed is the composer NAME buffer including the leading "/". Wait for at
+        // least one letter after the slash before showing the strip — typing "/" alone
+        // shouldn't dump every registered command on the user.
+        String prefix = displayed == null || displayed.isEmpty() || displayed.charAt(0) != '/'
+                ? "" : displayed.substring(1);
+        if (prefix.isEmpty()) {
+            root.cmdSuggestions().hide();
+            return;
+        }
+        // Affinity ranking: per-app shortcuts (like /standup in Slack) sit ahead of
+        // generic ones when both prefix-match.
+        root.cmdSuggestions().show(registry.matchesFor(prefix, currentPkg));
+    }
+
+    private void onCommandSuggestionPicked(CommandRegistry.Entry entry) {
+        // Same hand-off as a Quick Panel tap — drop into the inline composer for an
+        // explicit confirmation step. Host editor never sees "/<name>".
+        composer.enterPromptMode(entry.name);
+    }
+
+    private void onQuickPanelPick(CommandRegistry.Entry entry) {
+        hideQuickPanel();
+        // Every pick — prompt or no-prompt — drops into the in-keyboard composer for an
+        // explicit confirmation step. For prompt commands the user types an argument and
+        // taps Go; for no-prompt commands they tap Go on an empty input. Picking from the
+        // grid never auto-fires a command, and the host editor never sees "/<name>".
+        composer.enterPromptMode(entry.name);
     }
 
     private void onSlashCommand(com.prince.turtlekeyboard.command.SlashCommand cmd) {

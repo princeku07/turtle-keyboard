@@ -65,6 +65,7 @@ configurations.all {
 
 dependencies {
     implementation(project(":split"))
+    implementation(project(":notion"))
     implementation(libs.appcompat)
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)

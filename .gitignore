@@ -2,9 +2,15 @@
 .idea/
 *.iml
 
-# Android
+# Android — glob catches every module (app/, split/, notion/, future modules) so
+# new modules don't leak build artifacts the way notion/build/ initially did.
 android/build/
-android/app/build/
+android/**/build/
+android/**/.gradle/
+android/**/intermediates/
+android/**/.cxx/
+android/**/.externalNativeBuild/
+android/**/captures/
 android/local.properties
 android/.gradle/
 

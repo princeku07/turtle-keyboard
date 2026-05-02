@@ -6,13 +6,16 @@ import android.graphics.drawable.Drawable;
 import android.util.Log;
 import android.view.View;
 
+import com.prince.notion.ui.NotionConnectActivity;
 import com.prince.split.ui.SplitActivity;
 
 import androidx.annotation.Nullable;
 
 import com.prince.split.SplitStore;
+import com.prince.split.kbd.AppProfileRegistry;
 import com.prince.split.kbd.ChipSpec;
 import com.prince.split.kbd.IntegrationContext;
+import com.prince.split.kbd.LlmService;
 import com.prince.turtlekeyboard.ime.view.KeyboardRootView;
 import com.prince.turtlekeyboard.input.InputCommitter;
 import com.prince.turtlekeyboard.settings.Prefs;
@@ -29,15 +32,21 @@ public class KeyboardIntegrationContextImpl implements IntegrationContext {
     private final KeyboardRootView root;
     private final InputCommitter committer;
     private final Prefs prefs;
+    private final AppProfileRegistry profiles;
+    private final LlmService llm;
 
     public KeyboardIntegrationContextImpl(Context appContext,
                                           KeyboardRootView root,
                                           InputCommitter committer,
-                                          Prefs prefs) {
+                                          Prefs prefs,
+                                          AppProfileRegistry profiles,
+                                          LlmService llm) {
         this.appContext = appContext;
         this.root = root;
         this.committer = committer;
         this.prefs = prefs;
+        this.profiles = profiles;
+        this.llm = llm;
     }
 
     @Override public Context appContext() { return appContext; }
@@ -76,6 +85,10 @@ public class KeyboardIntegrationContextImpl implements IntegrationContext {
 
     @Override public SplitStore store() { return prefs; }
 
+    @Override public AppProfileRegistry profiles() { return profiles; }
+
+    @Override public LlmService llm() { return llm; }
+
     @Override public void commitText(CharSequence text) { committer.commitText(text); }
 
     @Override public void deleteBeforeCursor(int n) { committer.deleteBeforeCursor(n); }
@@ -85,7 +98,8 @@ public class KeyboardIntegrationContextImpl implements IntegrationContext {
         // out into its own APK this becomes an explicit-package Intent instead.
         Class<?> target;
         switch (screenId) {
-            case "split-detail": target = SplitActivity.class; break;
+            case "split-detail":    target = SplitActivity.class; break;
+            case "notion-connect":  target = NotionConnectActivity.class; break;
             default:
                 Log.w(TAG, "openScreen: unknown id=" + screenId);
                 return;

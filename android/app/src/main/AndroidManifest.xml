@@ -4,17 +4,36 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Required on Android 13+ for the Notion result notification. The system silently
+         drops notifications without this; the host activity is responsible for asking. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <queries>
         <intent>
             <action android:name="android.speech.RecognitionService" />
         </intent>
-        <!-- Required on Android 11+ to read display name & icon of host payment apps. -->
+        <!-- Required on Android 11+ to read display name & icon of host apps for the
+             enrollment banner and per-app personalization. Add a package here whenever a
+             new starter shortcut catalog is added in StaticSuggestedShortcutSource, or the
+             banner will fall back to showing the raw package name with no icon. -->
         <package android:name="com.google.android.apps.nbu.paisa.user" />
         <package android:name="com.phonepe.app" />
         <package android:name="com.phonepe.app.preprod" />
         <package android:name="net.one97.paytm" />
         <package android:name="in.org.npci.upiapp" />
+        <package android:name="com.Slack" />
+        <package android:name="com.whatsapp" />
+        <package android:name="com.notion.id" />
+        <package android:name="com.google.android.gm" />
+        <package android:name="com.instagram.android" />
+        <package android:name="com.twitter.android" />
+        <package android:name="com.discord" />
+        <package android:name="com.android.chrome" />
+        <package android:name="com.google.android.youtube" />
+        <package android:name="com.linkedin.android" />
+        <package android:name="org.telegram.messenger" />
+        <package android:name="com.reddit.frontpage" />
+        <package android:name="com.spotify.music" />
     </queries>
 
     <application
@@ -37,6 +56,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".ui.AppPersonalizationActivity"
+            android:exported="false"
+            android:label="App personalization" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

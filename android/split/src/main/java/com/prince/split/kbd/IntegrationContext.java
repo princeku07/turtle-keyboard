@@ -37,6 +37,13 @@ public interface IntegrationContext {
     /** Persistent storage for both keyboard and Split UI. */
     SplitStore store();
 
+    /** Lookup for known host apps. Integrations use this to decide when to activate. */
+    AppProfileRegistry profiles();
+
+    /** LLM completion service. Integrations that structure free text into API payloads
+     *  (e.g. Notion → {title, blocks}) talk to the same model as the rest of the IME. */
+    LlmService llm();
+
     /** Commit text into the host editor at the cursor. */
     void commitText(CharSequence text);
 

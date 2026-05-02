@@ -7,6 +7,7 @@ import android.view.inputmethod.EditorInfo;
 
 import androidx.annotation.Nullable;
 
+import com.prince.split.kbd.AppProfile;
 import com.prince.split.kbd.ChipSpec;
 import com.prince.split.kbd.CommandSpec;
 import com.prince.split.kbd.IntegrationContext;
@@ -18,7 +19,9 @@ import com.prince.split.view.SplitPanelView;
 import java.util.Locale;
 
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Pluggable Split integration. Activates whenever the user is typing into a numeric,
@@ -42,8 +45,8 @@ public class SplitIntegration implements KeyboardIntegration {
     @Nullable
     public IntegrationSession activate(EditorInfo info, IntegrationContext ctx) {
         if (ctx.store().getInt(KEY_ENABLED, 1) == 0) return null;
-        HostApp.Info host = info == null ? null : HostApp.paymentInfoFor(info.packageName);
-        if (host == null) return null;
+        AppProfile host = info == null ? null : ctx.profiles().get(info.packageName);
+        if (host == null || !host.hasTag("payment")) return null;
 
         boolean armable = EditorFieldHeuristics.isNumericField(info)
                 && !EditorFieldHeuristics.looksSensitive(info);
@@ -53,9 +56,17 @@ public class SplitIntegration implements KeyboardIntegration {
 
     @Override
     public List<CommandSpec> commands() {
+        Set<String> paymentApps = new HashSet<>(Arrays.asList(
+                "com.google.android.apps.nbu.paisa.user",
+                "com.phonepe.app",
+                "com.phonepe.app.preprod",
+                "net.one97.paytm",
+                "in.org.npci.upiapp"));
         return Arrays.asList(
-                new CommandSpec("split", "Split", "💸", true, this::handleSplit),
-                new CommandSpec("splits", "Splits", "📜", false, this::handleSplits));
+                new CommandSpec("split", "Split", "💸", true,
+                        this::handleSplit, paymentApps),
+                new CommandSpec("splits", "Splits", "📜", false,
+                        this::handleSplits, paymentApps));
     }
 
     private void handleSplit(String prompt, IntegrationContext ctx) {
@@ -150,12 +161,12 @@ public class SplitIntegration implements KeyboardIntegration {
     private static class SplitSession implements IntegrationSession {
 
         private final IntegrationContext ctx;
-        private final HostApp.Info host;
+        private final AppProfile host;
         private final boolean armable;
         @Nullable private final AmountWatcher watcher;
         @Nullable private String currentAmount;
 
-        SplitSession(IntegrationContext ctx, HostApp.Info host, boolean armable) {
+        SplitSession(IntegrationContext ctx, AppProfile host, boolean armable) {
             this.ctx = ctx;
             this.host = host;
             this.armable = armable;

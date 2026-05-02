@@ -21,7 +21,10 @@ public class KeyboardRootView extends LinearLayout {
     private BannerView banner;
     private ImagePreviewView preview;
     private IntegrationChipView chip;
+    private AppEnrollmentBannerView enrollmentBanner;
+    private CommandSuggestionStripView cmdSuggestions;
     private FrameLayout panelHost;
+    private FrameLayout quickPanelHost;
     private KeyboardView keyboard;
 
     public KeyboardRootView(Context context) { super(context); }
@@ -35,7 +38,10 @@ public class KeyboardRootView extends LinearLayout {
         banner = findViewById(R.id.banner);
         preview = findViewById(R.id.image_preview);
         chip = findViewById(R.id.integration_chip);
+        enrollmentBanner = findViewById(R.id.enrollment_banner);
+        cmdSuggestions = findViewById(R.id.cmd_suggestions);
         panelHost = findViewById(R.id.integration_panel_host);
+        quickPanelHost = findViewById(R.id.quick_panel_host);
         keyboard = findViewById(R.id.keyboard_view);
     }
 
@@ -44,9 +50,14 @@ public class KeyboardRootView extends LinearLayout {
     public BannerView banner() { return banner; }
     public ImagePreviewView preview() { return preview; }
     public IntegrationChipView chip() { return chip; }
+    public AppEnrollmentBannerView enrollmentBanner() { return enrollmentBanner; }
+    public CommandSuggestionStripView cmdSuggestions() { return cmdSuggestions; }
     /** Generic slot integrations attach panel views to. Visibility flips when content
      *  is added/removed by callers. */
     public ViewGroup panelHost() { return panelHost; }
+    /** Slot the Quick Panel mounts into. Sized to match the keyboard area when shown,
+     *  so the keys are replaced (not overlaid) by the command grid. */
+    public ViewGroup quickPanelHost() { return quickPanelHost; }
     public KeyboardView keyboardView() { return keyboard; }
 
     public void applyTheme(KeyboardTheme theme) {
@@ -57,6 +68,8 @@ public class KeyboardRootView extends LinearLayout {
             banner.setTextColor(theme.bannerText);
         }
         if (panel != null) panel.applyTheme(theme);
+        if (enrollmentBanner != null) enrollmentBanner.applyTheme(theme);
+        if (cmdSuggestions != null) cmdSuggestions.applyTheme(theme);
         if (preview != null) preview.applyTheme(theme);
         if (keyboard != null) {
             keyboard.setBackgroundColor(theme.background);

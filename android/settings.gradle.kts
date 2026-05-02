@@ -22,3 +22,4 @@ dependencyResolutionManagement {
 rootProject.name = "android"
 include(":app")
 include(":split")
+include(":notion")
