@@ -76,6 +76,8 @@ public class MainActivity extends AppCompatActivity {
             promptSignIn();
         } else {
             dismissSignInDialog();
+            // Heal legacy installs that signed in before the email scope was added.
+            auth.fetchAndStoreEmailIfMissing();
             // Provision sheet on first run; pull latest rows on every entry.
             SplitCloudSync.ensureSheet(this, prefs, changed -> {
                 SplitCloudSync.fetchAndMerge(MainActivity.this, prefs, null);

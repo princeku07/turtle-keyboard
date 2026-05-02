@@ -30,11 +30,20 @@ public final class SplitKeys {
     /** Epoch millis at which {@link #ACCESS_TOKEN} expires. */
     public static final String TOKEN_EXPIRES_AT = "split_token_expires_at";
 
-    /** Spreadsheet ID of the user's "Turtle Splits" sheet, created on first sign-in. */
+    /** Spreadsheet ID of the user's active "Turtle Splits" sheet. May be a sheet this user
+     *  owns (default), or one they joined via an invite link. */
     public static final String SHEET_ID = "split_sheet_id";
+
+    /** Email of the user who owns the active sheet. When equal to {@link #ACCOUNT_EMAIL},
+     *  this user is the owner; otherwise they're a joined collaborator. */
+    public static final String OWNER_EMAIL = "split_owner_email";
 
     /** "1" once existing local rows have been pushed up to the user's new sheet. */
     public static final String MIGRATED_LOCAL = "split_migrated_local";
+
+    /** Drive permissionId for the active "anyone with link can edit" share, when the
+     *  owner has membership open. Empty / unset means no link share is active. */
+    public static final String ANYONE_PERMISSION_ID = "split_anyone_permission_id";
 
     private SplitKeys() {}
 }

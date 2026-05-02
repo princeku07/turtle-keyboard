@@ -50,6 +50,16 @@ public final class SplitCloudSync {
             deliver(cb, false);
             return;
         }
+        // Backfill: pre-invite-feature installs created sheets without stamping OWNER_EMAIL.
+        // Anyone with a SHEET_ID but no OWNER_EMAIL is necessarily the owner — at the time
+        // the sheet was created, the only way to have a sheet was to create it yourself.
+        if (!store.getString(SplitKeys.SHEET_ID, "").isEmpty()
+                && store.getString(SplitKeys.OWNER_EMAIL, "").isEmpty()) {
+            String myEmail = auth.accountEmail();
+            if (myEmail != null && !myEmail.isEmpty()) {
+                store.putString(SplitKeys.OWNER_EMAIL, myEmail);
+            }
+        }
         if (!store.getString(SplitKeys.SHEET_ID, "").isEmpty()
                 && "1".equals(store.getString(SplitKeys.MIGRATED_LOCAL, ""))) {
             deliver(cb, false);
@@ -64,6 +74,11 @@ public final class SplitCloudSync {
                             if (sheetId.isEmpty()) {
                                 sheetId = SplitSheetsClient.createSpreadsheet(token);
                                 store.putString(SplitKeys.SHEET_ID, sheetId);
+                                // The user who creates the sheet owns it.
+                                String email = auth.accountEmail();
+                                if (email != null) {
+                                    store.putString(SplitKeys.OWNER_EMAIL, email);
+                                }
                             }
                             if (!"1".equals(store.getString(SplitKeys.MIGRATED_LOCAL, ""))) {
                                 migrateLocalRows(token, sheetId, store);
@@ -105,6 +120,20 @@ public final class SplitCloudSync {
 
     /** Mirrors a clear — removes only this device's rows from the sheet. */
     public static void pushClear(final Context ctx, final SplitStore store) {
+        pushClearInternal(ctx, store, false);
+    }
+
+    /**
+     * Owner-only: nukes every data row (across all devices) from the shared sheet.
+     * No-op if the current user isn't the sheet owner.
+     */
+    public static void pushClearAll(final Context ctx, final SplitStore store) {
+        if (!isOwner(store)) return;
+        pushClearInternal(ctx, store, true);
+    }
+
+    private static void pushClearInternal(final Context ctx, final SplitStore store,
+                                          final boolean wipeAll) {
         final SplitAuth auth = new SplitAuth(ctx, store);
         if (!auth.isSignedIn()) return;
         final String sheetId = store.getString(SplitKeys.SHEET_ID, "");
@@ -115,13 +144,24 @@ public final class SplitCloudSync {
                 EXEC.execute(new Runnable() {
                     @Override public void run() {
                         try {
-                            SplitSheetsClient.deleteRowsForDevice(token, sheetId, deviceId);
+                            if (wipeAll) {
+                                SplitSheetsClient.deleteAllDataRows(token, sheetId);
+                            } else {
+                                SplitSheetsClient.deleteRowsForDevice(token, sheetId, deviceId);
+                            }
                         } catch (Exception ignored) {}
                     }
                 });
             }
             @Override public void onError() { /* silent */ }
         });
+    }
+
+    /** True iff the current account is the email stamped at sheet-creation time. */
+    public static boolean isOwner(SplitStore store) {
+        String me = store.getString(SplitKeys.ACCOUNT_EMAIL, "");
+        String owner = store.getString(SplitKeys.OWNER_EMAIL, "");
+        return !me.isEmpty() && me.equalsIgnoreCase(owner);
     }
 
     /**
@@ -273,4 +313,149 @@ public final class SplitCloudSync {
         String dedupeKey() { return timestampMs + "|" + amount + "|" + people; }
     }
 
+    // -- single-QR membership flow ------------------------------------------
+
+    /**
+     * Single-QR invite flow.
+     *
+     * <ol>
+     *   <li>Owner taps "Invite" → {@link #openMembership} adds an anyone-with-link
+     *       writer permission and returns a {@code turtlekeyboard://join} deep link.</li>
+     *   <li>Joiner scans with any OS camera → deep link opens
+     *       {@link com.prince.split.ui.JoinSplitActivity} → {@link #joinSharedSheet}
+     *       stamps local pointers and refreshes.</li>
+     *   <li>Owner taps "Stop accepting members" → {@link #closeMembership} revokes the
+     *       anyone-with-link permission. Existing members keep direct grants if any;
+     *       in this minimal v1 they retain access until the owner removes them
+     *       (anyone-with-link removal alone doesn't revoke anyone — Google leaves the
+     *       file accessible to anyone who already opened it via the link).</li>
+     * </ol>
+     *
+     * <p>Same security model as Google Docs' "anyone with link can edit": whoever has
+     * the QR can read/write until the owner stops accepting members. Owner is in control
+     * of the lifecycle.
+     */
+    public static final String DEEP_LINK_JOIN = "turtlekeyboard://join";
+
+    /**
+     * Owner-only: enables anyone-with-link writer sharing on the sheet, persists the
+     * Drive permissionId, and returns a deep-link URL the owner can render as a QR.
+     * Fires {@code cb} on the main thread; the URL is delivered via the wider
+     * {@link InviteCallback}.
+     */
+    public interface InviteCallback {
+        void onReady(@Nullable String deepLink);
+    }
+
+    public static void openMembership(final Context ctx, final SplitStore store,
+                                      final InviteCallback cb) {
+        if (!isOwner(store)) { deliverInvite(cb, null); return; }
+        final SplitAuth auth = new SplitAuth(ctx, store);
+        if (!auth.isSignedIn()) { deliverInvite(cb, null); return; }
+        final String sheetId = store.getString(SplitKeys.SHEET_ID, "");
+        if (sheetId.isEmpty()) { deliverInvite(cb, null); return; }
+        withFreshToken(auth, null, new TokenAction() {
+            @Override public void run(final String token) {
+                EXEC.execute(new Runnable() {
+                    @Override public void run() {
+                        try {
+                            String existing = store.getString(SplitKeys.ANYONE_PERMISSION_ID, "");
+                            String permId = existing;
+                            if (permId.isEmpty()) {
+                                permId = SplitDriveClient.grantAnyoneWriter(token, sheetId);
+                                store.putString(SplitKeys.ANYONE_PERMISSION_ID, permId);
+                            }
+                            String url = buildJoinDeepLink(store);
+                            deliverInvite(cb, url);
+                        } catch (Exception e) {
+                            deliverInvite(cb, null);
+                        }
+                    }
+                });
+            }
+            @Override public void onError() { deliverInvite(cb, null); }
+        });
+    }
+
+    /** Owner-only: revokes the anyone-with-link permission. */
+    public static void closeMembership(final Context ctx, final SplitStore store,
+                                       @Nullable final SyncCallback cb) {
+        if (!isOwner(store)) { deliver(cb, false); return; }
+        final SplitAuth auth = new SplitAuth(ctx, store);
+        if (!auth.isSignedIn()) { deliver(cb, false); return; }
+        final String sheetId = store.getString(SplitKeys.SHEET_ID, "");
+        final String permId = store.getString(SplitKeys.ANYONE_PERMISSION_ID, "");
+        if (sheetId.isEmpty() || permId.isEmpty()) {
+            // Already closed — clear any stale state and report success.
+            store.putString(SplitKeys.ANYONE_PERMISSION_ID, "");
+            deliver(cb, true);
+            return;
+        }
+        withFreshToken(auth, null, new TokenAction() {
+            @Override public void run(final String token) {
+                EXEC.execute(new Runnable() {
+                    @Override public void run() {
+                        try {
+                            SplitDriveClient.revokePermission(token, sheetId, permId);
+                            store.putString(SplitKeys.ANYONE_PERMISSION_ID, "");
+                            deliver(cb, true);
+                        } catch (Exception e) {
+                            deliver(cb, false);
+                        }
+                    }
+                });
+            }
+            @Override public void onError() { deliver(cb, false); }
+        });
+    }
+
+    /** Whether the owner currently has an anyone-with-link share open. */
+    public static boolean isMembershipOpen(SplitStore store) {
+        return !store.getString(SplitKeys.ANYONE_PERMISSION_ID, "").isEmpty();
+    }
+
+    /** Builds the join deep link encoding {@code sheetId} + owner email for the QR. */
+    public static String buildJoinDeepLink(SplitStore store) {
+        String sheetId = store.getString(SplitKeys.SHEET_ID, "");
+        String owner = store.getString(SplitKeys.OWNER_EMAIL, "");
+        if (sheetId.isEmpty()) {
+            throw new IllegalStateException("no sheet provisioned yet");
+        }
+        return DEEP_LINK_JOIN + "?sheetId=" + urlEncode(sheetId)
+                + "&owner=" + urlEncode(owner);
+    }
+
+    /**
+     * Joiner-side: switches the local store onto {@code sheetId} (owned by
+     * {@code ownerEmail}) and refreshes from the sheet. Owner must have membership open
+     * for the {@code fetchAndMerge} call to succeed.
+     */
+    public static void joinSharedSheet(final Context ctx, final SplitStore store,
+                                       final String sheetId, final String ownerEmail,
+                                       @Nullable final SyncCallback cb) {
+        store.putString(SplitKeys.SHEET_ID, sheetId);
+        store.putString(SplitKeys.OWNER_EMAIL, ownerEmail == null ? "" : ownerEmail);
+        // Joiner doesn't own this sheet, so no migration of local rows; subsequent saves
+        // are mirrored to the new sheet on append.
+        store.putString(SplitKeys.MIGRATED_LOCAL, "1");
+        // Joiner is not the owner of any anyone-with-link share — clear any leftover from
+        // a previous owner role on this install.
+        store.putString(SplitKeys.ANYONE_PERMISSION_ID, "");
+        fetchAndMerge(ctx, store, cb);
+    }
+
+    private static void deliverInvite(@Nullable final InviteCallback cb, @Nullable final String url) {
+        if (cb == null) return;
+        MAIN.post(new Runnable() {
+            @Override public void run() { cb.onReady(url); }
+        });
+    }
+
+    private static String urlEncode(String s) {
+        try {
+            return java.net.URLEncoder.encode(s == null ? "" : s, "UTF-8");
+        } catch (Exception e) {
+            return s == null ? "" : s;
+        }
+    }
 }

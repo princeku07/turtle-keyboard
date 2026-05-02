@@ -52,6 +52,7 @@ android {
 dependencies {
     implementation(libs.appcompat)
     implementation(libs.play.services.auth)
+    implementation(libs.zxing.core)
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)

@@ -8,5 +8,20 @@
             android:exported="false"
             android:label="Splits"
             android:theme="@style/Theme.AppCompat.DayNight.NoActionBar" />
+
+        <activity
+            android:name="com.prince.split.ui.JoinSplitActivity"
+            android:exported="true"
+            android:label="Join split"
+            android:launchMode="singleTask"
+            android:theme="@style/Theme.AppCompat.DayNight.NoActionBar">
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="turtlekeyboard" android:host="join" />
+            </intent-filter>
+        </activity>
+
     </application>
 </manifest>

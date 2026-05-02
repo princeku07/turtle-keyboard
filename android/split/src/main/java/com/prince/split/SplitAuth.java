@@ -11,7 +11,15 @@ import com.google.android.gms.auth.api.identity.AuthorizationRequest;
 import com.google.android.gms.auth.api.identity.AuthorizationResult;
 import com.google.android.gms.auth.api.identity.Identity;
 
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.Arrays;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Google sign-in + OAuth access tokens for the user's own Sheets/Drive.
@@ -30,13 +38,18 @@ public final class SplitAuth {
     /** Sentinel returned in {@link AuthCallback#onError} when the user must complete UI. */
     public static final String ERROR_NEEDS_UI = "needs_ui";
 
-    /** Required for the spreadsheet create + read + write the SDK does. */
+    /** Read/write any spreadsheet the user has been granted access to (sensitive scope). */
+    private static final String SCOPE_SPREADSHEETS = "https://www.googleapis.com/auth/spreadsheets";
+    /** Lets the OWNER call drive.permissions.create on sheets they created. */
     private static final String SCOPE_DRIVE_FILE = "https://www.googleapis.com/auth/drive.file";
-    /** So we can show "signed in as <email>" in the UI; not required for Sheets/Drive REST. */
+    /** So we can show "signed in as <email>" in the UI and identify owner vs joiner. */
     private static final String SCOPE_EMAIL = "https://www.googleapis.com/auth/userinfo.email";
 
     /** Buffer subtracted from token expiry so we refresh before the token actually dies. */
     private static final long REFRESH_SKEW_MS = 60_000L;
+
+    private static final String USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo";
+    private static final ExecutorService EMAIL_EXEC = Executors.newSingleThreadExecutor();
 
     public interface AuthCallback {
         void onToken(String accessToken);
@@ -110,6 +123,7 @@ public final class SplitAuth {
     public void authorize(@Nullable Activity activity, final AuthCallback cb) {
         AuthorizationRequest req = AuthorizationRequest.builder()
                 .setRequestedScopes(Arrays.asList(
+                        new com.google.android.gms.common.api.Scope(SCOPE_SPREADSHEETS),
                         new com.google.android.gms.common.api.Scope(SCOPE_DRIVE_FILE),
                         new com.google.android.gms.common.api.Scope(SCOPE_EMAIL)))
                 .build();
@@ -159,8 +173,59 @@ public final class SplitAuth {
                 && result.toGoogleSignInAccount().getEmail() != null) {
             store.putString(SplitKeys.ACCOUNT_EMAIL,
                     result.toGoogleSignInAccount().getEmail());
+        } else if (store.getString(SplitKeys.ACCOUNT_EMAIL, "").isEmpty()) {
+            // AuthorizationResult won't surface the account when sign-in wasn't part of
+            // this request; fall back to userinfo for the email scope we did grant.
+            fetchAndStoreEmail(token);
         }
         cb.onToken(token);
+    }
+
+    /**
+     * Background fetch of the signed-in user's email from Google's userinfo endpoint
+     * and persists it in {@link SplitKeys#ACCOUNT_EMAIL}. Best-effort — silent on failure.
+     * Public so the host can also call this on resume if the local email is empty and a
+     * cached token is available.
+     */
+    public void fetchAndStoreEmailIfMissing() {
+        if (!store.getString(SplitKeys.ACCOUNT_EMAIL, "").isEmpty()) return;
+        String token = cachedAccessToken();
+        if (token == null) return;
+        fetchAndStoreEmail(token);
+    }
+
+    private void fetchAndStoreEmail(final String accessToken) {
+        EMAIL_EXEC.execute(() -> {
+            HttpURLConnection conn = null;
+            try {
+                conn = (HttpURLConnection) new URL(USERINFO_URL).openConnection();
+                conn.setConnectTimeout(4000);
+                conn.setReadTimeout(4000);
+                conn.setRequestMethod("GET");
+                conn.setRequestProperty("Authorization", "Bearer " + accessToken);
+                int code = conn.getResponseCode();
+                if (code < 200 || code >= 300) return;
+                BufferedReader r = new BufferedReader(
+                        new InputStreamReader(conn.getInputStream(), "UTF-8"));
+                StringBuilder sb = new StringBuilder();
+                String line;
+                while ((line = r.readLine()) != null) sb.append(line);
+                r.close();
+                String email = new JSONObject(sb.toString()).optString("email", "");
+                if (!email.isEmpty()) {
+                    store.putString(SplitKeys.ACCOUNT_EMAIL, email);
+                    // Also backfill OWNER_EMAIL for legacy installs that have a sheet but
+                    // no owner stamp — they necessarily own it (joining didn't exist yet).
+                    if (!store.getString(SplitKeys.SHEET_ID, "").isEmpty()
+                            && store.getString(SplitKeys.OWNER_EMAIL, "").isEmpty()) {
+                        store.putString(SplitKeys.OWNER_EMAIL, email);
+                    }
+                }
+            } catch (Exception ignored) {
+            } finally {
+                if (conn != null) conn.disconnect();
+            }
+        });
     }
 
     /** Lets the host app stamp the email after a separate Sign-In flow if needed. */

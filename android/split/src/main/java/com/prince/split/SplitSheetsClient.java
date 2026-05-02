@@ -82,9 +82,14 @@ final class SplitSheetsClient {
     /** Appends one or more value rows to the {@code Splits} tab. Each inner list is one row. */
     static void appendRows(String accessToken, String spreadsheetId, List<List<Object>> rows)
             throws IOException {
+        appendRowsToTab(accessToken, spreadsheetId, TAB, rows);
+    }
+
+    private static void appendRowsToTab(String accessToken, String spreadsheetId,
+                                        String tab, List<List<Object>> rows) throws IOException {
         if (rows.isEmpty()) return;
         String url = SHEETS_BASE + "/" + spreadsheetId + "/values/"
-                + encode(TAB + "!A1") + ":append?valueInputOption=RAW&insertDataOption=INSERT_ROWS";
+                + encode(tab + "!A1") + ":append?valueInputOption=RAW&insertDataOption=INSERT_ROWS";
         JSONArray values = new JSONArray();
         for (List<Object> row : rows) {
             JSONArray jsonRow = new JSONArray();
@@ -98,6 +103,13 @@ final class SplitSheetsClient {
             throw new IOException(e);
         }
         request("POST", url, accessToken, body.toString());
+    }
+
+    /** Owner-only: nukes every data row from the {@code Splits} tab while preserving the header. */
+    static void deleteAllDataRows(String accessToken, String spreadsheetId) throws IOException {
+        String url = SHEETS_BASE + "/" + spreadsheetId + "/values/"
+                + encode(TAB + "!A2:F") + ":clear";
+        request("POST", url, accessToken, "{}");
     }
 
     /** Reads every data row from the {@code Splits} tab into typed {@link Row}s. */

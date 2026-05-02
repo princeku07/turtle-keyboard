@@ -5,12 +5,14 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Bitmap;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.LayerDrawable;
 import android.net.Uri;
 import android.os.Bundle;
+import android.widget.ImageView;
 import android.text.format.DateUtils;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -66,6 +68,10 @@ public class SplitActivity extends AppCompatActivity {
     private TextView profileEmail;
     private TextView profileAvatar;
     private TextView sheetLinkBtn;
+    private TextView inviteBtn;
+    private TextView clearMineBtn;
+    private TextView clearAllBtn;
+    private TextView roleBadge;
 
     private final DateFormat fullDate = DateFormat.getDateTimeInstance(
             DateFormat.MEDIUM, DateFormat.SHORT, Locale.getDefault());
@@ -83,6 +89,8 @@ public class SplitActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        // Heal email/owner stamping for installs that signed in pre-invite-feature.
+        auth.fetchAndStoreEmailIfMissing();
         render();
         SplitCloudSync.fetchAndMerge(this, store, changed -> { if (changed) render(); });
     }
@@ -219,6 +227,18 @@ public class SplitActivity extends AppCompatActivity {
 
         card.addView(topRow);
 
+        // Role badge ("Owner" or "Member")
+        roleBadge = new TextView(this);
+        roleBadge.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
+        roleBadge.setTypeface(Typeface.DEFAULT_BOLD);
+        roleBadge.setLetterSpacing(0.18f);
+        roleBadge.setPadding(dp(10), dp(4), dp(10), dp(4));
+        LinearLayout.LayoutParams rbLp = new LinearLayout.LayoutParams(
+                LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+        rbLp.topMargin = dp(12);
+        roleBadge.setLayoutParams(rbLp);
+        card.addView(roleBadge);
+
         // Sheet link row (below)
         sheetLinkBtn = new TextView(this);
         sheetLinkBtn.setText("📊  Open in Google Sheets  →");
@@ -231,9 +251,62 @@ public class SplitActivity extends AppCompatActivity {
         sheetLinkBtn.setOnClickListener(v -> openSheet());
         LinearLayout.LayoutParams sbLp = new LinearLayout.LayoutParams(
                 LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
-        sbLp.topMargin = dp(14);
+        sbLp.topMargin = dp(10);
         sheetLinkBtn.setLayoutParams(sbLp);
         card.addView(sheetLinkBtn);
+
+        // Owner action: open / close anyone-with-link membership.
+        inviteBtn = new TextView(this);
+        inviteBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        inviteBtn.setTypeface(Typeface.DEFAULT_BOLD);
+        inviteBtn.setPadding(dp(14), dp(10), dp(14), dp(10));
+        inviteBtn.setGravity(Gravity.CENTER);
+        inviteBtn.setOnClickListener(v -> onInviteTapped());
+        LinearLayout.LayoutParams ibLp = new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+        ibLp.topMargin = dp(8);
+        inviteBtn.setLayoutParams(ibLp);
+        card.addView(inviteBtn);
+
+        // Clear-row pair (clear mine, clear all)
+        LinearLayout clearRow = new LinearLayout(this);
+        clearRow.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams crLp = new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+        crLp.topMargin = dp(8);
+        clearRow.setLayoutParams(crLp);
+
+        clearMineBtn = new TextView(this);
+        clearMineBtn.setText("Clear my rows");
+        clearMineBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        clearMineBtn.setTypeface(Typeface.DEFAULT_BOLD);
+        clearMineBtn.setTextColor(INK);
+        clearMineBtn.setBackground(pillDrawable(WHITE));
+        clearMineBtn.setPadding(dp(12), dp(8), dp(12), dp(8));
+        clearMineBtn.setGravity(Gravity.CENTER);
+        clearMineBtn.setOnClickListener(v -> confirmClearMine());
+        LinearLayout.LayoutParams cmLp = new LinearLayout.LayoutParams(
+                0, LayoutParams.WRAP_CONTENT, 1f);
+        clearMineBtn.setLayoutParams(cmLp);
+        clearRow.addView(clearMineBtn);
+
+        addHSpacer(clearRow, dp(6));
+
+        clearAllBtn = new TextView(this);
+        clearAllBtn.setText("Clear all (owner)");
+        clearAllBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        clearAllBtn.setTypeface(Typeface.DEFAULT_BOLD);
+        clearAllBtn.setTextColor(WHITE);
+        clearAllBtn.setBackground(pillDrawable(0xFFB91C1C));
+        clearAllBtn.setPadding(dp(12), dp(8), dp(12), dp(8));
+        clearAllBtn.setGravity(Gravity.CENTER);
+        clearAllBtn.setOnClickListener(v -> confirmClearAll());
+        LinearLayout.LayoutParams caLp = new LinearLayout.LayoutParams(
+                0, LayoutParams.WRAP_CONTENT, 1f);
+        clearAllBtn.setLayoutParams(caLp);
+        clearRow.addView(clearAllBtn);
+
+        card.addView(clearRow);
 
         return card;
     }
@@ -398,6 +471,34 @@ public class SplitActivity extends AppCompatActivity {
         sheetLinkBtn.setEnabled(haveSheet);
         sheetLinkBtn.setAlpha(haveSheet ? 1f : 0.45f);
 
+        // Role + visibility
+        boolean isOwner = SplitCloudSync.isOwner(store);
+        if (isOwner) {
+            roleBadge.setText("OWNER");
+            roleBadge.setTextColor(WHITE);
+            roleBadge.setBackground(pillDrawable(LIME));
+        } else {
+            roleBadge.setText("MEMBER");
+            roleBadge.setTextColor(INK);
+            roleBadge.setBackground(pillDrawable(0xFFEEF1FF));
+        }
+        // Invite button is owner-only; label flips based on current membership state.
+        boolean canInvite = isOwner && haveSheet;
+        inviteBtn.setVisibility(canInvite ? View.VISIBLE : View.GONE);
+        if (canInvite) {
+            boolean open = SplitCloudSync.isMembershipOpen(store);
+            if (open) {
+                inviteBtn.setText("⏹  Stop accepting members");
+                inviteBtn.setTextColor(WHITE);
+                inviteBtn.setBackground(pillDrawable(0xFFB91C1C));
+            } else {
+                inviteBtn.setText("➕  Invite a member");
+                inviteBtn.setTextColor(WHITE);
+                inviteBtn.setBackground(pillDrawable(LIME));
+            }
+        }
+        clearAllBtn.setVisibility(isOwner ? View.VISIBLE : View.GONE);
+
         // Stats + list
         List<SplitHistory.Entry> entries = history.all();
         int monthCount = 0;
@@ -551,6 +652,140 @@ public class SplitActivity extends AppCompatActivity {
                 .setPositiveButton("Sign out", (d, w) -> {
                     auth.signOut();
                     finish();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    // -- invite + clear ------------------------------------------------------
+
+    /** Owner taps the invite button. Opens membership and shows the QR, or stops it. */
+    private void onInviteTapped() {
+        if (SplitCloudSync.isMembershipOpen(store)) {
+            confirmStopMembership();
+            return;
+        }
+        inviteBtn.setEnabled(false);
+        SplitCloudSync.openMembership(this, store, deepLink -> runOnUiThread(() -> {
+            inviteBtn.setEnabled(true);
+            render();
+            if (deepLink == null) {
+                toast("Could not open invite — check connection and try again.");
+                return;
+            }
+            showInviteQr(deepLink);
+        }));
+    }
+
+    private void confirmStopMembership() {
+        new AlertDialog.Builder(this)
+                .setTitle("Stop accepting members?")
+                .setMessage("New scans of the invite QR will no longer connect. Members "
+                        + "who already joined keep access — remove them in Drive if needed.")
+                .setPositiveButton("Stop", (d, w) -> {
+                    inviteBtn.setEnabled(false);
+                    SplitCloudSync.closeMembership(this, store, ok -> runOnUiThread(() -> {
+                        inviteBtn.setEnabled(true);
+                        render();
+                        toast(ok ? "Membership closed" : "Could not close — try again");
+                    }));
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    /** Owner-only: renders the join QR + share/copy actions. */
+    private void showInviteQr(final String deepLink) {
+        Bitmap qr = QrRenderer.render(deepLink, dp(240));
+
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setGravity(Gravity.CENTER_HORIZONTAL);
+        int p = dp(20);
+        content.setPadding(p, p, p, p);
+
+        TextView head = new TextView(this);
+        head.setText("Scan to join");
+        head.setTypeface(Typeface.DEFAULT_BOLD);
+        head.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
+        head.setTextColor(INK);
+        content.addView(head);
+
+        TextView sub = new TextView(this);
+        sub.setText("Anyone scanning this QR with their phone camera will be added as a "
+                + "writer. Tap \"Stop accepting members\" when you're done sharing.");
+        sub.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        sub.setTextColor(MUTED);
+        sub.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+        subLp.topMargin = dp(6);
+        subLp.bottomMargin = dp(12);
+        sub.setLayoutParams(subLp);
+        content.addView(sub);
+
+        if (qr != null) {
+            ImageView img = new ImageView(this);
+            img.setImageBitmap(qr);
+            int sz = dp(240);
+            LinearLayout.LayoutParams iLp = new LinearLayout.LayoutParams(sz, sz);
+            img.setLayoutParams(iLp);
+            content.addView(img);
+        }
+
+        TextView linkLine = new TextView(this);
+        linkLine.setText(deepLink);
+        linkLine.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+        linkLine.setTextColor(MUTED);
+        linkLine.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams lLp = new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+        lLp.topMargin = dp(12);
+        linkLine.setLayoutParams(lLp);
+        content.addView(linkLine);
+
+        new AlertDialog.Builder(this)
+                .setView(content)
+                .setPositiveButton("Share link", (d, w) -> {
+                    Intent send = new Intent(Intent.ACTION_SEND);
+                    send.setType("text/plain");
+                    send.putExtra(Intent.EXTRA_TEXT, deepLink);
+                    startActivity(Intent.createChooser(send, "Invite to split"));
+                })
+                .setNeutralButton("Copy", (d, w) -> {
+                    ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                    if (cm != null) cm.setPrimaryClip(ClipData.newPlainText("Invite", deepLink));
+                    toast("Invite link copied");
+                })
+                .setNegativeButton("Done", null)
+                .show();
+    }
+
+    private void confirmClearMine() {
+        new AlertDialog.Builder(this)
+                .setTitle("Clear your rows?")
+                .setMessage("Removes only the splits this device added. Other members' "
+                        + "rows stay intact. This can't be undone.")
+                .setPositiveButton("Clear", (d, w) -> {
+                    history.clear();
+                    SplitCloudSync.pushClear(this, store);
+                    render();
+                    toast("Cleared");
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void confirmClearAll() {
+        new AlertDialog.Builder(this)
+                .setTitle("Clear everyone's rows?")
+                .setMessage("This wipes the entire shared history for every member. "
+                        + "Only the owner can do this. This can't be undone.")
+                .setPositiveButton("Clear all", (d, w) -> {
+                    history.clear();
+                    SplitCloudSync.pushClearAll(this, store);
+                    render();
+                    toast("Cleared all rows");
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
