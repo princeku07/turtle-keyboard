@@ -81,13 +81,21 @@ public final class NotionLlmBridge {
 
     private static Parsed parse(String llmOutput) {
         if (llmOutput == null) return null;
-        String json = stripFences(llmOutput).trim();
-        // The model sometimes prepends commentary. Find the first '{' and last '}'.
-        int start = json.indexOf('{');
-        int end = json.lastIndexOf('}');
+        // Reasoning models (ministral-*-reasoning, etc.) emit a [THINK]…[/THINK] block
+        // full of JSON-shaped scratch work before the real answer. Strip that first or
+        // brace-scanning will fold the entire trace into the parse window and fail.
+        String cleaned = stripThinkBlocks(llmOutput);
+        // Prefer the LAST fenced code block — models that wrap the final answer in
+        // ```json … ``` always put the answer fence at the end, after any in-trace code.
+        String body = extractLastFencedBlock(cleaned);
+        if (body == null) body = stripFences(cleaned);
+        body = body.trim();
+
+        int start = body.indexOf('{');
+        int end = body.lastIndexOf('}');
         if (start < 0 || end <= start) return null;
         try {
-            JSONObject obj = new JSONObject(json.substring(start, end + 1));
+            JSONObject obj = new JSONObject(body.substring(start, end + 1));
             String title = obj.optString("title", "Untitled");
             JSONArray src = obj.optJSONArray("blocks");
             JSONArray dst = new JSONArray();
@@ -119,6 +127,32 @@ public final class NotionLlmBridge {
             if (firstNl > 0 && closing > firstNl) return s.substring(firstNl + 1, closing);
         }
         return s;
+    }
+
+    /** Remove every {@code [THINK]…[/THINK]} (or {@code <think>…</think>}) reasoning
+     *  block. Tag matching is loose — case-insensitive, both square-bracket and angle
+     *  forms — so the same helper covers ministral-*-reasoning, Qwen, DeepSeek, etc. */
+    private static String stripThinkBlocks(String s) {
+        if (s == null) return null;
+        String out = s;
+        out = out.replaceAll("(?is)\\[think\\].*?\\[/think\\]", "");
+        out = out.replaceAll("(?is)<think>.*?</think>", "");
+        return out;
+    }
+
+    /** Find the LAST triple-backtick fenced block in {@code s} and return its body
+     *  (without the fences). Skips any ```language``` info string. Returns null if no
+     *  complete fenced block is found. */
+    private static String extractLastFencedBlock(String s) {
+        if (s == null) return null;
+        int closing = s.lastIndexOf("```");
+        if (closing < 0) return null;
+        int opening = s.lastIndexOf("```", closing - 1);
+        if (opening < 0 || opening >= closing) return null;
+        // Skip the optional info string ("json", "python", …) that follows the opener.
+        int firstNl = s.indexOf('\n', opening + 3);
+        int bodyStart = (firstNl > 0 && firstNl < closing) ? firstNl + 1 : opening + 3;
+        return s.substring(bodyStart, closing);
     }
 
     private static boolean isSupportedType(String t) {
