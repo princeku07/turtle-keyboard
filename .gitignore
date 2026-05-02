@@ -13,6 +13,7 @@ ios/build/
 ios/*.xcworkspace/xcuserdata/
 ios/*.xcodeproj/xcuserdata/
 ios/DerivedData/
+ios/Generated/
 
 # macOS
 .DS_Store
@@ -32,6 +33,12 @@ keystore.properties
 
 # Local Android config (path to the keystore on the maintainer's machine, etc.)
 local.properties
+
+# Repo-wide secrets (OAuth client IDs, etc.) consumed by both Android + iOS.
+# Schema is in .env.example (committed). Actual values stay local.
+.env
+.env.local
+!.env.example
 
 # Transient root-level Node artifacts produced by running the parity check
 # locally. The actual app's Node deps live under lading-app/.

@@ -11,21 +11,12 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
 
-        // OAuth Web client ID — used to request access tokens for the Sheets/Drive scope.
-        // Set in android/local.properties as: SPLIT_OAUTH_WEB_CLIENT_ID=xxxxx.apps.googleusercontent.com
+        // OAuth Web client ID — read from the repo-root `.env` file (gitignored) so the
+        // same secret seeds both Android + iOS builds. Schema lives in `.env.example`.
+        // -Dgradle property override still wins (handy for CI).
         val oauthClientId = providers
             .gradleProperty("SPLIT_OAUTH_WEB_CLIENT_ID")
-            .orElse(
-                providers.fileContents(rootProject.layout.projectDirectory.file("local.properties"))
-                    .asText
-                    .map { txt ->
-                        txt.lineSequence()
-                            .map { it.trim() }
-                            .firstOrNull { it.startsWith("SPLIT_OAUTH_WEB_CLIENT_ID=") }
-                            ?.substringAfter("=")
-                            .orEmpty()
-                    }
-            )
+            .orElse(providers.provider { readEnv("SPLIT_OAUTH_WEB_CLIENT_ID") })
             .getOrElse("")
         buildConfigField("String", "OAUTH_WEB_CLIENT_ID", "\"" + oauthClientId + "\"")
     }
@@ -56,4 +47,18 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
+}
+
+/** Reads `KEY=VALUE` from the repo-root `.env`. Returns empty string if missing. */
+fun readEnv(key: String): String {
+    // android/split/build.gradle.kts → repo root is two levels up.
+    val envFile = rootProject.layout.projectDirectory.file("../.env").asFile
+    if (!envFile.exists()) return ""
+    return envFile.readLines().asSequence()
+        .map { it.trim() }
+        .filter { it.isNotEmpty() && !it.startsWith("#") }
+        .firstOrNull { it.startsWith("$key=") }
+        ?.substringAfter("=")
+        ?.trim()
+        .orEmpty()
 }
