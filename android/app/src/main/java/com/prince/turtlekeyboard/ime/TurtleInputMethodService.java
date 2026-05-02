@@ -31,6 +31,7 @@ import com.prince.turtlekeyboard.gesture.SpaceGestureHandler;
 import com.prince.turtlekeyboard.ime.view.KeyPreviewPopup;
 import com.prince.turtlekeyboard.ime.view.KeyboardRootView;
 import com.prince.notion.NotionIntegration;
+import com.prince.slack.SlackIntegration;
 import com.prince.split.SplitIntegration;
 import com.prince.split.kbd.IntegrationContext;
 import com.prince.split.kbd.KeyboardIntegration;
@@ -158,7 +159,8 @@ public class TurtleInputMethodService extends InputMethodService
                 getApplicationContext(), root, committer, prefs, appProfiles, llm);
         java.util.List<KeyboardIntegration> integrationList = java.util.Arrays.asList(
                 new SplitIntegration(),
-                new NotionIntegration());
+                new NotionIntegration(),
+                new SlackIntegration());
         integrations = new IntegrationRegistry(integrationList, integrationCtx, registry);
 
         // Replay shortcut registrations for every enrolled app. Runs after module

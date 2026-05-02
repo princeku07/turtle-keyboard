@@ -163,7 +163,7 @@ export default function HeroClient() {
       <div className="mx-auto max-w-[1400px] w-full px-5 sm:px-6 pt-6 sm:pt-10 text-center">
         <div className="inline-flex items-center gap-2 font-mono text-[10px] sm:text-xs uppercase tracking-widest bg-ink text-cream px-3 py-1.5 rounded-full mb-5 sm:mb-7">
           <span className="w-2 h-2 rounded-full bg-[#15803d] animate-pulse" />
-          now in closed alpha · ios first
+          now in closed alpha · android first
         </div>
 
         <h1 className="font-sans font-black tracking-[-0.04em] leading-[0.92] text-[clamp(2.75rem,9vw,6rem)] min-h-[1.05em] break-words">

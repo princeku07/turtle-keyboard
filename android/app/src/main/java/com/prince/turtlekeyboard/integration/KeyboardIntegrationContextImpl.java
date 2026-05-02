@@ -7,6 +7,7 @@ import android.util.Log;
 import android.view.View;
 
 import com.prince.notion.ui.NotionConnectActivity;
+import com.prince.slack.ui.SlackConnectActivity;
 import com.prince.split.ui.SplitActivity;
 
 import androidx.annotation.Nullable;
@@ -100,6 +101,7 @@ public class KeyboardIntegrationContextImpl implements IntegrationContext {
         switch (screenId) {
             case "split-detail":    target = SplitActivity.class; break;
             case "notion-connect":  target = NotionConnectActivity.class; break;
+            case "slack-connect":   target = SlackConnectActivity.class; break;
             default:
                 Log.w(TAG, "openScreen: unknown id=" + screenId);
                 return;

@@ -18,6 +18,7 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.prince.notion.ui.NotionConnectActivity;
+import com.prince.slack.ui.SlackConnectActivity;
 import com.prince.split.SplitAuth;
 import com.prince.split.SplitCloudSync;
 import com.prince.split.SplitContract;
@@ -66,6 +67,8 @@ public class MainActivity extends AppCompatActivity {
                 startActivity(new Intent(this, AppPersonalizationActivity.class)));
         binding.btnConnectNotion.setOnClickListener(v ->
                 startActivity(new Intent(this, NotionConnectActivity.class)));
+        binding.btnConnectSlack.setOnClickListener(v ->
+                startActivity(new Intent(this, SlackConnectActivity.class)));
 
         refreshSplitStatus();
 
