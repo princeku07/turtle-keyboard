@@ -90,40 +90,52 @@ public final class SlackClient {
 
     public void listChannels(ChannelsCallback cb) {
         EXEC.execute(() -> {
-            HttpURLConnection conn = null;
             try {
-                // Both public + private channels the user belongs to. exclude_archived
-                // because you can't post to archived channels anyway.
-                conn = openGet("/conversations.list?types=public_channel,private_channel"
-                        + "&exclude_archived=true&limit=200");
-                int code = conn.getResponseCode();
-                String resp = readAll(code < 400 ? conn.getInputStream() : conn.getErrorStream());
-                JSONObject json = new JSONObject(resp);
-                if (!json.optBoolean("ok", false)) {
-                    cb.onError("conversations.list: " + json.optString("error", "unknown"));
-                    return;
-                }
-                JSONArray arr = json.optJSONArray("channels");
+                // users.conversations returns only the channels the authenticated user
+                // is a member of — naturally avoids the workspace-wide is_member filter
+                // we used to do client-side. Pagination is mandatory: workspaces with
+                // dozens of channels return the rest under response_metadata.next_cursor.
                 List<Channel> out = new ArrayList<>();
-                if (arr != null) {
-                    for (int i = 0; i < arr.length(); i++) {
-                        JSONObject c = arr.optJSONObject(i);
-                        if (c == null) continue;
-                        // Filter to channels the user is a member of — posting to others
-                        // either fails or surprises the user.
-                        if (!c.optBoolean("is_member", false)) continue;
-                        out.add(new Channel(
-                                c.optString("id"),
-                                c.optString("name"),
-                                c.optBoolean("is_private", false)));
+                String cursor = "";
+                int pages = 0;
+                final int MAX_PAGES = 10; // safety net, ~10k channels
+                while (pages++ < MAX_PAGES) {
+                    String path = "/users.conversations?types=public_channel,private_channel"
+                            + "&exclude_archived=true&limit=200";
+                    if (!cursor.isEmpty()) {
+                        path += "&cursor=" + URLEncoder.encode(cursor, "UTF-8");
+                    }
+                    HttpURLConnection conn = openGet(path);
+                    try {
+                        int code = conn.getResponseCode();
+                        String resp = readAll(code < 400 ? conn.getInputStream() : conn.getErrorStream());
+                        JSONObject json = new JSONObject(resp);
+                        if (!json.optBoolean("ok", false)) {
+                            cb.onError("users.conversations: " + json.optString("error", "unknown"));
+                            return;
+                        }
+                        JSONArray arr = json.optJSONArray("channels");
+                        if (arr != null) {
+                            for (int i = 0; i < arr.length(); i++) {
+                                JSONObject c = arr.optJSONObject(i);
+                                if (c == null) continue;
+                                out.add(new Channel(
+                                        c.optString("id"),
+                                        c.optString("name"),
+                                        c.optBoolean("is_private", false)));
+                            }
+                        }
+                        JSONObject meta = json.optJSONObject("response_metadata");
+                        cursor = meta == null ? "" : meta.optString("next_cursor", "");
+                        if (cursor.isEmpty()) break;
+                    } finally {
+                        conn.disconnect();
                     }
                 }
                 cb.onResults(out);
             } catch (Exception e) {
-                Log.w(TAG, "conversations.list failed", e);
+                Log.w(TAG, "users.conversations failed", e);
                 cb.onError(e.getClass().getSimpleName() + ": " + e.getMessage());
-            } finally {
-                if (conn != null) conn.disconnect();
             }
         });
     }

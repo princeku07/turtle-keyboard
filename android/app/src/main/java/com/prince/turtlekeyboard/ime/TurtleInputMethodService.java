@@ -211,6 +211,7 @@ public class TurtleInputMethodService extends InputMethodService
             integrations.onTextChanged(committer.textBeforeCursor(16), committer.textAfterCursor(16));
         }
         maybeOfferEnrollment(info);
+        refreshHostAppBadge(info);
         refreshSuggestions();
     }
 
@@ -219,6 +220,7 @@ public class TurtleInputMethodService extends InputMethodService
         super.onFinishInputView(finishingInput);
         if (integrations != null) integrations.onInputEnd();
         hideEnrollmentBanner();
+        if (root != null && root.hostAppBadge() != null) root.hostAppBadge().hide();
     }
 
     @Override
@@ -485,6 +487,31 @@ public class TurtleInputMethodService extends InputMethodService
         if (root != null && root.enrollmentBanner() != null) root.enrollmentBanner().hide();
     }
 
+    private void refreshHostAppBadge(@Nullable EditorInfo info) {
+        // Show only for apps the user has *mapped* (auto-enrolled seed apps + user-enrolled
+        // apps). Skip system surfaces and sensitive fields so the badge never leaks
+        // "we know where you are" into a password screen.
+        if (info == null || info.packageName == null) { root.hostAppBadge().hide(); return; }
+        String pkg = info.packageName;
+        if (isSystemPackage(pkg)) { root.hostAppBadge().hide(); return; }
+        if (com.prince.split.EditorFieldHeuristics.looksSensitive(info)) {
+            root.hostAppBadge().hide(); return;
+        }
+        if (appProfiles == null
+                || appProfiles.statusFor(pkg) != com.prince.split.kbd.AppProfileRegistry.Status.ENROLLED) {
+            root.hostAppBadge().hide();
+            return;
+        }
+        android.graphics.drawable.Drawable icon;
+        try {
+            icon = getApplicationContext().getPackageManager().getApplicationIcon(pkg);
+        } catch (android.content.pm.PackageManager.NameNotFoundException e) {
+            icon = null;
+        }
+        if (icon == null) { root.hostAppBadge().hide(); return; }
+        root.hostAppBadge().show(icon);
+    }
+
     private static boolean isSystemPackage(String pkg) {
         // Only filter true system surfaces (system UI, settings, launcher, IMEs and our
         // own host) — *not* arbitrary "com.android.*" packages, since Chrome ships as
@@ -520,6 +547,12 @@ public class TurtleInputMethodService extends InputMethodService
         com.prince.turtlekeyboard.ime.view.QuickPanelView panel =
                 new com.prince.turtlekeyboard.ime.view.QuickPanelView(this);
         panel.applyTheme(themes.current());
+        // Re-query the current host package right before ranking — onStartInputView
+        // stamps `currentPkg` but Android can re-enter the input view on some redraws
+        // without re-firing it, leaving the field stale. Asking for live info here
+        // guarantees /notion + /slack-affine commands hoist correctly in Slack, etc.
+        EditorInfo liveInfo = getCurrentInputEditorInfo();
+        if (liveInfo != null && liveInfo.packageName != null) currentPkg = liveInfo.packageName;
         panel.show(registry.allSortedFor(currentPkg), this::onQuickPanelPick, this::hideQuickPanel);
 
         // Match the keyboard's measured height so the grid sits in the same vertical band

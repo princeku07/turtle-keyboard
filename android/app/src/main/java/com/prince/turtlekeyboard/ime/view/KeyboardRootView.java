@@ -23,6 +23,7 @@ public class KeyboardRootView extends LinearLayout {
     private IntegrationChipView chip;
     private AppEnrollmentBannerView enrollmentBanner;
     private CommandSuggestionStripView cmdSuggestions;
+    private HostAppBadgeView hostAppBadge;
     private FrameLayout panelHost;
     private FrameLayout quickPanelHost;
     private KeyboardView keyboard;
@@ -40,6 +41,7 @@ public class KeyboardRootView extends LinearLayout {
         chip = findViewById(R.id.integration_chip);
         enrollmentBanner = findViewById(R.id.enrollment_banner);
         cmdSuggestions = findViewById(R.id.cmd_suggestions);
+        hostAppBadge = findViewById(R.id.host_app_badge);
         panelHost = findViewById(R.id.integration_panel_host);
         quickPanelHost = findViewById(R.id.quick_panel_host);
         keyboard = findViewById(R.id.keyboard_view);
@@ -52,6 +54,7 @@ public class KeyboardRootView extends LinearLayout {
     public IntegrationChipView chip() { return chip; }
     public AppEnrollmentBannerView enrollmentBanner() { return enrollmentBanner; }
     public CommandSuggestionStripView cmdSuggestions() { return cmdSuggestions; }
+    public HostAppBadgeView hostAppBadge() { return hostAppBadge; }
     /** Generic slot integrations attach panel views to. Visibility flips when content
      *  is added/removed by callers. */
     public ViewGroup panelHost() { return panelHost; }

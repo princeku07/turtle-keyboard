@@ -8,6 +8,12 @@
     android:paddingTop="2dp"
     android:paddingBottom="6dp">
 
+    <com.prince.turtlekeyboard.ime.view.HostAppBadgeView
+        android:id="@+id/host_app_badge"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone" />
+
     <com.prince.turtlekeyboard.ime.view.AppEnrollmentBannerView
         android:id="@+id/enrollment_banner"
         android:layout_width="match_parent"
