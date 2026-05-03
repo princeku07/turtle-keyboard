@@ -573,7 +573,7 @@ export default function Home() {
               </button>
             </form>
             <div className="mt-6 font-mono text-xs opacity-70">
-              ~3,200 people in line · ios alpha rolling out monthly
+              ~3,200 people in line · android alpha rolling out monthly
             </div>
           </div>
         </div>

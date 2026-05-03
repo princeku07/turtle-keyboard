@@ -8,6 +8,30 @@
     android:paddingTop="2dp"
     android:paddingBottom="6dp">
 
+    <com.prince.turtlekeyboard.ime.view.HostAppBadgeView
+        android:id="@+id/host_app_badge"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone" />
+
+    <com.prince.turtlekeyboard.ime.view.AppEnrollmentBannerView
+        android:id="@+id/enrollment_banner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone" />
+
+    <com.prince.turtlekeyboard.ime.view.IntegrationChipView
+        android:id="@+id/integration_chip"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone" />
+
+    <FrameLayout
+        android:id="@+id/integration_panel_host"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone" />
+
     <com.prince.turtlekeyboard.ime.view.SuggestionStripView
         android:id="@+id/suggestion_strip"
         android:layout_width="match_parent"
@@ -29,6 +53,12 @@
         android:layout_height="wrap_content"
         android:visibility="gone" />
 
+    <com.prince.turtlekeyboard.ime.view.CommandSuggestionStripView
+        android:id="@+id/cmd_suggestions"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone" />
+
     <com.prince.turtlekeyboard.ime.view.BannerView
         android:id="@+id/banner"
         android:layout_width="match_parent"
@@ -39,6 +69,12 @@
         android:textSize="14sp"
         android:textStyle="bold"
         android:background="#0D3F12"
+        android:visibility="gone" />
+
+    <FrameLayout
+        android:id="@+id/quick_panel_host"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
         android:visibility="gone" />
 
     <android.inputmethodservice.KeyboardView

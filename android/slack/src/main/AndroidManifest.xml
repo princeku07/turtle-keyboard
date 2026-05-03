@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application>
+        <!-- "Open in Slack" / "Copy link" action target on the result notification.
+             Mirrors NotionResultNotifier — receiver fires only via PendingIntent. -->
+        <receiver
+            android:name="com.prince.slack.SlackResultNotifier$SlackCopyLinkReceiver"
+            android:exported="false" />
+
+        <!-- OAuth landing point. Same App-Link pattern as Notion: the redirect URL
+             https://www.turtlekeyboard.com/oauth/slack is intercepted by Android via
+             the verified assetlinks.json hosted on the landing app, dropping the
+             ?code= straight into this Activity. -->
+        <activity
+            android:name="com.prince.slack.ui.SlackConnectActivity"
+            android:exported="true"
+            android:label="Connect Slack"
+            android:launchMode="singleTask"
+            android:theme="@style/Theme.AppCompat.DayNight.NoActionBar">
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="www.turtlekeyboard.com"
+                    android:pathPrefix="/oauth/slack" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

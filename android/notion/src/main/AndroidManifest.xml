@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application>
+        <!-- "Copy link" action target on the result notification. Not exported — fired
+             only by the notification framework via the PendingIntent we hand it. -->
+        <receiver
+            android:name="com.prince.notion.NotionResultNotifier$NotionCopyLinkReceiver"
+            android:exported="false" />
+
+        <!-- OAuth landing point. Notion only accepts HTTPS redirect URIs, so we route
+             through https://www.turtlekeyboard.com/oauth/notion and use Android App Links
+             (autoVerify) to intercept the redirect before the browser loads the page. The
+             landing app at lading-app/ hosts /.well-known/assetlinks.json and a graceful
+             fallback page for unverified browsers. singleTask so a re-entry replaces the
+             previous instance instead of stacking. -->
+        <activity
+            android:name="com.prince.notion.ui.NotionConnectActivity"
+            android:exported="true"
+            android:label="Connect Notion"
+            android:launchMode="singleTask"
+            android:theme="@style/Theme.AppCompat.DayNight.NoActionBar">
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="www.turtlekeyboard.com"
+                    android:pathPrefix="/oauth/notion" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

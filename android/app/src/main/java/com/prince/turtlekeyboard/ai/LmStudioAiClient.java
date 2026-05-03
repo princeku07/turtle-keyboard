@@ -42,7 +42,11 @@ public class LmStudioAiClient implements AiClient {
     private static final String BASE_URL = "http://192.168.1.10:1234";
     private static final String MODEL = "mistralai/ministral-3-3b-reasoning";
     private static final int CONNECT_TIMEOUT_MS = 5_000;
-    private static final int READ_TIMEOUT_MS = 30_000;
+    /** Reasoning models (e.g. ministral-3-3b-reasoning) routinely emit 1k+ tokens of
+     *  [THINK]…[/THINK] before the final answer; on local hardware this can take a
+     *  minute. 30s timed out mid-stream and the keyboard reported "Mistral unreachable"
+     *  while LM Studio kept happily generating. 90s leaves headroom. */
+    private static final int READ_TIMEOUT_MS = 90_000;
 
     /** Returns a window-attached ViewGroup the renderer can briefly add a
      *  WebView to. In the IME this is the SoftInputWindow's decor view. */
@@ -67,21 +71,30 @@ public class LmStudioAiClient implements AiClient {
         this.delegate = delegate;
     }
 
+    /** Synthetic command name used by {@code AiClientLlmService} to request a raw
+     *  completion (no built-in system prompt). The caller embeds its own instructions
+     *  in the user prompt. Routed straight to Mistral, never to the stub. */
+    private static final String RAW_COMPLETION = "_llm";
+
     @Override
     public void execute(SlashCommand cmd, Callback callback) {
         String name = cmd.name == null ? "" : cmd.name.toLowerCase();
-        if (!name.equals("ask") && !name.equals("org")) {
+        if (!name.equals("ask") && !name.equals("org") && !name.equals(RAW_COMPLETION)) {
             delegate.execute(cmd, callback);
             return;
         }
         String prompt = cmd.prompt == null ? "" : cmd.prompt.trim();
         if (prompt.isEmpty()) {
-            String msg = name.equals("org") ? "Organize what?" : "Ask what?";
+            String msg = name.equals("org") ? "Organize what?"
+                    : name.equals(RAW_COMPLETION) ? "Empty prompt"
+                    : "Ask what?";
             main.post(() -> callback.onResult(AiResult.error(msg)));
             return;
         }
         boolean isOrg = name.equals("org");
-        String systemPrompt = systemPromptFor(name);
+        // Raw completions skip the asset-loaded system prompt; the integration that
+        // requested the call has already prefixed its own instructions in `prompt`.
+        String systemPrompt = name.equals(RAW_COMPLETION) ? "" : systemPromptFor(name);
         io.execute(() -> {
             try {
                 String content = callMistral(systemPrompt, prompt);

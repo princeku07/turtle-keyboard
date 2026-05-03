@@ -16,6 +16,7 @@ turtle-keyboard/
 ├── ios/            # iOS keyboard app (coming soon, Swift)
 ├── lading-app/     # Marketing landing page (Next.js 16, React 19, Tailwind v4)
 ├── commands/       # Command registry — single source of truth for every slash command
+├── integrations/   # Integration registry — feature modules beyond slash commands (chips, panels, deep screens)
 ├── .github/        # CI workflows (parity check, per-component build/test) and scripts
 ├── Prd.md          # Product requirements document
 └── Readme.md
@@ -90,7 +91,7 @@ open TurtleKeyboard.xcodeproj
 
 ## Cross-platform parity
 
-Two native codebases (Java for Android, Swift for iOS) with no shared code means parity is a process, not a fact. The process is built around a single source of truth: the **command registry** in [`commands/`](./commands).
+Two native codebases (Java for Android, Swift for iOS) with no shared code means parity is a process, not a fact. The process is built around two single-sources-of-truth: the **command registry** in [`commands/`](./commands) (one YAML per slash command) and the **integration registry** in [`integrations/`](./integrations) (one YAML per pluggable feature module — see [Integrations](#integrations--composing-features-beyond-slash-commands) below). CI validates both on every PR.
 
 ### How it works
 
@@ -135,6 +136,99 @@ node .github/scripts/parity-check.mjs
 ```
 
 Exits non-zero if any YAML fails the schema or any `impl` path is missing.
+
+---
+
+## Integrations — composing features beyond slash commands
+
+Slash commands are the right shape when the user has typed text and wants AI to act on it. Plenty of useful features don't fit that shape: paying ₹3000 in GPay should surface a "Split this" chip, not require typing `/split` first; saved splits should list above the keys, not redirect to an app; and occasionally the user wants a deep view — totals, reports, share sheets — that the keyboard surface can't hold.
+
+To stay sane while shipping all of these, the keyboard exposes a single pluggable surface: **`KeyboardIntegration`**. Every contextual feature — Split today, Notion-clip / Slack-quote / Splitwise / etc. tomorrow — implements this one interface and ships as its own module. **The same contract is mirrored 1:1 on Android (Java interface) and iOS (Swift protocol)**, so an integration is one feature with two platform implementations — same way slash commands work.
+
+### The surfaces an integration can use
+
+| Surface | API | Use case |
+| --- | --- | --- |
+| **Chip** | `ctx.showChip(ChipSpec, onTap)` | Persistent bar above the keys; signals contextual relevance (`"GPay · Split ₹3000"`) |
+| **In-keyboard panel** | `ctx.showPanel(view)` / `ctx.hidePanel()` | Rich inline UI without leaving the host app — stepper, list, picker, history |
+| **Banner** | `ctx.showBanner(text, autoHideMs)` | Transient notice (`"Split saved 💸"`) |
+| **Slash command** | `CommandSpec(name, label, emoji, needsPrompt, handler)` | Discoverable via `/`; runs locally with no AI hop |
+| **Deep screen** | `ctx.openScreen(id)` | Hand off to a host-provided Activity / app for reports, settings, anything needing space |
+| **Storage** | `ctx.store()` | Shared key/value store (`SplitStore`) — both platforms agree on keys |
+
+### The lifecycle
+
+```
+onCreateInputView          → registry built; each integration's commands registered
+onStartInputView(info)     → registry calls each integration.activate(info, ctx)
+                              the first non-null IntegrationSession wins
+onUpdateSelection          → active session.onTextChanged(before, after)
+onFinishInputView          → active session.onDeactivate
+```
+
+An integration can be:
+
+- **Activation-only** — chip + panel, no commands (e.g. a future "Detect URL → Notion-clip" integration).
+- **Commands-only** — `/notify`, `/bill-image`, `/scan-receipt`, etc., no per-field detection.
+- **Both** — Split is the canonical example: activates contextually in payment apps **and** ships `/split <amount>` plus `/splits`.
+
+### Module shape
+
+Each integration ships as a standalone library (Android library module / iOS framework):
+
+```
+split/
+├── kbd/                          ← the cross-feature SDK contract — abstractions only
+│   ├── KeyboardIntegration       Java interface  /  Swift protocol
+│   ├── IntegrationSession        per-input-session lifecycle
+│   ├── IntegrationContext        UI surfaces + storage exposed to integrations
+│   ├── ChipSpec
+│   └── CommandSpec
+├── HostApp · AmountWatcher · …   ← Split-specific detection helpers
+├── view/SplitPanelView           ← in-keyboard panel UI
+├── view/SplitHistoryView         ← in-keyboard list UI
+└── SplitIntegration              ← the entry point implementing KeyboardIntegration
+```
+
+The keyboard's host app depends on each integration library and registers them in **one line**:
+
+```java
+// Android — same shape on iOS
+new IntegrationRegistry(
+    Arrays.asList(new SplitIntegration(), new NotionIntegration(), new SlackIntegration()),
+    integrationContext, commandRegistry);
+```
+
+Adding the next integration is therefore: new module → implement `KeyboardIntegration` → add to that list. **No churn in the IME service.**
+
+### Worked example — Split
+
+| Step | What happens |
+| --- | --- |
+| User opens GPay | `SplitIntegration.activate` matches payment package + numeric field, returns a `SplitSession`. Chip "GPay" appears. |
+| User types `3000` | `AmountWatcher` fires; chip updates to `"GPay · Split ₹3000"`. |
+| User taps chip | Session opens `SplitPanelView` via `ctx.showPanel(view)`. Stepper picks number of people; live per-person amount. |
+| User taps Save | History appended via `SplitHistory(ctx.store())`. Banner: `"Split saved 💸"`. |
+| User types `/splits` anywhere | Local command handler runs; `SplitHistoryView` opens in panel — scrollable list, tap to copy. |
+| User taps "Report ↗" | `ctx.openScreen("split-detail")` — host launches the Reports screen (today an in-process Activity / view controller, tomorrow a standalone Split APK / app). |
+
+### Why this scales
+
+- **Net new feature = net new module + one line.** No edits to the IME service, no risk of regressing existing integrations.
+- **Independent versioning.** Each integration's surface is the SDK contract; bumping one doesn't reshape the others.
+- **Standalone-app escape hatch.** When an integration outgrows the keyboard (e.g. needs notification listener access, widgets, contact pickers), it gets promoted from in-process module to its own APK. The change is localized: the `openScreen(id)` call site stays identical; the host swaps in an explicit-package `Intent` (or its iOS equivalent) instead of an in-process Activity launch. Integration code does not change.
+- **Same contract on iOS.** The Swift protocol mirrors the Java interface name-for-name. Parity for an integration is verified the same way as for slash commands — a `support` block per platform — and the Reports / detail screen counterpart is a `UIViewController`-backed entry under the same screen id.
+
+### Adding a new integration (cookbook)
+
+1. **Create a new library module** (Android: `:foo` / iOS: `FooSDK.framework`), depending only on the keyboard SDK contract.
+2. **Implement `KeyboardIntegration`** — `id()`, optionally `activate(...)`, optionally `commands()`.
+3. **Build any panel views you need** as plain `LinearLayout` / `UIView` subclasses; mount them via `ctx.showPanel(view)`.
+4. **Wire any deep screen** by calling `ctx.openScreen("foo-detail")` from your integration; host the Activity / view controller in the keyboard app (or a future standalone Foo app) and add one switch arm in the keyboard's context impl.
+5. **Add the integration** to the IME's registry list — one line.
+6. **Register it in [`integrations/<id>.yaml`](./integrations/)** — declares the surfaces it uses, the host packages it activates on, the commands it ships, and a per-platform `support` block. The same parity bot that gates `commands/` also validates `integrations/`. See [`integrations/README.md`](./integrations/README.md) for the schema and a worked example.
+
+Each integration thus has the same lifecycle as a command: ship on one platform, mark `planned` on the other, parity bot tracks the gap and posts the matrix on every PR.
 
 ---
 

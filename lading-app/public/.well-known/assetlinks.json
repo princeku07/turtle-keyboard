@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.prince.turtlekeyboard",
+      "sha256_cert_fingerprints": [
+        "2A:00:C2:D3:B3:44:1A:58:89:43:50:C2:AA:35:20:E0:BD:96:B3:C7:47:E9:95:45:EF:59:AA:E7:14:F1:EB:8C"
+      ]
+    }
+  }
+]

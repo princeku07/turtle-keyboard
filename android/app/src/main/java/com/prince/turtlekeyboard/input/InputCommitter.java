@@ -61,6 +61,14 @@ public class InputCommitter {
         return cs == null ? "" : cs;
     }
 
+    /** Returns up to {@code n} characters after the cursor, or empty string. */
+    public CharSequence textAfterCursor(int n) {
+        InputConnection ic = connection();
+        if (ic == null) return "";
+        CharSequence cs = ic.getTextAfterCursor(n, 0);
+        return cs == null ? "" : cs;
+    }
+
     public void deleteBeforeCursor(int n) {
         InputConnection ic = connection();
         if (ic != null) ic.deleteSurroundingText(n, 0);
