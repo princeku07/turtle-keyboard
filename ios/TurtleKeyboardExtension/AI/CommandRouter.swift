@@ -27,16 +27,16 @@ final class CommandRouter {
     ]
 
     // Default model per command.
-    // All text commands route to the local Ministral 3B for testing.
+    // All text commands route to the local Gemma 4 for testing.
     // /cap stays on Flux 2 via the Spark gateway.
     private let defaultRoutes: [String: AIModel] = [
         "cap":   ModelRegistry.flux2,
-        "fix":   ModelRegistry.ministral3B,
-        "tone":  ModelRegistry.ministral3B,
-        "reply": ModelRegistry.ministral3B,
-        "tl":    ModelRegistry.ministral3B,
-        "ask":   ModelRegistry.ministral3B,
-        "org":   ModelRegistry.ministral3B,
+        "fix":   ModelRegistry.gemma4,
+        "tone":  ModelRegistry.gemma4,
+        "reply": ModelRegistry.gemma4,
+        "tl":    ModelRegistry.gemma4,
+        "ask":   ModelRegistry.gemma4,
+        "org":   ModelRegistry.gemma4,
     ]
 
     // TODO: migrate to shared App Group defaults once App Groups are wired

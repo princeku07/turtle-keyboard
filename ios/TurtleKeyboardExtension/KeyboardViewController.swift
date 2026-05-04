@@ -51,11 +51,25 @@ class KeyboardViewController: UIInputViewController {
     //          iOS only gives custom keyboards ~290pt portrait on smaller iPads
     //          (mini), so we size for that worst case. Command bar shrinks too.
     //          5*42 + 6*6 + 4 = 250 (rows) + 40 (commandBar) = 290pt total.
-    private var rowH:        CGFloat { isPad ? 42 : 54 }
-    private var rowGap:      CGFloat { isPad ? 6  : 12 }
-    private var commandBarH: CGFloat { isPad ? 40 : 52 }
-    private let keyGap:      CGFloat = 8
-    private let bottomPad:   CGFloat = 4
+    // iPhone numbers tuned to match the iOS system keyboard (≈291pt total
+    // portrait). Previously rowH=54, rowGap=12 made the keys look chunky
+    // and the keyboard too tall.
+    private var rowH:        CGFloat { isPad ? 42 : 44 }
+    private var rowGap:      CGFloat { isPad ? 6  : 8 }
+    private var commandBarH: CGFloat { isPad ? 40 : 44 }
+    private var keyGap:      CGFloat { isPad ? 8  : 6 }
+    private var bottomPad:   CGFloat { isPad ? 4  : 6 }
+
+    // Command-bar internals shrink on iPhone — the prompt label needs to
+    // claim what's left after cancel + pill + mic + send buttons, and
+    // iPhone widths (375-393pt portrait) don't have headroom for the
+    // generous iPad spacing.
+    private var cmdSidePadding:   CGFloat { isPad ? 12 : 6 }
+    private var cmdCancelW:       CGFloat { isPad ? 28 : 24 }
+    private var cmdMicW:          CGFloat { isPad ? 32 : 28 }
+    private var cmdMicH:          CGFloat { isPad ? 30 : 26 }
+    private var cmdSendInsetH:    CGFloat { isPad ? 14 : 10 }
+    private var cmdSendInsetV:    CGFloat { isPad ? 7  : 5 }
 
     // Height of the four key rows (no command bar)
     private var rowsH: CGFloat {
@@ -316,11 +330,15 @@ class KeyboardViewController: UIInputViewController {
         cmdPill.translatesAutoresizingMaskIntoConstraints = false
         commandBar.addSubview(cmdPill)
 
-        // Prompt preview
+        // Prompt preview — must stretch to fill whatever space the fixed
+        // elements (pill + mic + send) leave behind, and shrink (with
+        // truncation) before any of those clip when the row is narrow.
         cmdPromptLabel = UILabel()
         cmdPromptLabel.font      = .systemFont(ofSize: 15)
         cmdPromptLabel.textColor = UIColor.white.withAlphaComponent(0.45)
+        cmdPromptLabel.lineBreakMode = .byTruncatingTail
         cmdPromptLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        cmdPromptLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         cmdPromptLabel.translatesAutoresizingMaskIntoConstraints = false
         commandBar.addSubview(cmdPromptLabel)
 
@@ -356,7 +374,7 @@ class KeyboardViewController: UIInputViewController {
         cmdSendButton.setTitleColor(.white, for: .normal)
         cmdSendButton.backgroundColor    = UIColor.white.withAlphaComponent(0.18)
         cmdSendButton.layer.cornerRadius = 8
-        cmdSendButton.contentEdgeInsets  = UIEdgeInsets(top: 7, left: 14, bottom: 7, right: 14)
+        cmdSendButton.contentEdgeInsets  = UIEdgeInsets(top: cmdSendInsetV, left: cmdSendInsetH, bottom: cmdSendInsetV, right: cmdSendInsetH)
         cmdSendButton.setContentHuggingPriority(.required, for: .horizontal)
         cmdSendButton.addTarget(self, action: #selector(sendCommand), for: .touchUpInside)
         cmdSendButton.translatesAutoresizingMaskIntoConstraints = false
@@ -416,33 +434,35 @@ class KeyboardViewController: UIInputViewController {
             bannerLabel.topAnchor.constraint(equalTo: bannerContainer.topAnchor),
             bannerLabel.bottomAnchor.constraint(equalTo: bannerContainer.bottomAnchor),
 
-            // Command bar internals
-            cmdCancelButton.leadingAnchor.constraint(equalTo: commandBar.leadingAnchor, constant: 10),
+            // Command bar internals — most distances narrow on iPhone via
+            // cmdSidePadding / cmdCancelW / cmdMicW / cmdMicH so the
+            // prompt label has room to breathe on a 393pt-wide row.
+            cmdCancelButton.leadingAnchor.constraint(equalTo: commandBar.leadingAnchor, constant: cmdSidePadding),
             cmdCancelButton.centerYAnchor.constraint(equalTo: commandBar.centerYAnchor),
-            cmdCancelButton.widthAnchor.constraint(equalToConstant: 28),
+            cmdCancelButton.widthAnchor.constraint(equalToConstant: cmdCancelW),
 
-            cmdPill.leadingAnchor.constraint(equalTo: cmdCancelButton.trailingAnchor, constant: 6),
+            cmdPill.leadingAnchor.constraint(equalTo: cmdCancelButton.trailingAnchor, constant: 4),
             cmdPill.centerYAnchor.constraint(equalTo: commandBar.centerYAnchor),
             cmdPill.heightAnchor.constraint(equalToConstant: 26),
 
-            cmdPromptLabel.leadingAnchor.constraint(equalTo: cmdPill.trailingAnchor, constant: 10),
+            cmdPromptLabel.leadingAnchor.constraint(equalTo: cmdPill.trailingAnchor, constant: 6),
             cmdPromptLabel.centerYAnchor.constraint(equalTo: commandBar.centerYAnchor),
-            cmdPromptLabel.trailingAnchor.constraint(equalTo: cmdMicButton.leadingAnchor, constant: -8),
+            cmdPromptLabel.trailingAnchor.constraint(equalTo: cmdMicButton.leadingAnchor, constant: -6),
 
-            cmdMicButton.trailingAnchor.constraint(equalTo: cmdSendButton.leadingAnchor, constant: -6),
+            cmdMicButton.trailingAnchor.constraint(equalTo: cmdSendButton.leadingAnchor, constant: -4),
             cmdMicButton.centerYAnchor.constraint(equalTo: commandBar.centerYAnchor),
-            cmdMicButton.widthAnchor.constraint(equalToConstant: 32),
-            cmdMicButton.heightAnchor.constraint(equalToConstant: 30),
+            cmdMicButton.widthAnchor.constraint(equalToConstant: cmdMicW),
+            cmdMicButton.heightAnchor.constraint(equalToConstant: cmdMicH),
 
             cmdSpinner.centerXAnchor.constraint(equalTo: cmdSendButton.centerXAnchor),
             cmdSpinner.centerYAnchor.constraint(equalTo: commandBar.centerYAnchor),
 
-            cmdSendButton.trailingAnchor.constraint(equalTo: commandBar.trailingAnchor, constant: -12),
+            cmdSendButton.trailingAnchor.constraint(equalTo: commandBar.trailingAnchor, constant: -cmdSidePadding),
             cmdSendButton.centerYAnchor.constraint(equalTo: commandBar.centerYAnchor),
 
             // Suggestions stack fills the space to the right of the cancel button
-            cmdSuggestionsStack.leadingAnchor.constraint(equalTo: cmdCancelButton.trailingAnchor, constant: 6),
-            cmdSuggestionsStack.trailingAnchor.constraint(equalTo: commandBar.trailingAnchor, constant: -12),
+            cmdSuggestionsStack.leadingAnchor.constraint(equalTo: cmdCancelButton.trailingAnchor, constant: 4),
+            cmdSuggestionsStack.trailingAnchor.constraint(equalTo: commandBar.trailingAnchor, constant: -cmdSidePadding),
             cmdSuggestionsStack.centerYAnchor.constraint(equalTo: commandBar.centerYAnchor),
             cmdSuggestionsStack.heightAnchor.constraint(equalToConstant: 36),
         ])
@@ -1357,7 +1377,10 @@ private final class KeyboardIntegrationContext: IntegrationContext {
 /// the assistant's content stripped of any `<think>…</think>` block that
 /// reasoning models prepend.
 private final class LMStudioLlmService: LlmService {
-    private let endpoint = URL(string: "http://192.168.1.5:1234/v1/chat/completions")!
+    private let endpoint = URL(string: "http://192.168.0.106:1234/api/v1/chat")!
+    /// Must match the model loaded in LM Studio. Keep in sync with
+    /// `LMStudioProvider`'s default.
+    private let model = "google/gemma-4-e4b"
 
     func complete(
         prompt: String,
@@ -1368,28 +1391,57 @@ private final class LMStudioLlmService: LlmService {
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.timeoutInterval = 30
+        // Custom (non-OpenAI) chat API: { model, system_prompt, input }.
+        // Notion's bridge sends a single combined prompt — pass it as
+        // `input` and leave `system_prompt` empty so the model treats
+        // the whole thing as the user message.
         let body: [String: Any] = [
-            "stream": false,
-            "temperature": 0.4,
-            "messages": [["role": "user", "content": prompt]],
+            "model": model,
+            "system_prompt": "",
+            "input": prompt,
         ]
         req.httpBody = try? JSONSerialization.data(withJSONObject: body)
         URLSession.shared.dataTask(with: req) { data, resp, err in
             if let err = err { onError(err.localizedDescription); return }
             guard let data = data,
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let choices = json["choices"] as? [[String: Any]],
-                  let first = choices.first,
-                  let message = first["message"] as? [String: Any],
-                  let content = message["content"] as? String
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
             else { onError("non-JSON LLM response"); return }
+            let content = Self.extractContent(from: json)
+            guard let raw = content else {
+                let snippet = String(data: data, encoding: .utf8)?.prefix(200) ?? ""
+                onError("unexpected LLM shape: \(snippet)"); return
+            }
             // Strip reasoning model think blocks the same way LMStudioProvider does.
-            let cleaned = content
+            let cleaned = raw
                 .replacingOccurrences(of: #"(?is)<think>.*?</think>"#,
                                        with: "", options: .regularExpression)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             onText(cleaned)
         }.resume()
+    }
+
+    /// Same defensive parser as `LMStudioProvider.extractContent`.
+    /// Handles `output: [{type, content}]` (new), single-string forms,
+    /// and OpenAI's nested shape.
+    private static func extractContent(from json: [String: Any]) -> String? {
+        if let outputArr = json["output"] as? [[String: Any]] {
+            if let msg = outputArr.first(where: { ($0["type"] as? String) == "message" }),
+               let content = msg["content"] as? String, !content.isEmpty {
+                return content
+            }
+            let merged = outputArr.compactMap { $0["content"] as? String }
+                                   .joined(separator: "\n")
+            if !merged.isEmpty { return merged }
+        }
+        for key in ["output", "response", "text", "content", "answer", "result"] {
+            if let s = json[key] as? String, !s.isEmpty { return s }
+        }
+        if let choices = json["choices"] as? [[String: Any]],
+           let message = choices.first?["message"] as? [String: Any],
+           let content = message["content"] as? String {
+            return content
+        }
+        return nil
     }
 }
 

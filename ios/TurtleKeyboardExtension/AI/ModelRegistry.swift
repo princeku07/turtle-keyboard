@@ -39,9 +39,9 @@ enum ModelRegistry {
 
     // MARK: Local (LM Studio / llama.cpp)  ──────────────────────────────────
 
-    static let ministral3B = AIModel(
-        id: "mistralai/ministral-3-3b-reasoning",
-        displayName: "Ministral 3B (local)",
+    static let gemma4 = AIModel(
+        id: "google/gemma-4-e4b",
+        displayName: "Gemma 4 e4b (local)",
         provider: .lmstudio,
         capabilities: [.textEdit, .chat, .translation],
         isFree: true
@@ -104,7 +104,7 @@ enum ModelRegistry {
     // MARK: Full catalog  ────────────────────────────────────────────────────
 
     static let all: [AIModel] = [
-        ministral3B,
+        gemma4,
         flux2, fluxSchnell, fluxPro,
         claudeHaiku, claudeSonnet,
         geminiFlash, geminiPro,

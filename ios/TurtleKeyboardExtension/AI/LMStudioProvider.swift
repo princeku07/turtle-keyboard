@@ -5,28 +5,24 @@ import Foundation
 // Local OpenAI-compatible inference (LM Studio / llama.cpp / Ollama compatible).
 // Used for testing without cloud API keys.
 //
-// Endpoint: POST http://192.168.1.10:1234/v1/chat/completions
-// Headers : Content-Type: application/json, Accept: application/json
-// Body    : standard OpenAI chat completions
+// Endpoint: POST http://192.168.0.106:1234/api/v1/chat
+// Headers : Content-Type: application/json
+// Body    : custom (NOT OpenAI-compatible)
 //   {
 //     "model": "<model-id>",
-//     "stream": false,
-//     "temperature": 0.4,
-//     "messages": [
-//       { "role": "system", "content": "..." },
-//       { "role": "user",   "content": "..." }
-//     ]
+//     "system_prompt": "...",
+//     "input": "..."
 //   }
 //
-// Response: choices[0].message.content
-//   The configured model is a reasoning model; it emits a <think>…</think> block
-//   before the answer. We strip everything up to and including the last </think>.
+// Response parser tries common field names in order:
+//   output / response / text / content / choices[0].message.content
+//   Reasoning models still wrap the answer in <think>…</think>; we strip
+//   everything up to and including the last </think>.
 
 final class LMStudioProvider: AIProvider {
     let id: ProviderID = .lmstudio
 
-    private let endpoint = URL(string: "http://192.168.1.5:1234/v1/chat/completions")!
-    private let temperature = 0.4
+    private let endpoint = URL(string: "http://192.168.0.106:1234/api/v1/chat")!
 
     private let session: URLSession = {
         let cfg = URLSessionConfiguration.default
@@ -72,12 +68,8 @@ final class LMStudioProvider: AIProvider {
 
         let body: [String: Any] = [
             "model": modelID,
-            "stream": false,
-            "temperature": temperature,
-            "messages": [
-                ["role": "system", "content": system],
-                ["role": "user",   "content": user]
-            ]
+            "system_prompt": system,
+            "input": user,
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
@@ -86,16 +78,49 @@ final class LMStudioProvider: AIProvider {
         let (data, response) = try await fetch(request)
         try validate(response, data: data)
 
-        guard let json    = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let choices = json["choices"] as? [[String: Any]],
-              let message = choices.first?["message"] as? [String: Any],
-              let content = message["content"] as? String else {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let content = Self.extractContent(from: json) else {
             let snippet = String(data: data, encoding: .utf8)?.prefix(400) ?? "(non-utf8)"
             log("unexpected response shape: \(snippet)")
             throw ProviderError.badResponse("Unexpected LM Studio response shape")
         }
         log("response chars=\(content.count)")
         return content
+    }
+
+    /// Defensive parser — handles three known response shapes:
+    ///
+    /// 1. New LM Studio: `output` is an array of `{type, content}` entries.
+    ///    The user-facing answer is the one with `type == "message"`;
+    ///    `type == "reasoning"` is the model's internal monologue and is
+    ///    discarded (replaces the old `<think>…</think>` inline form).
+    /// 2. Plain string at one of several common field names.
+    /// 3. OpenAI-compatible `choices[0].message.content`.
+    private static func extractContent(from json: [String: Any]) -> String? {
+        // (1) Typed-entries array
+        if let outputArr = json["output"] as? [[String: Any]] {
+            if let msg = outputArr.first(where: { ($0["type"] as? String) == "message" }),
+               let content = msg["content"] as? String, !content.isEmpty {
+                return content
+            }
+            // Fallback if no entry is tagged "message" — concatenate all
+            // content strings so the user sees something rather than an error.
+            let merged = outputArr
+                .compactMap { $0["content"] as? String }
+                .joined(separator: "\n")
+            if !merged.isEmpty { return merged }
+        }
+        // (2) Single-string forms
+        for key in ["output", "response", "text", "content", "answer", "result"] {
+            if let s = json[key] as? String, !s.isEmpty { return s }
+        }
+        // (3) OpenAI-compatible nested form
+        if let choices = json["choices"] as? [[String: Any]],
+           let message = choices.first?["message"] as? [String: Any],
+           let content = message["content"] as? String {
+            return content
+        }
+        return nil
     }
 
     // MARK: - Reasoning model output cleanup
