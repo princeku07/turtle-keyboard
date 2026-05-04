@@ -4,8 +4,8 @@ class KeyboardViewController: UIInputViewController {
 
     // MARK: - Keyboard mode / shift state
 
-    private enum KeyboardMode { case qwerty, symbols, symbolsShift }
-    private var mode: KeyboardMode = .qwerty
+    // KeyboardMode moved to Keyboard/KeyRows.swift as KeyRows.Mode.
+    private var mode: KeyRows.Mode = .qwerty
 
     private var isCapsLock    = false
     private var isShiftedOnce = false
@@ -17,34 +17,7 @@ class KeyboardViewController: UIInputViewController {
 
     // MARK: - Slash command state
 
-    private enum SlashCommand: String {
-        case cap   = "cap"
-        case fix   = "fix"
-        case tone  = "tone"
-        case reply = "reply"
-        case tl    = "tl"
-        case ask   = "ask"
-        case org   = "org"
-
-        var emoji: String {
-            switch self {
-            case .cap:   return "🎨"
-            case .fix:   return "✏️"
-            case .tone:  return "🎭"
-            case .reply: return "💬"
-            case .tl:    return "🌐"
-            case .ask:   return "❓"
-            case .org:   return "📐"
-            }
-        }
-        var needsPrompt: Bool {
-            switch self {
-            case .cap, .tone, .tl, .ask, .org: return true
-            case .fix, .reply:                 return false
-            }
-        }
-        var buttonTitle: String { self == .cap ? "Generate" : "Send" }
-    }
+    // SlashCommand enum moved to Command/SlashCommand.swift
 
     private var activeCommand: SlashCommand?
     private var commandPromptText = ""
@@ -104,7 +77,16 @@ class KeyboardViewController: UIInputViewController {
     private var cmdPromptLabel:      UILabel!
     private var cmdSendButton:       UIButton!
     private var cmdCancelButton:     UIButton!
+    private var cmdMicButton:        UIButton!
     private var cmdSpinner:          UIActivityIndicatorView!
+
+    // Voice dictation for the prompt area. Lazily created on first mic tap so
+    // we don't pull in SFSpeechRecognizer until the user actually wants it.
+    private lazy var voiceController = VoiceInputController()
+    /// Snapshot of `slashBuffer` at the moment dictation started. We rebuild
+    /// it as `<prefix><partial>` on every recognizer tick so cancelling
+    /// dictation cleanly reverts to the typed prompt.
+    private var voicePromptPrefix: String?
     private var cmdSuggestionsStack: UIStackView!
     private var cmdSuggestionBtns:   [UIButton] = []
     private var bannerContainer:     UIView!
@@ -117,62 +99,41 @@ class KeyboardViewController: UIInputViewController {
     private var previewImageView:    UIImageView?
     private var pendingPreviewImage: UIImage?
 
-    // MARK: - Palette
+    // Integration panel mount — holds whatever UIView an integration asked
+    // us to show via IntegrationContext.showPanel. Sits on top of the key
+    // rows but below the command bar / preview overlay.
+    private var integrationPanelHost: UIView?
 
-    private let bgColor    = UIColor(red: 0.106, green: 0.369, blue: 0.125, alpha: 1.0)
-    private let keyNormal  = UIColor(red: 0.220, green: 0.510, blue: 0.235, alpha: 1.0)
-    private let keySpecial = UIColor(red: 0.145, green: 0.420, blue: 0.160, alpha: 1.0)
-    private let keyShiftOn = UIColor(red: 0.290, green: 0.580, blue: 0.305, alpha: 1.0)
-    private let barBg      = UIColor(red: 0.045, green: 0.180, blue: 0.060, alpha: 1.0)
+    // Quick Panel — opened by double-tapping space (PRD §6.6). Lives in
+    // the same overlay slot as integration panels (mutually exclusive).
+    private var quickPanelView: QuickPanelView?
+    private lazy var integrationContext: IntegrationContext = KeyboardIntegrationContext(owner: self)
+    private lazy var personalizationStore: SplitStore =
+        UserDefaultsSplitStore(suiteName: SplitContract.storageSuiteName)
+
+    private lazy var integrationRegistry = IntegrationRegistry([
+        SplitIntegration(),
+        NotionIntegration(),
+        SlackIntegration(),
+    ], store: personalizationStore)
+
+    // MARK: - Palette
+    //
+    // Hex literals live in Keyboard/KeyboardPalette.swift; these are
+    // wrappers so the (now-many) call sites in this file don't need to
+    // change. Behavior is identical.
+
+    private var bgColor:    UIColor { KeyboardPalette.bg }
+    private var keyNormal:  UIColor { KeyboardPalette.keyNormal }
+    private var keySpecial: UIColor { KeyboardPalette.keySpecial }
+    private var keyShiftOn: UIColor { KeyboardPalette.keyShiftOn }
+    private var barBg:      UIColor { KeyboardPalette.barBg }
 
     // MARK: - Device
 
     private var isPad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
 
-    // MARK: - Key rows  (iPhone — 4 rows)
-
-    private let qwertyRows: [[String]] = [
-        ["q","w","e","r","t","y","u","i","o","p"],
-        ["a","s","d","f","g","h","j","k","l"],
-        ["⇧","z","x","c","v","b","n","m","⌫"],
-        ["🌐","?123",",","space",".","↵"]
-    ]
-    private let symbolRows: [[String]] = [
-        ["1","2","3","4","5","6","7","8","9","0"],
-        ["@","#","$","_","&","-","+","(",")","/"],
-        ["=\\<","*","\"","'",":",";","!","?","⌫"],
-        ["🌐","ABC",",","space",".","↵"]
-    ]
-    private let symbolShiftRows: [[String]] = [
-        ["~","`","|","•","√","π","÷","×","§","∆"],
-        ["%","^","€","£","¥","=","{","}","\\"],
-        ["?123","_","—","[","]","<",">","!","⌫"],
-        ["🌐","ABC",",","space",".","↵"]
-    ]
-
-    // MARK: - Key rows  (iPad — 5 rows: numbers + 3 letter rows + modifier)
-
-    private let qwertyRowsPad: [[String]] = [
-        ["1","2","3","4","5","6","7","8","9","0","⌫"],
-        ["q","w","e","r","t","y","u","i","o","p"],
-        ["a","s","d","f","g","h","j","k","l","↵"],
-        ["⇧","z","x","c","v","b","n","m",",",".","⇧"],
-        ["🌐","?123","space","?123","↵"]
-    ]
-    private let symbolRowsPad: [[String]] = [
-        ["1","2","3","4","5","6","7","8","9","0","⌫"],
-        ["@","#","$","_","&","-","+","(",")","/"],
-        ["=","*","\"","'",":",";","!","?","€","↵"],
-        ["=\\<","~","`","|","%","^","[","]","{","}","⇧"],
-        ["🌐","ABC","space","ABC","↵"]
-    ]
-    private let symbolShiftRowsPad: [[String]] = [
-        ["1","2","3","4","5","6","7","8","9","0","⌫"],
-        ["~","`","|","•","√","π","÷","×","§","∆"],
-        ["%","^","€","£","¥","=","\\","{","}","↵"],
-        ["?123","_","—","[","]","<",">","!",".",",","⇧"],
-        ["🌐","ABC","space","ABC","↵"]
-    ]
+    // Key row data moved to Keyboard/KeyRows.swift
 
     // MARK: - Lifecycle
 
@@ -370,6 +331,25 @@ class KeyboardViewController: UIInputViewController {
         cmdSpinner.translatesAutoresizingMaskIntoConstraints = false
         commandBar.addSubview(cmdSpinner)
 
+        // 🎙 mic — toggles voice dictation into the prompt area. Hidden
+        // entirely when the user has switched off "Voice mic key" on the
+        // Personalization screen.
+        let voiceEnabled = personalizationStore.int(
+            forKey: PersonalizationKeys.voiceEnabled, fallback: 1) != 0
+        cmdMicButton = UIButton(type: .system)
+        cmdMicButton.isHidden = !voiceEnabled
+        cmdMicButton.setImage(
+            UIImage(systemName: "mic.fill",
+                    withConfiguration: UIImage.SymbolConfiguration(pointSize: 15, weight: .medium)),
+            for: .normal)
+        cmdMicButton.tintColor = UIColor.white.withAlphaComponent(0.85)
+        cmdMicButton.backgroundColor = UIColor.white.withAlphaComponent(0.12)
+        cmdMicButton.layer.cornerRadius = 8
+        cmdMicButton.setContentHuggingPriority(.required, for: .horizontal)
+        cmdMicButton.addTarget(self, action: #selector(micTapped), for: .touchUpInside)
+        cmdMicButton.translatesAutoresizingMaskIntoConstraints = false
+        commandBar.addSubview(cmdMicButton)
+
         // Send / Generate button
         cmdSendButton = UIButton(type: .system)
         cmdSendButton.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
@@ -447,7 +427,12 @@ class KeyboardViewController: UIInputViewController {
 
             cmdPromptLabel.leadingAnchor.constraint(equalTo: cmdPill.trailingAnchor, constant: 10),
             cmdPromptLabel.centerYAnchor.constraint(equalTo: commandBar.centerYAnchor),
-            cmdPromptLabel.trailingAnchor.constraint(equalTo: cmdSendButton.leadingAnchor, constant: -10),
+            cmdPromptLabel.trailingAnchor.constraint(equalTo: cmdMicButton.leadingAnchor, constant: -8),
+
+            cmdMicButton.trailingAnchor.constraint(equalTo: cmdSendButton.leadingAnchor, constant: -6),
+            cmdMicButton.centerYAnchor.constraint(equalTo: commandBar.centerYAnchor),
+            cmdMicButton.widthAnchor.constraint(equalToConstant: 32),
+            cmdMicButton.heightAnchor.constraint(equalToConstant: 30),
 
             cmdSpinner.centerXAnchor.constraint(equalTo: cmdSendButton.centerXAnchor),
             cmdSpinner.centerYAnchor.constraint(equalTo: commandBar.centerYAnchor),
@@ -759,11 +744,49 @@ class KeyboardViewController: UIInputViewController {
     }
 
     private func handleSpaceDoubleTap() {
+        // Respect the Personalization toggle: when off, double-space falls
+        // through to whatever the host expects (just two spaces).
+        guard personalizationStore.int(
+            forKey: PersonalizationKeys.quickPanelEnabled, fallback: 1) != 0
+        else { return }
         let now = Date().timeIntervalSinceReferenceDate
         if now - lastSpaceTap < doubleTapInterval {
-            showBanner("🐢 Quick Panel — coming soon")
+            // Undo the second space — the user meant "open Quick Panel",
+            // not "type two spaces". (Native iOS would have inserted a
+            // period here; we hide that gesture behind the panel.)
+            textDocumentProxy.deleteBackward()
             lastSpaceTap = 0
+            showQuickPanel()
         } else { lastSpaceTap = now }
+    }
+
+    // MARK: - Quick Panel
+
+    private func showQuickPanel() {
+        // Tear down any active command bar / integration panel first —
+        // Quick Panel takes the whole overlay slot.
+        if !commandBar.isHidden { hideCommandBar() }
+        unmountIntegrationPanel()
+
+        let panel = QuickPanelView(columns: isPad ? 6 : 4)
+        panel.onSelect = self
+        panel.show(allCommandsForQuickPanel())
+        quickPanelView = panel
+        mountIntegrationPanel(panel)
+    }
+
+    private func dismissQuickPanel() {
+        quickPanelView = nil
+        unmountIntegrationPanel()
+    }
+
+    /// Order the user sees in the panel grid. Integrations' commands come
+    /// first (most recently added flows surface earliest), then the
+    /// AI-routed commands. Local-only `/splits` follows `/split`.
+    private func allCommandsForQuickPanel() -> [SlashCommand] {
+        // Show every case in declaration order — keeps the layout stable.
+        [.cap, .fix, .tone, .reply, .tl, .ask, .org,
+         .split, .splits, .notion, .note, .slack, .msg]
     }
 
     // MARK: - Slash command detection
@@ -947,10 +970,60 @@ class KeyboardViewController: UIInputViewController {
     }
 
     @objc private func cancelCommand() {
+        if voiceController.isListening { voiceController.cancel() }
+        voicePromptPrefix = nil
         // Nothing was inserted into the host field, so nothing to delete —
         // just drop the buffer.
         slashBuffer = nil
         hideCommandBar()
+    }
+
+    // MARK: - Voice dictation
+
+    @objc private func micTapped() {
+        guard hasFullAccess else {
+            shake(commandBar)
+            showBanner("⚠️ Enable Full Access in Settings → Keyboard")
+            return
+        }
+        if voiceController.isListening {
+            voiceController.stop()
+            return
+        }
+        if VoiceInputController.hasPermissions {
+            beginDictation()
+        } else {
+            VoiceInputController.requestPermissions { [weak self] granted in
+                guard let self = self else { return }
+                if granted { self.beginDictation() }
+                else { self.showBanner("⚠️ Mic & Speech permission needed") }
+            }
+        }
+    }
+
+    private func beginDictation() {
+        // Anchor the dictation onto whatever the user has typed so far —
+        // typed prompt + spoken prompt concatenate naturally.
+        let buf = slashBuffer ?? "/"
+        // If the buffer already contains the command/prompt separator, keep
+        // it as-is; otherwise add a space so the first dictated word becomes
+        // the prompt body rather than glomming onto the command name.
+        voicePromptPrefix = buf.contains(" ") ? buf : buf + " "
+        voiceController.start(sink: self)
+    }
+
+    private func setMicListeningUI(_ listening: Bool) {
+        cmdMicButton.tintColor = listening
+            ? UIColor(red: 1.0, green: 0.35, blue: 0.35, alpha: 1.0)
+            : UIColor.white.withAlphaComponent(0.85)
+        cmdMicButton.backgroundColor = listening
+            ? UIColor.white.withAlphaComponent(0.22)
+            : UIColor.white.withAlphaComponent(0.12)
+        let symbol = listening ? "stop.fill" : "mic.fill"
+        cmdMicButton.setImage(
+            UIImage(systemName: symbol,
+                    withConfiguration: UIImage.SymbolConfiguration(pointSize: 15, weight: .medium)),
+            for: .normal)
     }
 
     @objc private func sendCommand() {
@@ -977,6 +1050,18 @@ class KeyboardViewController: UIInputViewController {
     // MARK: - Command execution
 
     private func executeCommand(_ cmd: SlashCommand, prompt: String) {
+        // Local commands handled by integrations — no AI hop, no spinner.
+        if cmd.isLocal {
+            isGenerating = false
+            cmdSpinner.stopAnimating()
+            cmdSendButton.isHidden = false
+            hideCommandBar()
+            if let spec = integrationRegistry.command(named: cmd.rawValue) {
+                spec.handler(prompt, integrationContext)
+            }
+            return
+        }
+
         let context = contextBeforeSlash()
         Task { @MainActor in
             do {
@@ -1061,15 +1146,9 @@ class KeyboardViewController: UIInputViewController {
     }
 
     private func completionBanner(for cmd: SlashCommand) -> String {
-        switch cmd {
-        case .cap:   return "🎨 Image ready — long-press field to paste"
-        case .fix:   return "✏️ Grammar fixed"
-        case .tone:  return "🎭 Tone applied"
-        case .reply: return "💬 Reply inserted"
-        case .tl:    return "🌐 Translated"
-        case .ask:   return "❓ Answer inserted"
-        case .org:   return "📐 Layout ready — long-press field to paste"
-        }
+        // Moved to SlashCommand.completionBanner; keeping this wrapper so
+        // the existing call site doesn't change.
+        cmd.completionBanner
     }
 
     // MARK: - Suggestions UI  (/reply returns 3 tappable options)
@@ -1151,31 +1230,227 @@ class KeyboardViewController: UIInputViewController {
     }
 
     // MARK: - Helpers
+    //
+    // Wrappers around Keyboard/KeyRows.swift so the call sites don't
+    // change. Behaviour is identical.
 
     private func currentRows() -> [[String]] {
-        if isPad {
-            switch mode {
-            case .qwerty:       return qwertyRowsPad
-            case .symbols:      return symbolRowsPad
-            case .symbolsShift: return symbolShiftRowsPad
-            }
-        } else {
-            switch mode {
-            case .qwerty:       return qwertyRows
-            case .symbols:      return symbolRows
-            case .symbolsShift: return symbolShiftRows
-            }
-        }
+        KeyRows.rows(for: mode, isPad: isPad)
     }
 
     private func displayTitle(for key: String) -> String {
-        if mode == .qwerty, key.count == 1, key.first?.isLetter == true {
-            return (isCapsLock || isShiftedOnce) ? key.uppercased() : key
-        }
-        return key
+        KeyRows.displayTitle(for: key, mode: mode, shifted: isCapsLock || isShiftedOnce)
     }
 
     private func isSpecial(_ key: String) -> Bool {
-        ["🌐","⇧","⌫","?123","ABC","=\\<","↵","space"].contains(key)
+        KeyRows.isSpecial(key)
+    }
+}
+
+// MARK: - Integration panel mount
+//
+// Integrations call `IntegrationContext.showPanel(view)` to mount their UI
+// above the keys. We wrap the integration's view in a host view that's
+// pinned over the key rows (below the command bar) so the user keeps
+// keyboard chrome but loses the keys while the panel is up.
+
+extension KeyboardViewController {
+
+    func mountIntegrationPanel(_ panel: UIView) {
+        if integrationPanelHost == nil {
+            let host = UIView()
+            host.backgroundColor = bgColor
+            host.translatesAutoresizingMaskIntoConstraints = false
+            keyboardContainer.addSubview(host)
+            NSLayoutConstraint.activate([
+                host.topAnchor.constraint(equalTo: keyboardContainer.topAnchor, constant: commandBarH),
+                host.leadingAnchor.constraint(equalTo: keyboardContainer.leadingAnchor),
+                host.trailingAnchor.constraint(equalTo: keyboardContainer.trailingAnchor),
+                host.bottomAnchor.constraint(equalTo: keyboardContainer.bottomAnchor),
+            ])
+            integrationPanelHost = host
+        }
+        guard let host = integrationPanelHost else { return }
+        host.subviews.forEach { $0.removeFromSuperview() }
+        panel.translatesAutoresizingMaskIntoConstraints = false
+        host.addSubview(panel)
+        NSLayoutConstraint.activate([
+            panel.leadingAnchor.constraint(equalTo: host.leadingAnchor),
+            panel.trailingAnchor.constraint(equalTo: host.trailingAnchor),
+            panel.topAnchor.constraint(equalTo: host.topAnchor),
+            panel.bottomAnchor.constraint(equalTo: host.bottomAnchor),
+        ])
+        host.isHidden = false
+        keyboardContainer.bringSubviewToFront(host)
+    }
+
+    func unmountIntegrationPanel() {
+        integrationPanelHost?.subviews.forEach { $0.removeFromSuperview() }
+        integrationPanelHost?.isHidden = true
+    }
+
+    func emitBanner(_ text: String) { showBanner(text) }
+}
+
+// MARK: - IntegrationContext bridge
+//
+// Concrete `IntegrationContext` that adapts the protocol to the keyboard
+// view controller's surfaces. Holds a weak reference so panel coordinators
+// don't accidentally keep the IME alive after the input session ends.
+
+private final class KeyboardIntegrationContext: IntegrationContext {
+
+    weak var owner: KeyboardViewController?
+    let store: SplitStore
+    let llm: LlmService
+
+    init(owner: KeyboardViewController) {
+        self.owner = owner
+        // App Group will be wired later — falls back to standard defaults
+        // for now so saves persist across launches at minimum.
+        self.store = UserDefaultsSplitStore(suiteName: SplitContract.storageSuiteName)
+        self.llm = LMStudioLlmService()
+    }
+
+    func showPanel(_ view: UIView) {
+        DispatchQueue.main.async { self.owner?.mountIntegrationPanel(view) }
+    }
+
+    func hidePanel() {
+        DispatchQueue.main.async { self.owner?.unmountIntegrationPanel() }
+    }
+
+    // No chip surface on iOS for the MVP — the whole chip/activation story
+    // depends on host-app detection, which iOS keyboards can't do.
+    func showChip(_ spec: ChipSpec, onTap: @escaping () -> Void) {}
+    func hideChip() {}
+
+    func showBanner(_ text: String, autoHideMs: Int) {
+        DispatchQueue.main.async { self.owner?.emitBanner(text) }
+    }
+
+    func commitText(_ text: String) {
+        DispatchQueue.main.async { self.owner?.textDocumentProxy.insertText(text) }
+    }
+
+    func deleteBeforeCursor(_ n: Int) {
+        DispatchQueue.main.async {
+            for _ in 0..<n { self.owner?.textDocumentProxy.deleteBackward() }
+        }
+    }
+
+    func openScreen(_ screenId: String) {
+        let urlString = "turtlekeyboard://\(screenId)"
+        guard let url = URL(string: urlString) else { return }
+        // `extensionContext.open` is the only way a keyboard extension can
+        // launch URLs. Returns false if the host app isn't registered for
+        // the scheme — silently no-op in that case (mirrors Android's
+        // "no-op when the host doesn't recognize the screen id").
+        DispatchQueue.main.async {
+            self.owner?.extensionContext?.open(url, completionHandler: nil)
+        }
+    }
+}
+
+/// Minimal LlmService backed by the same LM Studio endpoint the rest of
+/// the keyboard's text commands hit. Posts a single user message; returns
+/// the assistant's content stripped of any `<think>…</think>` block that
+/// reasoning models prepend.
+private final class LMStudioLlmService: LlmService {
+    private let endpoint = URL(string: "http://192.168.1.5:1234/v1/chat/completions")!
+
+    func complete(
+        prompt: String,
+        onText: @escaping (String) -> Void,
+        onError: @escaping (String) -> Void
+    ) {
+        var req = URLRequest(url: endpoint)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.timeoutInterval = 30
+        let body: [String: Any] = [
+            "stream": false,
+            "temperature": 0.4,
+            "messages": [["role": "user", "content": prompt]],
+        ]
+        req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        URLSession.shared.dataTask(with: req) { data, resp, err in
+            if let err = err { onError(err.localizedDescription); return }
+            guard let data = data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let choices = json["choices"] as? [[String: Any]],
+                  let first = choices.first,
+                  let message = first["message"] as? [String: Any],
+                  let content = message["content"] as? String
+            else { onError("non-JSON LLM response"); return }
+            // Strip reasoning model think blocks the same way LMStudioProvider does.
+            let cleaned = content
+                .replacingOccurrences(of: #"(?is)<think>.*?</think>"#,
+                                       with: "", options: .regularExpression)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            onText(cleaned)
+        }.resume()
+    }
+}
+
+// MARK: - QuickPanelDelegate
+
+extension KeyboardViewController: QuickPanelDelegate {
+
+    func quickPanelDidSelect(_ command: SlashCommand) {
+        dismissQuickPanel()
+        if command.needsPrompt {
+            // Open the command bar pre-loaded with the command and an
+            // empty prompt; the user types (or dictates) the body and
+            // taps Send. Reusing the slash buffer keeps the existing
+            // detection / dispatch path intact.
+            slashBuffer = "/\(command.rawValue) "
+            updateCommandDetection()
+        } else {
+            // No prompt needed — fire immediately. activeCommand is set
+            // synchronously by updateCommandDetection so sendCommand
+            // picks it up.
+            slashBuffer = "/\(command.rawValue)"
+            updateCommandDetection()
+            sendCommand()
+        }
+    }
+
+    func quickPanelDidDismiss() {
+        dismissQuickPanel()
+    }
+}
+
+// MARK: - VoiceInputController.Sink
+
+extension KeyboardViewController: VoiceInputController.Sink {
+
+    func onListeningStarted() {
+        setMicListeningUI(true)
+    }
+
+    func onListeningStopped() {
+        setMicListeningUI(false)
+    }
+
+    func onPartial(_ text: String) {
+        appendDictation(text)
+    }
+
+    func onFinal(_ text: String) {
+        appendDictation(text)
+        voicePromptPrefix = nil
+    }
+
+    func onError(_ userVisibleMessage: String) {
+        voicePromptPrefix = nil
+        showBanner("⚠️ \(userVisibleMessage)")
+    }
+
+    private func appendDictation(_ spoken: String) {
+        guard let prefix = voicePromptPrefix else { return }
+        let trimmed = spoken.trimmingCharacters(in: .whitespacesAndNewlines)
+        slashBuffer = prefix + trimmed
+        updateCommandDetection()
     }
 }

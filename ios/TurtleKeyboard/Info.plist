@@ -6,6 +6,10 @@
 	<string>Turtle Keyboard</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Turtle Keyboard connects to AI servers running on your local network so you can use slash commands without sending text to the cloud.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Turtle Keyboard uses the microphone for voice-to-text dictation when you tap the mic key.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Turtle Keyboard transcribes your voice into text. Recognition runs on-device when supported.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>
@@ -46,6 +50,50 @@
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.turtlekeyboard.url</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>turtlekeyboard</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.turtlekeyboard.googleoauth</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>turtlegoogleoauth</string>
+				<string>com.googleusercontent.apps.1071829055550-n6ce0h96tsupi3t05924e0rrur8k3amv</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.turtlekeyboard.notionoauth</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>turtleknotionoauth</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.turtlekeyboard.slackoauth</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>turtleslackoauth</string>
+			</array>
+		</dict>
 	</array>
 </dict>
 </plist>

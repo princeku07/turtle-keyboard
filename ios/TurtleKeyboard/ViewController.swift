@@ -26,8 +26,10 @@ class ViewController: UIViewController {
 
         let enableBtn  = makeButton(title: "1. Enable Turtle Keyboard",  action: #selector(openKeyboardSettings))
         let chooseBtn  = makeButton(title: "2. Switch to Turtle Keyboard", action: #selector(openKeyboardSettings))
+        let personalizeBtn = makeButton(title: "Personalize",        action: #selector(openPersonalize))
+        let splitsBtn      = makeButton(title: "Saved splits",       action: #selector(openSplits))
 
-        let stack = UIStackView(arrangedSubviews: [titleLabel, subtitleLabel, enableBtn, chooseBtn])
+        let stack = UIStackView(arrangedSubviews: [titleLabel, subtitleLabel, enableBtn, chooseBtn, personalizeBtn, splitsBtn])
         stack.axis = .vertical
         stack.spacing = 16
         stack.alignment = .fill
@@ -40,7 +42,19 @@ class ViewController: UIViewController {
             stack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24),
             enableBtn.heightAnchor.constraint(equalToConstant: 50),
             chooseBtn.heightAnchor.constraint(equalToConstant: 50),
+            personalizeBtn.heightAnchor.constraint(equalToConstant: 50),
+            splitsBtn.heightAnchor.constraint(equalToConstant: 50),
         ])
+    }
+
+    @objc private func openPersonalize() {
+        let nav = UINavigationController(rootViewController: PersonalizationViewController())
+        present(nav, animated: true)
+    }
+
+    @objc private func openSplits() {
+        let nav = UINavigationController(rootViewController: SplitDetailViewController())
+        present(nav, animated: true)
     }
 
     private func makeButton(title: String, action: Selector) -> UIButton {

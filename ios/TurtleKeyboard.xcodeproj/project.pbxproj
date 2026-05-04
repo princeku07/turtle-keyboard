@@ -26,6 +26,44 @@
 		HH000029HH000029HH000029 /* org_template.html in Resources */ = {isa = PBXBuildFile; fileRef = HH000028HH000028HH000028 /* org_template.html */; };
 		HH000032HH000032HH000032 /* html-to-image.js in Resources */ = {isa = PBXBuildFile; fileRef = HH000031HH000031HH000031 /* html-to-image.js */; };
 		HH000034HH000034HH000034 /* OrgImageRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000033HH000033HH000033 /* OrgImageRenderer.swift */; };
+		HH000036HH000036HH000036 /* VoiceInputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000035HH000035HH000035 /* VoiceInputController.swift */; };
+		HH000040HH000040HH000040 /* IntegrationKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000041HH000041HH000041 /* IntegrationKit.swift */; };
+		HH000042HH000042HH000042 /* IntegrationRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000043HH000043HH000043 /* IntegrationRegistry.swift */; };
+		HH000044HH000044HH000044 /* SplitTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000045HH000045HH000045 /* SplitTypes.swift */; };
+		HH000046HH000046HH000046 /* SplitIntegration.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000047HH000047HH000047 /* SplitIntegration.swift */; };
+		HH000048HH000048HH000048 /* SplitPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000049HH000049HH000049 /* SplitPanelView.swift */; };
+		HH000050HH000050HH000050 /* SplitHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000051HH000051HH000051 /* SplitHistoryView.swift */; };
+		HH000060HH000060HH000060 /* SplitDetailViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000061HH000061HH000061 /* SplitDetailViewController.swift */; };
+		HH000062HH000062HH000062 /* SplitTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000045HH000045HH000045 /* SplitTypes.swift */; };
+		HH000063HH000063HH000063 /* SplitPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000049HH000049HH000049 /* SplitPanelView.swift */; };
+		HH000070HH000070HH000070 /* SplitKeychain.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000071HH000071HH000071 /* SplitKeychain.swift */; };
+		HH000072HH000072HH000072 /* SplitOAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000073HH000073HH000073 /* SplitOAuth.swift */; };
+		HH000074HH000074HH000074 /* SplitSheetsClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000075HH000075HH000075 /* SplitSheetsClient.swift */; };
+		HH000076HH000076HH000076 /* SplitDriveClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000077HH000077HH000077 /* SplitDriveClient.swift */; };
+		HH000078HH000078HH000078 /* SplitCloudSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000079HH000079HH000079 /* SplitCloudSync.swift */; };
+		HH000090HH000090HH000090 /* NotionTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000091HH000091HH000091 /* NotionTypes.swift */; };
+		HH000092HH000092HH000092 /* NotionClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000093HH000093HH000093 /* NotionClient.swift */; };
+		HH000094HH000094HH000094 /* NotionLlmBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000095HH000095HH000095 /* NotionLlmBridge.swift */; };
+		HH000096HH000096HH000096 /* NotionIntegration.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000097HH000097HH000097 /* NotionIntegration.swift */; };
+		HH000098HH000098HH000098 /* SlackTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000099HH000099HH000099 /* SlackTypes.swift */; };
+		HH000100HH000100HH000100 /* SlackClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000101HH000101HH000101 /* SlackClient.swift */; };
+		HH000102HH000102HH000102 /* SlackIntegration.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000103HH000103HH000103 /* SlackIntegration.swift */; };
+		HH000104HH000104HH000104 /* NotionAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000105HH000105HH000105 /* NotionAuth.swift */; };
+		HH000106HH000106HH000106 /* SlackAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000107HH000107HH000107 /* SlackAuth.swift */; };
+		HH000108HH000108HH000108 /* NotionConnectViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000109HH000109HH000109 /* NotionConnectViewController.swift */; };
+		HH000110HH000110HH000110 /* SlackConnectViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000111HH000111HH000111 /* SlackConnectViewController.swift */; };
+		HH000112HH000112HH000112 /* NotionTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000091HH000091HH000091 /* NotionTypes.swift */; };
+		HH000113HH000113HH000113 /* SlackTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000099HH000099HH000099 /* SlackTypes.swift */; };
+		HH000114HH000114HH000114 /* NotionClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000093HH000093HH000093 /* NotionClient.swift */; };
+		HH000115HH000115HH000115 /* SlackClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000101HH000101HH000101 /* SlackClient.swift */; };
+		HH000120HH000120HH000120 /* KeyRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000121HH000121HH000121 /* KeyRows.swift */; };
+		HH000122HH000122HH000122 /* KeyboardPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000123HH000123HH000123 /* KeyboardPalette.swift */; };
+		HH000124HH000124HH000124 /* SlashCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000125HH000125HH000125 /* SlashCommand.swift */; };
+		HH000130HH000130HH000130 /* QuickPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000131HH000131HH000131 /* QuickPanelView.swift */; };
+		HH000140HH000140HH000140 /* PersonalizationKeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000141HH000141HH000141 /* PersonalizationKeys.swift */; };
+		HH000142HH000142HH000142 /* PersonalizationViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000143HH000143HH000143 /* PersonalizationViewController.swift */; };
+		HH000144HH000144HH000144 /* PersonalizationKeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000141HH000141HH000141 /* PersonalizationKeys.swift */; };
+		HH000150HH000150HH000150 /* Secrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000151HH000151HH000151 /* Secrets.swift */; };
 		FF000001FF000001FF000001 /* TurtleKeyboardExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = EE000005EE000005EE000005 /* TurtleKeyboardExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -75,6 +113,37 @@
 		HH000028HH000028HH000028 /* org_template.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = org_template.html; sourceTree = "<group>"; };
 		HH000031HH000031HH000031 /* html-to-image.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "html-to-image.js"; sourceTree = "<group>"; };
 		HH000033HH000033HH000033 /* OrgImageRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrgImageRenderer.swift; sourceTree = "<group>"; };
+		HH000035HH000035HH000035 /* VoiceInputController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceInputController.swift; sourceTree = "<group>"; };
+		HH000041HH000041HH000041 /* IntegrationKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntegrationKit.swift; sourceTree = "<group>"; };
+		HH000043HH000043HH000043 /* IntegrationRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntegrationRegistry.swift; sourceTree = "<group>"; };
+		HH000045HH000045HH000045 /* SplitTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitTypes.swift; sourceTree = "<group>"; };
+		HH000047HH000047HH000047 /* SplitIntegration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitIntegration.swift; sourceTree = "<group>"; };
+		HH000049HH000049HH000049 /* SplitPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitPanelView.swift; sourceTree = "<group>"; };
+		HH000051HH000051HH000051 /* SplitHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitHistoryView.swift; sourceTree = "<group>"; };
+		HH000061HH000061HH000061 /* SplitDetailViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitDetailViewController.swift; sourceTree = "<group>"; };
+		HH000071HH000071HH000071 /* SplitKeychain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitKeychain.swift; sourceTree = "<group>"; };
+		HH000073HH000073HH000073 /* SplitOAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitOAuth.swift; sourceTree = "<group>"; };
+		HH000075HH000075HH000075 /* SplitSheetsClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitSheetsClient.swift; sourceTree = "<group>"; };
+		HH000077HH000077HH000077 /* SplitDriveClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitDriveClient.swift; sourceTree = "<group>"; };
+		HH000079HH000079HH000079 /* SplitCloudSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitCloudSync.swift; sourceTree = "<group>"; };
+		HH000091HH000091HH000091 /* NotionTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotionTypes.swift; sourceTree = "<group>"; };
+		HH000093HH000093HH000093 /* NotionClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotionClient.swift; sourceTree = "<group>"; };
+		HH000095HH000095HH000095 /* NotionLlmBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotionLlmBridge.swift; sourceTree = "<group>"; };
+		HH000097HH000097HH000097 /* NotionIntegration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotionIntegration.swift; sourceTree = "<group>"; };
+		HH000099HH000099HH000099 /* SlackTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlackTypes.swift; sourceTree = "<group>"; };
+		HH000101HH000101HH000101 /* SlackClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlackClient.swift; sourceTree = "<group>"; };
+		HH000103HH000103HH000103 /* SlackIntegration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlackIntegration.swift; sourceTree = "<group>"; };
+		HH000105HH000105HH000105 /* NotionAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotionAuth.swift; sourceTree = "<group>"; };
+		HH000107HH000107HH000107 /* SlackAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlackAuth.swift; sourceTree = "<group>"; };
+		HH000109HH000109HH000109 /* NotionConnectViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotionConnectViewController.swift; sourceTree = "<group>"; };
+		HH000111HH000111HH000111 /* SlackConnectViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlackConnectViewController.swift; sourceTree = "<group>"; };
+		HH000121HH000121HH000121 /* KeyRows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyRows.swift; sourceTree = "<group>"; };
+		HH000123HH000123HH000123 /* KeyboardPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardPalette.swift; sourceTree = "<group>"; };
+		HH000125HH000125HH000125 /* SlashCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlashCommand.swift; sourceTree = "<group>"; };
+		HH000131HH000131HH000131 /* QuickPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickPanelView.swift; sourceTree = "<group>"; };
+		HH000141HH000141HH000141 /* PersonalizationKeys.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalizationKeys.swift; sourceTree = "<group>"; };
+		HH000143HH000143HH000143 /* PersonalizationViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalizationViewController.swift; sourceTree = "<group>"; };
+		HH000151HH000151HH000151 /* Secrets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Secrets.swift"; path = "../Generated/Secrets.swift"; sourceTree = "<group>"; };
 		EE000004EE000004EE000004 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		EE000005EE000005EE000005 /* TurtleKeyboardExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = TurtleKeyboardExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -120,9 +189,29 @@
 			children = (
 				CC000002CC000002CC000002 /* AppDelegate.swift */,
 				CC000004CC000004CC000004 /* ViewController.swift */,
+				HH000061HH000061HH000061 /* SplitDetailViewController.swift */,
+				HH000109HH000109HH000109 /* NotionConnectViewController.swift */,
+				HH000111HH000111HH000111 /* SlackConnectViewController.swift */,
+				HH000143HH000143HH000143 /* PersonalizationViewController.swift */,
+				HH000151HH000151HH000151 /* Secrets.swift */,
+				HH000080HH000080HH000080 /* Cloud */,
 				CC000006CC000006CC000006 /* Info.plist */,
 			);
 			path = TurtleKeyboard;
+			sourceTree = "<group>";
+		};
+		HH000080HH000080HH000080 /* Cloud */ = {
+			isa = PBXGroup;
+			children = (
+				HH000071HH000071HH000071 /* SplitKeychain.swift */,
+				HH000073HH000073HH000073 /* SplitOAuth.swift */,
+				HH000075HH000075HH000075 /* SplitSheetsClient.swift */,
+				HH000077HH000077HH000077 /* SplitDriveClient.swift */,
+				HH000079HH000079HH000079 /* SplitCloudSync.swift */,
+				HH000105HH000105HH000105 /* NotionAuth.swift */,
+				HH000107HH000107HH000107 /* SlackAuth.swift */,
+			);
+			path = Cloud;
 			sourceTree = "<group>";
 		};
 		HH000005HH000005HH000005 /* AI */ = {
@@ -153,9 +242,84 @@
 				HH000001HH000001HH000001 /* APIClient.swift */,
 				HH000003HH000003HH000003 /* Models.swift */,
 				HH000005HH000005HH000005 /* AI */,
+				HH000037HH000037HH000037 /* Voice */,
+				HH000038HH000038HH000038 /* Integration */,
+				HH000126HH000126HH000126 /* Keyboard */,
+				HH000127HH000127HH000127 /* Command */,
 				EE000004EE000004EE000004 /* Info.plist */,
 			);
 			path = TurtleKeyboardExtension;
+			sourceTree = "<group>";
+		};
+		HH000126HH000126HH000126 /* Keyboard */ = {
+			isa = PBXGroup;
+			children = (
+				HH000121HH000121HH000121 /* KeyRows.swift */,
+				HH000123HH000123HH000123 /* KeyboardPalette.swift */,
+				HH000131HH000131HH000131 /* QuickPanelView.swift */,
+			);
+			path = Keyboard;
+			sourceTree = "<group>";
+		};
+		HH000127HH000127HH000127 /* Command */ = {
+			isa = PBXGroup;
+			children = (
+				HH000125HH000125HH000125 /* SlashCommand.swift */,
+			);
+			path = Command;
+			sourceTree = "<group>";
+		};
+		HH000037HH000037HH000037 /* Voice */ = {
+			isa = PBXGroup;
+			children = (
+				HH000035HH000035HH000035 /* VoiceInputController.swift */,
+			);
+			path = Voice;
+			sourceTree = "<group>";
+		};
+		HH000038HH000038HH000038 /* Integration */ = {
+			isa = PBXGroup;
+			children = (
+				HH000041HH000041HH000041 /* IntegrationKit.swift */,
+				HH000043HH000043HH000043 /* IntegrationRegistry.swift */,
+				HH000141HH000141HH000141 /* PersonalizationKeys.swift */,
+				HH000039HH000039HH000039 /* Split */,
+				HH000116HH000116HH000116 /* Notion */,
+				HH000117HH000117HH000117 /* Slack */,
+			);
+			path = Integration;
+			sourceTree = "<group>";
+		};
+		HH000039HH000039HH000039 /* Split */ = {
+			isa = PBXGroup;
+			children = (
+				HH000045HH000045HH000045 /* SplitTypes.swift */,
+				HH000047HH000047HH000047 /* SplitIntegration.swift */,
+				HH000049HH000049HH000049 /* SplitPanelView.swift */,
+				HH000051HH000051HH000051 /* SplitHistoryView.swift */,
+			);
+			path = Split;
+			sourceTree = "<group>";
+		};
+		HH000116HH000116HH000116 /* Notion */ = {
+			isa = PBXGroup;
+			children = (
+				HH000091HH000091HH000091 /* NotionTypes.swift */,
+				HH000093HH000093HH000093 /* NotionClient.swift */,
+				HH000095HH000095HH000095 /* NotionLlmBridge.swift */,
+				HH000097HH000097HH000097 /* NotionIntegration.swift */,
+			);
+			path = Notion;
+			sourceTree = "<group>";
+		};
+		HH000117HH000117HH000117 /* Slack */ = {
+			isa = PBXGroup;
+			children = (
+				HH000099HH000099HH000099 /* SlackTypes.swift */,
+				HH000101HH000101HH000101 /* SlackClient.swift */,
+				HH000103HH000103HH000103 /* SlackIntegration.swift */,
+			);
+			path = Slack;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -282,6 +446,25 @@
 			files = (
 				CC000003CC000003CC000003 /* AppDelegate.swift in Sources */,
 				CC000005CC000005CC000005 /* ViewController.swift in Sources */,
+				HH000060HH000060HH000060 /* SplitDetailViewController.swift in Sources */,
+				HH000062HH000062HH000062 /* SplitTypes.swift in Sources */,
+				HH000063HH000063HH000063 /* SplitPanelView.swift in Sources */,
+				HH000070HH000070HH000070 /* SplitKeychain.swift in Sources */,
+				HH000072HH000072HH000072 /* SplitOAuth.swift in Sources */,
+				HH000074HH000074HH000074 /* SplitSheetsClient.swift in Sources */,
+				HH000076HH000076HH000076 /* SplitDriveClient.swift in Sources */,
+				HH000078HH000078HH000078 /* SplitCloudSync.swift in Sources */,
+				HH000104HH000104HH000104 /* NotionAuth.swift in Sources */,
+				HH000106HH000106HH000106 /* SlackAuth.swift in Sources */,
+				HH000108HH000108HH000108 /* NotionConnectViewController.swift in Sources */,
+				HH000110HH000110HH000110 /* SlackConnectViewController.swift in Sources */,
+				HH000112HH000112HH000112 /* NotionTypes.swift in Sources */,
+				HH000113HH000113HH000113 /* SlackTypes.swift in Sources */,
+				HH000114HH000114HH000114 /* NotionClient.swift in Sources */,
+				HH000115HH000115HH000115 /* SlackClient.swift in Sources */,
+				HH000142HH000142HH000142 /* PersonalizationViewController.swift in Sources */,
+				HH000144HH000144HH000144 /* PersonalizationKeys.swift in Sources */,
+				HH000150HH000150HH000150 /* Secrets.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -304,6 +487,25 @@
 				HH000025HH000025HH000025 /* PromptLoader.swift in Sources */,
 				HH000027HH000027HH000027 /* HTMLImageRenderer.swift in Sources */,
 				HH000034HH000034HH000034 /* OrgImageRenderer.swift in Sources */,
+				HH000036HH000036HH000036 /* VoiceInputController.swift in Sources */,
+				HH000040HH000040HH000040 /* IntegrationKit.swift in Sources */,
+				HH000042HH000042HH000042 /* IntegrationRegistry.swift in Sources */,
+				HH000044HH000044HH000044 /* SplitTypes.swift in Sources */,
+				HH000046HH000046HH000046 /* SplitIntegration.swift in Sources */,
+				HH000048HH000048HH000048 /* SplitPanelView.swift in Sources */,
+				HH000050HH000050HH000050 /* SplitHistoryView.swift in Sources */,
+				HH000090HH000090HH000090 /* NotionTypes.swift in Sources */,
+				HH000092HH000092HH000092 /* NotionClient.swift in Sources */,
+				HH000094HH000094HH000094 /* NotionLlmBridge.swift in Sources */,
+				HH000096HH000096HH000096 /* NotionIntegration.swift in Sources */,
+				HH000098HH000098HH000098 /* SlackTypes.swift in Sources */,
+				HH000100HH000100HH000100 /* SlackClient.swift in Sources */,
+				HH000102HH000102HH000102 /* SlackIntegration.swift in Sources */,
+				HH000120HH000120HH000120 /* KeyRows.swift in Sources */,
+				HH000122HH000122HH000122 /* KeyboardPalette.swift in Sources */,
+				HH000124HH000124HH000124 /* SlashCommand.swift in Sources */,
+				HH000130HH000130HH000130 /* QuickPanelView.swift in Sources */,
+				HH000140HH000140HH000140 /* PersonalizationKeys.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
