@@ -1,0 +1,50 @@
+id: cap
+name: /cap
+summary: Generate a caption for an image
+description: |
+  Takes the most recent image from clipboard or an attached image and returns
+  a short caption ready to paste back into the conversation the user is in.
+
+owner: "@turtle-team"
+tags: [image, vision, caption]
+
+input:
+  modes: [image, clipboard]
+  required: [image]
+  example: "/cap"
+
+output:
+  type: text
+  format: plain
+  example: "When the deadline hits but the coffee already won."
+
+contract:
+  endpoint: POST /v1/commands/cap
+  request_schema: schemas/cap.request.json
+  response_schema: schemas/cap.response.json
+
+ux:
+  latency_budget_ms: 3000
+  loading_state: required
+  error_state: required
+  result_action: insert-inline
+  privacy_notice: required
+
+fixtures:
+  - name: meme-cat
+    request: commands/cap/fixtures/meme-cat-request.json
+    response: commands/cap/fixtures/meme-cat-response.json
+
+support:
+  android:
+    state: planned
+    since: null
+    impl: null
+  ios:
+    state: planned
+    since: null
+    impl: null
+  backend:
+    state: in-progress
+    since: null
+    impl: null

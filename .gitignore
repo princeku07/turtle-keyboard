@@ -1,0 +1,58 @@
+# IDE
+.idea/
+*.iml
+
+# Android — glob catches every module (app/, split/, notion/, future modules) so
+# new modules don't leak build artifacts the way notion/build/ initially did.
+android/build/
+android/**/build/
+android/**/.gradle/
+android/**/intermediates/
+android/**/.cxx/
+android/**/.externalNativeBuild/
+android/**/captures/
+android/local.properties
+android/.gradle/
+
+# iOS
+ios/build/
+ios/*.xcworkspace/xcuserdata/
+ios/*.xcodeproj/xcuserdata/
+ios/DerivedData/
+ios/Generated/
+
+# macOS
+.DS_Store
+
+# Node
+lading-app/node_modules/
+lading-app/.next/
+# macOS
+.DS_Store
+
+# Signing keys — never commit. Maintainers store the release keystore in CI
+# secrets; contributors don't need one (Gradle auto-generates a debug keystore).
+KEYSTORE
+*.keystore
+*.jks
+keystore.properties
+
+# Local Android config (path to the keystore on the maintainer's machine, etc.)
+local.properties
+
+# Repo-wide secrets (OAuth client IDs, etc.) consumed by both Android + iOS.
+# Schema is in .env.example (committed). Actual values stay local.
+.env
+.env.local
+!.env.example
+
+# Transient root-level Node artifacts produced by running the parity check
+# locally. The actual app's Node deps live under lading-app/.
+/node_modules/
+/package.json
+/package-lock.json
+
+# Editor scratch
+.idea/
+.vscode/
+*.swp

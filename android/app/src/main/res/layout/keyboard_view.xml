@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.prince.turtlekeyboard.ime.view.KeyboardRootView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="#1B5E20"
+    android:paddingTop="2dp"
+    android:paddingBottom="6dp">
+
+    <com.prince.turtlekeyboard.ime.view.HostAppBadgeView
+        android:id="@+id/host_app_badge"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone" />
+
+    <com.prince.turtlekeyboard.ime.view.AppEnrollmentBannerView
+        android:id="@+id/enrollment_banner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone" />
+
+    <com.prince.turtlekeyboard.ime.view.IntegrationChipView
+        android:id="@+id/integration_chip"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone" />
+
+    <FrameLayout
+        android:id="@+id/integration_panel_host"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone" />
+
+    <com.prince.turtlekeyboard.ime.view.SuggestionStripView
+        android:id="@+id/suggestion_strip"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:visibility="gone" />
+
+    <com.prince.turtlekeyboard.ime.view.CommandPanelView
+        android:id="@+id/command_panel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#0D3F12"
+        android:visibility="gone" />
+
+    <com.prince.turtlekeyboard.ime.view.PresetChipStripView
+        android:id="@+id/preset_strip"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#0D3F12"
+        android:visibility="gone" />
+
+    <com.prince.turtlekeyboard.ime.view.ImagePreviewView
+        android:id="@+id/image_preview"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone" />
+
+    <com.prince.turtlekeyboard.ime.view.CommandSuggestionStripView
+        android:id="@+id/cmd_suggestions"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone" />
+
+    <com.prince.turtlekeyboard.ime.view.BannerView
+        android:id="@+id/banner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:padding="8dp"
+        android:textColor="#FFFFFF"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:background="#0D3F12"
+        android:visibility="gone" />
+
+    <FrameLayout
+        android:id="@+id/quick_panel_host"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone" />
+
+    <com.prince.turtlekeyboard.ime.view.ShimmerView
+        android:id="@+id/shimmer"
+        android:layout_width="match_parent"
+        android:layout_height="6dp"
+        android:visibility="gone" />
+
+    <android.inputmethodservice.KeyboardView
+        android:id="@+id/keyboard_view"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#1B5E20"
+        android:keyBackground="@drawable/key_background_selector"
+        android:keyTextColor="#FFFFFF"
+        android:keyTextSize="20sp"
+        android:labelTextSize="16sp"
+        android:shadowColor="#00000000"
+        android:shadowRadius="0"
+        android:paddingLeft="3dp"
+        android:paddingRight="3dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp"
+        android:focusable="true"
+        android:focusableInTouchMode="true" />
+
+</com.prince.turtlekeyboard.ime.view.KeyboardRootView>

@@ -1,0 +1,53 @@
+id: fix
+name: /fix
+summary: Fix grammar, spelling, and punctuation in the current text
+description: |
+  Replaces the user's text or current selection with a corrected version.
+  Preserves tone and intent; only fixes grammar, spelling, and punctuation.
+
+owner: "@turtle-team"
+tags: [text, writing, polish]
+
+input:
+  modes: [text, selection]
+  required: [text]
+  example: "/fix"
+
+output:
+  type: text
+  format: plain
+  example: "I will be there at 5 pm."
+
+contract:
+  endpoint: POST /v1/commands/fix
+  request_schema: schemas/fix.request.json
+  response_schema: schemas/fix.response.json
+
+ux:
+  latency_budget_ms: 1500
+  loading_state: required
+  error_state: required
+  result_action: replace-selection
+  privacy_notice: not-required
+
+fixtures:
+  - name: basic-grammar
+    request: commands/fix/fixtures/basic-request.json
+    response: commands/fix/fixtures/basic-response.json
+  - name: empty-input
+    request: commands/fix/fixtures/empty-request.json
+    response: commands/fix/fixtures/empty-response.json
+
+support:
+  android:
+    state: in-progress
+    since: null
+    impl: null
+  ios:
+    state: planned
+    since: null
+    impl: null
+  backend:
+    state: in-progress
+    since: null
+    impl: null

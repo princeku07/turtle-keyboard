@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:background="@color/cream"
+    tools:context=".ui.MainActivity">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <!-- Hero -->
+        <TextView
+            style="@style/TextHero"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🐢 Turtle"
+            android:layout_marginTop="8dp" />
+
+        <TextView
+            style="@style/TextSubhero"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:layout_marginBottom="20dp"
+            android:text="The model-agnostic AI keyboard. Slash to invoke, double-tap space for the panel." />
+
+        <!-- Setup card -->
+        <LinearLayout
+            style="@style/CardBrutal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView style="@style/TextSectionLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Setup" />
+
+            <Button
+                android:id="@+id/btn_enable"
+                style="@style/ButtonBrutalPrimary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="1. Enable Turtle Keyboard" />
+
+            <Button
+                android:id="@+id/btn_choose"
+                style="@style/ButtonBrutalSecondary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="2. Switch to Turtle Keyboard" />
+        </LinearLayout>
+
+        <!-- Test card -->
+        <LinearLayout
+            style="@style/CardBrutal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView style="@style/TextSectionLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Try it" />
+
+            <EditText
+                android:id="@+id/test_input"
+                style="@style/EditTextBrutal"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="top|start"
+                android:hint="Tap and type to test the keyboard…"
+                android:importantForAutofill="no"
+                android:inputType="textMultiLine"
+                android:minHeight="120dp" />
+        </LinearLayout>
+
+        <!-- Personalization card -->
+        <LinearLayout
+            style="@style/CardBrutal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView style="@style/TextSectionLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Personalize" />
+
+            <TextView
+                style="@style/TextBodyMuted"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="10dp"
+                android:text="Manage which apps the keyboard adapts to. The keyboard prompts inline; this screen lets you undo or pin commands per app." />
+
+            <Button
+                android:id="@+id/btn_app_personalization"
+                style="@style/ButtonBrutalPrimary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Manage app personalization" />
+
+            <Button
+                android:id="@+id/btn_connect_notion"
+                style="@style/ButtonBrutalSecondary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="Connect Notion" />
+
+            <Button
+                android:id="@+id/btn_connect_slack"
+                style="@style/ButtonBrutalSecondary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="Connect Slack" />
+
+            <Button
+                android:id="@+id/btn_history"
+                style="@style/ButtonBrutalSecondary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="View image history" />
+        </LinearLayout>
+
+        <!-- Split card -->
+        <LinearLayout
+            style="@style/CardBrutal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView style="@style/TextSectionLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Split" />
+
+            <TextView
+                android:id="@+id/split_status"
+                style="@style/TextBody"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                tools:text="Default split: 2 people" />
+
+            <Button
+                android:id="@+id/btn_set_split"
+                style="@style/ButtonBrutalPrimary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Set split count" />
+
+            <Button
+                android:id="@+id/btn_view_splits"
+                style="@style/ButtonBrutalSecondary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="View saved splits" />
+
+            <TextView
+                style="@style/TextBodyMuted"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="Tip: type /splits in any text field to view your saved splits inside the keyboard." />
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>

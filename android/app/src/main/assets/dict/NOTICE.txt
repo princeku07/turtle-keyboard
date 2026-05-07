@@ -1,0 +1,14 @@
+en_unigrams.txt
+
+  Source:    https://github.com/wolfgarbe/SymSpell
+  File:      SymSpell/frequency_dictionary_en_82_765.txt
+  License:   MIT (Wolf Garbe, 2018)
+  Entries:   82,765 (lines: 82,833 — includes a small number of duplicates
+             handled by the loader)
+  Format:    "<word><space><frequency>" per line, UTF-8, no BOM.
+
+The UTF-8 BOM that ships in the upstream file was stripped during
+vendoring so SymSpell's loader does not corrupt the first entry ("the").
+
+The frequency counts are derived from the Google Books N-gram corpus per
+the SymSpell project's documentation.

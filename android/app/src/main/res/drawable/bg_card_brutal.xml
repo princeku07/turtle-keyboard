@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Neo-brutalist card: solid surface, ink border, hard offset shadow. The shadow
+     comes from a layered ink rectangle behind the card, mirroring the landing page's
+     offset-shadow look. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:left="4dp" android:top="4dp">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/ink" />
+            <corners android:radius="2dp" />
+        </shape>
+    </item>
+    <item android:right="4dp" android:bottom="4dp">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/surface" />
+            <stroke android:width="2dp" android:color="@color/ink" />
+            <corners android:radius="2dp" />
+        </shape>
+    </item>
+</layer-list>

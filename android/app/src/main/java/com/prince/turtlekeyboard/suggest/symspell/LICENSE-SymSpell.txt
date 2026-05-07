@@ -1,0 +1,50 @@
+This package vendors a Java port of the SymSpell algorithm:
+
+  Source:  https://github.com/Lundez/JavaSymSpell
+  License: MIT
+  Author:  Hampus Londögård (2018)
+
+Original SymSpell (C#):
+
+  Source:  https://github.com/wolfgarbe/SymSpell
+  License: MIT
+  Author:  Wolf Garbe (2018)
+
+Only mechanical changes were applied during vendoring:
+
+  1. The package declaration in each file was rewritten from
+     `package SymSpell;` to
+     `package com.prince.turtlekeyboard.suggest.symspell;`.
+
+  2. The intra-package import in ChunkArray.java was updated to the new
+     package path.
+
+  3. In SymSpell.java, four `System.out.println(ex.getMessage())` sites
+     were swapped for `android.util.Log.w("SymSpell", ..., ex)` so error
+     output goes to logcat on Android.
+
+The MIT license text follows.
+
+----------------------------------------------------------------------
+
+MIT License
+
+Copyright (c) 2018 Hampus Londögård
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

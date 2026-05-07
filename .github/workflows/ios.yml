@@ -1,0 +1,35 @@
+name: ios
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - "ios/**"
+      - "commands/**"
+      - ".github/workflows/ios.yml"
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect iOS project
+        id: ios
+        run: |
+          if find ios -name "*.xcodeproj" -o -name "*.xcworkspace" 2>/dev/null | grep -q .; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::iOS source not yet present in repo — skipping xcodebuild."
+          fi
+
+      - name: Build
+        if: steps.ios.outputs.exists == 'true'
+        run: |
+          xcodebuild build \
+            -project ios/TurtleKeyboard.xcodeproj \
+            -scheme TurtleKeyboard \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO

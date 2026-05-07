@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand palette — mirrors the landing-page CSS variables so the host app, the
+         keyboard panels, and the marketing site read as one product. -->
+    <color name="cream">#FFF4EFE4</color>
+    <color name="ink">#FF0C0C0C</color>
+    <color name="lime">#FF15803D</color>
+    <color name="pink">#FFFF4FA3</color>
+    <color name="blue">#FF5B6CFF</color>
+    <color name="orange">#FFFF7A1A</color>
+    <color name="muted">#FF6B6B6B</color>
+    <color name="surface">#FFFFFFFF</color>
+
+    <color name="purple_200">#FFBB86FC</color>
+    <color name="purple_500">#FF6200EE</color>
+    <color name="purple_700">#FF3700B3</color>
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF018786</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+</resources>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <cache-path name="shared_images" path="shared_images/" />
+    <!-- Persistent history of generated images (filesDir/history/<ts>.png).
+         Required so /history can FileProvider.getUriForFile and commitContent
+         the picked image into the host field — without this entry the call
+         throws IllegalArgumentException and crashes the IME. -->
+    <files-path name="history" path="history/" />
+</paths>
