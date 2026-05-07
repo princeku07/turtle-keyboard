@@ -64,7 +64,7 @@ public class QuickPanelView extends LinearLayout {
 
     private void init() {
         setOrientation(VERTICAL);
-        setBackgroundColor(0xFF0D3F12); // overridden by applyTheme
+        setBackgroundColor(0xFFE6F4EE); // overridden by applyTheme
 
         // Grid scroller takes all remaining vertical space.
         scroller.setFillViewport(true);
@@ -80,14 +80,14 @@ public class QuickPanelView extends LinearLayout {
 
         // Dismiss bar: full-width, fixed-height, single tap target back to keys.
         dismissBar.setText("↓ Keyboard");
-        dismissBar.setTextColor(0xCCFFFFFF);
+        dismissBar.setTextColor(0xFF0C0C0C);
         dismissBar.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f);
         dismissBar.setGravity(Gravity.CENTER);
         dismissBar.setClickable(true);
         dismissBar.setFocusable(true);
         int barPad = dp(10);
         dismissBar.setPadding(barPad, barPad, barPad, barPad);
-        dismissBar.setBackgroundColor(0x22000000);
+        dismissBar.setBackgroundColor(0xFFFFFFFF);
         addView(dismissBar, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
     }
 
@@ -109,7 +109,7 @@ public class QuickPanelView extends LinearLayout {
         tile.setGravity(Gravity.CENTER);
         int padV = dp(12), padH = dp(10);
         tile.setPadding(padH, padV, padH, padV);
-        tile.setBackground(tileBg(0x33FFFFFF));
+        tile.setBackground(tileBg(0xFFFFFFFF));
         tile.setClickable(true);
         tile.setFocusable(true);
         tile.setOnClickListener(v -> listener.onPick(entry));
@@ -123,7 +123,7 @@ public class QuickPanelView extends LinearLayout {
         TextView slash = new TextView(getContext());
         slash.setText("/" + entry.name);
         slash.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f);
-        slash.setTextColor(Color.WHITE);
+        slash.setTextColor(0xFF0C0C0C);
         slash.setGravity(Gravity.CENTER);
         slash.setPadding(0, dp(4), 0, 0);
         tile.addView(slash);
@@ -131,7 +131,7 @@ public class QuickPanelView extends LinearLayout {
         TextView sub = new TextView(getContext());
         sub.setText(entry.label);
         sub.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f);
-        sub.setTextColor(0xCCFFFFFF);
+        sub.setTextColor(0xCC0C0C0C);
         sub.setGravity(Gravity.CENTER);
         sub.setPadding(0, dp(1), 0, 0);
         tile.addView(sub);
@@ -151,18 +151,27 @@ public class QuickPanelView extends LinearLayout {
         g.setShape(GradientDrawable.RECTANGLE);
         g.setCornerRadius(dp(14));
         g.setColor(fill);
+        g.setStroke(dp(1), 0xFFD9E8DF);
         return g;
     }
 
     public void applyTheme(KeyboardTheme theme) {
         this.theme = theme;
         setBackgroundColor(theme.background);
-        int tileFill = (theme.accent & 0x00FFFFFF) | 0x33000000;
         for (int i = 0; i < grid.getChildCount(); i++) {
             View v = grid.getChildAt(i);
-            v.setBackground(tileBg(tileFill));
+            v.setBackground(tileBg(theme.bannerBg));
+            if (v instanceof LinearLayout) {
+                LinearLayout tile = (LinearLayout) v;
+                for (int j = 0; j < tile.getChildCount(); j++) {
+                    View child = tile.getChildAt(j);
+                    if (child instanceof TextView) {
+                        ((TextView) child).setTextColor(j == 2 ? 0xCC0C0C0C : theme.bannerText);
+                    }
+                }
+            }
         }
-        dismissBar.setBackgroundColor((theme.bannerBg & 0x00FFFFFF) | 0x33000000);
+        dismissBar.setBackgroundColor(theme.bannerBg);
         dismissBar.setTextColor(theme.bannerText);
     }
 

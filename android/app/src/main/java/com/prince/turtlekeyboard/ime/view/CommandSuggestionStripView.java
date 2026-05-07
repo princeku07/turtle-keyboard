@@ -49,7 +49,7 @@ public class CommandSuggestionStripView extends HorizontalScrollView {
     private void init() {
         setHorizontalScrollBarEnabled(false);
         setVisibility(GONE);
-        setBackgroundColor(0xFF0D3F12); // overridden by applyTheme
+        setBackgroundColor(0xFFFFFFFF); // overridden by applyTheme
         int padH = dp(8), padV = dp(6);
         row.setPadding(padH, padV, padH, padV);
         addView(row, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
@@ -71,12 +71,12 @@ public class CommandSuggestionStripView extends HorizontalScrollView {
         TextView pill = new TextView(getContext());
         String text = (e.emoji == null ? "" : e.emoji + "  ") + "/" + e.name;
         pill.setText(text);
-        pill.setTextColor(Color.WHITE);
+        pill.setTextColor(0xFF0C0C0C);
         pill.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f);
         pill.setGravity(Gravity.CENTER);
         int padH = dp(12), padV = dp(6);
         pill.setPadding(padH, padV, padH, padV);
-        pill.setBackground(pillBg(0x33FFFFFF));
+        pill.setBackground(pillBg(0xFFE8F5EE));
         pill.setClickable(true);
         pill.setFocusable(true);
         pill.setOnClickListener(v -> { if (pickListener != null) pickListener.onPick(e); });
@@ -101,7 +101,7 @@ public class CommandSuggestionStripView extends HorizontalScrollView {
             android.view.View v = row.getChildAt(i);
             if (v instanceof TextView) {
                 ((TextView) v).setTextColor(theme.bannerText);
-                v.setBackground(pillBg((theme.accent & 0x00FFFFFF) | 0x55000000));
+                v.setBackground(pillBg(theme.chipFill));
             }
         }
     }

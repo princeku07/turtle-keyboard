@@ -69,13 +69,14 @@ public class PresetChipStripView extends HorizontalScrollView {
     private TextView makeChip(String label, String value, @Nullable OnPresetTap l) {
         TextView t = new TextView(getContext());
         t.setText(label);
-        t.setTextColor(Color.WHITE);
+        t.setTextColor(0xFF0C0C0C);
         t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f);
         t.setTypeface(t.getTypeface(), Typeface.BOLD);
         t.setPadding(dp(14), dp(6), dp(14), dp(6));
         GradientDrawable bg = new GradientDrawable();
         bg.setShape(GradientDrawable.RECTANGLE);
-        bg.setColor(0x33FFFFFF);
+        bg.setColor(0xFFE8F5EE);
+        bg.setStroke(dp(1), 0xFFC8E8D5);
         bg.setCornerRadius(dp(16));
         t.setBackground(bg);
         t.setClickable(true);

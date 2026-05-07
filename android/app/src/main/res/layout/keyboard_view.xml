@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:background="#1B5E20"
+    android:background="#E6F4EE"
     android:paddingTop="2dp"
     android:paddingBottom="6dp">
 
@@ -37,21 +37,20 @@
         android:layout_width="match_parent"
         android:layout_height="48dp"
         android:clipChildren="false"
-        android:clipToPadding="false"
-        android:visibility="gone" />
+        android:clipToPadding="false" />
 
     <com.prince.turtlekeyboard.ime.view.CommandPanelView
         android:id="@+id/command_panel"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#0D3F12"
+        android:background="#FFFFFF"
         android:visibility="gone" />
 
     <com.prince.turtlekeyboard.ime.view.PresetChipStripView
         android:id="@+id/preset_strip"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#0D3F12"
+        android:background="#FFFFFF"
         android:visibility="gone" />
 
     <com.prince.turtlekeyboard.ime.view.ImagePreviewView
@@ -72,10 +71,10 @@
         android:layout_height="wrap_content"
         android:gravity="center"
         android:padding="8dp"
-        android:textColor="#FFFFFF"
+        android:textColor="#0C0C0C"
         android:textSize="14sp"
         android:textStyle="bold"
-        android:background="#0D3F12"
+        android:background="#FFFFFF"
         android:visibility="gone" />
 
     <FrameLayout
@@ -90,19 +89,19 @@
         android:layout_height="6dp"
         android:visibility="gone" />
 
-    <android.inputmethodservice.KeyboardView
+    <com.prince.turtlekeyboard.ime.view.TurtleKeyboardView
         android:id="@+id/keyboard_view"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#1B5E20"
-        android:keyBackground="@drawable/key_background_selector"
-        android:keyTextColor="#FFFFFF"
+        android:background="#E6F4EE"
+        android:keyBackground="@android:color/transparent"
+        android:keyTextColor="#0C0C0C"
         android:keyTextSize="20sp"
         android:labelTextSize="16sp"
         android:shadowColor="#00000000"
         android:shadowRadius="0"
-        android:paddingLeft="3dp"
-        android:paddingRight="3dp"
+        android:paddingLeft="0dp"
+        android:paddingRight="0dp"
         android:paddingTop="4dp"
         android:paddingBottom="4dp"
         android:focusable="true"

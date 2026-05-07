@@ -43,7 +43,7 @@ public class KeyPreviewPopup {
         this.context = context;
         label = new TextView(context);
         label.setBackgroundResource(R.drawable.key_preview_background);
-        label.setTextColor(Color.WHITE);
+        label.setTextColor(Color.parseColor("#0C0C0C"));
         label.setTextSize(TypedValue.COMPLEX_UNIT_SP, 28);
         label.setGravity(Gravity.CENTER);
         label.setIncludeFontPadding(false);

@@ -20,8 +20,8 @@ import androidx.annotation.Nullable;
  */
 public class ShimmerView extends View {
 
-    private static final int BASE_COLOR = 0x33000000;       // dim wash
-    private static final int HIGHLIGHT_COLOR = 0xCCFFFFFF;  // moving sheen
+    private static final int BASE_COLOR = 0xFFD9E8DF;       // soft mint base
+    private static final int HIGHLIGHT_COLOR = 0xFF15803D;  // brand-green sheen
     private static final long CYCLE_MS = 1100L;
 
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -69,7 +69,7 @@ public class ShimmerView extends View {
         float cx = -bandW + (w + 2 * bandW) * progress;
         LinearGradient lg = new LinearGradient(
                 cx - bandW, 0, cx + bandW, 0,
-                new int[]{0x00FFFFFF, HIGHLIGHT_COLOR, 0x00FFFFFF},
+                new int[]{HIGHLIGHT_COLOR & 0x00FFFFFF, HIGHLIGHT_COLOR, HIGHLIGHT_COLOR & 0x00FFFFFF},
                 new float[]{0f, 0.5f, 1f},
                 Shader.TileMode.CLAMP);
         paint.setShader(lg);

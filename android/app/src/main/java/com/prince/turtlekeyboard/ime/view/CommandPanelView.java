@@ -44,6 +44,7 @@ public class CommandPanelView extends LinearLayout {
     private OnGoListener onGo;
     private OnPasteListener onPaste;
     @Nullable private Runnable onStagedClear;
+    @Nullable private KeyboardTheme theme;
     private String hint = "type and tap →";
     @Nullable private String clipboardText;
     /** True after the user dismissed the paste chip in this prompt session. Reset
@@ -89,13 +90,13 @@ public class CommandPanelView extends LinearLayout {
         addView(stagedClose, closeLp);
 
         labelView = new TextView(getContext());
-        labelView.setTextColor(Color.WHITE);
+        labelView.setTextColor(0xFF0C0C0C);
         labelView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f);
         labelView.setTypeface(labelView.getTypeface(), Typeface.BOLD);
         addView(labelView, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
 
         queryView = new TextView(getContext());
-        queryView.setTextColor(Color.WHITE);
+        queryView.setTextColor(0xFF0C0C0C);
         queryView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f);
         queryView.setSingleLine(true);
         queryView.setEllipsize(android.text.TextUtils.TruncateAt.START);
@@ -120,12 +121,12 @@ public class CommandPanelView extends LinearLayout {
 
         pasteChip = new TextView(getContext());
         pasteChip.setText("📋 Paste");
-        pasteChip.setTextColor(Color.WHITE);
+        pasteChip.setTextColor(0xFF0C0C0C);
         pasteChip.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f);
         pasteChip.setTypeface(pasteChip.getTypeface(), Typeface.BOLD);
         pasteChip.setPadding(dp(12), dp(6), dp(12), dp(6));
         pasteChip.setSingleLine(true);
-        pasteChip.setBackground(pillBackground(0x33FFFFFF, dp(14)));
+        pasteChip.setBackground(pillBackground(0xFFE8F5EE, dp(14)));
         pasteChip.setClickable(true);
         pasteChip.setFocusable(true);
         pasteChip.setOnClickListener(v -> firePaste());
@@ -147,7 +148,7 @@ public class CommandPanelView extends LinearLayout {
         goButton.setTypeface(goButton.getTypeface(), Typeface.BOLD);
         goButton.setGravity(Gravity.CENTER);
         goButton.setPadding(dp(16), dp(8), dp(16), dp(8));
-        goButton.setBackground(pillBackground(Color.parseColor("#2E7D32"), dp(18)));
+        goButton.setBackground(pillBackground(0xFF15803D, dp(18)));
         goButton.setClickable(true);
         goButton.setFocusable(true);
         goButton.setOnClickListener(v -> { if (onGo != null) onGo.onGo(); });
@@ -170,14 +171,14 @@ public class CommandPanelView extends LinearLayout {
     private TextView makeCloseButton() {
         TextView t = new TextView(getContext());
         t.setText("×");
-        t.setTextColor(Color.WHITE);
+        t.setTextColor(0xFF0C0C0C);
         t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f);
         t.setTypeface(t.getTypeface(), Typeface.BOLD);
         t.setGravity(Gravity.CENTER);
         t.setIncludeFontPadding(false);
         GradientDrawable bg = new GradientDrawable();
         bg.setShape(GradientDrawable.OVAL);
-        bg.setColor(0x33FFFFFF);
+        bg.setColor(0xFFE8F5EE);
         t.setBackground(bg);
         t.setClickable(true);
         t.setFocusable(true);
@@ -259,15 +260,24 @@ public class CommandPanelView extends LinearLayout {
     public void setOnPasteListener(OnPasteListener l) { onPaste = l; }
 
     public void applyTheme(KeyboardTheme theme) {
+        this.theme = theme;
         setBackgroundColor(theme.bannerBg);
         labelView.setTextColor(theme.bannerText);
         queryView.setTextColor(theme.bannerText);
         pasteChip.setTextColor(theme.bannerText);
+        pasteChip.setBackground(pillBackground(theme.chipFill, dp(14)));
         pasteClose.setTextColor(theme.bannerText);
         stagedClose.setTextColor(theme.bannerText);
-        // Re-apply pill background tinted by the theme accent so the Go button
-        // doesn't lose its rounded shape after a theme switch.
+        GradientDrawable closeBg = new GradientDrawable();
+        closeBg.setShape(GradientDrawable.OVAL);
+        closeBg.setColor(theme.chipFill);
+        pasteClose.setBackground(closeBg);
+        GradientDrawable stagedBg = new GradientDrawable();
+        stagedBg.setShape(GradientDrawable.OVAL);
+        stagedBg.setColor(theme.chipFill);
+        stagedClose.setBackground(stagedBg);
+        // Solid accent fill so Go reads strongly against the white panel.
         goButton.setBackground(pillBackground(theme.accent, dp(18)));
-        goButton.setTextColor(theme.background);
+        goButton.setTextColor(0xFFFFFFFF);
     }
 }

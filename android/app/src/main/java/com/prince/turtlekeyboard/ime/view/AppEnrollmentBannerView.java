@@ -49,7 +49,7 @@ public class AppEnrollmentBannerView extends LinearLayout {
         setOrientation(HORIZONTAL);
         setGravity(Gravity.CENTER_VERTICAL);
         setVisibility(GONE);
-        setBackgroundColor(0xFF0D3F12);
+        setBackgroundColor(0xFFFFFFFF);
         int padH = dp(12), padV = dp(8);
         setPadding(padH, padV, padH, padV);
 
@@ -58,24 +58,24 @@ public class AppEnrollmentBannerView extends LinearLayout {
         iconLp.rightMargin = dp(10);
         addView(icon, iconLp);
 
-        label.setTextColor(Color.WHITE);
+        label.setTextColor(0xFF0C0C0C);
         label.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f);
         label.setSingleLine(true);
         LayoutParams labelLp = new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f);
         addView(label, labelLp);
 
-        styleActionButton(accept, "✓ Add", 0x33FFFFFF);
+        styleActionButton(accept, "✓ Add", 0xFF15803D, 0xFFFFFFFF);
         addView(accept, actionLp());
 
-        styleActionButton(close, "✕", 0x22000000);
+        styleActionButton(close, "✕", 0xFFE8F5EE, 0xFF0C0C0C);
         LayoutParams closeLp = actionLp();
         closeLp.leftMargin = dp(8);
         addView(close, closeLp);
     }
 
-    private void styleActionButton(TextView v, CharSequence text, int fill) {
+    private void styleActionButton(TextView v, CharSequence text, int fill, int textColor) {
         v.setText(text);
-        v.setTextColor(Color.WHITE);
+        v.setTextColor(textColor);
         v.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f);
         v.setGravity(Gravity.CENTER);
         v.setPadding(dp(12), dp(6), dp(12), dp(6));
@@ -113,9 +113,10 @@ public class AppEnrollmentBannerView extends LinearLayout {
     public void applyTheme(KeyboardTheme theme) {
         setBackgroundColor(theme.bannerBg);
         label.setTextColor(theme.bannerText);
-        accept.setTextColor(theme.bannerText);
+        accept.setTextColor(0xFFFFFFFF);
+        accept.setBackground(pillBg(theme.accent));
         close.setTextColor(theme.bannerText);
-        accept.setBackground(pillBg((theme.accent & 0x00FFFFFF) | 0x55000000));
+        close.setBackground(pillBg(theme.chipFill));
     }
 
     private int dp(int v) {

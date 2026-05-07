@@ -1,21 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Keyboard xmlns:android="http://schemas.android.com/apk/res/android"
     android:keyWidth="10%p"
-    android:horizontalGap="2dp"
+    android:horizontalGap="0dp"
     android:verticalGap="6dp"
-    android:keyHeight="52dp">
+    android:keyHeight="60dp">
 
+    <!-- Top row: each letter carries a single-digit popupCharacter that doubles as
+         the long-press fallback and as the small superscript hint TurtleKeyboardView
+         renders in the top-right corner. -->
     <Row>
-        <Key android:codes="113" android:keyLabel="q" android:keyEdgeFlags="left"/>
-        <Key android:codes="119" android:keyLabel="w"/>
-        <Key android:codes="101" android:keyLabel="e"/>
-        <Key android:codes="114" android:keyLabel="r"/>
-        <Key android:codes="116" android:keyLabel="t"/>
-        <Key android:codes="121" android:keyLabel="y"/>
-        <Key android:codes="117" android:keyLabel="u"/>
-        <Key android:codes="105" android:keyLabel="i"/>
-        <Key android:codes="111" android:keyLabel="o"/>
-        <Key android:codes="112" android:keyLabel="p" android:keyEdgeFlags="right"/>
+        <Key android:codes="113" android:keyLabel="q" android:popupCharacters="1" android:keyEdgeFlags="left"/>
+        <Key android:codes="119" android:keyLabel="w" android:popupCharacters="2"/>
+        <Key android:codes="101" android:keyLabel="e" android:popupCharacters="3"/>
+        <Key android:codes="114" android:keyLabel="r" android:popupCharacters="4"/>
+        <Key android:codes="116" android:keyLabel="t" android:popupCharacters="5"/>
+        <Key android:codes="121" android:keyLabel="y" android:popupCharacters="6"/>
+        <Key android:codes="117" android:keyLabel="u" android:popupCharacters="7"/>
+        <Key android:codes="105" android:keyLabel="i" android:popupCharacters="8"/>
+        <Key android:codes="111" android:keyLabel="o" android:popupCharacters="9"/>
+        <Key android:codes="112" android:keyLabel="p" android:popupCharacters="0" android:keyEdgeFlags="right"/>
     </Row>
 
     <Row>
@@ -44,13 +47,15 @@
              android:isRepeatable="true" android:keyEdgeFlags="right"/>
     </Row>
 
+    <!-- Bottom row mirrors the reference: ?123, comma, emoji, space, period, enter.
+         The Enter key has no label — TurtleKeyboardView paints a circular face and
+         a custom ↵ glyph so it reads cleanly at any size. -->
     <Row android:rowEdgeFlags="bottom">
         <Key android:codes="-2"  android:keyLabel="\?123" android:keyWidth="15%p" android:keyEdgeFlags="left"/>
         <Key android:codes="44"  android:keyLabel=","   android:keyWidth="10%p"/>
-        <Key android:codes="47"  android:keyLabel="/"   android:keyWidth="10%p"/>
-        <Key android:codes="32"  android:keyLabel="space" android:keyWidth="30%p" android:isRepeatable="true"/>
+        <Key android:codes="32"  android:keyWidth="40%p" android:isRepeatable="true"/>
         <Key android:codes="46"  android:keyLabel="."   android:keyWidth="10%p"/>
-        <Key android:codes="-10" android:keyLabel="🎤"  android:keyWidth="10%p"/>
-        <Key android:codes="-4"  android:keyLabel="↵"   android:keyWidth="15%p" android:keyEdgeFlags="right"/>
+        <Key android:codes="47"  android:keyLabel="/"   android:keyWidth="10%p"/>
+        <Key android:codes="-4"  android:keyWidth="15%p" android:keyEdgeFlags="right"/>
     </Row>
 </Keyboard>

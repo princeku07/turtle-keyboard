@@ -215,6 +215,9 @@ public class TurtleInputMethodService extends InputMethodService
         // the picker activity stole focus and many hosts don't auto-resume the IME.
         LmStudioAiClient.setOnImageStagedListener(this::onEditImageStaged);
         root.strip().setOnPickListener(this::onSuggestionPicked);
+        root.strip().setOnMicTapListener(this::toggleVoiceInput);
+        root.strip().setOnPasteTapListener(this::pasteFromClipboard);
+        root.strip().setOnSettingsTapListener(this::openHostDetailView);
         root.cmdSuggestions().setOnPickListener(this::onCommandSuggestionPicked);
 
         // Build the integration context off the freshly inflated views, then construct the
@@ -306,6 +309,109 @@ public class TurtleInputMethodService extends InputMethodService
         maybeOfferEnrollment(info);
         refreshHostAppBadge(info);
         refreshSuggestions();
+        // Surface the top bar with mic + (paste preview, when clipboard has text).
+        root.strip().setVisibility(View.VISIBLE);
+        root.strip().setPasteText(readClipboardText());
+    }
+
+    /** Wired to the center paste preview pill on the top bar. Commits the clipboard
+     *  text directly to the focused field, then dismisses the pill so it doesn't
+     *  re-fire on the next tap. */
+    private void pasteFromClipboard() {
+        String text = readClipboardText();
+        if (text == null) return;
+        committer.commitText(text);
+        root.strip().setPasteText(null);
+    }
+
+    /** Wired to the leading hamburger button on the top bar. Mounts the more-options
+     *  panel in the same slot the Quick Panel uses, replacing the keys. */
+    private void openHostDetailView() {
+        showMoreActionsPanel();
+    }
+
+    private void showMoreActionsPanel() {
+        android.view.ViewGroup host = root.quickPanelHost();
+        com.prince.turtlekeyboard.ime.view.MoreActionsPanelView panel =
+                new com.prince.turtlekeyboard.ime.view.MoreActionsPanelView(this);
+        panel.applyTheme(themes.current());
+        panel.show(new com.prince.turtlekeyboard.ime.view.MoreActionsPanelView.Callbacks() {
+            @Override public void onClose() { hideQuickPanel(); }
+            @Override public void onAction(int actionId) { onMoreActionPicked(actionId); }
+        });
+
+        // Match the keyboard's measured height so the panel sits in the same band as the keys.
+        android.inputmethodservice.KeyboardView keys = root.keyboardView();
+        int targetHeight = keys.getHeight();
+        host.removeAllViews();
+        android.widget.FrameLayout.LayoutParams lp = new android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                targetHeight > 0 ? targetHeight : android.widget.FrameLayout.LayoutParams.WRAP_CONTENT);
+        host.addView(panel, lp);
+        host.setVisibility(View.VISIBLE);
+        keys.setVisibility(View.GONE);
+    }
+
+    private void onMoreActionPicked(int actionId) {
+        // Hide the panel first; specific actions either commit text, launch an
+        // activity, or surface another panel that handles its own visibility.
+        hideQuickPanel();
+        switch (actionId) {
+            case com.prince.turtlekeyboard.ime.view.MoreActionsPanelView.ACTION_QUICK_PANEL:
+                showQuickPanel();
+                break;
+            case com.prince.turtlekeyboard.ime.view.MoreActionsPanelView.ACTION_HISTORY:
+                showHistoryPanel();
+                break;
+            case com.prince.turtlekeyboard.ime.view.MoreActionsPanelView.ACTION_SETTINGS:
+                launchHostActivity();
+                break;
+            case com.prince.turtlekeyboard.ime.view.MoreActionsPanelView.ACTION_VOICE:
+                toggleVoiceInput();
+                break;
+            case com.prince.turtlekeyboard.ime.view.MoreActionsPanelView.ACTION_THEME:
+                cycleTheme();
+                break;
+            case com.prince.turtlekeyboard.ime.view.MoreActionsPanelView.ACTION_EMOJI:
+                committer.commitText("😀");
+                break;
+            case com.prince.turtlekeyboard.ime.view.MoreActionsPanelView.ACTION_TRANSLATE:
+                composer.enterPromptMode("tl");
+                break;
+            case com.prince.turtlekeyboard.ime.view.MoreActionsPanelView.ACTION_UNDO:
+                committer.backspace();
+                break;
+            default:
+                // No-op for unknown actions.
+                break;
+        }
+    }
+
+    private void launchHostActivity() {
+        android.content.Intent i = new android.content.Intent(this, MainActivity.class);
+        i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                | android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        try {
+            startActivity(i);
+        } catch (android.content.ActivityNotFoundException ignored) {}
+    }
+
+    /** Round-robin through the available themes; re-applies immediately. */
+    private void cycleTheme() {
+        Prefs prefs = new Prefs(this);
+        String current = prefs.getString(Prefs.KEY_THEME,
+                com.prince.turtlekeyboard.theme.ThemeManager.AUTO);
+        String next;
+        switch (current) {
+            case com.prince.turtlekeyboard.theme.ThemeManager.LIGHT:
+                next = com.prince.turtlekeyboard.theme.ThemeManager.DARK; break;
+            case com.prince.turtlekeyboard.theme.ThemeManager.DARK:
+                next = com.prince.turtlekeyboard.theme.ThemeManager.AUTO; break;
+            default:
+                next = com.prince.turtlekeyboard.theme.ThemeManager.LIGHT; break;
+        }
+        prefs.putString(Prefs.KEY_THEME, next);
+        applyTheme();
     }
 
     @Override
@@ -351,6 +457,11 @@ public class TurtleInputMethodService extends InputMethodService
         // typing into the host editor. The sink picks the destination.
         if (primaryCode == Keycodes.MIC) {
             toggleVoiceInput();
+            return;
+        }
+        if (primaryCode == Keycodes.EMOJI) {
+            // Placeholder: commit a default smiley until the dedicated emoji panel ships.
+            committer.commitText("😀");
             return;
         }
 
@@ -633,6 +744,12 @@ public class TurtleInputMethodService extends InputMethodService
     }
 
     private void emitChar(int code) {
+        // Once the user starts typing, the clipboard preview is no longer the
+        // foreground action — dismiss it so the suggestion slots reclaim the
+        // center of the top bar.
+        if (root != null && root.strip() != null) {
+            root.strip().setPasteText(null);
+        }
         char c = (char) code;
         if (Character.isLetter(c) && shift.isUpper()) c = Character.toUpperCase(c);
         // Space is the autocomplete trigger: if the typed token has a high-

@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Keyboard xmlns:android="http://schemas.android.com/apk/res/android"
     android:keyWidth="10%p"
-    android:horizontalGap="2dp"
+    android:horizontalGap="0dp"
     android:verticalGap="6dp"
-    android:keyHeight="52dp">
+    android:keyHeight="60dp">
 
     <Row>
         <Key android:codes="49" android:keyLabel="1" android:keyEdgeFlags="left"/>
@@ -46,12 +46,11 @@
     </Row>
 
     <Row android:rowEdgeFlags="bottom">
-        <Key android:codes="-2" android:keyLabel="ABC" android:keyWidth="15%p" android:keyEdgeFlags="left"/>
-        <Key android:codes="44" android:keyLabel="," android:keyWidth="10%p"/>
-        <Key android:codes="47" android:keyLabel="/" android:keyWidth="10%p"/>
-        <Key android:codes="32" android:keyLabel="space" android:keyWidth="30%p" android:isRepeatable="true"/>
-        <Key android:codes="46" android:keyLabel="." android:keyWidth="10%p"/>
-        <Key android:codes="-10" android:keyLabel="🎤" android:keyWidth="10%p"/>
-        <Key android:codes="-4" android:keyLabel="↵" android:keyWidth="15%p" android:keyEdgeFlags="right"/>
+        <Key android:codes="-2"  android:keyLabel="ABC" android:keyWidth="15%p" android:keyEdgeFlags="left"/>
+        <Key android:codes="44"  android:keyLabel=","   android:keyWidth="10%p"/>
+        <Key android:codes="32"  android:keyWidth="40%p" android:isRepeatable="true"/>
+        <Key android:codes="46"  android:keyLabel="."   android:keyWidth="10%p"/>
+        <Key android:codes="47"  android:keyLabel="/"   android:keyWidth="10%p"/>
+        <Key android:codes="-4"  android:keyWidth="15%p" android:keyEdgeFlags="right"/>
     </Row>
 </Keyboard>

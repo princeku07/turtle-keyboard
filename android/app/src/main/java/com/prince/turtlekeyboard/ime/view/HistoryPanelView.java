@@ -61,7 +61,7 @@ public class HistoryPanelView extends FrameLayout {
         header.setPadding(hp, dp(8), hp, dp(8));
         title = new TextView(getContext());
         title.setText("🗂️ History");
-        title.setTextColor(Color.WHITE);
+        title.setTextColor(0xFF0C0C0C);
         title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f);
         title.setTypeface(title.getTypeface(), Typeface.BOLD);
         header.addView(title, new LinearLayout.LayoutParams(0,
@@ -69,14 +69,14 @@ public class HistoryPanelView extends FrameLayout {
 
         close = new TextView(getContext());
         close.setText("×");
-        close.setTextColor(Color.WHITE);
+        close.setTextColor(0xFF0C0C0C);
         close.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f);
         close.setTypeface(close.getTypeface(), Typeface.BOLD);
         close.setGravity(Gravity.CENTER);
         close.setIncludeFontPadding(false);
         GradientDrawable bg = new GradientDrawable();
         bg.setShape(GradientDrawable.OVAL);
-        bg.setColor(0x33FFFFFF);
+        bg.setColor(0xFFE8F5EE);
         close.setBackground(bg);
         close.setClickable(true);
         close.setFocusable(true);
@@ -98,7 +98,7 @@ public class HistoryPanelView extends FrameLayout {
 
         emptyHint = new TextView(getContext());
         emptyHint.setText("No images yet.\nTry /style ghibli on a recent photo.");
-        emptyHint.setTextColor(0xCCFFFFFF);
+        emptyHint.setTextColor(0xCC0C0C0C);
         emptyHint.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f);
         emptyHint.setGravity(Gravity.CENTER);
         emptyHint.setVisibility(GONE);
@@ -125,6 +125,13 @@ public class HistoryPanelView extends FrameLayout {
     public void applyTheme(KeyboardTheme theme) {
         this.theme = theme;
         setBackgroundColor(theme.bannerBg);
+        title.setTextColor(theme.bannerText);
+        close.setTextColor(theme.bannerText);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setShape(GradientDrawable.OVAL);
+        bg.setColor(theme.chipFill);
+        close.setBackground(bg);
+        emptyHint.setTextColor((theme.bannerText & 0x00FFFFFF) | 0xCC000000);
     }
 
     private int dp(int v) {

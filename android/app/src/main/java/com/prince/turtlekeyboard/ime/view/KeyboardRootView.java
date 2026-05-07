@@ -81,7 +81,9 @@ public class KeyboardRootView extends LinearLayout {
         if (enrollmentBanner != null) enrollmentBanner.applyTheme(theme);
         if (cmdSuggestions != null) cmdSuggestions.applyTheme(theme);
         if (preview != null) preview.applyTheme(theme);
-        if (keyboard != null) {
+        if (keyboard instanceof TurtleKeyboardView) {
+            ((TurtleKeyboardView) keyboard).applyTheme(theme);
+        } else if (keyboard != null) {
             keyboard.setBackgroundColor(theme.background);
         }
     }

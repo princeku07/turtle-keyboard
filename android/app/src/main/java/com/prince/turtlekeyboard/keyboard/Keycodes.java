@@ -13,6 +13,9 @@ public final class Keycodes {
     /** Synthetic keycode for the dedicated mic key. Negative so it never collides
      *  with a printable character or the framework's reserved negative codes. */
     public static final int MIC = -10;
+    /** Synthetic keycode for the bottom-row emoji button (placeholder until the emoji
+     *  panel ships — for now {@code onKey} commits a default smiley). */
+    public static final int EMOJI = -11;
 
     private Keycodes() {}
 }

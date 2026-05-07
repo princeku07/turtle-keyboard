@@ -35,8 +35,8 @@ public class IntegrationChipView extends TextView {
     private void init() {
         setVisibility(GONE);
         setGravity(Gravity.CENTER_VERTICAL);
-        setTextColor(Color.WHITE);
-        setBackgroundColor(0xFF1F6F2A); // slightly lifted from the keyboard green
+        setTextColor(0xFF0C0C0C);
+        setBackgroundColor(0xFFE8F5EE); // soft mint chip on the white surface
         setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         int padV = (int) TypedValue.applyDimension(
                 TypedValue.COMPLEX_UNIT_DIP, 10, getResources().getDisplayMetrics());

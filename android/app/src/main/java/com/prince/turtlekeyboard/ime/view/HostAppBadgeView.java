@@ -37,7 +37,7 @@ public class HostAppBadgeView extends LinearLayout {
         icon = new ImageView(context);
         int iconPx = dp(18);
         LayoutParams lp = new LayoutParams(iconPx, iconPx);
-        icon.setBackground(roundedFill(0x33FFFFFF, dp(9)));
+        icon.setBackground(roundedFill(0xFFE8F5EE, dp(9)));
         icon.setPadding(dp(2), dp(2), dp(2), dp(2));
         addView(icon, lp);
     }
