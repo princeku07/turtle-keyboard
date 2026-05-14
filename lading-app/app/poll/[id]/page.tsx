@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import Link from 'next/link';
 
 /**
  * Web fallback for poll links. Tapped by anyone who doesn't have Turtle installed —
@@ -10,6 +9,10 @@ import Link from 'next/link';
  * <p>For Turtle users on Android the App Link intent-filter intercepts before this page
  * ever renders; this Next.js route only fires when verification fails (no app installed
  * yet, web browser, iOS until Universal Links land).
+ *
+ * <p>Styling mirrors the landing site exactly — same ocean/abyss gradient body, foam
+ * text, cyan accent, glass cards, Geist Sans/Mono. No new visual language; this page
+ * has to feel like the rest of turtle.
  */
 
 const WORKER_URL =
@@ -42,20 +45,18 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { id } = await params;
   const poll = await getPoll(id);
-  if (!poll) return { title: 'Poll · Turtle' };
+  if (!poll) return { title: 'poll · turtle' };
   return {
-    title: `${poll.question} · Turtle`,
-    description: `Vote on this poll in Turtle: ${poll.options.map(o => o.label).join(' · ')}`,
+    title: `${poll.question} · turtle`,
+    description: `${poll.options.map(o => o.label).join(' · ')} — vote in the turtle keyboard.`,
     openGraph: {
       title: poll.question,
-      description: `Vote in this poll on Turtle. ${poll.options.length} options.`,
+      description: `${poll.options.length} options · turtle`,
       type: 'website',
-      siteName: 'Turtle',
+      siteName: 'turtle',
     },
   };
 }
-
-const ACCENTS = ['bg-lime', 'bg-pink', 'bg-blue', 'bg-orange'] as const;
 
 export default async function PollPage({
   params,
@@ -67,68 +68,110 @@ export default async function PollPage({
   if (!poll) notFound();
 
   const total = poll.options.reduce((sum, o) => sum + o.votes, 0);
+  const leadingPct =
+    total > 0 ? Math.max(...poll.options.map(o => (o.votes / total) * 100)) : 0;
 
   return (
-    <div className="min-h-screen bg-cream grain">
-      <header className="border-b-2 border-ink bg-cream px-6 py-4">
-        <Link href="/" className="text-xl font-black text-ink">
-          🐢 Turtle
-        </Link>
-      </header>
-
-      <main className="mx-auto max-w-xl px-6 py-10">
-        <p className="text-xs font-bold tracking-widest text-[var(--ink)] opacity-60 uppercase">
-          Poll
-        </p>
-        <h1 className="mt-2 text-4xl font-black text-ink leading-tight">
-          {poll.question}
-        </h1>
-        <p className="mt-2 text-sm text-[var(--ink)] opacity-60">
-          {total} vote{total === 1 ? '' : 's'}
-        </p>
-
-        <div className="mt-8 space-y-3">
-          {poll.options.map((opt, i) => {
-            const pct = total > 0 ? Math.round((opt.votes / total) * 100) : 0;
-            const accent = ACCENTS[i % ACCENTS.length];
-            return (
-              <div
-                key={i}
-                className="relative border-2 border-ink bg-white p-4 shadow-[4px_4px_0_0_var(--ink)]"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <span className="font-bold text-ink text-lg">{opt.label}</span>
-                  <span
-                    className={`rounded-full ${accent} border border-ink px-3 py-1 text-xs font-bold text-white`}
-                  >
-                    {pct}%
-                  </span>
-                </div>
-                {/* Width-percentage bar under the row, behind the content. */}
-                <div className="mt-3 h-1 w-full bg-[var(--ink)] opacity-10" />
-                <div
-                  className={`-mt-1 h-1 ${accent}`}
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
-            );
-          })}
-        </div>
-
-        <section className="mt-12 border-2 border-ink bg-white p-6 shadow-[4px_4px_0_0_var(--ink)]">
-          <h2 className="text-xl font-black text-ink">Vote with Turtle</h2>
-          <p className="mt-2 text-sm text-[var(--ink)] opacity-70">
-            Install the Turtle keyboard to vote, create your own polls, and play games
-            with friends — all from inside any chat.
-          </p>
+    <main className="min-h-screen w-full text-foam overflow-x-clip">
+      {/* Nav — matches landing exactly */}
+      <header className="sticky top-0 z-40 backdrop-blur-md">
+        <div className="mx-auto max-w-[1400px] px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-3">
+          <a
+            href="/"
+            className="flex items-center gap-2 font-sans font-semibold text-base sm:text-lg shrink-0 tracking-tight text-foam"
+          >
+            <span className="text-xl sm:text-2xl leading-none">🐢</span>
+            turtle
+          </a>
           <a
             href={PLAY_STORE_URL}
-            className="mt-6 inline-block border-2 border-ink bg-lime px-6 py-3 font-black text-white shadow-[4px_4px_0_0_var(--ink)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_var(--ink)] transition-transform"
+            target="_blank"
+            rel="noreferrer"
+            className="font-mono text-xs sm:text-sm font-semibold bg-foam text-ink px-3 sm:px-4 py-2 rounded-full hover:bg-cyan transition-colors whitespace-nowrap"
           >
-            Get Turtle on Play Store →
+            get app →
           </a>
-        </section>
-      </main>
-    </div>
+        </div>
+      </header>
+
+      {/* Poll */}
+      <section className="relative">
+        <div className="mx-auto max-w-[640px] px-5 sm:px-6 pt-10 pb-20 sm:pt-16 sm:pb-28">
+          <p className="font-mono text-xs tracking-[0.22em] text-foam-dim uppercase">
+            poll
+          </p>
+          <h1 className="mt-3 font-sans font-semibold tracking-[-0.03em] leading-[1.05] text-[clamp(2rem,5.5vw,3.4rem)] text-foam">
+            {poll.question}
+          </h1>
+          <p className="mt-4 font-mono text-sm text-foam-dim">
+            {total} {total === 1 ? 'vote' : 'votes'}
+          </p>
+
+          <div className="mt-10 space-y-3">
+            {poll.options.map((opt, i) => {
+              const pct = total > 0 ? Math.round((opt.votes / total) * 100) : 0;
+              const isLeader = total > 0 && (opt.votes / total) * 100 === leadingPct && leadingPct > 0;
+              return (
+                <div
+                  key={i}
+                  className="glass rounded-2xl px-5 py-4 relative overflow-hidden"
+                >
+                  {/* Cyan fill behind the row — width = vote percentage. */}
+                  <div
+                    aria-hidden
+                    className={`absolute inset-y-0 left-0 ${isLeader ? 'bg-cyan/25' : 'bg-cyan/12'}`}
+                    style={{ width: `${pct}%` }}
+                  />
+                  <div className="relative flex items-center justify-between gap-4">
+                    <span className="font-sans text-base sm:text-lg text-foam">
+                      {opt.label}
+                    </span>
+                    <span
+                      className={`font-mono text-sm font-semibold tabular-nums ${isLeader ? 'text-cyan' : 'text-foam-dim'}`}
+                    >
+                      {pct}%
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Install CTA */}
+          <div className="mt-16 sm:mt-20 glass rounded-2xl p-6 sm:p-8">
+            <h2 className="font-sans font-semibold tracking-[-0.02em] text-2xl sm:text-3xl text-foam">
+              vote in the app
+            </h2>
+            <p className="mt-3 font-mono text-sm sm:text-[15px] text-foam-dim leading-relaxed">
+              install the turtle keyboard. type{' '}
+              <span className="text-cyan">/poll</span> in any chat to make your own,
+              tap to vote on theirs — all without leaving the conversation.
+            </p>
+            <a
+              href={PLAY_STORE_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-7 inline-flex items-center gap-2 bg-cyan text-ink font-mono font-semibold px-5 py-3 rounded-full hover:bg-foam transition-colors"
+            >
+              get turtle <span aria-hidden>↗</span>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer — slim variant of the landing footer */}
+      <footer className="border-t border-white/10">
+        <div className="mx-auto max-w-[1400px] px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-xs text-foam/55">
+          <div className="flex items-center gap-3">
+            <span className="text-lg leading-none">🐢</span>
+            <span className="font-semibold text-foam">turtle</span>
+            <span>© 2026 · MIT</span>
+          </div>
+          <a href="/" className="hover:text-foam transition-colors">
+            ← turtle home
+          </a>
+        </div>
+      </footer>
+    </main>
   );
 }
