@@ -89,7 +89,7 @@ public class SplitIntegration implements KeyboardIntegration {
             }
             @Override public void onClear() {
                 history.clear();
-                SplitCloudSync.pushClear(ctx.appContext(), ctx.store("split"));
+                SplitCloudSync.pushClear(ctx.appContext(), ctx.googleAuth(), ctx.store("split"));
                 view.show(history.all(), this);
             }
             @Override public void onDismiss() {
@@ -102,7 +102,7 @@ public class SplitIntegration implements KeyboardIntegration {
         };
         // Render local immediately, then refresh once the cloud pull lands.
         view.show(history.all(), listener);
-        SplitCloudSync.fetchAndMerge(ctx.appContext(), ctx.store("split"), new SplitCloudSync.SyncCallback() {
+        SplitCloudSync.fetchAndMerge(ctx.appContext(), ctx.googleAuth(), ctx.store("split"), new SplitCloudSync.SyncCallback() {
             @Override public void onComplete(boolean changed) {
                 if (changed) view.show(history.all(), listener);
             }
@@ -137,7 +137,7 @@ public class SplitIntegration implements KeyboardIntegration {
         panel.show(amount, defaultPeople, new SplitPanelView.Listener() {
             @Override public void onSave(double amt, int people) {
                 long ts = new SplitHistory(ctx.store("split")).add(amt, people);
-                SplitCloudSync.pushSave(ctx.appContext(), ctx.store("split"), amt, people, ts);
+                SplitCloudSync.pushSave(ctx.appContext(), ctx.googleAuth(), ctx.store("split"), amt, people, ts);
                 ctx.store("split").putInt(SplitKeys.DEFAULT_PEOPLE, people);
                 ctx.hidePanel();
                 ctx.showBanner("Split saved 💸", 1500L);

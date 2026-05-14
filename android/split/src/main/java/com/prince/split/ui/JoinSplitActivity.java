@@ -20,11 +20,13 @@ import androidx.activity.result.IntentSenderRequest;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.prince.kbd.core.GoogleAuth;
+import com.prince.kbd.core.GoogleAuthImpl;
 import com.prince.kbd.core.KeyValueStore;
 import com.prince.kbd.core.SharedPrefsKeyValueStore;
-import com.prince.split.SplitAuth;
 import com.prince.split.SplitCloudSync;
 import com.prince.split.SplitContract;
+import com.prince.split.SplitOAuthScopes;
 
 /**
  * Handles {@code turtlekeyboard://join?sheetId=...&owner=...} deep links — the second
@@ -40,7 +42,7 @@ public class JoinSplitActivity extends AppCompatActivity {
     private static final int MUTED = 0xFF6B6B6B;
 
     private KeyValueStore store;
-    private SplitAuth auth;
+    private GoogleAuth auth;
     private String sheetId;
     private String ownerEmail;
 
@@ -55,7 +57,8 @@ public class JoinSplitActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         store = new SharedPrefsKeyValueStore(this, SharedPrefsKeyValueStore.DEFAULT_FILE).scoped("split");
-        auth = new SplitAuth(this, store);
+        auth = new GoogleAuthImpl(this,
+                new SharedPrefsKeyValueStore(this, SharedPrefsKeyValueStore.DEFAULT_FILE).scoped("google"));
 
         Uri data = getIntent() != null ? getIntent().getData() : null;
         if (data == null) { abort("No invite link"); return; }
@@ -138,16 +141,16 @@ public class JoinSplitActivity extends AppCompatActivity {
     private void proceed() {
         joinBtn.setEnabled(false);
         statusLine.setText("Connecting…");
-        if (auth.isSignedIn() && auth.cachedAccessToken() != null) {
+        if (auth.isSignedIn() && auth.cachedToken() != null) {
             doJoin();
             return;
         }
         // Prompt for the broader Sheets/Drive scope if the joiner hasn't signed in yet.
-        auth.authorize(this, new SplitAuth.AuthCallback() {
+        auth.authorize(this, SplitOAuthScopes.SCOPES, new GoogleAuth.Callback() {
             @Override public void onToken(String accessToken) {
                 runOnUiThread(JoinSplitActivity.this::doJoin);
             }
-            @Override public void onError(String reason, SplitAuth.PendingUi pendingUi) {
+            @Override public void onError(String reason, GoogleAuth.PendingUi pendingUi) {
                 if (pendingUi != null) {
                     runOnUiThread(() -> launchAuthUi(pendingUi.intentSender));
                 } else {
@@ -166,11 +169,11 @@ public class JoinSplitActivity extends AppCompatActivity {
     }
 
     private void finishAuth(Intent data) {
-        auth.onAuthorizationResult(this, data, new SplitAuth.AuthCallback() {
+        auth.onAuthorizationResult(this, data, new GoogleAuth.Callback() {
             @Override public void onToken(String accessToken) {
                 runOnUiThread(JoinSplitActivity.this::doJoin);
             }
-            @Override public void onError(String reason, SplitAuth.PendingUi pendingUi) {
+            @Override public void onError(String reason, GoogleAuth.PendingUi pendingUi) {
                 runOnUiThread(() -> abort("Sign-in failed: " + reason));
             }
         });
@@ -178,7 +181,7 @@ public class JoinSplitActivity extends AppCompatActivity {
 
     private void doJoin() {
         statusLine.setText("Loading shared splits…");
-        SplitCloudSync.joinSharedSheet(this, store, sheetId, ownerEmail,
+        SplitCloudSync.joinSharedSheet(this, auth, store, sheetId, ownerEmail,
                 ok -> runOnUiThread(() -> {
                     if (ok) {
                         new AlertDialog.Builder(this)

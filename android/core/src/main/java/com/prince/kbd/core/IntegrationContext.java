@@ -43,15 +43,18 @@ public interface IntegrationContext {
     /** Lookup for known host apps. Integrations use this to decide when to activate. */
     AppProfileRegistry profiles();
 
-    /** LLM completion service. Modules that structure free text into API payloads talk to
-     *  the same model as the rest of the IME. Use is opt-in — modules that don't need AI
-     *  simply don't call this. */
-    LlmService llm();
+    /** AI primitive — call Gemini directly with the integration's own system prompt.
+     *  Replaces the legacy {@code llm()} / {@code images()} ports; each command owns its
+     *  prompt and dispatch logic rather than routing through a god-class AI client. Use
+     *  is opt-in — modules that don't need AI simply don't call this. */
+    GeminiService ai();
 
-    /** Image generation service. Same opt-in pattern as {@link #llm()} — only modules
-     *  that actually generate images call this. The provider (OpenAI / Gemini / …) is
-     *  composed in the app and may include fallback chains; modules see only the port. */
-    ImageService images();
+    /** Cross-module Google OAuth. Modules declare the scopes they need per call; tokens
+     *  are cached and shared across modules, so a feature that asks for a scope already
+     *  granted to another feature reuses the same token without a second consent dialog.
+     *  Same opt-in pattern as {@link #ai()} — modules that don't talk to Google APIs
+     *  simply don't call this. */
+    GoogleAuth googleAuth();
 
     /** Commit text into the host editor at the cursor. */
     void commitText(CharSequence text);
@@ -62,7 +65,7 @@ public interface IntegrationContext {
     /**
      * Hand off to a deeper screen the host app provides. The {@code screenId} is a stable
      * string the integration and the host agree on (e.g. {@code "split-detail"}). The host
-     * decides which Activity / app handles it.
+     * decides which Activity / view controller handles it.
      *
      * <p>No-op when the host doesn't recognize the screen id.
      */

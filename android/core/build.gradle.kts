@@ -28,4 +28,5 @@ android {
 
 dependencies {
     implementation(libs.appcompat)
+    implementation(libs.play.services.auth)
 }

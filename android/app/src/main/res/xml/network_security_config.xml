@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
     <domain-config cleartextTrafficPermitted="true">
+        <!-- Android emulator's loopback to the dev-machine localhost. Used by PollClient
+             when BASE_URL points at http://10.0.2.2:8787 (wrangler dev). -->
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <!-- Real-device dev: dev-machine LAN IPs. Add yours here if it's not listed. -->
         <domain includeSubdomains="false">192.168.1.5</domain>
         <domain includeSubdomains="false">192.168.1.10</domain>
         <domain includeSubdomains="false">192.168.0.43</domain>

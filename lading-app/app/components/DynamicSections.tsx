@@ -18,19 +18,26 @@ const FALLBACK_MARQUEE = [
   "/slack #standup did x, doing y",
 ];
 
+// Old → new pastel mapping. We keep the Accent token in commands.ts unchanged
+// and remap to the turtle palette here.
+//   pink   → coral    (sunset)
+//   lime   → seafoam  (shallow water)
+//   blue   → sky      (ocean surface)
+//   orange → sand     (beach)
+//   ink    → dusk     (twilight)
 const CTA_BG: Record<Accent, string> = {
-  pink: "bg-pink",
-  lime: "bg-lime",
-  blue: "bg-blue",
-  orange: "bg-orange",
-  ink: "bg-ink",
+  pink: "bg-coral",
+  lime: "bg-seafoam",
+  blue: "bg-sky",
+  orange: "bg-sand",
+  ink: "bg-dusk",
 };
 const CTA_FG: Record<Accent, string> = {
-  pink: "text-cream",
-  lime: "text-cream",
-  blue: "text-cream",
+  pink: "text-ink",
+  lime: "text-ink",
+  blue: "text-ink",
   orange: "text-ink",
-  ink: "text-cream",
+  ink: "text-ink",
 };
 
 export function DynamicCta() {
@@ -86,7 +93,7 @@ export function DynamicMarquee() {
   return (
     <div
       key={c?.cmd ?? "default"}
-      className="border-y-2 border-ink bg-ink text-cream py-2.5 sm:py-3 md:py-4 overflow-hidden"
+      className="relative bg-ink text-foam py-3 sm:py-3.5 md:py-4 overflow-hidden"
     >
       <div className="flex animate-marquee whitespace-nowrap">
         {[...items, ...items].map((cmd, i) => {
@@ -97,9 +104,9 @@ export function DynamicMarquee() {
               key={i}
               className="font-mono text-sm sm:text-base md:text-xl lg:text-2xl mx-4 sm:mx-6 md:mx-8 inline-flex items-center gap-2 sm:gap-3 md:gap-4"
             >
-              <span className="text-cream font-bold">{head}</span>
-              {rest && <span className="text-cream/80">{rest}</span>}
-              <span className="text-pink">✺</span>
+              <span className="text-foam font-semibold">{head}</span>
+              {rest && <span className="text-foam/70">{rest}</span>}
+              <span className="text-coral-mid">✺</span>
             </span>
           );
         })}
@@ -109,25 +116,36 @@ export function DynamicMarquee() {
 }
 
 const ACCENT_BG: Record<Accent, string> = {
-  pink: "bg-pink",
-  lime: "bg-lime",
-  blue: "bg-blue",
-  orange: "bg-orange",
-  ink: "bg-ink",
+  pink: "bg-coral",
+  lime: "bg-seafoam",
+  blue: "bg-sky",
+  orange: "bg-sand",
+  ink: "bg-dusk",
 };
 const ACCENT_FG: Record<Accent, string> = {
-  pink: "text-cream",
-  lime: "text-cream",
-  blue: "text-cream",
+  pink: "text-ink",
+  lime: "text-ink",
+  blue: "text-ink",
   orange: "text-ink",
-  ink: "text-cream",
+  ink: "text-ink",
 };
+// Highlighter — used for headline word emphasis. We want this to stand out
+// more than the soft tints, so it uses the saturated mid hue + white text.
 const ACCENT_HI: Record<Accent, string> = {
-  pink: "bg-pink text-cream",
-  lime: "bg-lime text-cream",
-  blue: "bg-blue text-cream",
-  orange: "bg-orange text-ink",
-  ink: "bg-ink text-cream",
+  pink: "bg-coral-mid text-white",
+  lime: "bg-seafoam-mid text-white",
+  blue: "bg-sky-mid text-white",
+  orange: "bg-sand-mid text-white",
+  ink: "bg-dusk-mid text-white",
+};
+// Per-command radial gradient — used on CommandPickCard tiles so each command
+// reads as its own little pastel scene, not a flat color block.
+const ACCENT_GRAD: Record<Accent, string> = {
+  pink: "bg-gradient-to-br from-coral via-rose to-foam",
+  lime: "bg-gradient-to-br from-seafoam via-mint to-foam",
+  blue: "bg-gradient-to-br from-sky via-foam to-lilac",
+  orange: "bg-gradient-to-br from-sand via-coral to-foam",
+  ink: "bg-gradient-to-br from-dusk via-lilac to-foam",
 };
 
 function CommandSwitcher({
@@ -300,38 +318,44 @@ export function DynamicUseCases() {
     return (
       <section
         id="commands"
-        className="mx-auto max-w-[1400px] px-6 py-20 sm:py-24"
+        className="band-reef grain relative overflow-hidden"
       >
-        <div className="font-mono text-xs uppercase tracking-widest text-ink/60 mb-3">
-          § the commands
-        </div>
-        <h2 className="font-sans font-black tracking-[-0.03em] leading-[0.95] text-[clamp(2.2rem,5vw,4.4rem)] max-w-4xl">
-          Six image commands. Three live integrations.{" "}
-          <span className="bg-blue text-cream px-2 -rotate-1 inline-block">
-            Tap one
-          </span>{" "}
-          to see how it's used.
-        </h2>
-        <p className="mt-6 max-w-2xl text-lg text-ink/80">
-          Pick any command — the rest of this page will rewrite itself around that one's real-world use cases. Splitting a bill in GPay works nothing like generating a samurai cat. Each one gets its own story.
-        </p>
+        {/* soft blur orbs for depth */}
+        <div className="blob blob-md drift" style={{ background: "var(--mint)",  top: "8%",  left: "-80px" }} />
+        <div className="blob blob-md float-y" style={{ background: "var(--sand)", bottom: "12%", right: "-100px" }} />
 
-        <div className="mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {COMMAND_ORDER.map((cmd, i) => (
-            <CommandPickCard key={cmd} cmd={cmd} index={i} />
-          ))}
-        </div>
+        <div className="relative mx-auto max-w-[1400px] px-6 py-20 sm:py-28">
+          <div className="font-mono text-xs uppercase tracking-widest text-ink/55 mb-3">
+            § the commands
+          </div>
+          <h2 className="font-sans font-semibold tracking-[-0.03em] leading-[0.95] text-[clamp(2.2rem,5vw,4.4rem)] max-w-4xl text-ink">
+            Six image commands. Three live integrations.{" "}
+            <span className="bg-sky-mid text-white px-3 py-1 rounded-xl inline-block">
+              Tap one
+            </span>{" "}
+            to see how it's used.
+          </h2>
+          <p className="mt-6 max-w-2xl text-lg text-ink/75">
+            Pick any command — the rest of this page will rewrite itself around that one's real-world use cases. Splitting a bill in GPay works nothing like generating a samurai cat. Each one gets its own story.
+          </p>
 
-        <div className="mt-10 flex flex-wrap items-center gap-3 font-mono text-sm">
-          <span className="opacity-60">on the roadmap:</span>
-          {["/fix", "/tone", "/reply", "/tl", "/sum", "/jared (your custom)"].map((t) => (
-            <span
-              key={t}
-              className="border-2 border-ink rounded-full px-3 py-1.5 bg-cream"
-            >
-              {t}
-            </span>
-          ))}
+          <div className="mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {COMMAND_ORDER.map((cmd, i) => (
+              <CommandPickCard key={cmd} cmd={cmd} index={i} />
+            ))}
+          </div>
+
+          <div className="mt-10 flex flex-wrap items-center gap-3 font-mono text-sm text-ink/75">
+            <span className="text-ink/55">on the roadmap:</span>
+            {["/fix", "/tone", "/reply", "/tl", "/sum", "/jared (your custom)"].map((t) => (
+              <span
+                key={t}
+                className="rounded-full px-3 py-1.5 bg-white/55 backdrop-blur-sm hairline"
+              >
+                {t}
+              </span>
+            ))}
+          </div>
         </div>
       </section>
     );
@@ -374,21 +398,21 @@ function CommandPickCard({ cmd, index }: { cmd: CommandId; index: number }) {
     <button
       type="button"
       onClick={() => injectCommand(cmd)}
-      className={`text-left ${ACCENT_BG[c.accent]} ${ACCENT_FG[c.accent]} rounded-3xl border-2 border-ink p-6 sm:p-7 relative min-h-[210px] flex flex-col justify-between transition-transform hover:-translate-y-1 hover:shadow-[6px_6px_0_0_var(--ink)]`}
+      className={`relative text-left ${ACCENT_GRAD[c.accent]} text-ink rounded-3xl hairline-light p-6 sm:p-7 min-h-[210px] flex flex-col justify-between overflow-hidden transition-all hover:-translate-y-1 hover:shadow-[0_20px_50px_-20px_rgba(26,26,34,0.35)] grain grain-soft`}
     >
-      <div className="flex items-start justify-between">
-        <span className="font-mono font-black text-3xl md:text-4xl tracking-tight">
+      <div className="flex items-start justify-between relative">
+        <span className="font-mono font-semibold text-3xl md:text-4xl tracking-tight">
           {c.cmd}
         </span>
-        <span className="font-mono text-[10px] uppercase tracking-widest border-2 border-current rounded-full px-2 py-0.5 opacity-80">
+        <span className="font-mono text-[10px] uppercase tracking-widest rounded-full px-2 py-0.5 bg-white/55 backdrop-blur-sm hairline">
           v1
         </span>
       </div>
-      <div>
-        <div className="font-mono text-xs opacity-60 mb-1.5">
+      <div className="relative">
+        <div className="font-mono text-xs text-ink/55 mb-1.5">
           no.{String(index + 1).padStart(2, "0")} · tap to explore
         </div>
-        <p className="text-base leading-snug">{c.hint}.</p>
+        <p className="text-base leading-snug text-ink/85">{c.hint}.</p>
       </div>
     </button>
   );

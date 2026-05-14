@@ -1,0 +1,46 @@
+id: drive
+name: Drive
+summary: User-owned Google Drive storage for reference photos used by personalized image commands.
+
+description: |
+  Adds Google Drive as user-owned storage. Currently powers /us — the user
+  links their Drive once via the host app's Settings, picks 3-5 reference
+  selfies, and from then on every /us call fetches those photos with a scoped
+  token at gen time. The backend never holds long-term storage.
+
+  Auth happens in the host app, never in the keyboard extension (iOS keyboard
+  extensions cannot run OAuth flows). The resulting access token lives in
+  shared storage:
+  - Android: encrypted SharedPreferences, same pattern as Split / Notion /
+    Slack.
+  - iOS: shared App Group keychain (App Group entitlement needs to be added
+    to the Xcode project; not yet set up).
+
+  Uses the drive.file OAuth scope — the app can only read / write files it
+  created, not the user's whole Drive. Keeps the consent dialog small and
+  avoids Google's full-Drive verification process.
+
+owner: "@turtle-team"
+tags: [storage, oauth, google, personalized]
+
+surfaces:
+  - storage
+  - deep-screen
+  - slash-command
+
+commands:
+  - us
+
+deep_screens:
+  - drive-link
+  - drive-photos
+
+support:
+  android:
+    state: in-progress
+    since: null
+    impl: android/app/src/main/java/com/prince/turtlekeyboard/integration/drive/DriveIntegration.java
+  ios:
+    state: planned
+    since: null
+    impl: null

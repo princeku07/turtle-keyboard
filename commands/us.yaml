@@ -1,0 +1,54 @@
+id: us
+name: /us
+summary: Generate a stylized image of you (and your partner) in any scenario
+description: |
+  Free-form prompt that drops the user (and optionally a second reference face)
+  into any scenario as a generated image — "as astronauts on Mars", "in 1970s
+  Bollywood", "as Studio Ghibli characters". The host app surfaces a curated
+  preset dropdown for first-time users, but the field is fully free-form.
+
+  Reference photos live in the user's own Google Drive (drive.file scope, set
+  up once via the host app — see `integrations/drive.yaml`). The backend
+  fetches them with a scoped token at gen time and discards them after the
+  response; Turtle never stores user photos long-term.
+
+  /us is the marquee command for Turtle's couples-positioning launch: every
+  generated image carries an implicit "what app made this?" demo when sent in
+  chat.
+
+owner: "@turtle-team"
+tags: [image, vision, personalized, couples]
+
+input:
+  modes: [text]
+  required: [text]
+  example: "/us as astronauts on Mars"
+
+output:
+  type: image
+  format: png
+  example: "(generated image of the user's reference faces in the prompted scenario)"
+
+contract:
+  endpoint: POST /v1/commands/us
+
+ux:
+  latency_budget_ms: 4500
+  loading_state: required
+  error_state: required
+  result_action: insert-inline
+  privacy_notice: required
+
+support:
+  android:
+    state: planned
+    since: null
+    impl: null
+  ios:
+    state: planned
+    since: null
+    impl: null
+  backend:
+    state: planned
+    since: null
+    impl: null

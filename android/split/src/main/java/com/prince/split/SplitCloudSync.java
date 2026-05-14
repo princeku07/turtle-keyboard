@@ -6,6 +6,7 @@ import android.os.Looper;
 
 import androidx.annotation.Nullable;
 
+import com.prince.kbd.core.GoogleAuth;
 import com.prince.kbd.core.KeyValueStore;
 
 import java.io.IOException;
@@ -25,8 +26,10 @@ import java.util.concurrent.Executors;
  * Local SharedPreferences remains the source of truth for the keyboard panel; this class
  * mirrors saves to the cloud and pulls remote rows on demand.
  *
- * <p>All cloud calls are no-ops unless the user is signed in via {@link SplitAuth} and a
- * sheet has been provisioned by {@link #ensureSheet}.
+ * <p>All cloud calls are no-ops unless the user is signed in via {@link GoogleAuth} and a
+ * sheet has been provisioned by {@link #ensureSheet}. The {@link GoogleAuth} instance is
+ * passed in by every caller (rather than constructed here) so the same shared instance —
+ * with the cached token in the {@code google} namespace — is reused across modules.
  */
 public final class SplitCloudSync {
 
@@ -45,9 +48,9 @@ public final class SplitCloudSync {
      * needed and migrating any pre-existing local rows on first run. Safe to call on
      * every app launch — short-circuits when already provisioned.
      */
-    public static void ensureSheet(final Context ctx, final KeyValueStore store,
+    public static void ensureSheet(final Context ctx, final GoogleAuth auth,
+                                   final KeyValueStore store,
                                    @Nullable final SyncCallback cb) {
-        final SplitAuth auth = new SplitAuth(ctx, store);
         if (!auth.isSignedIn()) {
             deliver(cb, false);
             return;
@@ -98,9 +101,9 @@ public final class SplitCloudSync {
     }
 
     /** Mirrors a save to the user's sheet. Fire-and-forget; local write already happened. */
-    public static void pushSave(final Context ctx, final KeyValueStore store,
+    public static void pushSave(final Context ctx, final GoogleAuth auth,
+                                final KeyValueStore store,
                                 final double amount, final int people, final long timestampMs) {
-        final SplitAuth auth = new SplitAuth(ctx, store);
         if (!auth.isSignedIn()) return;
         final String sheetId = store.getString(SplitKeys.SHEET_ID, "");
         if (sheetId.isEmpty()) return;
@@ -121,22 +124,24 @@ public final class SplitCloudSync {
     }
 
     /** Mirrors a clear — removes only this device's rows from the sheet. */
-    public static void pushClear(final Context ctx, final KeyValueStore store) {
-        pushClearInternal(ctx, store, false);
+    public static void pushClear(final Context ctx, final GoogleAuth auth,
+                                 final KeyValueStore store) {
+        pushClearInternal(ctx, auth, store, false);
     }
 
     /**
      * Owner-only: nukes every data row (across all devices) from the shared sheet.
      * No-op if the current user isn't the sheet owner.
      */
-    public static void pushClearAll(final Context ctx, final KeyValueStore store) {
-        if (!isOwner(store)) return;
-        pushClearInternal(ctx, store, true);
+    public static void pushClearAll(final Context ctx, final GoogleAuth auth,
+                                    final KeyValueStore store) {
+        if (!isOwner(auth, store)) return;
+        pushClearInternal(ctx, auth, store, true);
     }
 
-    private static void pushClearInternal(final Context ctx, final KeyValueStore store,
+    private static void pushClearInternal(final Context ctx, final GoogleAuth auth,
+                                          final KeyValueStore store,
                                           final boolean wipeAll) {
-        final SplitAuth auth = new SplitAuth(ctx, store);
         if (!auth.isSignedIn()) return;
         final String sheetId = store.getString(SplitKeys.SHEET_ID, "");
         if (sheetId.isEmpty()) return;
@@ -160,8 +165,9 @@ public final class SplitCloudSync {
     }
 
     /** True iff the current account is the email stamped at sheet-creation time. */
-    public static boolean isOwner(KeyValueStore store) {
-        String me = store.getString(SplitKeys.ACCOUNT_EMAIL, "");
+    public static boolean isOwner(GoogleAuth auth, KeyValueStore store) {
+        String me = auth.accountEmail();
+        if (me == null) me = "";
         String owner = store.getString(SplitKeys.OWNER_EMAIL, "");
         return !me.isEmpty() && me.equalsIgnoreCase(owner);
     }
@@ -171,9 +177,9 @@ public final class SplitCloudSync {
      * {@code (timestampMs, amount, people)}, writes anything new, and fires {@code cb}
      * on the main thread.
      */
-    public static void fetchAndMerge(final Context ctx, final KeyValueStore store,
+    public static void fetchAndMerge(final Context ctx, final GoogleAuth auth,
+                                     final KeyValueStore store,
                                      @Nullable final SyncCallback cb) {
-        final SplitAuth auth = new SplitAuth(ctx, store);
         if (!auth.isSignedIn()) { deliver(cb, false); return; }
         final String sheetId = store.getString(SplitKeys.SHEET_ID, "");
         if (sheetId.isEmpty()) { deliver(cb, false); return; }
@@ -203,11 +209,12 @@ public final class SplitCloudSync {
         void onError();
     }
 
-    private static void withFreshToken(SplitAuth auth, @Nullable android.app.Activity activity,
+    private static void withFreshToken(GoogleAuth auth,
+                                       @Nullable android.app.Activity activity,
                                        final TokenAction action) {
-        auth.freshAccessToken(activity, new SplitAuth.AuthCallback() {
+        auth.freshToken(activity, SplitOAuthScopes.SCOPES, new GoogleAuth.Callback() {
             @Override public void onToken(String accessToken) { action.run(accessToken); }
-            @Override public void onError(String reason, @Nullable SplitAuth.PendingUi pendingUi) {
+            @Override public void onError(String reason, @Nullable GoogleAuth.PendingUi pendingUi) {
                 action.onError();
             }
         });
@@ -349,10 +356,10 @@ public final class SplitCloudSync {
         void onReady(@Nullable String deepLink);
     }
 
-    public static void openMembership(final Context ctx, final KeyValueStore store,
+    public static void openMembership(final Context ctx, final GoogleAuth auth,
+                                      final KeyValueStore store,
                                       final InviteCallback cb) {
-        if (!isOwner(store)) { deliverInvite(cb, null); return; }
-        final SplitAuth auth = new SplitAuth(ctx, store);
+        if (!isOwner(auth, store)) { deliverInvite(cb, null); return; }
         if (!auth.isSignedIn()) { deliverInvite(cb, null); return; }
         final String sheetId = store.getString(SplitKeys.SHEET_ID, "");
         if (sheetId.isEmpty()) { deliverInvite(cb, null); return; }
@@ -380,10 +387,10 @@ public final class SplitCloudSync {
     }
 
     /** Owner-only: revokes the anyone-with-link permission. */
-    public static void closeMembership(final Context ctx, final KeyValueStore store,
+    public static void closeMembership(final Context ctx, final GoogleAuth auth,
+                                       final KeyValueStore store,
                                        @Nullable final SyncCallback cb) {
-        if (!isOwner(store)) { deliver(cb, false); return; }
-        final SplitAuth auth = new SplitAuth(ctx, store);
+        if (!isOwner(auth, store)) { deliver(cb, false); return; }
         if (!auth.isSignedIn()) { deliver(cb, false); return; }
         final String sheetId = store.getString(SplitKeys.SHEET_ID, "");
         final String permId = store.getString(SplitKeys.ANYONE_PERMISSION_ID, "");
@@ -432,7 +439,8 @@ public final class SplitCloudSync {
      * {@code ownerEmail}) and refreshes from the sheet. Owner must have membership open
      * for the {@code fetchAndMerge} call to succeed.
      */
-    public static void joinSharedSheet(final Context ctx, final KeyValueStore store,
+    public static void joinSharedSheet(final Context ctx, final GoogleAuth auth,
+                                       final KeyValueStore store,
                                        final String sheetId, final String ownerEmail,
                                        @Nullable final SyncCallback cb) {
         store.putString(SplitKeys.SHEET_ID, sheetId);
@@ -443,7 +451,7 @@ public final class SplitCloudSync {
         // Joiner is not the owner of any anyone-with-link share — clear any leftover from
         // a previous owner role on this install.
         store.putString(SplitKeys.ANYONE_PERMISSION_ID, "");
-        fetchAndMerge(ctx, store, cb);
+        fetchAndMerge(ctx, auth, store, cb);
     }
 
     private static void deliverInvite(@Nullable final InviteCallback cb, @Nullable final String url) {

@@ -3,6 +3,8 @@ package com.prince.turtlekeyboard.ime.view;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -86,7 +88,26 @@ public class ImagePreviewView extends LinearLayout {
 
     public boolean show(File file, Listener l) {
         this.listener = l;
-        Bitmap bmp = BitmapFactory.decodeFile(file.getAbsolutePath());
+        // Release any previous preview's bitmap before decoding a new one — show() can
+        // be called again without an intervening hide() if the user dispatches a second
+        // image command while the preview is still up.
+        recycleCurrent();
+        // Subsample on decode so the preview's ImageView (≤ display width × 180dp tall)
+        // doesn't pull a full-res bitmap onto the heap. Even with /cap's 512px outputs
+        // this saves a redundant decode pass after the gen-time peak.
+        String path = file.getAbsolutePath();
+        int targetPx = Math.max(1, getResources().getDisplayMetrics().widthPixels);
+        BitmapFactory.Options bounds = new BitmapFactory.Options();
+        bounds.inJustDecodeBounds = true;
+        BitmapFactory.decodeFile(path, bounds);
+        int sample = 1;
+        int w = bounds.outWidth, h = bounds.outHeight;
+        while (w > 0 && h > 0 && w / 2 >= targetPx && h / 2 >= targetPx) {
+            w /= 2; h /= 2; sample *= 2;
+        }
+        BitmapFactory.Options decode = new BitmapFactory.Options();
+        decode.inSampleSize = sample;
+        Bitmap bmp = BitmapFactory.decodeFile(path, decode);
         if (bmp == null) {
             this.listener = null;
             return false;
@@ -98,8 +119,17 @@ public class ImagePreviewView extends LinearLayout {
 
     public void hide() {
         setVisibility(GONE);
-        image.setImageDrawable(null);
+        recycleCurrent();
         listener = null;
+    }
+
+    private void recycleCurrent() {
+        Drawable d = image.getDrawable();
+        image.setImageDrawable(null);
+        if (d instanceof BitmapDrawable) {
+            Bitmap b = ((BitmapDrawable) d).getBitmap();
+            if (b != null && !b.isRecycled()) b.recycle();
+        }
     }
 
     public boolean isShowing() {

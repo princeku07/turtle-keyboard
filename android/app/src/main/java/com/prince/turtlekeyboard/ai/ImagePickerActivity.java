@@ -59,9 +59,11 @@ public class ImagePickerActivity extends Activity {
                 byte[] buf = new byte[8192];
                 int n;
                 while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
-                String mime = getContentResolver().getType(uri);
-                if (mime == null) mime = "image/png";
-                LmStudioAiClient.stageEditImage(out.toByteArray(), mime);
+                // Downsize before staging — the staged bytes sit in a static
+                // AtomicReference until /edit consumes them, and a full-res selfie can
+                // be 5+ MB. Bounded staging = bounded IME heap pressure.
+                byte[] downsized = ImageDownsizer.downsizeToJpegBytes(out.toByteArray());
+                LmStudioAiClient.stageEditImage(downsized, "image/jpeg");
             }
         } catch (Exception e) {
             Log.w(TAG, "read failed for " + uri, e);

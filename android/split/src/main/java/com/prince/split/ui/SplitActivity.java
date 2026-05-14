@@ -26,9 +26,10 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.prince.kbd.core.GoogleAuth;
+import com.prince.kbd.core.GoogleAuthImpl;
 import com.prince.kbd.core.KeyValueStore;
 import com.prince.kbd.core.SharedPrefsKeyValueStore;
-import com.prince.split.SplitAuth;
 import com.prince.split.SplitCloudSync;
 import com.prince.split.SplitContract;
 import com.prince.split.SplitHistory;
@@ -58,7 +59,7 @@ public class SplitActivity extends AppCompatActivity {
 
     private KeyValueStore store;
     private SplitHistory history;
-    private SplitAuth auth;
+    private GoogleAuth auth;
 
     private TextView totalLifetime;
     private TextView totalMonth;
@@ -81,7 +82,8 @@ public class SplitActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         store = new SharedPrefsKeyValueStore(this, SharedPrefsKeyValueStore.DEFAULT_FILE).scoped("split");
         history = new SplitHistory(store);
-        auth = new SplitAuth(this, store);
+        auth = new GoogleAuthImpl(this,
+                new SharedPrefsKeyValueStore(this, SharedPrefsKeyValueStore.DEFAULT_FILE).scoped("google"));
         setContentView(buildLayout());
         setTitle("Splits");
     }
@@ -92,7 +94,7 @@ public class SplitActivity extends AppCompatActivity {
         // Heal email/owner stamping for installs that signed in pre-invite-feature.
         auth.fetchAndStoreEmailIfMissing();
         render();
-        SplitCloudSync.fetchAndMerge(this, store, changed -> { if (changed) render(); });
+        SplitCloudSync.fetchAndMerge(this, auth, store, changed -> { if (changed) render(); });
     }
 
     private View buildLayout() {
@@ -472,7 +474,7 @@ public class SplitActivity extends AppCompatActivity {
         sheetLinkBtn.setAlpha(haveSheet ? 1f : 0.45f);
 
         // Role + visibility
-        boolean isOwner = SplitCloudSync.isOwner(store);
+        boolean isOwner = SplitCloudSync.isOwner(auth, store);
         if (isOwner) {
             roleBadge.setText("OWNER");
             roleBadge.setTextColor(WHITE);
@@ -666,7 +668,7 @@ public class SplitActivity extends AppCompatActivity {
             return;
         }
         inviteBtn.setEnabled(false);
-        SplitCloudSync.openMembership(this, store, deepLink -> runOnUiThread(() -> {
+        SplitCloudSync.openMembership(this, auth, store, deepLink -> runOnUiThread(() -> {
             inviteBtn.setEnabled(true);
             render();
             if (deepLink == null) {
@@ -684,7 +686,7 @@ public class SplitActivity extends AppCompatActivity {
                         + "who already joined keep access — remove them in Drive if needed.")
                 .setPositiveButton("Stop", (d, w) -> {
                     inviteBtn.setEnabled(false);
-                    SplitCloudSync.closeMembership(this, store, ok -> runOnUiThread(() -> {
+                    SplitCloudSync.closeMembership(this, auth, store, ok -> runOnUiThread(() -> {
                         inviteBtn.setEnabled(true);
                         render();
                         toast(ok ? "Membership closed" : "Could not close — try again");
@@ -768,7 +770,7 @@ public class SplitActivity extends AppCompatActivity {
                         + "rows stay intact. This can't be undone.")
                 .setPositiveButton("Clear", (d, w) -> {
                     history.clear();
-                    SplitCloudSync.pushClear(this, store);
+                    SplitCloudSync.pushClear(this, auth, store);
                     render();
                     toast("Cleared");
                 })
@@ -783,7 +785,7 @@ public class SplitActivity extends AppCompatActivity {
                         + "Only the owner can do this. This can't be undone.")
                 .setPositiveButton("Clear all", (d, w) -> {
                     history.clear();
-                    SplitCloudSync.pushClearAll(this, store);
+                    SplitCloudSync.pushClearAll(this, auth, store);
                     render();
                     toast("Cleared all rows");
                 })

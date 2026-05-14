@@ -6,6 +6,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.view.inputmethod.InputMethodManager;
@@ -17,14 +18,19 @@ import androidx.activity.result.IntentSenderRequest;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.prince.kbd.core.GoogleAuth;
+import com.prince.kbd.core.GoogleAuthImpl;
 import com.prince.notion.ui.NotionConnectActivity;
 import com.prince.slack.ui.SlackConnectActivity;
-import com.prince.split.SplitAuth;
 import com.prince.split.SplitCloudSync;
 import com.prince.split.SplitContract;
 import com.prince.split.SplitKeys;
+import com.prince.split.SplitOAuthScopes;
 import com.prince.split.ui.SplitActivity;
 import com.prince.turtlekeyboard.databinding.ActivityMainBinding;
+import com.prince.turtlekeyboard.integration.drive.DriveLinkActivity;
+import com.prince.turtlekeyboard.overlay.BottomSheetActivity;
+import com.prince.turtlekeyboard.overlay.OverlayUrls;
 import com.prince.turtlekeyboard.settings.Prefs;
 
 /**
@@ -45,7 +51,7 @@ public class MainActivity extends AppCompatActivity {
     private ActivityMainBinding binding;
     private Prefs prefs;
     private com.prince.kbd.core.KeyValueStore splitStore;
-    private SplitAuth auth;
+    private GoogleAuth auth;
     private AlertDialog signInDialog;
 
     private final ActivityResultLauncher<IntentSenderRequest> authLauncher =
@@ -59,7 +65,7 @@ public class MainActivity extends AppCompatActivity {
         setContentView(binding.getRoot());
         prefs = new Prefs(this);
         splitStore = prefs.root().scoped("split");
-        auth = new SplitAuth(this, splitStore);
+        auth = new GoogleAuthImpl(this, prefs.root().scoped("google"));
 
         binding.btnEnable.setOnClickListener(v -> openInputMethodSettings());
         binding.btnChoose.setOnClickListener(v -> showInputMethodPicker());
@@ -72,8 +78,19 @@ public class MainActivity extends AppCompatActivity {
                 startActivity(new Intent(this, NotionConnectActivity.class)));
         binding.btnConnectSlack.setOnClickListener(v ->
                 startActivity(new Intent(this, SlackConnectActivity.class)));
+        binding.btnConnectDrive.setOnClickListener(v ->
+                startActivity(new Intent(this, DriveLinkActivity.class)));
         binding.btnHistory.setOnClickListener(v ->
                 startActivity(new Intent(this, HistoryActivity.class)));
+        // Dev button — direct-launches BottomSheetActivity with a synthetic URL so the
+        // sheet rails can be verified without depending on deep-link routing (which
+        // requires assetlinks.json hosted on the App Link domain). Remove once Cloudflare
+        // Worker is live and tap-link-in-chat is verified end-to-end.
+        binding.btnPreviewSheet.setOnClickListener(v -> {
+            Intent i = new Intent(this, BottomSheetActivity.class);
+            i.setData(Uri.parse(OverlayUrls.forArtifact("poll", "testid123")));
+            startActivity(i);
+        });
 
         refreshSplitStatus();
 
@@ -103,8 +120,8 @@ public class MainActivity extends AppCompatActivity {
             // Heal legacy installs that signed in before the email scope was added.
             auth.fetchAndStoreEmailIfMissing();
             // Provision sheet on first run; pull latest rows on every entry.
-            SplitCloudSync.ensureSheet(this, splitStore, changed -> {
-                SplitCloudSync.fetchAndMerge(MainActivity.this, splitStore, null);
+            SplitCloudSync.ensureSheet(this, auth, splitStore, changed -> {
+                SplitCloudSync.fetchAndMerge(MainActivity.this, auth, splitStore, null);
             });
         }
     }
@@ -120,15 +137,19 @@ public class MainActivity extends AppCompatActivity {
 
     private void promptSignIn() {
         if (signInDialog != null && signInDialog.isShowing()) return;
+        // Dismissible — users who only want /us, /cap, etc. can skip Split sync entirely.
+        // Sheets / Drive scopes are only requested if the user opts in here.
         signInDialog = new AlertDialog.Builder(this)
-                .setTitle("Sign in to sync your splits")
+                .setTitle("Sync your splits across devices?")
                 .setMessage(
-                        "Turtle Keyboard saves your splits to a private spreadsheet in your "
-                        + "Google Drive — only you can read it.\n\n"
-                        + "What you allow:\n"
+                        "Optional. Turtle saves your splits to a private spreadsheet in "
+                        + "your Google Drive so they sync to your other devices.\n\n"
+                        + "What you'd allow:\n"
                         + "• Read & write the one sheet this app creates\n"
-                        + "• Nothing else in your Drive is ever touched")
-                .setCancelable(false)
+                        + "• Nothing else in your Drive is ever touched\n\n"
+                        + "Skip this if you only want /us, /cap, and other commands.")
+                .setCancelable(true)
+                .setNegativeButton("Maybe later", (d, w) -> dismissSignInDialog())
                 .setPositiveButton("Continue with Google", (d, w) -> startAuth())
                 .create();
         signInDialog.show();
@@ -142,11 +163,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startAuth() {
-        auth.authorize(this, new SplitAuth.AuthCallback() {
+        auth.authorize(this, SplitOAuthScopes.SCOPES, new GoogleAuth.Callback() {
             @Override public void onToken(String accessToken) {
                 runOnUiThread(MainActivity.this::onSignedIn);
             }
-            @Override public void onError(String reason, SplitAuth.PendingUi pendingUi) {
+            @Override public void onError(String reason, GoogleAuth.PendingUi pendingUi) {
                 if (pendingUi != null) {
                     launchAuthUi(pendingUi.intentSender);
                 } else {
@@ -170,11 +191,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void finishAuth(Intent data) {
-        auth.onAuthorizationResult(this, data, new SplitAuth.AuthCallback() {
+        auth.onAuthorizationResult(this, data, new GoogleAuth.Callback() {
             @Override public void onToken(String accessToken) {
                 runOnUiThread(MainActivity.this::onSignedIn);
             }
-            @Override public void onError(String reason, SplitAuth.PendingUi pendingUi) {
+            @Override public void onError(String reason, GoogleAuth.PendingUi pendingUi) {
                 runOnUiThread(() -> {
                     Toast.makeText(MainActivity.this,
                             "Sign-in failed: " + reason, Toast.LENGTH_LONG).show();
@@ -187,8 +208,8 @@ public class MainActivity extends AppCompatActivity {
     private void onSignedIn() {
         dismissSignInDialog();
         Toast.makeText(this, "Signed in — provisioning sheet…", Toast.LENGTH_SHORT).show();
-        SplitCloudSync.ensureSheet(this, splitStore, ready -> {
-            SplitCloudSync.fetchAndMerge(MainActivity.this, splitStore, null);
+        SplitCloudSync.ensureSheet(this, auth, splitStore, ready -> {
+            SplitCloudSync.fetchAndMerge(MainActivity.this, auth, splitStore, null);
         });
     }
 

@@ -35,17 +35,15 @@ import com.prince.turtlekeyboard.ime.view.KeyboardRootView;
 import com.prince.notion.NotionIntegration;
 import com.prince.slack.SlackIntegration;
 import com.prince.split.SplitIntegration;
+import com.prince.turtlekeyboard.integration.drive.DriveIntegration;
+import com.prince.turtlekeyboard.integration.poll.PollIntegration;
+import com.prince.turtlekeyboard.integration.wyr.WyrIntegration;
 import com.prince.web.WebIntegration;
 import com.prince.kbd.core.CommandProvider;
 import com.prince.kbd.core.IntegrationContext;
 import com.prince.kbd.core.KeyboardIntegration;
 import com.prince.turtlekeyboard.command.BuiltinAiCommands;
 import com.prince.turtlekeyboard.command.UserCommandPins;
-import com.prince.ai.AiImages;
-import com.prince.ai.AiLlm;
-import com.prince.turtlekeyboard.integration.FallbackImageService;
-import com.prince.turtlekeyboard.integration.FallbackLlm;
-import com.prince.turtlekeyboard.integration.NoopImageService;
 import com.prince.turtlekeyboard.input.InputCommitter;
 import androidx.annotation.Nullable;
 
@@ -65,7 +63,6 @@ import com.prince.turtlekeyboard.ui.MainActivity;
 import com.prince.turtlekeyboard.voice.VoiceInputController;
 
 import java.util.List;
-import java.util.Locale;
 
 /**
  * Thin orchestrator. Owns nothing but the lifecycle hookup: it wires the bound view to a
@@ -159,12 +156,17 @@ public class TurtleInputMethodService extends InputMethodService
                 if ("edit".equals(commandName) || "style".equals(commandName)) {
                     launchEditImagePicker();
                 }
-                // /style: surface the curated preset chips so the user can transform
-                // their photo with one tap instead of having to know preset names.
+                // /style + /us: surface curated preset chips so the user can fire a
+                // canned prompt with one tap. /style transforms the input photo; /us
+                // places the user's stored reference faces into a scenario.
                 if ("style".equals(commandName)) {
                     root.presetStrip().setPresets(
                             LmStudioAiClient.stylePresetNames(),
                             TurtleInputMethodService.this::dispatchStylePreset);
+                } else if ("us".equals(commandName)) {
+                    root.presetStrip().setPresets(
+                            LmStudioAiClient.usPresetNames(),
+                            TurtleInputMethodService.this::dispatchUsPreset);
                 } else {
                     root.presetStrip().hide();
                 }
@@ -231,23 +233,28 @@ public class TurtleInputMethodService extends InputMethodService
         // LLM service — saves duplicate construction and keeps /notion talking to the
         // same backend as /cap, /fix, etc.
         LmStudioAiClient ai = new LmStudioAiClient(this, hostProvider, new StubAiClient());
-        // AI router. Each provider lives in its own module and implements one of the
-        // capability ports in :core. Composition (primary + fallback) and provider choice
-        // are the app's responsibility — modules consuming ctx.llm() / ctx.images() see
-        // only the port and don't know which backend answered.
-        com.prince.kbd.core.LlmService llm = new FallbackLlm(
-                new AiLlm(),
-                new com.prince.turtlekeyboard.integration.AiClientLlmService(ai));
-        com.prince.kbd.core.ImageService images = new FallbackImageService(
-                new AiImages(),
-                new NoopImageService());
+        // Single shared Gemini client — modules call ctx.ai() with their own system
+        // prompts. Replaced the legacy LlmService / ImageService composition; each
+        // command now owns its prompt + dispatch in its own integration.
+        com.prince.kbd.core.GeminiService gemini = new com.prince.ai.GeminiClient(
+                com.prince.turtlekeyboard.BuildConfig.GEMINI_API_KEY);
+        // Shared Google OAuth — every module that hits Google APIs (Split for Sheets/Drive,
+        // Drive for /us reference photos, future Calendar / Gmail / Photos integrations)
+        // reuses this single instance via ctx.googleAuth(). Storage in the "google" namespace
+        // keeps token state consistent across modules and across host activities.
+        com.prince.kbd.core.GoogleAuth googleAuth = new com.prince.kbd.core.GoogleAuthImpl(
+                getApplicationContext(), prefs.root().scoped("google"));
         IntegrationContext integrationCtx = new KeyboardIntegrationContextImpl(
-                getApplicationContext(), root, committer, prefs.root(), appProfiles, llm, images);
+                getApplicationContext(), root, committer, prefs.root(), appProfiles,
+                gemini, googleAuth);
         java.util.List<KeyboardIntegration> integrationList = java.util.Arrays.asList(
                 new SplitIntegration(),
                 new NotionIntegration(),
                 new SlackIntegration(),
-                new WebIntegration());
+                new WebIntegration(),
+                new DriveIntegration(),
+                new PollIntegration(),
+                new WyrIntegration());
         java.util.List<CommandProvider> builtins = java.util.Arrays.asList(new BuiltinAiCommands());
         integrations = new IntegrationRegistry(integrationList, builtins, integrationCtx, registry);
 
@@ -576,6 +583,17 @@ public class TurtleInputMethodService extends InputMethodService
         dispatcher.dispatchComposed(cmd);
     }
 
+    /** One-tap dispatch from a preset chip in {@code /us} prompt mode — same shape as
+     *  {@link #dispatchStylePreset}. The AI client looks up the preset key in its /us
+     *  scenario map and expands it to the full scenario description sent alongside the
+     *  user's reference selfies. */
+    private void dispatchUsPreset(String preset) {
+        if (preset == null || preset.isEmpty()) return;
+        composer.cancel();
+        SlashCommand cmd = new SlashCommand("us", preset, "/us " + preset);
+        dispatcher.dispatchComposed(cmd);
+    }
+
     private static final String NOTIF_CHANNEL_ID = "image_ready";
     private boolean notifChannelCreated;
 
@@ -752,14 +770,9 @@ public class TurtleInputMethodService extends InputMethodService
         }
         char c = (char) code;
         if (Character.isLetter(c) && shift.isUpper()) c = Character.toUpperCase(c);
-        // Space is the autocomplete trigger: if the typed token has a high-
-        // confidence prefix extension (e.g. "vi" -> "video"), replace the token
-        // *and* the trailing space in one go. Falls through to a normal commit
-        // when there's nothing safe to apply.
-        boolean autocompleted = code == Keycodes.SPACE && tryAutocompleteOnSpace();
-        if (!autocompleted) {
-            committer.commitChar(c);
-        }
+        // No auto-correction on space — suggestions are applied only when the
+        // user taps a chip in the suggestion strip (onSuggestionPicked).
+        committer.commitChar(c);
         if (code == Keycodes.SPACE) spaceGesture.onSpacePressed();
         // Word boundary just committed (space, punctuation, etc.) — record the
         // word that ended so personal vocabulary builds up over time.
@@ -767,62 +780,6 @@ public class TurtleInputMethodService extends InputMethodService
         shift.onCharCommitted();
         slashDetector.onTextChanged();
         refreshSuggestions();
-    }
-
-    /**
-     * If the token immediately before the cursor has a top suggestion that
-     * extends it as a strict prefix (e.g. typed "vi", suggestion "video"),
-     * replace the token with the suggestion and commit a trailing space.
-     * Returns true on apply.
-     *
-     * Conservative: skips when the typed token already matches the suggestion
-     * (case-insensitive), when it's shorter than 2 characters, when the cursor
-     * is mid-word (followed by another letter), or when the suggestion is not
-     * a strict prefix extension — typo correction stays a manual tap on the
-     * suggestion chip rather than an aggressive auto-replacement.
-     */
-    private boolean tryAutocompleteOnSpace() {
-        if (suggestionEngine == null || !suggestionEngine.isReady()) return false;
-        if (committer == null) return false;
-
-        // Don't autocomplete in the middle of an existing word — would corrupt
-        // text the user came back to edit.
-        CharSequence after = committer.textAfterCursor(1);
-        if (after != null && after.length() > 0
-                && Character.isLetter(after.charAt(0))) {
-            return false;
-        }
-
-        CharSequence before = committer.textBeforeCursor(64);
-        if (before == null || before.length() == 0) return false;
-        int end = before.length();
-        int start = end;
-        while (start > 0) {
-            char ch = before.charAt(start - 1);
-            if (!(Character.isLetter(ch) || ch == '\'' || ch == '-')) break;
-            start--;
-        }
-        if (start >= end) return false;
-        String typed = before.subSequence(start, end).toString();
-        if (typed.length() < 2) return false;
-
-        List<String> top = suggestionEngine.suggest(typed, 1);
-        if (top.isEmpty()) return false;
-        String suggestion = top.get(0);
-        if (suggestion.equalsIgnoreCase(typed)) return false;
-
-        String typedLc = typed.toLowerCase(Locale.ROOT);
-        String suggestionLc = suggestion.toLowerCase(Locale.ROOT);
-        if (!suggestionLc.startsWith(typedLc) || suggestionLc.equals(typedLc)) {
-            return false;
-        }
-
-        String replacement = Character.isUpperCase(typed.charAt(0))
-                ? Character.toUpperCase(suggestion.charAt(0)) + suggestion.substring(1)
-                : suggestion;
-        committer.deleteBeforeCursor(typed.length());
-        committer.commitText(replacement + " ");
-        return true;
     }
 
     /**

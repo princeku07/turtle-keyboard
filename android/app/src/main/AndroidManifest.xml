@@ -37,6 +37,7 @@
     </queries>
 
     <application
+        android:name=".TurtleApp"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -80,6 +81,41 @@
             android:exported="false"
             android:label="History"
             android:parentActivityName=".ui.MainActivity" />
+
+        <activity
+            android:name=".integration.drive.DriveLinkActivity"
+            android:exported="false"
+            android:label="Connect Drive"
+            android:parentActivityName=".ui.MainActivity" />
+
+        <!-- Bottom-sheet overlay host. Launched by tapping a Turtle App Link
+             (https://www.turtlekeyboard.com/<routeKey>/<id>) from a chat / share intent. The
+             activity itself is a thin shell; the registered SheetView (see
+             KeyboardIntegration.sheetRoutes) provides the actual UI. autoVerify="true"
+             needs assetlinks.json hosted at https://www.turtlekeyboard.com/.well-known/assetlinks.json
+             — until that's in place, Android shows a chooser instead of opening Turtle
+             directly. Update the host here AND OverlayUrls.HOST in lockstep. -->
+        <activity
+            android:name=".overlay.BottomSheetActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask"
+            android:taskAffinity=""
+            android:theme="@style/Theme.TurtleKeyboard.BottomSheet">
+            <!-- HTTPS App Link. assetlinks.json must be served at
+                 https://www.turtlekeyboard.com/.well-known/assetlinks.json (file lives in
+                 lading-app/public/.well-known/assetlinks.json — deployed via Vercel).
+                 autoVerify runs on install; without a reachable file Android 12+
+                 silently routes taps to the browser. Re-run after fresh install with:
+                 adb shell pm get-app-links com.prince.turtlekeyboard
+                 — host should report "verified". -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="www.turtlekeyboard.com" />
+            </intent-filter>
+        </activity>
 
         <provider
             android:name="androidx.core.content.FileProvider"

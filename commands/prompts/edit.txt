@@ -1,0 +1,1 @@
+Edit the input image according to the user's instruction. Preserve the original subject, framing, identity, and aspect ratio unless the instruction explicitly says otherwise. Output a single image.

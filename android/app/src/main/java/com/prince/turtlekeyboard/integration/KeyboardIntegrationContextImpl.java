@@ -9,15 +9,16 @@ import android.view.View;
 import com.prince.notion.ui.NotionConnectActivity;
 import com.prince.slack.ui.SlackConnectActivity;
 import com.prince.split.ui.SplitActivity;
+import com.prince.turtlekeyboard.integration.drive.DriveLinkActivity;
 
 import androidx.annotation.Nullable;
 
 import com.prince.kbd.core.AppProfileRegistry;
 import com.prince.kbd.core.ChipSpec;
-import com.prince.kbd.core.ImageService;
+import com.prince.kbd.core.GeminiService;
+import com.prince.kbd.core.GoogleAuth;
 import com.prince.kbd.core.IntegrationContext;
 import com.prince.kbd.core.KeyValueStore;
-import com.prince.kbd.core.LlmService;
 import com.prince.turtlekeyboard.ime.view.KeyboardRootView;
 import com.prince.turtlekeyboard.input.InputCommitter;
 
@@ -36,23 +37,23 @@ public class KeyboardIntegrationContextImpl implements IntegrationContext {
     private final InputCommitter committer;
     private final KeyValueStore rootStore;
     private final AppProfileRegistry profiles;
-    private final LlmService llm;
-    private final ImageService images;
+    private final GeminiService ai;
+    private final GoogleAuth googleAuth;
 
     public KeyboardIntegrationContextImpl(Context appContext,
                                           KeyboardRootView root,
                                           InputCommitter committer,
                                           KeyValueStore rootStore,
                                           AppProfileRegistry profiles,
-                                          LlmService llm,
-                                          ImageService images) {
+                                          GeminiService ai,
+                                          GoogleAuth googleAuth) {
         this.appContext = appContext;
         this.root = root;
         this.committer = committer;
         this.rootStore = rootStore;
         this.profiles = profiles;
-        this.llm = llm;
-        this.images = images;
+        this.ai = ai;
+        this.googleAuth = googleAuth;
     }
 
     @Override public Context appContext() { return appContext; }
@@ -93,9 +94,9 @@ public class KeyboardIntegrationContextImpl implements IntegrationContext {
 
     @Override public AppProfileRegistry profiles() { return profiles; }
 
-    @Override public LlmService llm() { return llm; }
+    @Override public GeminiService ai() { return ai; }
 
-    @Override public ImageService images() { return images; }
+    @Override public GoogleAuth googleAuth() { return googleAuth; }
 
     @Override public void commitText(CharSequence text) { committer.commitText(text); }
 
@@ -107,6 +108,7 @@ public class KeyboardIntegrationContextImpl implements IntegrationContext {
             case "split-detail":    target = SplitActivity.class; break;
             case "notion-connect":  target = NotionConnectActivity.class; break;
             case "slack-connect":   target = SlackConnectActivity.class; break;
+            case "drive-link":      target = DriveLinkActivity.class; break;
             default:
                 Log.w(TAG, "openScreen: unknown id=" + screenId);
                 return;

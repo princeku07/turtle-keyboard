@@ -14,7 +14,7 @@ import com.prince.kbd.core.IntegrationContext;
 import com.prince.kbd.core.IntegrationSession;
 import com.prince.kbd.core.KeyValueStore;
 import com.prince.kbd.core.KeyboardIntegration;
-import com.prince.kbd.core.LlmService;
+import com.prince.kbd.core.GeminiService;
 
 import org.json.JSONArray;
 
@@ -94,7 +94,7 @@ public final class NotionIntegration implements KeyboardIntegration {
         final Context appContext = ctx.appContext();
         final String token = auth.accessToken();
         final String userPrompt = prompt;
-        final LlmService llm = ctx.llm();
+        final GeminiService llm = ctx.ai();
 
         NotionLlmBridge.structure(userPrompt, llm, new NotionLlmBridge.Callback() {
             @Override public void onStructured(String title, JSONArray blocks) {

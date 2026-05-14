@@ -1,123 +1,118 @@
 @import "tailwindcss";
 
+/* ────────────────────────────────────────────────────────────────
+   palette — six tokens, one job each.
+
+   abyss     deepest navy. footer floor, dark glass cards, text on foam.
+   ocean     hero background base — what the reef glow sits on top of.
+   reef      mid teal. accent borders, focus rings, hover edges only.
+             DELIBERATELY NOT a gradient stop — keeps the background
+             from competing with the reef photo for attention.
+   cyan      single bright accent. links, primary buttons, the only
+             color allowed to "pop" on the page.
+   foam      primary text — warm cream so it never reads cold against
+             the deep ocean blue.
+   foam-dim  secondary text. same family, lower energy.
+
+   the gradient between ocean → abyss is the entire visual depth story.
+   no extra hues in the descent — that's what created bands before.
+   ──────────────────────────────────────────────────────────────── */
 :root {
-  --cream: #f4efe4;
-  --ink: #0c0c0c;
-  --lime: #15803d;
-  --pink: #ff4fa3;
-  --blue: #5b6cff;
-  --orange: #ff7a1a;
+  --abyss:    #08182a;
+  --ocean:    #0e2e44;
+  --reef:     #1d5d72;
+  --cyan:     #7ec5cc;
+  --foam:     #ece6d4;
+  --foam-dim: #a89e8a;
+  --ink:      #08182a;   /* alias of abyss — used for text on cream */
 }
 
 @theme inline {
-  --color-cream: var(--cream);
-  --color-ink: var(--ink);
-  --color-lime: var(--lime);
-  --color-pink: var(--pink);
-  --color-blue: var(--blue);
-  --color-orange: var(--orange);
+  --color-abyss:    var(--abyss);
+  --color-ocean:    var(--ocean);
+  --color-reef:     var(--reef);
+  --color-cyan:     var(--cyan);
+  --color-foam:     var(--foam);
+  --color-foam-dim: var(--foam-dim);
+  --color-ink:      var(--ink);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
+/* one gradient, two stops. anchored to the body — scrolls with content,
+   so the descent feels physical, not like staring at a fixed wallpaper. */
 html, body {
-  background: var(--cream);
-  color: var(--ink);
+  background: linear-gradient(180deg, var(--ocean) 0%, var(--abyss) 100%);
+  color: var(--foam);
   -webkit-font-smoothing: antialiased;
 }
 
-::selection { background: var(--lime); color: var(--ink); }
+::selection { background: var(--cyan); color: var(--ink); }
 
-@keyframes marquee {
-  0%   { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
-}
-.animate-marquee { animation: marquee 18s linear infinite; }
-@media (max-width: 768px) {
-  .animate-marquee { animation-duration: 12s; }
-}
-
-@keyframes wobble {
-  0%, 100% { transform: rotate(-2deg); }
-  50%      { transform: rotate(2deg); }
-}
-.wobble { animation: wobble 4s ease-in-out infinite; }
-
-@keyframes blink {
-  0%, 49% { opacity: 1; }
-  50%, 100% { opacity: 0; }
-}
-.caret { animation: blink 1s steps(1) infinite; }
-
-@keyframes float-y {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
-}
-.float-y { animation: float-y 5s ease-in-out infinite; }
-
-.grain {
-  background-image: radial-gradient(rgba(0,0,0,0.07) 1px, transparent 1px);
-  background-size: 3px 3px;
+/* ────────────────────────────────────────────────────────────────
+   reef overlay — the coral-reef photo as an atmospheric glow.
+   blurred + feathered via a radial mask so it has no hard edges
+   and dissolves into the ocean gradient.
+   ──────────────────────────────────────────────────────────────── */
+.reef-overlay {
+  position: absolute;
+  inset: 0;
+  background-image: url("/chloral_reave.jpg");
+  background-size: cover;
+  background-position: center 20%;
+  filter: blur(28px) saturate(1.1) brightness(0.95);
+  opacity: 0.6;
+  pointer-events: none;
+  mask-image:
+    radial-gradient(ellipse 110% 75% at 50% 30%,
+      #000 0%,
+      #000 35%,
+      rgba(0,0,0,0.5) 70%,
+      transparent 95%);
+  -webkit-mask-image:
+    radial-gradient(ellipse 110% 75% at 50% 30%,
+      #000 0%,
+      #000 35%,
+      rgba(0,0,0,0.5) 70%,
+      transparent 95%);
 }
 
-.outline-text {
-  -webkit-text-stroke: 2px var(--ink);
-  color: transparent;
+/* film grain — fractal noise, monochrome. very subtle on the dark ocean. */
+.grain { position: relative; }
+.grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.6 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  background-size: 220px 220px;
+  opacity: 0.06;
+  mix-blend-mode: overlay;
 }
 
-@keyframes gen-card-pop {
-  0%   { opacity: 0; transform: translateY(-8px) scale(0.96) rotate(-1.5deg); }
-  60%  { opacity: 1; transform: translateY(2px)  scale(1.01) rotate(0.5deg); }
-  100% { opacity: 1; transform: translateY(0)    scale(1)    rotate(0); }
+/* glass — translucent ocean tile with a top highlight + drop shadow */
+.glass {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.08) inset,
+    0 12px 40px -12px rgba(0,0,0,0.45);
 }
-.gen-card-pop { animation: gen-card-pop 0.32s cubic-bezier(0.22, 1, 0.36, 1) both; }
 
+/* hairline — 1px white-tinted border for chrome */
+.hairline { border: 1px solid rgba(255, 255, 255, 0.14); }
+
+/* ────────────────────────────────────────────────────────────────
+   animations — kept minimal.
+   ──────────────────────────────────────────────────────────────── */
 @keyframes bounce-soft {
   0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(4px); }
+  50%      { transform: translateY(3px); }
 }
-.animate-bounce-soft { animation: bounce-soft 1.4s ease-in-out infinite; }
+.animate-bounce-soft { animation: bounce-soft 1.8s ease-in-out infinite; }
 
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-
-@keyframes section-swap {
-  0%   { opacity: 0; transform: translateY(8px); }
-  100% { opacity: 1; transform: translateY(0); }
-}
-.section-swap { animation: section-swap 0.36s cubic-bezier(0.22, 1, 0.36, 1) both; }
-
-@keyframes scroll-hint-pulse {
-  0%, 100% {
-    box-shadow: 3px 3px 0 0 var(--ink), 0 0 0 0 var(--lime);
-    border-color: var(--ink);
-  }
-  50% {
-    box-shadow: 3px 3px 0 0 var(--ink), 0 0 0 6px rgba(21, 128, 61, 0.35);
-    border-color: var(--lime);
-  }
-}
-.scroll-hint-pulse { animation: scroll-hint-pulse 1.4s ease-in-out infinite; }
-.scroll-hint-pulse:hover { animation: none; }
-
-/* FlatKey press effect — imperative class swap for instant tap feedback,
-   no React re-render in the visual path. */
-.flat-key {
-  transition: background-color 140ms ease, color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
-  -webkit-tap-highlight-color: transparent;
-}
-button.flat-key.flat-key-flash,
-button.flat-key.flat-key-flash:active {
-  background-color: var(--lime) !important;
-  color: var(--cream) !important;
-  transform: translateY(2px) scale(0.96) !important;
-  box-shadow: none !important;
-  transition: none !important;
-}
-button.flat-key.flat-key-flash-strong {
-  background-color: var(--pink) !important;
-  color: var(--cream) !important;
-  transform: scale(1.02) !important;
-  box-shadow: 0 0 0 4px rgba(255, 79, 163, 0.4) !important;
-  transition: none !important;
-}

@@ -31,6 +31,9 @@ import com.prince.turtlekeyboard.settings.Prefs;
 import com.prince.notion.NotionIntegration;
 import com.prince.slack.SlackIntegration;
 import com.prince.split.SplitIntegration;
+import com.prince.turtlekeyboard.integration.drive.DriveIntegration;
+import com.prince.turtlekeyboard.integration.poll.PollIntegration;
+import com.prince.turtlekeyboard.integration.wyr.WyrIntegration;
 import com.prince.web.WebIntegration;
 
 import java.util.ArrayList;
@@ -289,7 +292,10 @@ public class CommandPinsActivity extends AppCompatActivity {
                 new SplitIntegration(),
                 new NotionIntegration(),
                 new SlackIntegration(),
-                new WebIntegration()}) {
+                new WebIntegration(),
+                new DriveIntegration(),
+                new PollIntegration(),
+                new WyrIntegration()}) {
             for (CommandSpec spec : p.commands()) {
                 out.put(spec.name.toLowerCase(),
                         new CommandMeta(spec.name, spec.label, spec.emoji));

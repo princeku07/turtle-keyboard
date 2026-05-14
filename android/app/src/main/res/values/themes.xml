@@ -8,4 +8,17 @@
         <item name="colorPrimaryDark">@color/ink</item>
         <item name="colorAccent">@color/pink</item>
     </style>
+
+    <!-- Translucent host theme for BottomSheetActivity. The activity draws its own
+         dimmed backdrop + sheet card programmatically; this theme just makes sure
+         the OS window is transparent and doesn't show its own title bar or default
+         background underneath. -->
+    <style name="Theme.TurtleKeyboard.BottomSheet" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:colorBackgroundCacheHint">@null</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:backgroundDimEnabled">false</item>
+    </style>
 </resources>

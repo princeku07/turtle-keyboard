@@ -40,7 +40,7 @@ export default function FlatKeyboard({ layout, onKeyTap, onClearLine }: Props) {
   };
 
   return (
-    <div className="w-full select-none touch-manipulation flex flex-col gap-1.5 sm:gap-2 px-2 sm:px-3 py-3 bg-[#d6d0c2] rounded-2xl border-2 border-ink shadow-[6px_6px_0_0_var(--ink)]">
+    <div className="w-full select-none touch-manipulation flex flex-col gap-1.5 sm:gap-2 px-2 sm:px-3 py-3 glass rounded-3xl">
       {rows.map((row, ri) => (
         <div key={ri} className={`flex gap-1.5 ${rowPadding(ri)}`}>
           {row.map((c) => {
@@ -98,10 +98,10 @@ function FlatKey({
   accent?: boolean;
 }) {
   const cls = accent
-    ? "bg-lime text-cream"
+    ? "bg-cyan text-ink"
     : mod
-    ? "bg-[#a9a392] text-cream"
-    : "bg-white text-ink";
+    ? "bg-white/15 text-foam backdrop-blur-sm"
+    : "bg-white/90 text-ink backdrop-blur-sm";
 
   const longPressTimer = useRef<number | null>(null);
   const longPressFired = useRef<boolean>(false);
@@ -166,7 +166,7 @@ function FlatKey({
         }
         onPress();
       }}
-      className={`flat-key ${cls} font-mono text-base sm:text-lg font-semibold rounded-lg border border-ink/20 shadow-[0_2px_0_0_rgba(12,12,11,0.55)] active:bg-lime active:text-cream active:translate-y-[2px] active:scale-[0.96] active:shadow-none py-3 sm:py-3.5 px-2`}
+      className={`flat-key ${cls} font-mono text-base sm:text-lg font-semibold rounded-xl border border-white/25 shadow-[0_1px_0_0_rgba(255,255,255,0.18)_inset,0_2px_6px_-1px_rgba(0,0,0,0.35)] active:bg-cyan active:text-ink active:translate-y-[2px] active:scale-[0.96] active:shadow-none py-3 sm:py-3.5 px-2`}
       style={{ flexGrow: flex, flexBasis: 0 }}
     >
       {label}

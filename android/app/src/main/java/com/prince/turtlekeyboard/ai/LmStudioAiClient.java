@@ -13,8 +13,11 @@ import android.view.ViewGroup;
 import androidx.annotation.Nullable;
 import androidx.core.content.FileProvider;
 
+import com.prince.kbd.core.KeyValueStore;
+import com.prince.kbd.core.SharedPrefsKeyValueStore;
 import com.prince.turtlekeyboard.BuildConfig;
 import com.prince.turtlekeyboard.command.SlashCommand;
+import com.prince.turtlekeyboard.integration.drive.DriveKeys;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -22,6 +25,7 @@ import org.json.JSONObject;
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -30,7 +34,9 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -78,9 +84,11 @@ public class LmStudioAiClient implements AiClient {
         this.delegate = delegate;
     }
 
-    /** Synthetic command name used by {@code AiClientLlmService} to request a raw
-     *  completion (no built-in system prompt). The caller embeds its own instructions
-     *  in the user prompt. Routed straight to Gemini, never to the stub. */
+    /** Synthetic command name for raw text completions — no built-in system prompt, the
+     *  caller embeds its own instructions in the user prompt. Routed straight to Gemini,
+     *  never to the stub. Legacy from when {@code AiClientLlmService} bridged an
+     *  {@code LlmService} consumer to this client; the bridge is gone but the sentinel
+     *  is preserved in case a future caller needs the same "raw prompt" door. */
     private static final String RAW_COMPLETION = "_llm";
 
     @Override
@@ -88,7 +96,8 @@ public class LmStudioAiClient implements AiClient {
         String name = cmd.name == null ? "" : cmd.name.toLowerCase();
         if (!name.equals("ask") && !name.equals("org") && !name.equals("cap")
                 && !name.equals("edit") && !name.equals("style")
-                && !name.equals("sticker") && !name.equals(RAW_COMPLETION)) {
+                && !name.equals("sticker") && !name.equals("us")
+                && !name.equals(RAW_COMPLETION)) {
             delegate.execute(cmd, callback);
             return;
         }
@@ -99,6 +108,7 @@ public class LmStudioAiClient implements AiClient {
                     : name.equals("edit") ? "Describe the edit…"
                     : name.equals("style") ? "Pick a style (ghibli, anime, pixar…)"
                     : name.equals("sticker") ? "Describe the sticker…"
+                    : name.equals("us") ? "Try /us as astronauts"
                     : name.equals(RAW_COMPLETION) ? "Empty prompt"
                     : "Ask what?";
             main.post(() -> callback.onResult(AiResult.error(msg)));
@@ -107,7 +117,7 @@ public class LmStudioAiClient implements AiClient {
         if (name.equals("cap")) {
             io.execute(() -> {
                 try {
-                    byte[] png = callGeminiImage(prompt, CAP_SYSTEM_PROMPT);
+                    byte[] png = callGeminiImage(prompt, systemPromptFor("cap"));
                     // /cap has no input image — skip aspect-fix, keep model output's shape.
                     main.post(() -> saveImageBytes(png, callback, 0f, "cap", prompt));
                 } catch (Exception e) {
@@ -120,7 +130,7 @@ public class LmStudioAiClient implements AiClient {
         if (name.equals("sticker")) {
             io.execute(() -> {
                 try {
-                    byte[] png = callGeminiImage(prompt, STICKER_SYSTEM_PROMPT);
+                    byte[] png = callGeminiImage(prompt, systemPromptFor("sticker"));
                     main.post(() -> saveImageBytes(png, callback, 0f, "sticker", prompt));
                 } catch (Exception e) {
                     Log.w(TAG, "sticker failed", e);
@@ -167,6 +177,25 @@ public class LmStudioAiClient implements AiClient {
                             png, callback, aspect, "style", prompt));
                 } catch (Exception e) {
                     Log.w(TAG, "style failed", e);
+                    main.post(() -> callback.onResult(AiResult.error("Gemini unreachable")));
+                }
+            });
+            return;
+        }
+        if (name.equals("us")) {
+            io.execute(() -> {
+                List<ReferenceImage> refs = readDriveReferencePhotos();
+                if (refs.isEmpty()) {
+                    main.post(() -> callback.onResult(AiResult.error(
+                            "Add reference photos in Settings → Connect Google Drive")));
+                    return;
+                }
+                try {
+                    String userPrompt = usPromptFor(prompt);
+                    byte[] png = callGeminiImageUs(userPrompt, refs, systemPromptFor("us"));
+                    main.post(() -> saveImageBytes(png, callback, 0f, "us", prompt));
+                } catch (Exception e) {
+                    Log.w(TAG, "us failed", e);
                     main.post(() -> callback.onResult(AiResult.error("Gemini unreachable")));
                 }
             });
@@ -402,29 +431,11 @@ public class LmStudioAiClient implements AiClient {
      *  square at 512×512 with no redundant resample. */
     private static final int MAX_OUTPUT_SIDE_PX = 512;
 
-    /** Biases composition toward a small square sticker matching Nano Banana's 512px
-     *  native size. The actual size is enforced by the post-decode resize. */
-    private static final String CAP_SYSTEM_PROMPT =
-            "Generate a single 512x512 pixel square image. Tight framing, simple "
-                    + "composition, no text or watermark. Subject centered. Treat the "
-                    + "user prompt as the subject description.";
-
-    /** /edit takes the user's clipboard image as the base; the model should keep
-     *  the original subject and composition unless the instruction says otherwise.
-     *  Note: we deliberately don't ask for a fixed pixel size or aspect — the local
-     *  downscale caps the longest side at {@link #MAX_OUTPUT_SIDE_PX}, and we want
-     *  the model to match the input's aspect ratio rather than force 1:1. */
-    private static final String EDIT_SYSTEM_PROMPT =
-            "Edit the input image according to the user's instruction. Preserve the "
-                    + "original subject, framing, identity, and aspect ratio unless "
-                    + "the instruction explicitly says otherwise. Output a single image.";
-
-    /** /sticker is text-to-image with a forced sticker-style framing. Plain background
-     *  helps host apps treat it as a sticker even when it's a regular PNG. */
-    private static final String STICKER_SYSTEM_PROMPT =
-            "Generate a single sticker-style image. Centered subject with a bold "
-                    + "outline, plain white background, expressive cartoon-leaning "
-                    + "style, no text or watermark. Square 512x512 framing.";
+    // System prompts for /cap, /edit, /sticker, /us live in commands/prompts/<name>.txt
+    // — copied into assets/prompts/ at build time and loaded via {@link #systemPromptFor}.
+    // Same path /ask and /org already use; gives iOS prompt parity for free. Integrations
+    // migrated off this class (e.g. PollIntegration) load their prompts directly via
+    // {@code AssetPrompts.load(ctx.appContext(), name)} from :core.
 
     /** Curated style presets for /style. The user types a preset name (e.g. "ghibli")
      *  and the matching value is sent as the user prompt to the same image-edit
@@ -477,6 +488,54 @@ public class LmStudioAiClient implements AiClient {
         }
         return "Restyle this image: " + request
                 + ". Preserve the subject's identity and composition.";
+    }
+
+    /** Curated scenario presets for /us. The user types or taps a key (e.g. "astronauts")
+     *  and the matching value is sent as the prompt to Nano Banana with the user's
+     *  reference selfies as inline image parts. Anything not in the map is treated as a
+     *  free-form scenario description, so power users can write their own.
+     *
+     *  <p>Tuned toward couple-shaped / shareable scenarios for the launch positioning —
+     *  every entry should look great as a /us image dropped into a chat. Insertion-ordered
+     *  so the chip strip renders the same way every time. */
+    private static final java.util.Map<String, String> US_PRESETS = buildUsPresets();
+
+    private static java.util.Map<String, String> buildUsPresets() {
+        java.util.Map<String, String> m = new java.util.LinkedHashMap<>();
+        m.put("astronauts", "as astronauts on Mars in space suits, helmets reflecting the distant Earth, cinematic lighting");
+        m.put("ghibli",     "as Studio Ghibli characters in a hand-drawn watercolor anime scene, soft pastel palette, dreamy atmosphere");
+        m.put("anime",      "as modern Japanese anime characters with crisp lineart, vibrant cel-shaded colors, expressive eyes");
+        m.put("pixar",      "as Pixar 3D animated characters with soft volumetric lighting, warm cinematic colors, slightly stylized features");
+        m.put("vintage",    "in a 1970s Bollywood film poster, dramatic warm color grading, soft film grain, hand-painted feel");
+        m.put("polaroid",   "in a vintage polaroid photograph, faded warm colors, light leaks, soft grain, candid moment");
+        m.put("renaissance","as figures in a Renaissance oil painting, rich textures, dramatic chiaroscuro lighting, museum-quality feel");
+        m.put("cyberpunk",  "in a cyberpunk neon-lit street, saturated pinks and cyans, holographic signage, dystopian future vibe");
+        m.put("fantasy",    "as fantasy adventurers in a misty enchanted forest, leather armor and cloaks, atmospheric lighting");
+        m.put("paris",      "in front of the Eiffel Tower at golden hour, Parisian streets, romantic warm light");
+        m.put("beach",      "on a tropical beach at sunset, palm trees, warm light, vacation polaroid feel");
+        m.put("noir",       "in a 1940s film noir scene, black and white, high contrast, dramatic shadows, cigarette smoke and rain");
+        m.put("lego",       "as LEGO minifigures with the signature blocky look, studded plastic surfaces, plain bright background");
+        m.put("pixel",      "as 16-bit pixel art characters, limited retro palette, classic JRPG aesthetic");
+        return java.util.Collections.unmodifiableMap(m);
+    }
+
+    /** Display order of /us preset keys. The IME renders a horizontal chip strip from
+     *  this list whenever the user enters {@code /us} prompt mode, mirroring the /style
+     *  chip strip. Lower-case keys; the chip view title-cases for display. */
+    public static java.util.List<String> usPresetNames() {
+        return new java.util.ArrayList<>(US_PRESETS.keySet());
+    }
+
+    /** Maps the user's /us prompt to the user-prompt text sent alongside reference photos
+     *  in the Nano Banana request. Recognized preset → curated description; otherwise the
+     *  free-form text is treated as a custom scenario description. The system prompt
+     *  (loaded from {@code commands/prompts/us.txt}) instructs the model to preserve identity and place
+     *  the reference faces into whatever scenario this returns. */
+    private static String usPromptFor(String request) {
+        String key = request == null ? "" : request.trim().toLowerCase();
+        String preset = US_PRESETS.get(key);
+        if (preset != null) return preset;
+        return request == null ? "" : request;
     }
 
     /** Bytes + mime type + decoded pixel dimensions of an image read from the system
@@ -611,6 +670,100 @@ public class LmStudioAiClient implements AiClient {
         return decodeImagePart(raw);
     }
 
+    /** Reference photo for /us — bytes + mime type. Bytes are read from the local cache
+     *  populated by {@code DriveLinkActivity}; the same files are also synced to the user's
+     *  own Drive via {@code DriveFilesClient}, but for the gen call we use the local copy
+     *  to skip the Drive download round-trip. */
+    private static final class ReferenceImage {
+        final byte[] bytes;
+        final String mime;
+        ReferenceImage(byte[] b, String m) { bytes = b; mime = m; }
+    }
+
+    /** Loads the locally-cached reference selfies the user picked in {@code DriveLinkActivity}.
+     *  Reads {@link DriveKeys#REFERENCE_PHOTOS} (newline-separated {@code <path>|<fileId>}
+     *  entries), drops entries whose local file is gone, returns bytes + mime for each. */
+    private List<ReferenceImage> readDriveReferencePhotos() {
+        KeyValueStore store = new SharedPrefsKeyValueStore(
+                appContext, SharedPrefsKeyValueStore.DEFAULT_FILE).scoped("drive");
+        String raw = store.getString(DriveKeys.REFERENCE_PHOTOS, "");
+        List<ReferenceImage> out = new ArrayList<>();
+        if (raw.isEmpty()) return out;
+        for (String line : raw.split("\n")) {
+            if (line.isEmpty()) continue;
+            String path = line.split("\\|", -1)[0];
+            File f = new File(path);
+            if (!f.exists()) continue;
+            try (FileInputStream in = new FileInputStream(f)) {
+                ByteArrayOutputStream buf = new ByteArrayOutputStream();
+                byte[] tmp = new byte[8192];
+                int n;
+                while ((n = in.read(tmp)) > 0) buf.write(tmp, 0, n);
+                out.add(new ReferenceImage(buf.toByteArray(), mimeFromPath(path)));
+            } catch (IOException e) {
+                Log.w(TAG, "ref read failed for " + path, e);
+            }
+        }
+        return out;
+    }
+
+    private static String mimeFromPath(String path) {
+        int dot = path.lastIndexOf('.');
+        if (dot < 0 || dot == path.length() - 1) return "image/jpeg";
+        String ext = path.substring(dot + 1).toLowerCase();
+        switch (ext) {
+            case "jpg":
+            case "jpeg": return "image/jpeg";
+            case "png":  return "image/png";
+            case "webp": return "image/webp";
+            case "heic": return "image/heic";
+            default:     return "image/jpeg";
+        }
+    }
+
+    /** /us — sends every reference selfie inline plus the user's scenario prompt to Nano
+     *  Banana. The model treats the inline images as identity references and places them
+     *  into the prompted scene. Same endpoint as /cap and /edit; difference is multiple
+     *  image parts in {@code contents.parts} ahead of the text part. */
+    private byte[] callGeminiImageUs(String prompt, List<ReferenceImage> refs, String systemPrompt) throws Exception {
+        HttpURLConnection conn = (HttpURLConnection) new URL(GEMINI_IMAGE_URL).openConnection();
+        conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
+        conn.setReadTimeout(READ_TIMEOUT_MS);
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("Content-Type", "application/json");
+        conn.setRequestProperty("Accept", "application/json");
+        conn.setRequestProperty("X-goog-api-key", GEMINI_API_KEY);
+        conn.setDoOutput(true);
+
+        JSONArray parts = new JSONArray();
+        for (ReferenceImage ref : refs) {
+            String b64 = android.util.Base64.encodeToString(ref.bytes, android.util.Base64.NO_WRAP);
+            JSONObject inline = new JSONObject().put("mimeType", ref.mime).put("data", b64);
+            parts.put(new JSONObject().put("inlineData", inline));
+        }
+        parts.put(new JSONObject().put("text", prompt));
+
+        JSONObject userTurn = new JSONObject().put("parts", parts);
+        JSONObject sysInstruction = new JSONObject().put("parts",
+                new JSONArray().put(new JSONObject().put("text", systemPrompt)));
+        JSONObject body = new JSONObject()
+                .put("systemInstruction", sysInstruction)
+                .put("contents", new JSONArray().put(userTurn));
+
+        try (OutputStream os = conn.getOutputStream()) {
+            os.write(body.toString().getBytes(StandardCharsets.UTF_8));
+        }
+
+        int code = conn.getResponseCode();
+        if (code < 200 || code >= 300) {
+            String err = readStream(conn.getErrorStream());
+            throw new RuntimeException("HTTP " + code + (err.isEmpty() ? "" : ": " + err));
+        }
+        String raw = readStream(conn.getInputStream());
+        conn.disconnect();
+        return decodeImagePart(raw);
+    }
+
     /** Sends the user's clipboard image plus a text instruction to Nano Banana for
      *  in-place editing. The image goes first in {@code parts} so the model treats it
      *  as the primary input; the text part is the edit instruction. */
@@ -632,7 +785,7 @@ public class LmStudioAiClient implements AiClient {
         JSONObject userTurn = new JSONObject()
                 .put("parts", new JSONArray().put(imagePart).put(textPart));
         JSONObject sysInstruction = new JSONObject().put("parts",
-                new JSONArray().put(new JSONObject().put("text", EDIT_SYSTEM_PROMPT)));
+                new JSONArray().put(new JSONObject().put("text", systemPromptFor("edit"))));
         JSONObject body = new JSONObject()
                 .put("systemInstruction", sysInstruction)
                 .put("contents", new JSONArray().put(userTurn));

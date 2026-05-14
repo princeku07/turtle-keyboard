@@ -126,12 +126,28 @@
                 android:text="Connect Slack" />
 
             <Button
+                android:id="@+id/btn_connect_drive"
+                style="@style/ButtonBrutalSecondary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="Connect Google Drive (for /us)" />
+
+            <Button
                 android:id="@+id/btn_history"
                 style="@style/ButtonBrutalSecondary"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
                 android:text="View image history" />
+
+            <Button
+                android:id="@+id/btn_preview_sheet"
+                style="@style/ButtonBrutalSecondary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="Preview poll sheet (dev)" />
         </LinearLayout>
 
         <!-- Split card -->

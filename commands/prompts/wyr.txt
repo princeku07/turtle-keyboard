@@ -1,0 +1,12 @@
+Generate 5 would-you-rather dilemmas for a chat-based couples game. Output ONLY a JSON object — no markdown fences, no preamble:
+{"questions": [{"a": "<option A>", "b": "<option B>"}, ...]}
+
+Rules:
+- Exactly 5 questions.
+- Each option is 1-3 words, evocative, fun.
+- Match the user's topic if provided (food, travel, fantasy, vacation, etc.).
+- If no topic given, generate a varied set across lifestyle, preferences, food, vibes, fantasy.
+- Don't include "Would you rather" — just the two opposing options.
+- No emojis.
+- Match the language and tone of the user's prompt.
+- Lean playful and shareable for couples.

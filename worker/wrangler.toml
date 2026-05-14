@@ -1,0 +1,20 @@
+name = "turtle-worker"
+main = "src/index.ts"
+compatibility_date = "2026-05-01"
+
+# KV namespace for overlay-sheet artifacts. List both with:
+#   npx wrangler kv namespace list
+# Production id matches `turtle-worker-TURTLE_KV`; preview matches `..._preview`.
+[[kv_namespaces]]
+binding = "TURTLE_KV"
+id = "6158de3a91cc42b28505c8f6a661c0b6"
+preview_id = "0e006af86a944de18f638e6412ad477b"
+
+# Optional: route the Worker on a custom domain. Until this is set, the Worker is
+# reachable at https://turtle-worker.<acct>.workers.dev. To use a custom domain:
+#   1. Add turtlekeyboard.com (or whichever) to your Cloudflare account.
+#   2. Uncomment and edit the block below.
+#   3. wrangler deploy.
+# [[routes]]
+# pattern = "api.turtlekeyboard.com/*"
+# zone_name = "turtlekeyboard.com"

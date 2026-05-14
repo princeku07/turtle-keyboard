@@ -2,7 +2,7 @@ package com.prince.notion;
 
 import android.util.Log;
 
-import com.prince.kbd.core.LlmService;
+import com.prince.kbd.core.GeminiService;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -38,9 +38,8 @@ public final class NotionLlmBridge {
             + "}\n"
             + "Use heading_2 for sections, paragraph for prose, to_do for actionable tasks. Keep it concise.";
 
-    public static void structure(String userPrompt, LlmService llm, Callback cb) {
-        String prompt = SYSTEM + "\n\nUser message:\n" + userPrompt;
-        llm.complete(prompt, new LlmService.Callback() {
+    public static void structure(String userPrompt, GeminiService ai, Callback cb) {
+        ai.text(SYSTEM, userPrompt, new GeminiService.TextCallback() {
             @Override public void onText(String text) {
                 Parsed p = parse(text);
                 if (p != null) { cb.onStructured(p.title, p.blocks); return; }
