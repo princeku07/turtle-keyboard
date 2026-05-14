@@ -58,17 +58,20 @@ public final class BuiltinAiCommands implements CommandProvider {
     @Override
     public List<CommandSpec> commands() {
         return Arrays.asList(
-                new CommandSpec("cap",    "Image",     "🎨", true,  null, CHAT_AFFINITY),
-                new CommandSpec("edit",   "Edit image","🖼️", true,  null, CHAT_AFFINITY),
-                new CommandSpec("style",  "Style",     "✨", true,  null, CHAT_AFFINITY),
-                new CommandSpec("sticker","Sticker",   "🪄", true,  null, CHAT_AFFINITY),
-                new CommandSpec("fix",    "Fix",       "✏️", false, null, WRITING_AFFINITY),
-                new CommandSpec("tone",   "Tone",      "🎭", true,  null, WRITING_AFFINITY),
-                new CommandSpec("reply",  "Reply",     "💬", false, null, EMAIL_AFFINITY),
-                new CommandSpec("tl",     "Translate", "🌐", true,  null, TRANSLATE_AFFINITY),
-                new CommandSpec("search", "Search",    "🔍", true,  null),
-                new CommandSpec("ask",    "Ask",       "❓", true,  null),
-                new CommandSpec("org",    "Organize",  "🗂️", true,  null, NOTES_AFFINITY)
+                // Each command carries a per-action loading message — surfaced
+                // by the dispatcher into the GeneratingLoaderView while the AI
+                // request is in flight, so the user knows what's being made.
+                new CommandSpec("cap",     "Image",      "🎨", true,  null, CHAT_AFFINITY,      "Generating image"),
+                new CommandSpec("edit",    "Edit image", "🖼️", true,  null, CHAT_AFFINITY,      "Editing image"),
+                new CommandSpec("style",   "Style",      "✨", true,  null, CHAT_AFFINITY,      "Restyling image"),
+                new CommandSpec("sticker", "Sticker",    "🪄", true,  null, CHAT_AFFINITY,      "Making sticker"),
+                new CommandSpec("fix",     "Fix",        "✏️", false, null, WRITING_AFFINITY,   "Fixing text"),
+                new CommandSpec("tone",    "Tone",       "🎭", true,  null, WRITING_AFFINITY,   "Adjusting tone"),
+                new CommandSpec("reply",   "Reply",      "💬", false, null, EMAIL_AFFINITY,     "Drafting reply"),
+                new CommandSpec("tl",      "Translate",  "🌐", true,  null, TRANSLATE_AFFINITY, "Translating"),
+                new CommandSpec("search",  "Search",     "🔍", true,  null, Collections.emptySet(), "Searching"),
+                new CommandSpec("ask",     "Ask",        "❓", true,  null, Collections.emptySet(), "Thinking"),
+                new CommandSpec("org",     "Organize",   "🗂️", true,  null, NOTES_AFFINITY,     "Organizing")
         );
     }
 

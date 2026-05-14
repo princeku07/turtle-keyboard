@@ -64,7 +64,7 @@ public class QuickPanelView extends LinearLayout {
 
     private void init() {
         setOrientation(VERTICAL);
-        setBackgroundColor(0xFFE6F4EE); // overridden by applyTheme
+        setBackgroundColor(0xFF000000); // overridden by applyTheme
 
         // Grid scroller takes all remaining vertical space.
         scroller.setFillViewport(true);

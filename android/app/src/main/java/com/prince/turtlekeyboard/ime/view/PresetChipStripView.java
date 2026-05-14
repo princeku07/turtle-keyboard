@@ -28,6 +28,10 @@ public class PresetChipStripView extends HorizontalScrollView {
 
     public interface OnPresetTap { void onTap(String preset); }
 
+    private static final int BG = 0xFF000000;
+    private static final int CHIP_FILL = 0x22FFFFFF;
+    private static final int TEXT_PRIMARY = 0xFFF5F5F5;
+
     private LinearLayout row;
 
     public PresetChipStripView(Context c) { super(c); init(); }
@@ -36,6 +40,7 @@ public class PresetChipStripView extends HorizontalScrollView {
     private void init() {
         setHorizontalScrollBarEnabled(false);
         setVisibility(GONE);
+        setBackgroundColor(BG);
         row = new LinearLayout(getContext());
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
@@ -69,14 +74,14 @@ public class PresetChipStripView extends HorizontalScrollView {
     private TextView makeChip(String label, String value, @Nullable OnPresetTap l) {
         TextView t = new TextView(getContext());
         t.setText(label);
-        t.setTextColor(0xFF0C0C0C);
+        t.setTextColor(TEXT_PRIMARY);
         t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f);
         t.setTypeface(t.getTypeface(), Typeface.BOLD);
         t.setPadding(dp(14), dp(6), dp(14), dp(6));
         GradientDrawable bg = new GradientDrawable();
         bg.setShape(GradientDrawable.RECTANGLE);
-        bg.setColor(0xFFE8F5EE);
-        bg.setStroke(dp(1), 0xFFC8E8D5);
+        bg.setColor(CHIP_FILL);
+        // No stroke — keep edges soft to match the gradient/aesthetic direction.
         bg.setCornerRadius(dp(16));
         t.setBackground(bg);
         t.setClickable(true);
@@ -96,7 +101,7 @@ public class PresetChipStripView extends HorizontalScrollView {
     }
 
     public void applyTheme(KeyboardTheme theme) {
-        setBackgroundColor(theme.bannerBg);
+        // Surface and chip colours fixed by the dark gradient design — no-op.
     }
 
     private int dp(int v) {

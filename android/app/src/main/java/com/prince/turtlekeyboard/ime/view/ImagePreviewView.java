@@ -3,14 +3,17 @@ package com.prince.turtlekeyboard.ime.view;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Typeface;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
 import android.util.AttributeSet;
 import android.util.TypedValue;
 import android.view.Gravity;
-import android.widget.Button;
+import android.view.View;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.TextView;
 
 import java.io.File;
 
@@ -31,6 +34,12 @@ public class ImagePreviewView extends LinearLayout {
         void onCancel();
     }
 
+    // Dark gradient palette — matches CommandPanelView and the voice stage.
+    private static final int BG = 0xFF000000;
+    private static final int TEXT_PRIMARY = 0xFFF5F5F5;
+    private static final int CHIP_FILL = 0x22FFFFFF;
+    private static final int CHIP_FILL_SUBTLE = 0x14FFFFFF;
+
     private ImageView image;
     private Listener listener;
 
@@ -42,6 +51,7 @@ public class ImagePreviewView extends LinearLayout {
         setVisibility(GONE);
         int pad = dp(8);
         setPadding(pad, pad, pad, pad);
+        setBackgroundColor(BG);
 
         image = new ImageView(getContext());
         image.setAdjustViewBounds(true);
@@ -53,17 +63,17 @@ public class ImagePreviewView extends LinearLayout {
 
         LinearLayout row = new LinearLayout(getContext());
         row.setOrientation(HORIZONTAL);
-        row.setGravity(Gravity.CENTER);
+        row.setGravity(Gravity.CENTER_VERTICAL);
         LayoutParams rp = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
-        rp.topMargin = dp(6);
+        rp.topMargin = dp(8);
         row.setLayoutParams(rp);
 
-        row.addView(makeButton("✕", v -> {
-            if (listener != null) listener.onCancel();
-        }, 0.6f));
-        row.addView(makeButton("Image", v -> share(ImageVariants.Type.IMAGE), 1f));
-        row.addView(makeButton("Sticker", v -> share(ImageVariants.Type.STICKER), 1f));
-        row.addView(makeButton("GIF", v -> share(ImageVariants.Type.GIF), 1f));
+        // Close pill is subtler and a fixed width — the three share types each
+        // get equal weight so they read as a unified action row.
+        row.addView(makePill("✕",       v -> { if (listener != null) listener.onCancel(); }, CHIP_FILL_SUBTLE, 0.6f));
+        row.addView(makePill("Image",   v -> share(ImageVariants.Type.IMAGE),                 CHIP_FILL,        1f));
+        row.addView(makePill("Sticker", v -> share(ImageVariants.Type.STICKER),               CHIP_FILL,        1f));
+        row.addView(makePill("GIF",     v -> share(ImageVariants.Type.GIF),                   CHIP_FILL,        1f));
 
         addView(row);
     }
@@ -72,17 +82,29 @@ public class ImagePreviewView extends LinearLayout {
         if (listener != null) listener.onShare(t);
     }
 
-    private Button makeButton(String label, android.view.View.OnClickListener onClick, float weight) {
-        Button b = new Button(getContext());
+    /** Translucent-white pill matching the dark gradient design. No outline, no
+     *  offset shadow — soft edges only. */
+    private TextView makePill(String label, View.OnClickListener onClick, int fill, float weight) {
+        TextView b = new TextView(getContext());
         b.setText(label);
         b.setAllCaps(false);
+        b.setGravity(Gravity.CENTER);
         b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f);
+        b.setTextColor(TEXT_PRIMARY);
+        b.setTypeface(b.getTypeface(), Typeface.BOLD);
+        b.setPadding(dp(14), dp(10), dp(14), dp(10));
+        GradientDrawable pill = new GradientDrawable();
+        pill.setColor(fill);
+        pill.setCornerRadius(dp(999));
+        b.setBackground(pill);
+        b.setClickable(true);
+        b.setFocusable(true);
+        b.setOnClickListener(onClick);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0,
                 LayoutParams.WRAP_CONTENT, weight);
-        lp.leftMargin = dp(3);
-        lp.rightMargin = dp(3);
+        lp.leftMargin = dp(4);
+        lp.rightMargin = dp(4);
         b.setLayoutParams(lp);
-        b.setOnClickListener(onClick);
         return b;
     }
 
@@ -137,7 +159,7 @@ public class ImagePreviewView extends LinearLayout {
     }
 
     public void applyTheme(KeyboardTheme theme) {
-        setBackgroundColor(theme.bannerBg);
+        // Surface and chip colours fixed by the dark gradient design.
     }
 
     private int dp(int v) {

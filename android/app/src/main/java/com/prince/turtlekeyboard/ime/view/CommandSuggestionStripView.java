@@ -31,6 +31,10 @@ public class CommandSuggestionStripView extends HorizontalScrollView {
 
     public interface OnPickListener { void onPick(CommandRegistry.Entry entry); }
 
+    private static final int BG = 0xFF000000;
+    private static final int CHIP_FILL = 0x22FFFFFF;
+    private static final int TEXT_PRIMARY = 0xFFF5F5F5;
+
     private final LinearLayout row;
     @Nullable private OnPickListener pickListener;
 
@@ -49,7 +53,7 @@ public class CommandSuggestionStripView extends HorizontalScrollView {
     private void init() {
         setHorizontalScrollBarEnabled(false);
         setVisibility(GONE);
-        setBackgroundColor(0xFFFFFFFF); // overridden by applyTheme
+        setBackgroundColor(BG);
         int padH = dp(8), padV = dp(6);
         row.setPadding(padH, padV, padH, padV);
         addView(row, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
@@ -71,12 +75,12 @@ public class CommandSuggestionStripView extends HorizontalScrollView {
         TextView pill = new TextView(getContext());
         String text = (e.emoji == null ? "" : e.emoji + "  ") + "/" + e.name;
         pill.setText(text);
-        pill.setTextColor(0xFF0C0C0C);
+        pill.setTextColor(TEXT_PRIMARY);
         pill.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f);
         pill.setGravity(Gravity.CENTER);
         int padH = dp(12), padV = dp(6);
         pill.setPadding(padH, padV, padH, padV);
-        pill.setBackground(pillBg(0xFFE8F5EE));
+        pill.setBackground(pillBg(CHIP_FILL));
         pill.setClickable(true);
         pill.setFocusable(true);
         pill.setOnClickListener(v -> { if (pickListener != null) pickListener.onPick(e); });
@@ -96,14 +100,9 @@ public class CommandSuggestionStripView extends HorizontalScrollView {
     }
 
     public void applyTheme(KeyboardTheme theme) {
-        setBackgroundColor(theme.bannerBg);
-        for (int i = 0; i < row.getChildCount(); i++) {
-            android.view.View v = row.getChildAt(i);
-            if (v instanceof TextView) {
-                ((TextView) v).setTextColor(theme.bannerText);
-                v.setBackground(pillBg(theme.chipFill));
-            }
-        }
+        // Surface and chip colours are fixed by the dark gradient design;
+        // nothing to wire to the theme here. Method kept for symmetry with
+        // sibling chip views.
     }
 
     private int dp(int v) {

@@ -33,6 +33,14 @@ public class CommandPanelView extends LinearLayout {
     public interface OnGoListener { void onGo(); }
     public interface OnPasteListener { void onPaste(String text); }
 
+    // Surface palette — black panel, translucent-white chips, light glyphs.
+    // Matches the voice stage and the suggestion strip so the whole IME reads
+    // as one continuous dark canvas with subtle gradient accents.
+    private static final int BG = 0xFF000000;
+    private static final int TEXT_PRIMARY = 0xFFF5F5F5;
+    private static final int CHIP_FILL = 0x22FFFFFF;
+    private static final int CHIP_FILL_SUBTLE = 0x14FFFFFF;
+
     private ImageView stagedThumb;
     private TextView stagedClose;
     private TextView labelView;
@@ -61,6 +69,12 @@ public class CommandPanelView extends LinearLayout {
         setGravity(Gravity.CENTER_VERTICAL);
         int padH = dp(12), padV = dp(10);
         setPadding(padH, padV, padH, padV);
+        // Subtle vertical gradient (a touch lighter at top, black at bottom)
+        // so the panel doesn't read as a flat rectangle on top of the strip.
+        GradientDrawable surface = new GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{ 0xFF1A1A1A, BG });
+        setBackground(surface);
 
         // Leading slot: thumbnail of a staged /edit image with a small × to clear it.
         // Hidden by default; shown when setStagedImage(...) is called with a bitmap.
@@ -90,13 +104,13 @@ public class CommandPanelView extends LinearLayout {
         addView(stagedClose, closeLp);
 
         labelView = new TextView(getContext());
-        labelView.setTextColor(0xFF0C0C0C);
+        labelView.setTextColor(TEXT_PRIMARY);
         labelView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f);
         labelView.setTypeface(labelView.getTypeface(), Typeface.BOLD);
         addView(labelView, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
 
         queryView = new TextView(getContext());
-        queryView.setTextColor(0xFF0C0C0C);
+        queryView.setTextColor(TEXT_PRIMARY);
         queryView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f);
         queryView.setSingleLine(true);
         queryView.setEllipsize(android.text.TextUtils.TruncateAt.START);
@@ -121,12 +135,12 @@ public class CommandPanelView extends LinearLayout {
 
         pasteChip = new TextView(getContext());
         pasteChip.setText("📋 Paste");
-        pasteChip.setTextColor(0xFF0C0C0C);
+        pasteChip.setTextColor(TEXT_PRIMARY);
         pasteChip.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f);
         pasteChip.setTypeface(pasteChip.getTypeface(), Typeface.BOLD);
         pasteChip.setPadding(dp(12), dp(6), dp(12), dp(6));
         pasteChip.setSingleLine(true);
-        pasteChip.setBackground(pillBackground(0xFFE8F5EE, dp(14)));
+        pasteChip.setBackground(pillBackground(CHIP_FILL, dp(14)));
         pasteChip.setClickable(true);
         pasteChip.setFocusable(true);
         pasteChip.setOnClickListener(v -> firePaste());
@@ -171,14 +185,14 @@ public class CommandPanelView extends LinearLayout {
     private TextView makeCloseButton() {
         TextView t = new TextView(getContext());
         t.setText("×");
-        t.setTextColor(0xFF0C0C0C);
+        t.setTextColor(TEXT_PRIMARY);
         t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f);
         t.setTypeface(t.getTypeface(), Typeface.BOLD);
         t.setGravity(Gravity.CENTER);
         t.setIncludeFontPadding(false);
         GradientDrawable bg = new GradientDrawable();
         bg.setShape(GradientDrawable.OVAL);
-        bg.setColor(0xFFE8F5EE);
+        bg.setColor(CHIP_FILL_SUBTLE);
         t.setBackground(bg);
         t.setClickable(true);
         t.setFocusable(true);
@@ -261,22 +275,9 @@ public class CommandPanelView extends LinearLayout {
 
     public void applyTheme(KeyboardTheme theme) {
         this.theme = theme;
-        setBackgroundColor(theme.bannerBg);
-        labelView.setTextColor(theme.bannerText);
-        queryView.setTextColor(theme.bannerText);
-        pasteChip.setTextColor(theme.bannerText);
-        pasteChip.setBackground(pillBackground(theme.chipFill, dp(14)));
-        pasteClose.setTextColor(theme.bannerText);
-        stagedClose.setTextColor(theme.bannerText);
-        GradientDrawable closeBg = new GradientDrawable();
-        closeBg.setShape(GradientDrawable.OVAL);
-        closeBg.setColor(theme.chipFill);
-        pasteClose.setBackground(closeBg);
-        GradientDrawable stagedBg = new GradientDrawable();
-        stagedBg.setShape(GradientDrawable.OVAL);
-        stagedBg.setColor(theme.chipFill);
-        stagedClose.setBackground(stagedBg);
-        // Solid accent fill so Go reads strongly against the white panel.
+        // Surface, chip fills, and glyph colours are fixed by the dark
+        // gradient design — only the lime accent on the Go button still
+        // tracks the theme so brand changes propagate.
         goButton.setBackground(pillBackground(theme.accent, dp(18)));
         goButton.setTextColor(0xFFFFFFFF);
     }

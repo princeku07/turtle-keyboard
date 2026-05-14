@@ -61,7 +61,14 @@ public class CommandDispatcher {
             e.handler.handle(cmd.prompt == null ? "" : cmd.prompt, contextProvider.get());
             return;
         }
-        ui.showStatus("/" + cmd.name + "…");
+        // Per-command loading text (e.g. "Generating image…") falls back to
+        // the raw slash name when the entry hasn't declared one. The trailing
+        // "…" is the loader marker — TurtleInputMethodService.showStatus uses
+        // it to decide between the loader panel and the transient banner.
+        String base = (e != null && e.loadingMessage != null && !e.loadingMessage.isEmpty())
+                ? e.loadingMessage
+                : "/" + cmd.name;
+        ui.showStatus(base + "…");
         client.execute(cmd, result -> handle(result));
     }
 

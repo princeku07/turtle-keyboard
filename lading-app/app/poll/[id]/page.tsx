@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { PollOptions } from './PollOptions';
 
 /**
  * Web fallback for poll links. Tapped by anyone who doesn't have Turtle installed —
@@ -46,15 +47,39 @@ export async function generateMetadata({
   const { id } = await params;
   const poll = await getPoll(id);
   if (!poll) return { title: 'poll · turtle' };
+
+  const url = `/poll/${id}`;
+  // Short option list for the description — long lists get truncated so the
+  // preview line stays readable in chat clients. The OG image itself shows
+  // the actual chips, so this is just a textual fallback.
+  const optionPreview = poll.options
+    .slice(0, 4)
+    .map(o => o.label)
+    .join(' · ');
+  const description =
+    poll.options.length > 4
+      ? `${optionPreview} · +${poll.options.length - 4} more`
+      : `${optionPreview} — vote in the turtle keyboard.`;
+
   return {
     title: `${poll.question} · turtle`,
-    description: `${poll.options.map(o => o.label).join(' · ')} — vote in the turtle keyboard.`,
+    description,
     openGraph: {
       title: poll.question,
-      description: `${poll.options.length} options · turtle`,
+      description,
       type: 'website',
       siteName: 'turtle',
+      url,
+      // The dynamic image lives at /poll/<id>/opengraph-image (Next.js
+      // route-segment convention). metadataBase on the root layout resolves
+      // the relative URL to absolute so platforms can fetch it.
     },
+    twitter: {
+      card: 'summary_large_image',
+      title: poll.question,
+      description,
+    },
+    alternates: { canonical: url },
   };
 }
 
@@ -66,10 +91,6 @@ export default async function PollPage({
   const { id } = await params;
   const poll = await getPoll(id);
   if (!poll) notFound();
-
-  const total = poll.options.reduce((sum, o) => sum + o.votes, 0);
-  const leadingPct =
-    total > 0 ? Math.max(...poll.options.map(o => (o.votes / total) * 100)) : 0;
 
   return (
     <main className="min-h-screen w-full text-foam overflow-x-clip">
@@ -103,39 +124,8 @@ export default async function PollPage({
           <h1 className="mt-3 font-sans font-semibold tracking-[-0.03em] leading-[1.05] text-[clamp(2rem,5.5vw,3.4rem)] text-foam">
             {poll.question}
           </h1>
-          <p className="mt-4 font-mono text-sm text-foam-dim">
-            {total} {total === 1 ? 'vote' : 'votes'}
-          </p>
 
-          <div className="mt-10 space-y-3">
-            {poll.options.map((opt, i) => {
-              const pct = total > 0 ? Math.round((opt.votes / total) * 100) : 0;
-              const isLeader = total > 0 && (opt.votes / total) * 100 === leadingPct && leadingPct > 0;
-              return (
-                <div
-                  key={i}
-                  className="glass rounded-2xl px-5 py-4 relative overflow-hidden"
-                >
-                  {/* Cyan fill behind the row — width = vote percentage. */}
-                  <div
-                    aria-hidden
-                    className={`absolute inset-y-0 left-0 ${isLeader ? 'bg-cyan/25' : 'bg-cyan/12'}`}
-                    style={{ width: `${pct}%` }}
-                  />
-                  <div className="relative flex items-center justify-between gap-4">
-                    <span className="font-sans text-base sm:text-lg text-foam">
-                      {opt.label}
-                    </span>
-                    <span
-                      className={`font-mono text-sm font-semibold tabular-nums ${isLeader ? 'text-cyan' : 'text-foam-dim'}`}
-                    >
-                      {pct}%
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <PollOptions pollId={poll.id} initialOptions={poll.options} />
 
           {/* Install CTA */}
           <div className="mt-16 sm:mt-20 glass rounded-2xl p-6 sm:p-8">

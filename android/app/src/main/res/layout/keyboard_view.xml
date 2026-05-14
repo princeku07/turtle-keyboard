@@ -4,9 +4,9 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:background="#E6F4EE"
-    android:paddingTop="2dp"
-    android:paddingBottom="6dp">
+    android:background="#000000"
+    android:paddingTop="0dp"
+    android:paddingBottom="0dp">
 
     <com.prince.turtlekeyboard.ime.view.HostAppBadgeView
         android:id="@+id/host_app_badge"
@@ -35,7 +35,7 @@
     <com.prince.turtlekeyboard.ime.view.SuggestionStripView
         android:id="@+id/suggestion_strip"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
+        android:layout_height="50dp"
         android:clipChildren="false"
         android:clipToPadding="false" />
 
@@ -70,10 +70,17 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center"
-        android:padding="8dp"
-        android:textColor="#0C0C0C"
+        android:padding="10dp"
+        android:textColor="#F5F5F5"
         android:textSize="14sp"
         android:textStyle="bold"
+        android:background="#22FFFFFF"
+        android:visibility="gone" />
+
+    <com.prince.turtlekeyboard.ime.view.VoiceListeningView
+        android:id="@+id/voice_listening"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
         android:background="#FFFFFF"
         android:visibility="gone" />
 
@@ -89,13 +96,30 @@
         android:layout_height="6dp"
         android:visibility="gone" />
 
+    <com.prince.turtlekeyboard.ime.view.GeneratingLoaderView
+        android:id="@+id/generating_loader"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:visibility="gone" />
+
+    <!-- Sibling of keyboard_view. The IME assigns this view's height to match
+         the keyboard's measured height when listening starts, then flips
+         keyboard visibility to GONE — so the IME window height is preserved. -->
+    <com.prince.turtlekeyboard.ime.view.VoiceStageView
+        android:id="@+id/voice_stage"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone" />
+
     <com.prince.turtlekeyboard.ime.view.TurtleKeyboardView
         android:id="@+id/keyboard_view"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#E6F4EE"
+        android:background="#000000"
         android:keyBackground="@android:color/transparent"
-        android:keyTextColor="#0C0C0C"
+        android:keyTextColor="#F5F5F5"
         android:keyTextSize="20sp"
         android:labelTextSize="16sp"
         android:shadowColor="#00000000"
@@ -103,7 +127,7 @@
         android:paddingLeft="0dp"
         android:paddingRight="0dp"
         android:paddingTop="4dp"
-        android:paddingBottom="4dp"
+        android:paddingBottom="10dp"
         android:focusable="true"
         android:focusableInTouchMode="true" />
 

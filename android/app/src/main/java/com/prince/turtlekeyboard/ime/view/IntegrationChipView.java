@@ -35,8 +35,11 @@ public class IntegrationChipView extends TextView {
     private void init() {
         setVisibility(GONE);
         setGravity(Gravity.CENTER_VERTICAL);
-        setTextColor(0xFF0C0C0C);
-        setBackgroundColor(0xFFE8F5EE); // soft mint chip on the white surface
+        setTextColor(0xFFF5F5F5);
+        // Translucent white wash on the now-black canvas; reads as a soft chip
+        // rather than a hard rectangle. No corner radius — this view spans the
+        // full width above the keys, so a flat fill is correct.
+        setBackgroundColor(0x22FFFFFF);
         setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         int padV = (int) TypedValue.applyDimension(
                 TypedValue.COMPLEX_UNIT_DIP, 10, getResources().getDisplayMetrics());

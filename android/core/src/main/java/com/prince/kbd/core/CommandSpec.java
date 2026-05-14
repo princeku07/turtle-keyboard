@@ -1,5 +1,7 @@
 package com.prince.kbd.core;
 
+import androidx.annotation.Nullable;
+
 import java.util.Collections;
 import java.util.Set;
 
@@ -11,6 +13,11 @@ import java.util.Set;
  * <p>{@link #affinityPkgs} is a ranking signal, not a gate: a command is always callable
  * everywhere, but tiles for it float to the top of the Quick Panel when the user is in
  * one of the listed apps. Empty set ⇒ no preference.
+ *
+ * <p>{@link #loadingMessage} (optional, AI-routed commands only) is the user-facing
+ * status shown while the request is in flight. Lets each command have its own copy
+ * ("Generating image", "Translating", …) instead of the bare slash name. Null falls back
+ * to {@code "/" + name} in the dispatcher.
  */
 public final class CommandSpec {
 
@@ -25,13 +32,20 @@ public final class CommandSpec {
     public final boolean needsPrompt;
     public final Handler handler;
     public final Set<String> affinityPkgs;
+    @Nullable public final String loadingMessage;
 
     public CommandSpec(String name, String label, String emoji, boolean needsPrompt, Handler handler) {
-        this(name, label, emoji, needsPrompt, handler, Collections.emptySet());
+        this(name, label, emoji, needsPrompt, handler, Collections.emptySet(), null);
     }
 
     public CommandSpec(String name, String label, String emoji, boolean needsPrompt,
                        Handler handler, Set<String> affinityPkgs) {
+        this(name, label, emoji, needsPrompt, handler, affinityPkgs, null);
+    }
+
+    public CommandSpec(String name, String label, String emoji, boolean needsPrompt,
+                       Handler handler, Set<String> affinityPkgs,
+                       @Nullable String loadingMessage) {
         this.name = name;
         this.label = label;
         this.emoji = emoji;
@@ -40,5 +54,6 @@ public final class CommandSpec {
         this.affinityPkgs = affinityPkgs == null
                 ? Collections.emptySet()
                 : Collections.unmodifiableSet(affinityPkgs);
+        this.loadingMessage = loadingMessage;
     }
 }

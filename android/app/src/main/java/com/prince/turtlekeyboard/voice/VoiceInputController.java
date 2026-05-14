@@ -41,6 +41,9 @@ public class VoiceInputController {
         /** Lifecycle hooks for UI state (banner pulse etc.). */
         void onListeningStarted();
         void onListeningStopped();
+        /** Latest mic loudness in dB. Roughly -2..10 from the platform recognizer.
+         *  Default no-op so existing sinks don't need to implement it. */
+        default void onRms(float dB) {}
     }
 
     private final Context appContext;
@@ -138,7 +141,10 @@ public class VoiceInputController {
     private final RecognitionListener listener = new RecognitionListener() {
         @Override public void onReadyForSpeech(Bundle params) { Log.d(TAG, "onReadyForSpeech"); }
         @Override public void onBeginningOfSpeech() {}
-        @Override public void onRmsChanged(float rmsdB) {}
+        @Override public void onRmsChanged(float rmsdB) {
+            Sink s = activeSink;
+            if (s != null) s.onRms(rmsdB);
+        }
         @Override public void onBufferReceived(byte[] buffer) {}
         @Override public void onEndOfSpeech() { Log.d(TAG, "onEndOfSpeech"); }
         @Override public void onEvent(int eventType, Bundle params) {}

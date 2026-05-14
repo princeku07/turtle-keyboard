@@ -209,6 +209,7 @@ public class TurtleInputMethodService extends InputMethodService
         suggestionEngine.setOnReadyListener(
                 () -> mainHandler.post(this::refreshSuggestions));
         voice = new VoiceInputController(this);
+        root.voiceStage().setListener(() -> { if (voice != null) voice.stop(); });
 
         root.panel().setOnGoListener(this::dispatchPromptPanel);
         root.panel().setOnPasteListener(text -> composer.appendString(text));
@@ -824,10 +825,42 @@ public class TurtleInputMethodService extends InputMethodService
     }
 
     private final VoiceInputController.Sink voiceSink = new VoiceInputController.Sink() {
-        @Override public void onListeningStarted() { root.banner().show("🎤 Listening…"); }
-        @Override public void onListeningStopped() { root.banner().clear(); }
+        @Override public void onListeningStarted() {
+            root.banner().clear();
+            // Mini banner-row bars are redundant once the full stage takes over —
+            // keep one voice indicator on screen, not two.
+            root.voiceListening().stop();
+            // Lock the stage's height to whatever the keyboard is currently
+            // occupying, then hide the keyboard. The LinearLayout sum stays
+            // the same, so the IME window height does not change.
+            int kh = root.keyboardView().getHeight();
+            if (kh > 0) {
+                android.view.ViewGroup.LayoutParams lp = root.voiceStage().getLayoutParams();
+                lp.height = kh;
+                root.voiceStage().setLayoutParams(lp);
+            }
+
+            // Mic stays visible in the strip throughout listening, so its
+            // window-space centre is stable. The stage resolves the local
+            // coordinate inside post() after layout settles, so passing
+            // window coords here is safe even though we're about to swap
+            // visibilities.
+            View mic = root.strip().micButton();
+            int[] micLoc = new int[2];
+            mic.getLocationInWindow(micLoc);
+            int micCx = micLoc[0] + mic.getWidth() / 2;
+            int micCy = micLoc[1] + mic.getHeight() / 2;
+
+            root.keyboardView().setVisibility(View.GONE);
+            root.voiceStage().start(micCx, micCy);
+        }
+        @Override public void onListeningStopped() {
+            root.voiceStage().stop();
+            root.keyboardView().setVisibility(View.VISIBLE);
+        }
+        @Override public void onRms(float dB) { root.voiceStage().setRms(dB); }
         @Override public void onPartial(String text) {
-            if (text != null && !text.isEmpty()) root.banner().show("🎤 " + text);
+            if (text != null && !text.isEmpty()) root.voiceStage().setTranscript(text);
         }
         @Override public void onFinal(String text) {
             if (text == null || text.isEmpty()) return;
@@ -841,6 +874,8 @@ public class TurtleInputMethodService extends InputMethodService
             }
         }
         @Override public void onError(String userVisibleMessage) {
+            root.voiceStage().stop();
+            root.keyboardView().setVisibility(View.VISIBLE);
             root.banner().showAndAutoHide(userVisibleMessage, 1500);
         }
     };
@@ -1095,23 +1130,29 @@ public class TurtleInputMethodService extends InputMethodService
     // ===== CommandDispatcher.ResultUi =====
 
     @Override public void showStatus(String message) {
-        // Trailing "…" is CommandDispatcher's loading marker — start the shimmer until
-        // a terminal result arrives. Any other status (errors, completions) stops it.
+        // Trailing "…" is CommandDispatcher's loading marker — show the dark
+        // gradient loader panel (with the status text) until a terminal result
+        // arrives. Any other status (errors, completions) hides it and falls
+        // through to the transient banner.
         if (message != null && message.endsWith("…")) {
-            root.shimmer().start();
-        } else {
+            root.generatingLoader().show(message);
             root.shimmer().stop();
+            return;
         }
+        root.generatingLoader().hide();
+        root.shimmer().stop();
         root.banner().showAndAutoHide(message, 2000L);
     }
 
     @Override public void showSuggestions(String[] suggestions) {
         root.shimmer().stop();
+        root.generatingLoader().hide();
         root.strip().setSuggestions(java.util.Arrays.asList(suggestions));
     }
 
     @Override public void showImage(String imagePayload) {
         root.shimmer().stop();
+        root.generatingLoader().hide();
         if (imagePayload == null || imagePayload.isEmpty()) {
             root.banner().showAndAutoHide("Empty result", 1500L);
             return;
@@ -1206,6 +1247,7 @@ public class TurtleInputMethodService extends InputMethodService
 
     @Override public void clearStatus() {
         root.shimmer().stop();
+        root.generatingLoader().hide();
         root.banner().clear();
     }
 

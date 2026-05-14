@@ -78,6 +78,18 @@ public class KeyboardIntegrationContextImpl implements IntegrationContext {
     @Override public void hideChip() { root.chip().hide(); }
 
     @Override public void showBanner(String text, long autoHideMs) {
+        // Trailing "…" is the shared loading-marker convention (same as
+        // CommandDispatcher.run). Integrations that pass e.g. "Creating poll…"
+        // get the gradient loader panel instead of the transient banner; on
+        // the next non-loading status (or after autoHideMs) we hide it.
+        if (text != null && text.endsWith("…")) {
+            root.generatingLoader().show(text);
+            root.banner().clear();
+            root.generatingLoader().postDelayed(
+                    () -> root.generatingLoader().hide(), autoHideMs);
+            return;
+        }
+        root.generatingLoader().hide();
         root.banner().showAndAutoHide(text, autoHideMs);
     }
 
@@ -98,7 +110,12 @@ public class KeyboardIntegrationContextImpl implements IntegrationContext {
 
     @Override public GoogleAuth googleAuth() { return googleAuth; }
 
-    @Override public void commitText(CharSequence text) { committer.commitText(text); }
+    @Override public void commitText(CharSequence text) {
+        // A successful commit means whatever was "in flight" has landed — hide
+        // the gradient loader so it doesn't linger past the result.
+        root.generatingLoader().hide();
+        committer.commitText(text);
+    }
 
     @Override public void deleteBeforeCursor(int n) { committer.deleteBeforeCursor(n); }
 

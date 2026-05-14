@@ -13,6 +13,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  // Resolves any relative URLs used by route-segment OG images (e.g. the
+  // dynamically-rendered /poll/[id]/opengraph-image) to absolute URLs that
+  // social previewers — WhatsApp, iMessage, Twitter, Slack — can fetch.
+  metadataBase: new URL("https://www.turtlekeyboard.com"),
   title: "Turtle Keyboard — slash is the new hey siri.",
   description:
     "An open-source AI keyboard for iOS and Android. Every model — image, text, voice — one slash command away, inside any app you already use.",

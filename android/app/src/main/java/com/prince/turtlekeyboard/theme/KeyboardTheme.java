@@ -57,29 +57,31 @@ public class KeyboardTheme {
         this.enterIcon = enterIcon;
     }
 
-    /** Light theme: mint surface, white key faces, ink glyphs, lime Enter. */
+    /** Default theme: black surface, neutral-dark lifted key faces, light glyphs,
+     *  lime Enter accent. Keys are monochrome grays rather than the dark theme's
+     *  olive-green so they read clean on a pure-black canvas. */
     public static KeyboardTheme turtleLight() {
         return new KeyboardTheme(
-                Color.parseColor("#E6F4EE"),  // background
-                Color.parseColor("#0C0C0C"),  // keyText
-                Color.parseColor("#15803D"),  // accent
-                Color.parseColor("#0C0C0C"),  // suggestionText
+                Color.parseColor("#000000"),  // background
+                Color.parseColor("#F5F5F5"),  // keyText — off-white glyphs
+                Color.parseColor("#15803D"),  // accent — brand lime
+                Color.parseColor("#0C0C0C"),  // suggestionText — used by icon chips (on light chipFill)
                 Color.parseColor("#FFFFFF"),  // bannerBg
                 Color.parseColor("#0C0C0C"),  // bannerText
                 Color.parseColor("#E8F5EE"),  // chipFill
                 Color.parseColor("#D9E8DF"),  // divider
-                Color.parseColor("#FFFFFF"),  // keyFace — white letter keys
-                Color.parseColor("#C8E8D5"),  // functionFace — light mint function keys
-                Color.parseColor("#A6D9BC"),  // pressedFace — deeper mint while touched
-                Color.parseColor("#6B6B6B"),  // hintText — muted ink
-                Color.parseColor("#15803D"),  // enterFill — brand green
+                Color.parseColor("#1E1E1E"),  // keyFace — lifted dark letter keys
+                Color.parseColor("#141414"),  // functionFace — recessed function keys
+                Color.parseColor("#2E2E2E"),  // pressedFace — touch press wash
+                Color.parseColor("#888888"),  // hintText — muted hint glyph
+                Color.parseColor("#15803D"),  // enterFill — brand lime
                 Color.parseColor("#FFFFFF")); // enterIcon — white arrow
     }
 
-    /** Dark theme: olive-gray surface, lifted key faces, off-white glyphs, vivid green Enter. */
+    /** Dark theme: black surface, lifted key faces, off-white glyphs, vivid green Enter. */
     public static KeyboardTheme turtleDark() {
         return new KeyboardTheme(
-                Color.parseColor("#2C332E"),  // background
+                Color.parseColor("#000000"),  // background
                 Color.parseColor("#E8EDE9"),  // keyText
                 Color.parseColor("#4F8E5C"),  // accent
                 Color.parseColor("#E8EDE9"),  // suggestionText

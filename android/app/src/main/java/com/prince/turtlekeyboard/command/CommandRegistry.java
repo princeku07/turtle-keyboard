@@ -35,24 +35,35 @@ public class CommandRegistry {
         public final boolean needsPrompt;
         @Nullable public final CommandSpec.Handler handler;
         public final Set<String> affinityPkgs;
+        /** Optional per-command status copy shown in the loader while an AI
+         *  request is in flight (e.g. "Generating image"). Null falls back to
+         *  {@code "/" + name} in the dispatcher. */
+        @Nullable public final String loadingMessage;
 
         public Entry(String name, String label, String emoji, boolean needsPrompt) {
-            this(name, label, emoji, needsPrompt, null, Collections.emptySet());
+            this(name, label, emoji, needsPrompt, null, Collections.emptySet(), null);
         }
 
         public Entry(String name, String label, String emoji, boolean needsPrompt,
                      @Nullable CommandSpec.Handler handler) {
-            this(name, label, emoji, needsPrompt, handler, Collections.emptySet());
+            this(name, label, emoji, needsPrompt, handler, Collections.emptySet(), null);
         }
 
         public Entry(String name, String label, String emoji, boolean needsPrompt,
                      @Nullable CommandSpec.Handler handler, Set<String> affinityPkgs) {
+            this(name, label, emoji, needsPrompt, handler, affinityPkgs, null);
+        }
+
+        public Entry(String name, String label, String emoji, boolean needsPrompt,
+                     @Nullable CommandSpec.Handler handler, Set<String> affinityPkgs,
+                     @Nullable String loadingMessage) {
             this.name = name;
             this.label = label;
             this.emoji = emoji;
             this.needsPrompt = needsPrompt;
             this.handler = handler;
             this.affinityPkgs = affinityPkgs == null ? Collections.emptySet() : affinityPkgs;
+            this.loadingMessage = loadingMessage;
         }
     }
 
@@ -69,7 +80,7 @@ public class CommandRegistry {
     public void register(CommandSpec spec) {
         entries.put(spec.name.toLowerCase(),
                 new Entry(spec.name, spec.label, spec.emoji, spec.needsPrompt,
-                        spec.handler, spec.affinityPkgs));
+                        spec.handler, spec.affinityPkgs, spec.loadingMessage));
     }
 
     public boolean has(String name) {

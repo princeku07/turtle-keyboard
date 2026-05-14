@@ -4,7 +4,6 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
-import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.util.AttributeSet;
@@ -17,6 +16,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 
 import com.prince.turtlekeyboard.R;
 import com.prince.turtlekeyboard.theme.KeyboardTheme;
@@ -150,18 +150,25 @@ public class SuggestionStripView extends LinearLayout {
         return oneLine.substring(0, PASTE_PREVIEW_MAX_CHARS) + "…";
     }
 
+    // The strip sits flush on top of the black keyboard surface, so its own
+    // content must read light regardless of theme. We bypass theme.suggestionText
+    // / theme.divider here (those tokens are still used by icon glyphs sitting
+    // on the mint chipFill, where dark-on-light is correct).
+    private static final int STRIP_SLOT_TEXT = 0xFFF5F5F5;
+    private static final int STRIP_DIVIDER = 0x22FFFFFF;
+
     public void applyTheme(KeyboardTheme theme) {
         this.theme = theme;
-        setBackgroundColor(theme.bannerBg);
+        setBackgroundColor(theme.background);
         settingsButton.applyTheme(theme);
         micButton.applyTheme(theme);
         pasteChip.applyTheme(theme);
         for (int i = 0; i < slotsRow.getChildCount(); i++) {
             View v = slotsRow.getChildAt(i);
             if (v instanceof TextView) {
-                ((TextView) v).setTextColor(theme.suggestionText);
+                ((TextView) v).setTextColor(STRIP_SLOT_TEXT);
             } else {
-                v.setBackgroundColor(theme.divider);
+                v.setBackgroundColor(STRIP_DIVIDER);
             }
         }
     }
@@ -179,6 +186,10 @@ public class SuggestionStripView extends LinearLayout {
 
     public void clear() { setSuggestions(null); }
 
+    /** Mic icon view — exposed so the IME can read its window position
+     *  (used as the source point for the voice-stage reveal animation). */
+    public View micButton() { return micButton; }
+
     private void addSlot(String text) {
         TextView tv = new TextView(getContext());
         tv.setText(text);
@@ -186,7 +197,7 @@ public class SuggestionStripView extends LinearLayout {
         tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
         tv.setSingleLine(true);
         tv.setIncludeFontPadding(false);
-        tv.setTextColor(theme != null ? theme.suggestionText : Color.parseColor("#0C0C0C"));
+        tv.setTextColor(STRIP_SLOT_TEXT);
         tv.setBackgroundResource(R.drawable.suggestion_pick_ripple);
         tv.setClickable(true);
         tv.setFocusable(true);
@@ -201,7 +212,7 @@ public class SuggestionStripView extends LinearLayout {
 
     private void addDivider() {
         View v = new View(getContext());
-        v.setBackgroundColor(theme != null ? theme.divider : 0xFFD9E8DF);
+        v.setBackgroundColor(STRIP_DIVIDER);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(1), dp(22));
         lp.gravity = Gravity.CENTER_VERTICAL;
         slotsRow.addView(v, lp);
@@ -274,8 +285,8 @@ public class SuggestionStripView extends LinearLayout {
     }
 
     /**
-     * Tiny circular tap-target with a vector glyph drawn in code so we don't need
-     * extra drawable resources. Two glyph variants: mic and paste.
+     * Tiny circular tap-target with a vector glyph rendered from a pre-baked
+     * drawable resource (mic / paste / menu).
      */
     private static class IconButton extends FrameLayout {
         static final int GLYPH_MIC = 0;
@@ -283,25 +294,40 @@ public class SuggestionStripView extends LinearLayout {
         static final int GLYPH_MENU = 2;
 
         private final Paint backgroundPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final Paint glyphPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final int glyphKind;
         /** When false (used inside the paste preview pill) we skip the circular
          *  background — the parent pill already provides one. */
         private boolean drawBackground = true;
         private int bgColor = 0x00000000;
         private int glyphColor = 0xFF0C0C0C;
+        /** Vector glyph for this button. Tinted with {@link #glyphColor} so it
+         *  tracks the theme. */
+        @Nullable private Drawable glyph;
 
         IconButton(Context context, int glyphKind) {
             super(context);
             this.glyphKind = glyphKind;
             backgroundPaint.setStyle(Paint.Style.FILL);
-            glyphPaint.setStyle(Paint.Style.STROKE);
-            glyphPaint.setStrokeCap(Paint.Cap.ROUND);
-            glyphPaint.setStrokeJoin(Paint.Join.ROUND);
             setClickable(true);
             setFocusable(true);
             setBackground(rippleMask());
             setWillNotDraw(false);
+            int resId = drawableFor(glyphKind);
+            if (resId != 0) {
+                Drawable d = ContextCompat.getDrawable(context, resId);
+                // mutate() so per-instance tints don't bleed across other users
+                // of the same drawable resource.
+                glyph = d == null ? null : d.mutate();
+            }
+        }
+
+        private static int drawableFor(int glyphKind) {
+            switch (glyphKind) {
+                case GLYPH_MIC:   return R.drawable.baseline_mic_24;
+                case GLYPH_PASTE: return R.drawable.baseline_paste_24;
+                case GLYPH_MENU:  return R.drawable.baseline_menu_24;
+                default:          return 0;
+            }
         }
 
         @Override
@@ -316,7 +342,7 @@ public class SuggestionStripView extends LinearLayout {
             this.bgColor = theme.chipFill;
             this.glyphColor = theme.suggestionText;
             backgroundPaint.setColor(bgColor);
-            glyphPaint.setColor(glyphColor);
+            if (glyph != null) glyph.setTint(glyphColor);
             invalidate();
         }
 
@@ -328,60 +354,15 @@ public class SuggestionStripView extends LinearLayout {
             if (drawBackground) {
                 c.drawCircle(cx, cy, r, backgroundPaint);
             }
-            float strokePx = dp(1.8f);
-            glyphPaint.setStrokeWidth(strokePx);
-            switch (glyphKind) {
-                case GLYPH_MIC: drawMic(c, cx, cy, r); break;
-                case GLYPH_PASTE: drawPaste(c, cx, cy, r); break;
-                case GLYPH_MENU: drawMenu(c, cx, cy, r); break;
+            if (glyph != null) {
+                // ~85 % of the chip radius — leaves a touch of breathing room
+                // between the glyph and the circular wash behind it.
+                int half = (int) (r * 0.85f);
+                glyph.setBounds((int) (cx - half), (int) (cy - half),
+                        (int) (cx + half), (int) (cy + half));
+                glyph.draw(c);
             }
             super.onDraw(c);
-        }
-
-        /** Hamburger menu: three rounded horizontal bars. */
-        private void drawMenu(Canvas c, float cx, float cy, float r) {
-            float w = r * 1.2f;
-            float gap = r * 0.32f;
-            float left = cx - w / 2f;
-            float right = cx + w / 2f;
-            c.drawLine(left, cy - gap, right, cy - gap, glyphPaint);
-            c.drawLine(left, cy,       right, cy,       glyphPaint);
-            c.drawLine(left, cy + gap, right, cy + gap, glyphPaint);
-        }
-
-        /** Mic: rounded capsule + curved base + short stem. */
-        private void drawMic(Canvas c, float cx, float cy, float r) {
-            float bodyW = r * 0.55f;
-            float bodyH = r * 0.95f;
-            float top = cy - bodyH * 0.55f;
-            float bottom = cy + bodyH * 0.10f;
-            float cornerR = bodyW / 2f;
-            RectF body = new RectF(cx - bodyW / 2f, top, cx + bodyW / 2f, bottom);
-            Paint fill = new Paint(glyphPaint);
-            fill.setStyle(Paint.Style.FILL);
-            c.drawRoundRect(body, cornerR, cornerR, fill);
-            float arcR = bodyW * 0.95f;
-            RectF arc = new RectF(
-                    cx - arcR, cy - arcR * 0.2f, cx + arcR, cy + arcR * 1.2f);
-            c.drawArc(arc, 20f, 140f, false, glyphPaint);
-            c.drawLine(cx, cy + arcR * 0.55f, cx, cy + arcR * 0.95f, glyphPaint);
-        }
-
-        /** Paste: clipboard outline with a small clip at top. */
-        private void drawPaste(Canvas c, float cx, float cy, float r) {
-            float w = r * 1.05f;
-            float h = r * 1.25f;
-            RectF body = new RectF(cx - w / 2f, cy - h / 2f + dp(2),
-                    cx + w / 2f, cy + h / 2f);
-            float corner = dp(3);
-            c.drawRoundRect(body, corner, corner, glyphPaint);
-            float clipW = w * 0.55f;
-            float clipH = dp(7);
-            RectF clip = new RectF(cx - clipW / 2f, cy - h / 2f - dp(1),
-                    cx + clipW / 2f, cy - h / 2f + clipH);
-            Paint fill = new Paint(glyphPaint);
-            fill.setStyle(Paint.Style.FILL);
-            c.drawRoundRect(clip, dp(2), dp(2), fill);
         }
 
         private Drawable rippleMask() {
