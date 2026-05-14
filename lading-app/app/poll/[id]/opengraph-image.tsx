@@ -18,6 +18,13 @@ export const alt = "Turtle poll";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
+// Edge runtime + a short public cache so WhatsApp's crawler gets a fast
+// response on first scrape (it bails on slow images) and subsequent shares of
+// the same link don't re-render the PNG on every fetch. Votes change but the
+// preview doesn't need to — 5 min is short enough to pick up renames, long
+// enough to stay snappy in chat unfurls.
+export const runtime = "edge";
+
 const WORKER_URL =
   process.env.NEXT_PUBLIC_WORKER_URL || "https://turtle-worker.trtlk.workers.dev";
 
@@ -31,7 +38,12 @@ type Poll = {
 
 async function getPoll(id: string): Promise<Poll | null> {
   try {
-    const res = await fetch(`${WORKER_URL}/poll/${id}`, { cache: "no-store" });
+    // Brief edge-cache on the worker fetch too — WhatsApp's first crawl is
+    // bottlenecked by this round-trip. Vote counts can be stale; the preview
+    // doesn't surface them anyway.
+    const res = await fetch(`${WORKER_URL}/poll/${id}`, {
+      next: { revalidate: 300 },
+    });
     if (!res.ok) return null;
     return (await res.json()) as Poll;
   } catch {
@@ -157,6 +169,16 @@ export default async function Image({
         </div>
       </div>
     ),
-    size,
+    {
+      ...size,
+      headers: {
+        // Public cache so chat-app crawlers (WhatsApp, Slack, Telegram) and
+        // Vercel's edge serve the rendered PNG from cache instead of
+        // re-rendering on every share. s-maxage applies to CDN; max-age to
+        // the crawler. 5 min is short enough that a rename propagates fast.
+        "Cache-Control":
+          "public, max-age=300, s-maxage=300, stale-while-revalidate=86400",
+      },
+    },
   );
 }

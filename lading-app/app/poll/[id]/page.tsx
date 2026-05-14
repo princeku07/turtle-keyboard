@@ -61,6 +61,19 @@ export async function generateMetadata({
       ? `${optionPreview} · +${poll.options.length - 4} more`
       : `${optionPreview} — vote in the turtle keyboard.`;
 
+  // Explicit image entry — WhatsApp's crawler is strict and skips previews
+  // when og:image:width / og:image:height / og:image:type aren't in the
+  // initial HTML. Don't rely on Next's auto-emission from the file-convention
+  // opengraph-image.tsx; declare them ourselves so the tags are guaranteed.
+  // metadataBase on the root layout resolves the relative URL to absolute.
+  const ogImage = {
+    url: `/poll/${id}/opengraph-image`,
+    width: 1200,
+    height: 630,
+    alt: poll.question,
+    type: 'image/png',
+  } as const;
+
   return {
     title: `${poll.question} · turtle`,
     description,
@@ -70,14 +83,13 @@ export async function generateMetadata({
       type: 'website',
       siteName: 'turtle',
       url,
-      // The dynamic image lives at /poll/<id>/opengraph-image (Next.js
-      // route-segment convention). metadataBase on the root layout resolves
-      // the relative URL to absolute so platforms can fetch it.
+      images: [ogImage],
     },
     twitter: {
       card: 'summary_large_image',
       title: poll.question,
       description,
+      images: [ogImage.url],
     },
     alternates: { canonical: url },
   };
