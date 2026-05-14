@@ -9,9 +9,10 @@ import { ImageResponse } from "next/og";
  * link is pasted into a chat — so what we render here is the visible card the
  * recipient sees without opening the link.
  *
- * <p>Visual: turtle's ocean → abyss gradient, foam typography, cyan accent.
- * Same palette tokens that drive the landing page, kept inline because
- * ImageResponse can't pull from {@code globals.css}.
+ * <p>Design goal: read as a real <i>poll widget</i>, not a marketing card.
+ * Vertical list of options with vote bars + counts (Twitter-poll shape),
+ * total votes at the bottom, light brand chrome at the top so the poll is the
+ * hero. Same palette tokens that drive the landing page.
  */
 
 export const alt = "Turtle poll";
@@ -20,9 +21,7 @@ export const contentType = "image/png";
 
 // Edge runtime + a short public cache so WhatsApp's crawler gets a fast
 // response on first scrape (it bails on slow images) and subsequent shares of
-// the same link don't re-render the PNG on every fetch. Votes change but the
-// preview doesn't need to — 5 min is short enough to pick up renames, long
-// enough to stay snappy in chat unfurls.
+// the same link don't re-render the PNG on every fetch.
 export const runtime = "edge";
 
 const WORKER_URL =
@@ -38,9 +37,6 @@ type Poll = {
 
 async function getPoll(id: string): Promise<Poll | null> {
   try {
-    // Brief edge-cache on the worker fetch too — WhatsApp's first crawl is
-    // bottlenecked by this round-trip. Vote counts can be stale; the preview
-    // doesn't surface them anyway.
     const res = await fetch(`${WORKER_URL}/poll/${id}`, {
       next: { revalidate: 300 },
     });
@@ -68,117 +64,203 @@ export default async function Image({
   const poll = await getPoll(id);
 
   return new ImageResponse(
-    (
-      <div
-        style={{
-          width: "100%",
-          height: "100%",
-          display: "flex",
-          flexDirection: "column",
-          background: `linear-gradient(135deg, ${OCEAN} 0%, ${ABYSS} 100%)`,
-          color: FOAM,
-          padding: "64px 80px",
-          fontFamily: "sans-serif",
-        }}
-      >
-        {/* Brand strip */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 18,
-            fontSize: 36,
-            color: CYAN,
-            letterSpacing: "0.18em",
-          }}
-        >
-          <span style={{ fontSize: 60 }}>🐢</span>
-          <span style={{ fontWeight: 600 }}>TURTLE · POLL</span>
-        </div>
-
-        {/* Question — hero. Sized by length so very short or very long
-            questions both occupy the card without overflowing. */}
-        <h1
-          style={{
-            display: "flex",
-            margin: "44px 0 0 0",
-            fontSize: poll && poll.question.length > 60 ? 64 : 84,
-            fontWeight: 700,
-            lineHeight: 1.05,
-            letterSpacing: "-0.02em",
-            color: FOAM,
-          }}
-        >
-          {poll ? poll.question : "Poll not found"}
-        </h1>
-
-        {/* Options as chips. Max 4 shown; overflow collapses to "+N more". */}
-        {poll && (
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: 14,
-              marginTop: 36,
-            }}
-          >
-            {poll.options.slice(0, 4).map((o) => (
-              <div
-                key={o.label}
-                style={{
-                  display: "flex",
-                  fontSize: 30,
-                  fontWeight: 500,
-                  color: FOAM,
-                  background: "rgba(126, 197, 204, 0.16)",
-                  border: `2px solid ${REEF}`,
-                  padding: "12px 22px",
-                  borderRadius: 999,
-                }}
-              >
-                {o.label}
-              </div>
-            ))}
-            {poll.options.length > 4 && (
-              <div
-                style={{
-                  display: "flex",
-                  fontSize: 26,
-                  color: FOAM_DIM,
-                  padding: "12px 8px",
-                  alignItems: "center",
-                }}
-              >
-                +{poll.options.length - 4} more
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Footer CTA */}
-        <div
-          style={{
-            display: "flex",
-            marginTop: "auto",
-            fontSize: 26,
-            color: FOAM_DIM,
-            letterSpacing: "0.04em",
-          }}
-        >
-          tap to vote · in turtle keyboard ↗
-        </div>
-      </div>
-    ),
+    poll ? renderPoll(poll) : renderMissing(),
     {
       ...size,
       headers: {
-        // Public cache so chat-app crawlers (WhatsApp, Slack, Telegram) and
-        // Vercel's edge serve the rendered PNG from cache instead of
-        // re-rendering on every share. s-maxage applies to CDN; max-age to
-        // the crawler. 5 min is short enough that a rename propagates fast.
         "Cache-Control":
           "public, max-age=300, s-maxage=300, stale-while-revalidate=86400",
       },
     },
+  );
+}
+
+function renderPoll(poll: Poll) {
+  const totalVotes = poll.options.reduce((sum, o) => sum + (o.votes || 0), 0);
+  // 4 is the cap that fits comfortably at 28 sp/row with a hero question.
+  const visibleOptions = poll.options.slice(0, 4);
+  const overflowCount = poll.options.length - visibleOptions.length;
+  // Question shrinks for long copy so the bars below still have room.
+  const questionSize = poll.question.length > 56 ? 54 : 68;
+
+  return (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        background: `linear-gradient(135deg, ${OCEAN} 0%, ${ABYSS} 100%)`,
+        padding: "56px 80px",
+        fontFamily: "sans-serif",
+        color: FOAM,
+      }}
+    >
+      {/* Brand strip — small turtle wordmark + POLL pill, so the card reads
+          as "a poll on turtle" rather than "click for a website". */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 46, lineHeight: 1 }}>🐢</span>
+          <span
+            style={{
+              fontSize: 28,
+              fontWeight: 600,
+              letterSpacing: "-0.01em",
+              color: FOAM,
+            }}
+          >
+            turtle
+          </span>
+        </div>
+        <div
+          style={{
+            display: "flex",
+            fontSize: 20,
+            fontWeight: 700,
+            letterSpacing: "0.22em",
+            color: CYAN,
+            padding: "8px 18px",
+            border: `2px solid ${CYAN}`,
+            borderRadius: 999,
+          }}
+        >
+          POLL
+        </div>
+      </div>
+
+      {/* Question — hero */}
+      <h1
+        style={{
+          display: "flex",
+          margin: "36px 0 28px 0",
+          fontSize: questionSize,
+          fontWeight: 700,
+          lineHeight: 1.05,
+          letterSpacing: "-0.02em",
+          color: FOAM,
+        }}
+      >
+        {poll.question}
+      </h1>
+
+      {/* Options as vote bars — each row stacks label/count + the bar
+          underneath. Empty polls show empty tracks (0 % everywhere) which
+          still reads as "fresh poll, be the first to vote". */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {visibleOptions.map((option) => {
+          const pct =
+            totalVotes > 0
+              ? Math.round(((option.votes || 0) / totalVotes) * 100)
+              : 0;
+          return (
+            <div
+              key={option.label}
+              style={{ display: "flex", flexDirection: "column", gap: 8 }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <span style={{ fontSize: 28, color: FOAM, fontWeight: 500 }}>
+                  {option.label}
+                </span>
+                <span
+                  style={{
+                    fontSize: 24,
+                    color: FOAM_DIM,
+                    fontWeight: 500,
+                  }}
+                >
+                  {pct}%
+                </span>
+              </div>
+              {/* Track + fill. Always render the track; fill width is the
+                  percentage. With 0 votes everything reads empty. */}
+              <div
+                style={{
+                  display: "flex",
+                  height: 12,
+                  background: "rgba(255, 255, 255, 0.08)",
+                  borderRadius: 6,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    width: `${pct}%`,
+                    background: CYAN,
+                    borderRadius: 6,
+                  }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Footer: aggregate stats + CTA. Keeps the card grounded so the
+          recipient sees what they'd be joining. */}
+      <div
+        style={{
+          display: "flex",
+          marginTop: "auto",
+          alignItems: "center",
+          justifyContent: "space-between",
+          fontSize: 22,
+          color: FOAM_DIM,
+        }}
+      >
+        <span style={{ display: "flex" }}>
+          {totalVotes} {totalVotes === 1 ? "vote" : "votes"}
+          {overflowCount > 0 ? `  ·  +${overflowCount} more options` : ""}
+        </span>
+        <span
+          style={{
+            display: "flex",
+            color: CYAN,
+            fontWeight: 600,
+            letterSpacing: "0.04em",
+          }}
+        >
+          tap to vote ↗
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function renderMissing() {
+  return (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        background: `linear-gradient(135deg, ${OCEAN} 0%, ${ABYSS} 100%)`,
+        fontFamily: "sans-serif",
+        color: FOAM,
+        gap: 16,
+      }}
+    >
+      <span style={{ fontSize: 72 }}>🐢</span>
+      <div style={{ display: "flex", fontSize: 40, fontWeight: 600 }}>
+        Poll not found
+      </div>
+      <div style={{ display: "flex", fontSize: 22, color: FOAM_DIM }}>
+        It may have expired
+      </div>
+    </div>
   );
 }
