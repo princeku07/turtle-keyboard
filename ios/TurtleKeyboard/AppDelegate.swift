@@ -69,14 +69,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
               !sheetId.isEmpty
         else { return }
         let owner = comps.queryItems?.first(where: { $0.name == "owner" })?.value ?? ""
-
-        let store: SplitStore = UserDefaultsSplitStore(suiteName: SplitContract.storageSuiteName)
-        let oauth = SplitOAuth(store: store, presentationAnchor: window)
-        let sync = SplitCloudSync(store: store, oauth: oauth)
-        Task { @MainActor in
-            _ = await sync.joinSharedSheet(sheetId: sheetId, ownerEmail: owner)
-            presentSplitDetail()
-        }
+        present(JoinSplitViewController(sheetId: sheetId, ownerEmail: owner))
     }
 
     private func presentSplitDetail() {

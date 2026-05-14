@@ -64,6 +64,8 @@
 		HH000142HH000142HH000142 /* PersonalizationViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000143HH000143HH000143 /* PersonalizationViewController.swift */; };
 		HH000144HH000144HH000144 /* PersonalizationKeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000141HH000141HH000141 /* PersonalizationKeys.swift */; };
 		HH000150HH000150HH000150 /* Secrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000151HH000151HH000151 /* Secrets.swift */; };
+		HH000200HH000200HH000200 /* QrRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000201HH000201HH000201 /* QrRenderer.swift */; };
+		HH000202HH000202HH000202 /* JoinSplitViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000203HH000203HH000203 /* JoinSplitViewController.swift */; };
 		FF000001FF000001FF000001 /* TurtleKeyboardExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = EE000005EE000005EE000005 /* TurtleKeyboardExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -144,6 +146,10 @@
 		HH000141HH000141HH000141 /* PersonalizationKeys.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalizationKeys.swift; sourceTree = "<group>"; };
 		HH000143HH000143HH000143 /* PersonalizationViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalizationViewController.swift; sourceTree = "<group>"; };
 		HH000151HH000151HH000151 /* Secrets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Secrets.swift"; path = "../Generated/Secrets.swift"; sourceTree = "<group>"; };
+		HH000201HH000201HH000201 /* QrRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QrRenderer.swift; sourceTree = "<group>"; };
+		HH000203HH000203HH000203 /* JoinSplitViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoinSplitViewController.swift; sourceTree = "<group>"; };
+		HH000210HH000210HH000210 /* TurtleKeyboard.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TurtleKeyboard.entitlements; sourceTree = "<group>"; };
+		HH000211HH000211HH000211 /* TurtleKeyboardExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TurtleKeyboardExtension.entitlements; sourceTree = "<group>"; };
 		EE000004EE000004EE000004 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		EE000005EE000005EE000005 /* TurtleKeyboardExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = TurtleKeyboardExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -190,12 +196,14 @@
 				CC000002CC000002CC000002 /* AppDelegate.swift */,
 				CC000004CC000004CC000004 /* ViewController.swift */,
 				HH000061HH000061HH000061 /* SplitDetailViewController.swift */,
+				HH000203HH000203HH000203 /* JoinSplitViewController.swift */,
 				HH000109HH000109HH000109 /* NotionConnectViewController.swift */,
 				HH000111HH000111HH000111 /* SlackConnectViewController.swift */,
 				HH000143HH000143HH000143 /* PersonalizationViewController.swift */,
 				HH000151HH000151HH000151 /* Secrets.swift */,
 				HH000080HH000080HH000080 /* Cloud */,
 				CC000006CC000006CC000006 /* Info.plist */,
+				HH000210HH000210HH000210 /* TurtleKeyboard.entitlements */,
 			);
 			path = TurtleKeyboard;
 			sourceTree = "<group>";
@@ -208,6 +216,7 @@
 				HH000075HH000075HH000075 /* SplitSheetsClient.swift */,
 				HH000077HH000077HH000077 /* SplitDriveClient.swift */,
 				HH000079HH000079HH000079 /* SplitCloudSync.swift */,
+				HH000201HH000201HH000201 /* QrRenderer.swift */,
 				HH000105HH000105HH000105 /* NotionAuth.swift */,
 				HH000107HH000107HH000107 /* SlackAuth.swift */,
 			);
@@ -247,6 +256,7 @@
 				HH000126HH000126HH000126 /* Keyboard */,
 				HH000127HH000127HH000127 /* Command */,
 				EE000004EE000004EE000004 /* Info.plist */,
+				HH000211HH000211HH000211 /* TurtleKeyboardExtension.entitlements */,
 			);
 			path = TurtleKeyboardExtension;
 			sourceTree = "<group>";
@@ -465,6 +475,8 @@
 				HH000142HH000142HH000142 /* PersonalizationViewController.swift in Sources */,
 				HH000144HH000144HH000144 /* PersonalizationKeys.swift in Sources */,
 				HH000150HH000150HH000150 /* Secrets.swift in Sources */,
+				HH000200HH000200HH000200 /* QrRenderer.swift in Sources */,
+				HH000202HH000202HH000202 /* JoinSplitViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -523,6 +535,7 @@
 		BB000003BB000003BB000003 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = TurtleKeyboard/TurtleKeyboard.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = AHV2R8U5DW;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -544,6 +557,7 @@
 		BB000004BB000004BB000004 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = TurtleKeyboard/TurtleKeyboard.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = AHV2R8U5DW;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -565,6 +579,7 @@
 		DD000003DD000003DD000003 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = TurtleKeyboardExtension/TurtleKeyboardExtension.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = AHV2R8U5DW;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -588,6 +603,7 @@
 		DD000004DD000004DD000004 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = TurtleKeyboardExtension/TurtleKeyboardExtension.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = AHV2R8U5DW;
 				GENERATE_INFOPLIST_FILE = NO;

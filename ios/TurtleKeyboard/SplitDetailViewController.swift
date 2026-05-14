@@ -300,10 +300,86 @@ final class SplitDetailViewController: UIViewController {
                 return
             }
             refreshCloudUI()
-            let activity = UIActivityViewController(activityItems: [link], applicationActivities: nil)
-            activity.popoverPresentationController?.sourceView = inviteButton
-            present(activity, animated: true)
+            showInviteQr(deepLink: link)
         }
+    }
+
+    /// Owner-only: shows the scan-to-join QR with Share / Copy actions.
+    /// Mirrors Android's `SplitActivity.showInviteQr`.
+    private func showInviteQr(deepLink: String) {
+        let sheet = UIViewController()
+        sheet.modalPresentationStyle = .formSheet
+        sheet.view.backgroundColor = .systemBackground
+
+        let title = UILabel()
+        title.text = "Scan to join"
+        title.font = .systemFont(ofSize: 18, weight: .bold)
+        title.textAlignment = .center
+
+        let sub = UILabel()
+        sub.text = "Anyone scanning this QR with their phone camera will be added as a writer. Tap \"Stop sharing\" when you're done."
+        sub.font = .systemFont(ofSize: 12)
+        sub.textColor = .secondaryLabel
+        sub.textAlignment = .center
+        sub.numberOfLines = 0
+
+        let qrView = UIImageView(image: QrRenderer.render(deepLink, size: 240))
+        qrView.contentMode = .scaleAspectFit
+        qrView.layer.magnificationFilter = .nearest
+        qrView.translatesAutoresizingMaskIntoConstraints = false
+
+        let link = UILabel()
+        link.text = deepLink
+        link.font = .systemFont(ofSize: 11)
+        link.textColor = .secondaryLabel
+        link.textAlignment = .center
+        link.numberOfLines = 2
+        link.lineBreakMode = .byTruncatingMiddle
+
+        let shareBtn = UIButton(type: .system)
+        shareBtn.setTitle("Share link", for: .normal)
+        shareBtn.titleLabel?.font = .systemFont(ofSize: 15, weight: .semibold)
+        shareBtn.addAction(UIAction { [weak self, weak sheet] _ in
+            guard let self = self, let sheet = sheet else { return }
+            let activity = UIActivityViewController(activityItems: [deepLink], applicationActivities: nil)
+            activity.popoverPresentationController?.sourceView = sheet.view
+            sheet.present(activity, animated: true)
+            _ = self // silence weakself unused
+        }, for: .touchUpInside)
+
+        let copyBtn = UIButton(type: .system)
+        copyBtn.setTitle("Copy", for: .normal)
+        copyBtn.titleLabel?.font = .systemFont(ofSize: 15)
+        copyBtn.addAction(UIAction { _ in
+            UIPasteboard.general.string = deepLink
+        }, for: .touchUpInside)
+
+        let doneBtn = UIButton(type: .system)
+        doneBtn.setTitle("Done", for: .normal)
+        doneBtn.titleLabel?.font = .systemFont(ofSize: 15)
+        doneBtn.addAction(UIAction { [weak sheet] _ in
+            sheet?.dismiss(animated: true)
+        }, for: .touchUpInside)
+
+        let buttonRow = UIStackView(arrangedSubviews: [shareBtn, copyBtn, doneBtn])
+        buttonRow.axis = .horizontal
+        buttonRow.distribution = .fillEqually
+
+        let stack = UIStackView(arrangedSubviews: [title, sub, qrView, link, buttonRow])
+        stack.axis = .vertical
+        stack.spacing = 12
+        stack.alignment = .fill
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        sheet.view.addSubview(stack)
+
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: sheet.view.safeAreaLayoutGuide.leadingAnchor, constant: 24),
+            stack.trailingAnchor.constraint(equalTo: sheet.view.safeAreaLayoutGuide.trailingAnchor, constant: -24),
+            stack.centerYAnchor.constraint(equalTo: sheet.view.safeAreaLayoutGuide.centerYAnchor),
+            qrView.heightAnchor.constraint(equalToConstant: 240),
+        ])
+
+        present(sheet, animated: true)
     }
 
     private func showAlert(title: String, message: String) {
