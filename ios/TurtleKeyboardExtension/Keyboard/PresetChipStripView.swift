@@ -65,17 +65,29 @@ final class PresetChipStripView: UIView {
     /// Replace every chip. Empty `presets` collapses the strip (caller
     /// should hide the parent slot in that case).
     func setPresets(_ presets: [String], onTap: @escaping OnTap) {
+        setChips(presets.map { Chip(label: $0, value: $0) }, onTap: onTap)
+    }
+
+    /// Richer chip representation — display label can differ from the
+    /// tap payload. Used by slash-command autocomplete to show
+    /// `🎨 /cap` while returning just `"cap"` on tap.
+    struct Chip {
+        let label: String
+        let value: String
+    }
+
+    func setChips(_ chips: [Chip], onTap: @escaping OnTap) {
         self.onTap = onTap
         stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        for value in presets {
-            stack.addArrangedSubview(buildChip(value: value))
+        for chip in chips {
+            stack.addArrangedSubview(buildChip(chip: chip))
         }
         scroll.setContentOffset(.zero, animated: false)
     }
 
-    private func buildChip(value: String) -> UIButton {
-        let btn = UIButton(type: .custom)
-        btn.setTitle(value, for: .normal)
+    private func buildChip(chip: Chip) -> UIButton {
+        let btn = ChipButton(value: chip.value)
+        btn.setTitle(chip.label, for: .normal)
         btn.titleLabel?.font = .systemFont(ofSize: 12, weight: .medium)
         btn.setTitleColor(.white, for: .normal)
         btn.backgroundColor = UIColor.white.withAlphaComponent(0.16)
@@ -83,12 +95,23 @@ final class PresetChipStripView: UIView {
         btn.contentEdgeInsets = UIEdgeInsets(top: 0, left: 10, bottom: 0, right: 10)
         btn.heightAnchor.constraint(equalToConstant: 26).isActive = true
         btn.addAction(UIAction { [weak self, weak btn] _ in
-            guard let v = btn?.currentTitle else { return }
-            btn?.alpha = 0.6
-            UIView.animate(withDuration: 0.15) { btn?.alpha = 1.0 }
-            self?.onTap?(v)
+            guard let cb = btn else { return }
+            cb.alpha = 0.6
+            UIView.animate(withDuration: 0.15) { cb.alpha = 1.0 }
+            self?.onTap?(cb.payloadValue)
         }, for: .touchUpInside)
         return btn
+    }
+
+    /// Subclass that carries the tap payload separately from the display
+    /// title so chips like `🎨 /cap` can return the bare `"cap"`.
+    private final class ChipButton: UIButton {
+        let payloadValue: String
+        init(value: String) {
+            self.payloadValue = value
+            super.init(frame: .zero)
+        }
+        required init?(coder: NSCoder) { fatalError("init(coder:) not used") }
     }
 }
 

@@ -36,6 +36,17 @@ class KeyboardViewController: UIInputViewController {
     /// (after the user picks and the picker dismisses).
     private var editPickerActive = false
 
+    /// Top slash-command match for the current draft buffer, or `nil`
+    /// when nothing matches. Drives both the ghost completion in the
+    /// prompt label and the Send button's tap-to-accept behaviour.
+    private var slashAutocompleteTopMatch: String?
+
+    /// Explicit caret-position override in points. When non-nil,
+    /// `updateCaretPosition()` uses this instead of measuring the full
+    /// label text — keeps the caret between the typed prefix and the
+    /// ghost completion in draft mode.
+    private var caretAnchorWidth: CGFloat?
+
     // While the user is composing a slash command, every keystroke is routed
     // into this buffer instead of `textDocumentProxy.insertText`. The host app
     // never sees `/ask …`; only the final result (or nothing, if cancelled)
@@ -1146,6 +1157,9 @@ class KeyboardViewController: UIInputViewController {
         guard !isGenerating else { return }
         activeCommand = cmd
         suggestionMode = .slashCommand
+        // Leaving draft mode — let the caret measure full label text again.
+        caretAnchorWidth = nil
+        slashAutocompleteTopMatch = nil
 
         // /edit needs a reference image before the user can describe an
         // edit — fire the system image picker on first entry. The picker
@@ -1202,25 +1216,91 @@ class KeyboardViewController: UIInputViewController {
     }
 
     // Shown while the buffer is `/` or `/xy` — i.e. the user is mid-typing a
-    // command name that doesn't yet match a known command. Gives them visible
-    // feedback for every keystroke.
+    // command name that doesn't yet match a known command. Renders the
+    // typed characters in white plus the rest of the best-matching command
+    // in dim gray as a ghost, terminal-style. Pressing space accepts the
+    // ghost (existing detection handles it); tapping the Send button —
+    // re-labelled `→ /name` — also accepts.
     private func showDraftCommandBar(buffer: String) {
         activeCommand  = nil
         suggestionMode = .slashCommand
 
         [cmdPill, cmdPromptLabel, cmdSendButton, cmdCancelButton].forEach { $0.isHidden = false }
+        cmdPresetStrip?.isHidden = true
         cmdSpinner.stopAnimating()
         cmdSuggestionsStack.isHidden = true
 
         cmdPill.text = "  /  "
-        if buffer.count <= 1 {
-            cmdPromptLabel.text      = "type a command…"
+
+        // Strip the leading "/" and lowercase for matching.
+        let body = buffer.hasPrefix("/")
+            ? String(buffer.dropFirst()).lowercased()
+            : buffer.lowercased()
+        let topMatch = slashAutocompleteTopMatch(query: body)
+        slashAutocompleteTopMatch = topMatch?.rawValue
+
+        if body.isEmpty {
+            // User just typed `/`. No ghost yet — the empty pill says
+            // enough on its own. A faint placeholder keeps the bar from
+            // looking inert. Caret sits at the start of the placeholder
+            // so it's obviously where the next character will land.
+            cmdPromptLabel.attributedText = nil
+            cmdPromptLabel.text = "type a command…"
             cmdPromptLabel.textColor = UIColor.white.withAlphaComponent(0.40)
+            cmdSendButton.setTitle("Send", for: .normal)
+            caretAnchorWidth = 0
+        } else if let match = topMatch {
+            // Best match found. Render typed prefix opaque white, the
+            // rest of the command name as a dimmer ghost. Send button
+            // doubles as a one-tap accept.
+            let typed = body
+            let full = match.rawValue
+            let ghost = full.hasPrefix(typed)
+                ? String(full.dropFirst(typed.count))
+                : ""
+            let attr = NSMutableAttributedString(
+                string: typed,
+                attributes: [
+                    .foregroundColor: UIColor.white.withAlphaComponent(0.95),
+                    .font: cmdPromptLabel.font as Any,
+                ])
+            if !ghost.isEmpty {
+                attr.append(NSAttributedString(
+                    string: ghost,
+                    attributes: [
+                        .foregroundColor: UIColor.white.withAlphaComponent(0.32),
+                        .font: cmdPromptLabel.font as Any,
+                    ]))
+            }
+            cmdPromptLabel.attributedText = attr
+            cmdSendButton.setTitle("→ /\(match.rawValue)", for: .normal)
+            // Caret sits right after the typed prefix, just before the
+            // dim-gray ghost. Measure only the typed portion.
+            let typedWidth = (typed as NSString)
+                .size(withAttributes: [.font: cmdPromptLabel.font as Any]).width
+            caretAnchorWidth = typedWidth
         } else {
-            cmdPromptLabel.text      = buffer
-            cmdPromptLabel.textColor = UIColor.white.withAlphaComponent(0.90)
+            // No match at all. Show the typed body verbatim plus a
+            // small explanatory tail so the user knows nothing's wrong
+            // with the keyboard — they just typed something unknown.
+            let attr = NSMutableAttributedString(
+                string: body,
+                attributes: [
+                    .foregroundColor: UIColor.white.withAlphaComponent(0.95),
+                    .font: cmdPromptLabel.font as Any,
+                ])
+            attr.append(NSAttributedString(
+                string: "  no match",
+                attributes: [
+                    .foregroundColor: UIColor.white.withAlphaComponent(0.32),
+                    .font: cmdPromptLabel.font as Any,
+                ]))
+            cmdPromptLabel.attributedText = attr
+            cmdSendButton.setTitle("Send", for: .normal)
+            let typedWidth = (body as NSString)
+                .size(withAttributes: [.font: cmdPromptLabel.font as Any]).width
+            caretAnchorWidth = typedWidth
         }
-        cmdSendButton.setTitle("Send", for: .normal)
 
         if commandBar.isHidden {
             commandBar.alpha    = 0
@@ -1231,11 +1311,36 @@ class KeyboardViewController: UIInputViewController {
         updateCaret()
     }
 
+    /// Single best-matching command for the partial query. Prefix wins
+    /// over substring — `/c` returns `/cap`, never `/notion`. Nil if
+    /// nothing matches.
+    private func slashAutocompleteTopMatch(query: String) -> SlashCommand? {
+        guard !query.isEmpty else { return nil }
+        let all = SlashCommand.allCases
+        if let prefix = all.first(where: { $0.rawValue.lowercased().hasPrefix(query) }) {
+            return prefix
+        }
+        return all.first { $0.rawValue.lowercased().contains(query) }
+    }
+
+    /// Tap-to-accept handler invoked from the Send button while the bar
+    /// is in draft mode. Replaces the slash buffer with `/<name> ` and
+    /// routes through the normal detection so the command bar enters
+    /// its prompt state (with `/edit` firing the picker, presets
+    /// surfacing for `/tone`, etc.).
+    private func handleSlashSuggestionTap(_ name: String) {
+        slashBuffer = "/\(name) "
+        commandPromptText = ""
+        updateCommandDetection()
+    }
+
     private func hideCommandBar() {
         guard !commandBar.isHidden, !isGenerating else { return }
         activeCommand = nil
         pendingSuggestions = []
         suggestionMode = .none
+        caretAnchorWidth = nil
+        slashAutocompleteTopMatch = nil
         // Drop any staged /edit reference — the user backed out before
         // describing the edit. Re-entering /edit will re-launch the picker.
         stagedEditImage = nil
@@ -1309,6 +1414,13 @@ class KeyboardViewController: UIInputViewController {
         guard hasFullAccess else {
             shake(commandBar)
             showBanner("⚠️ Enable Full Access in Settings → Keyboard")
+            return
+        }
+        // Draft mode with a ghost completion: Send acts as
+        // "accept the suggested command". Routes through the same path
+        // a typed space would.
+        if activeCommand == nil, let suggested = slashAutocompleteTopMatch {
+            handleSlashSuggestionTap(suggested)
             return
         }
         guard let cmd = activeCommand, !isGenerating else { return }
@@ -1546,16 +1658,23 @@ class KeyboardViewController: UIInputViewController {
     }
 
     private func updateCaretPosition() {
-        guard let label = cmdPromptLabel,
-              let text = label.text, !text.isEmpty,
-              let font = label.font else {
+        guard let label = cmdPromptLabel, let font = label.font else {
+            cmdCaretLeading.constant = 0
+            return
+        }
+        let maxWidth = max(0, label.bounds.width - 2)
+        // Draft mode supplies an explicit width so the caret lands between
+        // the typed prefix and the ghost completion, not at the end of the
+        // ghost.
+        if let override = caretAnchorWidth {
+            cmdCaretLeading.constant = min(override, maxWidth) + 1
+            return
+        }
+        guard let text = label.text, !text.isEmpty else {
             cmdCaretLeading.constant = 0
             return
         }
         let size = (text as NSString).size(withAttributes: [.font: font])
-        // Cap inside the label's frame width so the caret can't drift
-        // past the mic button when the prompt overflows.
-        let maxWidth = max(0, label.bounds.width - 2)
         cmdCaretLeading.constant = min(size.width, maxWidth) + 1
     }
 

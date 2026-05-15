@@ -4,7 +4,7 @@ import Foundation
 /// `command/SlashCommand`. Local commands route to the integration
 /// registry; remote commands route through `CommandRouter` to the AI
 /// backend.
-enum SlashCommand: String {
+enum SlashCommand: String, CaseIterable {
     case cap    = "cap"
     case edit   = "edit"
     case fix    = "fix"
