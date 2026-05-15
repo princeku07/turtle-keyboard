@@ -49,6 +49,7 @@ struct CommandPayload {
 enum CommandResult {
     case text(String)               // insert directly into field
     case image(String)              // URL — keyboard downloads + puts to clipboard
+    case imageData(Data)            // raw bytes (e.g. Gemini inline image response)
     case suggestions([String])      // /reply — 3 tappable chips
 }
 

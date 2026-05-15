@@ -31,8 +31,9 @@ class KeyboardViewController: UIInputViewController {
     private var slashBuffer: String?
 
     // commandBar can show one of three things at a time
-    private enum SuggestionMode { case none, slashCommand, replyResult, wordSuggestion }
+    private enum SuggestionMode { case none, slashCommand, replyResult, wordSuggestion, suggestedShortcuts }
     private var suggestionMode: SuggestionMode = .none
+    private var pendingShortcuts: [SuggestedShortcut] = []
 
     private let textChecker = UITextChecker()
 
@@ -129,6 +130,9 @@ class KeyboardViewController: UIInputViewController {
         SplitIntegration(),
         NotionIntegration(),
         SlackIntegration(),
+        PollIntegration(),
+        WyrIntegration(),
+        WebIntegration(),
     ], store: personalizationStore)
 
     // MARK: - Palette
@@ -171,6 +175,22 @@ class KeyboardViewController: UIInputViewController {
     private func suppressSystemShortcutBar() {
         inputAssistantItem.leadingBarButtonGroups  = []
         inputAssistantItem.trailingBarButtonGroups = []
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        // Surface suggested-shortcut chips as soon as the keyboard mounts
+        // on an empty field. Subsequent text changes refresh via textDidChange.
+        updateWordSuggestions()
+    }
+
+    override func textDidChange(_ textInput: UITextInput?) {
+        super.textDidChange(textInput)
+        // If user cleared the field while the shortcuts strip was up, keep
+        // it. If they typed past the empty state, word suggestions / hide
+        // logic in updateWordSuggestions handle it.
+        guard activeCommand == nil, !isGenerating else { return }
+        updateWordSuggestions()
     }
 
     // MARK: - Image preview overlay
@@ -846,7 +866,10 @@ class KeyboardViewController: UIInputViewController {
         let range = context.range(of: "\\S+$", options: .regularExpression)
 
         guard range.location != NSNotFound else {
+            // No word at cursor — empty / freshly cleared field. Offer the
+            // suggested-shortcut chips if this field accepts them.
             if suggestionMode == .wordSuggestion { hideCommandBar() }
+            updateSuggestedShortcuts()
             return
         }
         let currentWord = context.substring(with: range)
@@ -854,6 +877,9 @@ class KeyboardViewController: UIInputViewController {
         // Skip while user is composing a slash command
         guard !currentWord.hasPrefix("/"), currentWord.count >= 2 else {
             if suggestionMode == .wordSuggestion { hideCommandBar() }
+            // Single character or slash buffer — no UITextChecker payload,
+            // but still no useful shortcuts to show either; hide if up.
+            if suggestionMode == .suggestedShortcuts { hideCommandBar() }
             return
         }
 
@@ -886,6 +912,58 @@ class KeyboardViewController: UIInputViewController {
             if suggestionMode == .wordSuggestion { hideCommandBar() }
         } else {
             showWordSuggestions(picks)
+        }
+    }
+
+    // MARK: - Suggested shortcuts (per-field templates)
+    //
+    // Port of android/.../SuggestedShortcut. iOS keys the catalog off field
+    // traits (UITextInputTraits) rather than Android's `EditorInfo.packageName`
+    // since extensions can't read the host bundle id.
+
+    private func updateSuggestedShortcuts() {
+        guard activeCommand == nil, !isGenerating, commandBar.isHidden || suggestionMode == .suggestedShortcuts else {
+            return
+        }
+        // Only offer on a freshly empty field.
+        let before = textDocumentProxy.documentContextBeforeInput ?? ""
+        let after  = textDocumentProxy.documentContextAfterInput  ?? ""
+        guard before.isEmpty, after.isEmpty else {
+            if suggestionMode == .suggestedShortcuts { hideCommandBar() }
+            return
+        }
+
+        guard let proxy = textDocumentProxy as? (UITextDocumentProxy & UITextInputTraits) else { return }
+        let kind = FieldKind.from(InputContext(proxy: proxy))
+        let shortcuts = Array(SuggestedShortcutCatalog.shortcuts(for: kind).prefix(3))
+        guard !shortcuts.isEmpty else {
+            if suggestionMode == .suggestedShortcuts { hideCommandBar() }
+            return
+        }
+        showSuggestedShortcuts(shortcuts)
+    }
+
+    private func showSuggestedShortcuts(_ shortcuts: [SuggestedShortcut]) {
+        suggestionMode   = .suggestedShortcuts
+        pendingShortcuts = shortcuts
+
+        for (i, btn) in cmdSuggestionBtns.enumerated() {
+            if i < shortcuts.count {
+                let s = shortcuts[i]
+                btn.setTitle("\(s.emoji) \(s.label)", for: .normal)
+                btn.isHidden = false
+            } else {
+                btn.setTitle(nil, for: .normal)
+                btn.isHidden = true
+            }
+        }
+        [cmdPill, cmdPromptLabel, cmdSendButton, cmdCancelButton].forEach { $0.isHidden = true }
+        cmdSuggestionsStack.isHidden = false
+
+        if commandBar.isHidden {
+            commandBar.alpha = 0
+            commandBar.isHidden = false
+            UIView.animate(withDuration: 0.15) { self.commandBar.alpha = 1 }
         }
     }
 
@@ -1120,6 +1198,14 @@ class KeyboardViewController: UIInputViewController {
                         showBanner("⚠️ Image download failed")
                     }
 
+                case .imageData(let data):
+                    hideCommandBar()
+                    if let image = UIImage(data: data) {
+                        showImagePreview(image)
+                    } else {
+                        showBanner("⚠️ Image decode failed")
+                    }
+
                 case .suggestions(let items):
                     showSuggestions(items)
                 }
@@ -1192,6 +1278,20 @@ class KeyboardViewController: UIInputViewController {
 
     @objc private func suggestionTapped(_ sender: UIButton) {
         let i = sender.tag
+
+        if suggestionMode == .suggestedShortcuts {
+            guard i < pendingShortcuts.count else { return }
+            let shortcut = pendingShortcuts[i]
+            pendingShortcuts = []
+            suggestionMode = .none
+            hideCommandBar()
+            textDocumentProxy.insertText(shortcut.template)
+            // Template may include text or a "/cmd " seed — re-evaluate so
+            // word suggestions / shortcut strip update for the new state.
+            updateWordSuggestions()
+            return
+        }
+
         guard i < pendingSuggestions.count else { return }
         let pick = pendingSuggestions[i]
 
@@ -1329,7 +1429,13 @@ private final class KeyboardIntegrationContext: IntegrationContext {
         // App Group will be wired later — falls back to standard defaults
         // for now so saves persist across launches at minimum.
         self.store = UserDefaultsSplitStore(suiteName: SplitContract.storageSuiteName)
-        self.llm = LMStudioLlmService()
+        // Prefer Gemini when a key is wired in .env; otherwise fall back to
+        // the LAN LM Studio endpoint so devs without a key still get a model.
+        if !Secrets.geminiApiKey.isEmpty {
+            self.llm = GeminiLlmService(apiKey: Secrets.geminiApiKey)
+        } else {
+            self.llm = LMStudioLlmService()
+        }
     }
 
     func showPanel(_ view: UIView) {
@@ -1369,6 +1475,63 @@ private final class KeyboardIntegrationContext: IntegrationContext {
         DispatchQueue.main.async {
             self.owner?.extensionContext?.open(url, completionHandler: nil)
         }
+    }
+
+    func openExternalURL(_ url: URL) {
+        DispatchQueue.main.async {
+            self.owner?.extensionContext?.open(url, completionHandler: nil)
+        }
+    }
+}
+
+/// LlmService backed by Google Gemini's generateContent endpoint. Used when
+/// `Secrets.geminiApiKey` is set via the `.env` loader. Posts the prompt as
+/// a single user message; returns the text part of the first candidate.
+private final class GeminiLlmService: LlmService {
+    private let apiKey: String
+    private let model: String
+
+    init(apiKey: String, model: String = "gemini-2.5-flash-lite") {
+        self.apiKey = apiKey
+        self.model = model
+    }
+
+    func complete(
+        prompt: String,
+        onText: @escaping (String) -> Void,
+        onError: @escaping (String) -> Void
+    ) {
+        let urlStr = "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent?key=\(apiKey)"
+        guard let url = URL(string: urlStr) else {
+            onError("bad Gemini URL"); return
+        }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.timeoutInterval = 30
+        let body: [String: Any] = [
+            "contents": [["parts": [["text": prompt]]]],
+            "generationConfig": ["maxOutputTokens": 1024, "temperature": 0.7],
+        ]
+        req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        URLSession.shared.dataTask(with: req) { data, resp, err in
+            if let err = err { onError(err.localizedDescription); return }
+            let status = (resp as? HTTPURLResponse)?.statusCode ?? -1
+            guard let data = data else { onError("empty response"); return }
+            if !(200..<300).contains(status) {
+                let body = String(data: data, encoding: .utf8)?.prefix(200) ?? ""
+                onError("gemini \(status): \(body)"); return
+            }
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let candidates = json["candidates"] as? [[String: Any]],
+                  let content = candidates.first?["content"] as? [String: Any],
+                  let parts = content["parts"] as? [[String: Any]],
+                  let text = parts.first?["text"] as? String else {
+                let snippet = String(data: data, encoding: .utf8)?.prefix(200) ?? ""
+                onError("unexpected gemini shape: \(snippet)"); return
+            }
+            onText(text.trimmingCharacters(in: .whitespacesAndNewlines))
+        }.resume()
     }
 }
 

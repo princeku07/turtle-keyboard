@@ -8,6 +8,9 @@ enum PersonalizationKeys {
     static let splitEnabled       = "personalization.split.enabled"
     static let notionEnabled      = "personalization.notion.enabled"
     static let slackEnabled       = "personalization.slack.enabled"
+    static let pollEnabled        = "personalization.poll.enabled"
+    static let wyrEnabled         = "personalization.wyr.enabled"
+    static let webEnabled         = "personalization.web.enabled"
     static let quickPanelEnabled  = "personalization.keyboard.quickpanel"
     static let voiceEnabled       = "personalization.keyboard.voice"
 
@@ -19,6 +22,9 @@ enum PersonalizationKeys {
         case "split":  key = splitEnabled
         case "notion": key = notionEnabled
         case "slack":  key = slackEnabled
+        case "poll":   key = pollEnabled
+        case "wyr":    key = wyrEnabled
+        case "web":    key = webEnabled
         default: return true
         }
         return store.int(forKey: key, fallback: 1) != 0

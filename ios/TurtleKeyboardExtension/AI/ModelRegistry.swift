@@ -66,20 +66,31 @@ enum ModelRegistry {
     )
 
     // MARK: Google  ──────────────────────────────────────────────────────────
+    // Model IDs mirror android/ai/GeminiClient. Flash-Lite is 2-3x faster than
+    // flash-latest for short structured outputs; image gen uses the
+    // "Nano Banana" model.
 
     static let geminiFlash = AIModel(
-        id: "gemini-1.5-flash",
-        displayName: "Gemini Flash",
+        id: "gemini-2.5-flash-lite",
+        displayName: "Gemini Flash Lite",
         provider: .google,
         capabilities: [.textEdit, .chat, .translation],
         isFree: false
     )
 
     static let geminiPro = AIModel(
-        id: "gemini-1.5-pro",
-        displayName: "Gemini Pro",
+        id: "gemini-flash-latest",
+        displayName: "Gemini Flash",
         provider: .google,
         capabilities: [.textEdit, .chat, .translation],
+        isFree: false
+    )
+
+    static let geminiImage = AIModel(
+        id: "gemini-2.5-flash-image",
+        displayName: "Gemini 2.5 Flash Image",
+        provider: .google,
+        capabilities: [.imageGeneration],
         isFree: false
     )
 
@@ -107,7 +118,7 @@ enum ModelRegistry {
         gemma4,
         flux2, fluxSchnell, fluxPro,
         claudeHaiku, claudeSonnet,
-        geminiFlash, geminiPro,
+        geminiFlash, geminiPro, geminiImage,
         gpt4oMini, gpt4o,
     ]
 

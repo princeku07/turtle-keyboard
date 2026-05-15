@@ -2,9 +2,12 @@ import Foundation
 
 // MARK: - GoogleProvider
 //
-// Text commands via Google Generative Language API (Gemini).
-// Supported commands: /fix, /tone, /reply, /tl
-// Supported models:   Gemini Flash, Gemini Pro
+// Text + image commands via Google Generative Language API (Gemini).
+// Mirrors android/ai/GeminiClient.java:
+//   • text   → gemini-2.5-flash-lite  (or any text-capable model in ModelRegistry)
+//   • image  → gemini-2.5-flash-image ("Nano Banana"), returned as inline PNG bytes
+//
+// Supported commands: /fix, /tone, /reply, /tl, /ask, /org, /cap
 //
 // API key: set via KeyStore.shared[.google] = "your_key"
 // Get a key at: https://aistudio.google.com/app/apikey
@@ -14,17 +17,25 @@ final class GoogleProvider: AIProvider {
 
     private let session: URLSession = {
         let cfg = URLSessionConfiguration.default
-        cfg.timeoutIntervalForRequest  = 15
-        cfg.timeoutIntervalForResource = 30
+        cfg.timeoutIntervalForRequest  = 30
+        cfg.timeoutIntervalForResource = 90
         return URLSession(configuration: cfg)
     }()
 
     func execute(_ payload: CommandPayload) async throws -> CommandResult {
         let systemPrompt = CommandRouter.systemPrompt(for: payload.command, prompt: payload.prompt)
         let userContent  = userMessage(from: payload)
-        // Gemini doesn't have a separate system field — prepend to user content
-        let fullPrompt   = systemPrompt + "\n\n" + userContent
-        let raw          = try await generateContent(modelID: payload.model.id, prompt: fullPrompt)
+
+        if payload.model.supports(.imageGeneration) {
+            let png = try await generateImage(modelID: payload.model.id,
+                                              systemPrompt: systemPrompt,
+                                              userPrompt: userContent)
+            return .imageData(png)
+        }
+
+        let raw = try await generateText(modelID: payload.model.id,
+                                         systemPrompt: systemPrompt,
+                                         userPrompt: userContent)
 
         switch payload.command {
         case "reply": return .suggestions(parseSuggestionsJSON(raw))
@@ -43,41 +54,74 @@ final class GoogleProvider: AIProvider {
         }
     }
 
-    // MARK: - API call
+    // MARK: - Text
 
-    private func generateContent(modelID: String, prompt: String) async throws -> String {
+    private func generateText(modelID: String, systemPrompt: String, userPrompt: String) async throws -> String {
+        let data = try await callGenerateContent(modelID: modelID,
+                                                 systemPrompt: systemPrompt,
+                                                 userPrompt: userPrompt)
+        guard let json       = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let candidates = json["candidates"] as? [[String: Any]],
+              let content    = candidates.first?["content"] as? [String: Any],
+              let parts      = content["parts"] as? [[String: Any]] else {
+            throw ProviderError.badResponse("Unexpected Gemini response shape")
+        }
+        let text = parts.compactMap { $0["text"] as? String }.joined()
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    // MARK: - Image
+
+    private func generateImage(modelID: String, systemPrompt: String, userPrompt: String) async throws -> Data {
+        let data = try await callGenerateContent(modelID: modelID,
+                                                 systemPrompt: systemPrompt,
+                                                 userPrompt: userPrompt)
+
+        guard let json       = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let candidates = json["candidates"] as? [[String: Any]],
+              let content    = candidates.first?["content"] as? [String: Any],
+              let parts      = content["parts"] as? [[String: Any]] else {
+            throw ProviderError.badResponse("Unexpected Gemini image response shape")
+        }
+
+        for part in parts {
+            // Accept both camelCase and snake_case (the API has used both).
+            let inline = (part["inlineData"] as? [String: Any]) ?? (part["inline_data"] as? [String: Any])
+            if let b64 = inline?["data"] as? String,
+               let bytes = Data(base64Encoded: b64, options: [.ignoreUnknownCharacters]) {
+                return bytes
+            }
+        }
+        throw ProviderError.badResponse("No inline image part in Gemini response")
+    }
+
+    // MARK: - HTTP
+
+    private func callGenerateContent(modelID: String, systemPrompt: String, userPrompt: String) async throws -> Data {
         let key = try KeyStore.shared.requireKey(for: .google)
 
-        let urlString = "https://generativelanguage.googleapis.com/v1beta/models/\(modelID):generateContent?key=\(key)"
-        guard let url = URL(string: urlString) else {
+        guard let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(modelID):generateContent") else {
             throw ProviderError.badResponse("Invalid Gemini URL for model \(modelID)")
         }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue(key, forHTTPHeaderField: "X-goog-api-key")
 
-        let body: [String: Any] = [
-            "contents": [["parts": [["text": prompt]]]],
-            "generationConfig": ["maxOutputTokens": 512, "temperature": 0.7]
+        var body: [String: Any] = [
+            "contents": [["parts": [["text": userPrompt]]]]
         ]
+        if !systemPrompt.isEmpty {
+            body["systemInstruction"] = ["parts": [["text": systemPrompt]]]
+        }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (data, response) = try await fetch(request)
-        try validate(response)
-
-        // Response: { "candidates": [{ "content": { "parts": [{ "text": "..." }] } }] }
-        guard let json       = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let candidates = json["candidates"] as? [[String: Any]],
-              let content    = candidates.first?["content"] as? [String: Any],
-              let parts      = content["parts"] as? [[String: Any]],
-              let text       = parts.first?["text"] as? String else {
-            throw ProviderError.badResponse("Unexpected Gemini response shape")
-        }
-        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+        try validate(response, data: data)
+        return data
     }
-
-    // MARK: - Helpers
 
     private func fetch(_ request: URLRequest) async throws -> (Data, URLResponse) {
         do {
@@ -86,11 +130,13 @@ final class GoogleProvider: AIProvider {
         catch { throw ProviderError.unknown(error) }
     }
 
-    private func validate(_ response: URLResponse) throws {
+    private func validate(_ response: URLResponse, data: Data) throws {
         guard let http = response as? HTTPURLResponse else {
             throw ProviderError.badResponse("No HTTP response")
         }
         guard (200..<300).contains(http.statusCode) else {
+            let snippet = String(data: data, encoding: .utf8)?.prefix(400) ?? ""
+            NSLog("🐢[Gemini] HTTP %d %@", http.statusCode, String(snippet))
             throw ProviderError.http(http.statusCode)
         }
     }

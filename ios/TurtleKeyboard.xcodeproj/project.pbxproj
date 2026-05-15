@@ -64,8 +64,18 @@
 		HH000142HH000142HH000142 /* PersonalizationViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000143HH000143HH000143 /* PersonalizationViewController.swift */; };
 		HH000144HH000144HH000144 /* PersonalizationKeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000141HH000141HH000141 /* PersonalizationKeys.swift */; };
 		HH000150HH000150HH000150 /* Secrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000151HH000151HH000151 /* Secrets.swift */; };
+		HH000240HH000240HH000240 /* Secrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000151HH000151HH000151 /* Secrets.swift */; };
 		HH000200HH000200HH000200 /* QrRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000201HH000201HH000201 /* QrRenderer.swift */; };
 		HH000202HH000202HH000202 /* JoinSplitViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000203HH000203HH000203 /* JoinSplitViewController.swift */; };
+		HH000220HH000220HH000220 /* WorkerUrls.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000221HH000221HH000221 /* WorkerUrls.swift */; };
+		HH000222HH000222HH000222 /* PollClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000223HH000223HH000223 /* PollClient.swift */; };
+		HH000224HH000224HH000224 /* PollIntegration.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000225HH000225HH000225 /* PollIntegration.swift */; };
+		HH000230HH000230HH000230 /* WyrClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000231HH000231HH000231 /* WyrClient.swift */; };
+		HH000232HH000232HH000232 /* WyrIntegration.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000233HH000233HH000233 /* WyrIntegration.swift */; };
+		HH000300HH000300HH000300 /* WebIntegration.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000301HH000301HH000301 /* WebIntegration.swift */; };
+		HH000302HH000302HH000302 /* WebPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000303HH000303HH000303 /* WebPanelView.swift */; };
+		HH000310HH000310HH000310 /* SuggestedShortcut.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000311HH000311HH000311 /* SuggestedShortcut.swift */; };
+		HH000312HH000312HH000312 /* SuggestedShortcutCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000313HH000313HH000313 /* SuggestedShortcutCatalog.swift */; };
 		FF000001FF000001FF000001 /* TurtleKeyboardExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = EE000005EE000005EE000005 /* TurtleKeyboardExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -150,6 +160,15 @@
 		HH000203HH000203HH000203 /* JoinSplitViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoinSplitViewController.swift; sourceTree = "<group>"; };
 		HH000210HH000210HH000210 /* TurtleKeyboard.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TurtleKeyboard.entitlements; sourceTree = "<group>"; };
 		HH000211HH000211HH000211 /* TurtleKeyboardExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TurtleKeyboardExtension.entitlements; sourceTree = "<group>"; };
+		HH000221HH000221HH000221 /* WorkerUrls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkerUrls.swift; sourceTree = "<group>"; };
+		HH000223HH000223HH000223 /* PollClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PollClient.swift; sourceTree = "<group>"; };
+		HH000225HH000225HH000225 /* PollIntegration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PollIntegration.swift; sourceTree = "<group>"; };
+		HH000231HH000231HH000231 /* WyrClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WyrClient.swift; sourceTree = "<group>"; };
+		HH000233HH000233HH000233 /* WyrIntegration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WyrIntegration.swift; sourceTree = "<group>"; };
+		HH000301HH000301HH000301 /* WebIntegration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebIntegration.swift; sourceTree = "<group>"; };
+		HH000303HH000303HH000303 /* WebPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebPanelView.swift; sourceTree = "<group>"; };
+		HH000311HH000311HH000311 /* SuggestedShortcut.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuggestedShortcut.swift; sourceTree = "<group>"; };
+		HH000313HH000313HH000313 /* SuggestedShortcutCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuggestedShortcutCatalog.swift; sourceTree = "<group>"; };
 		EE000004EE000004EE000004 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		EE000005EE000005EE000005 /* TurtleKeyboardExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = TurtleKeyboardExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -293,11 +312,44 @@
 				HH000041HH000041HH000041 /* IntegrationKit.swift */,
 				HH000043HH000043HH000043 /* IntegrationRegistry.swift */,
 				HH000141HH000141HH000141 /* PersonalizationKeys.swift */,
+				HH000221HH000221HH000221 /* WorkerUrls.swift */,
+				HH000311HH000311HH000311 /* SuggestedShortcut.swift */,
+				HH000313HH000313HH000313 /* SuggestedShortcutCatalog.swift */,
 				HH000039HH000039HH000039 /* Split */,
 				HH000116HH000116HH000116 /* Notion */,
 				HH000117HH000117HH000117 /* Slack */,
+				HH000226HH000226HH000226 /* Poll */,
+				HH000234HH000234HH000234 /* Wyr */,
+				HH000304HH000304HH000304 /* Web */,
 			);
 			path = Integration;
+			sourceTree = "<group>";
+		};
+		HH000226HH000226HH000226 /* Poll */ = {
+			isa = PBXGroup;
+			children = (
+				HH000223HH000223HH000223 /* PollClient.swift */,
+				HH000225HH000225HH000225 /* PollIntegration.swift */,
+			);
+			path = Poll;
+			sourceTree = "<group>";
+		};
+		HH000234HH000234HH000234 /* Wyr */ = {
+			isa = PBXGroup;
+			children = (
+				HH000231HH000231HH000231 /* WyrClient.swift */,
+				HH000233HH000233HH000233 /* WyrIntegration.swift */,
+			);
+			path = Wyr;
+			sourceTree = "<group>";
+		};
+		HH000304HH000304HH000304 /* Web */ = {
+			isa = PBXGroup;
+			children = (
+				HH000301HH000301HH000301 /* WebIntegration.swift */,
+				HH000303HH000303HH000303 /* WebPanelView.swift */,
+			);
+			path = Web;
 			sourceTree = "<group>";
 		};
 		HH000039HH000039HH000039 /* Split */ = {
@@ -437,11 +489,15 @@
 			inputPaths = (
 				"$(SRCROOT)/../commands/prompts/ask.txt",
 				"$(SRCROOT)/../commands/prompts/org.txt",
+				"$(SRCROOT)/../commands/prompts/poll.txt",
+				"$(SRCROOT)/../commands/prompts/wyr.txt",
 			);
 			name = "Copy shared command prompts";
 			outputPaths = (
 				"$(BUILT_PRODUCTS_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ask.txt",
 				"$(BUILT_PRODUCTS_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/org.txt",
+				"$(BUILT_PRODUCTS_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/poll.txt",
+				"$(BUILT_PRODUCTS_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/wyr.txt",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -518,6 +574,16 @@
 				HH000124HH000124HH000124 /* SlashCommand.swift in Sources */,
 				HH000130HH000130HH000130 /* QuickPanelView.swift in Sources */,
 				HH000140HH000140HH000140 /* PersonalizationKeys.swift in Sources */,
+				HH000220HH000220HH000220 /* WorkerUrls.swift in Sources */,
+				HH000222HH000222HH000222 /* PollClient.swift in Sources */,
+				HH000224HH000224HH000224 /* PollIntegration.swift in Sources */,
+				HH000230HH000230HH000230 /* WyrClient.swift in Sources */,
+				HH000232HH000232HH000232 /* WyrIntegration.swift in Sources */,
+				HH000300HH000300HH000300 /* WebIntegration.swift in Sources */,
+				HH000302HH000302HH000302 /* WebPanelView.swift in Sources */,
+				HH000310HH000310HH000310 /* SuggestedShortcut.swift in Sources */,
+				HH000312HH000312HH000312 /* SuggestedShortcutCatalog.swift in Sources */,
+				HH000240HH000240HH000240 /* Secrets.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -133,6 +133,16 @@ protocol IntegrationContext: AnyObject {
     /// "split-detail"). On iOS this opens a URL scheme into the host app.
     /// No-op when the host doesn't recognize the screen id.
     func openScreen(_ screenId: String)
+
+    /// Open an arbitrary URL via `extensionContext.open(_:)`. For https
+    /// URLs this routes to the default browser (Safari). Used by /web's
+    /// "Open in Safari" hand-off. Completion fires `false` if the system
+    /// blocks the open.
+    func openExternalURL(_ url: URL)
+}
+
+extension IntegrationContext {
+    func openExternalURL(_ url: URL) {} // default no-op for older conformers
 }
 
 // MARK: - IntegrationSession

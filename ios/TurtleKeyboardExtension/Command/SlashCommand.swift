@@ -18,6 +18,9 @@ enum SlashCommand: String {
     case note   = "note"
     case slack  = "slack"
     case msg    = "msg"
+    case poll   = "poll"
+    case wyr    = "wyr"
+    case web    = "web"
 
     var emoji: String {
         switch self {
@@ -32,14 +35,17 @@ enum SlashCommand: String {
         case .splits:        return "📜"
         case .notion, .note: return "📓"
         case .slack, .msg:   return "💬"
+        case .poll:          return "📊"
+        case .wyr:           return "🤔"
+        case .web:           return "🌐"
         }
     }
 
     var needsPrompt: Bool {
         switch self {
         case .cap, .tone, .tl, .ask, .org, .split,
-             .notion, .note, .slack, .msg:        return true
-        case .fix, .reply, .splits:               return false
+             .notion, .note, .slack, .msg, .poll, .web: return true
+        case .fix, .reply, .splits, .wyr:               return false
         }
     }
 
@@ -50,6 +56,9 @@ enum SlashCommand: String {
         case .splits:            return "Open"
         case .notion, .note:     return "Create"
         case .slack, .msg:       return "Post"
+        case .poll:              return "Create"
+        case .wyr:               return "Play"
+        case .web:               return "Open"
         default:                 return "Send"
         }
     }
@@ -57,7 +66,7 @@ enum SlashCommand: String {
     /// Local commands run inside the keyboard with no AI round-trip.
     var isLocal: Bool {
         switch self {
-        case .split, .splits, .notion, .note, .slack, .msg: return true
+        case .split, .splits, .notion, .note, .slack, .msg, .poll, .wyr, .web: return true
         default: return false
         }
     }
@@ -77,6 +86,9 @@ enum SlashCommand: String {
         case .splits:        return "📜 Splits opened"
         case .notion, .note: return "📓 Notion"
         case .slack, .msg:   return "💬 Slack"
+        case .poll:          return "📊 Poll"
+        case .wyr:           return "🤔 Game ready"
+        case .web:           return "🌐 Web"
         }
     }
 }

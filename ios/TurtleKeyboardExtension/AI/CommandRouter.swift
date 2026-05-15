@@ -15,29 +15,53 @@ import Foundation
 
 final class CommandRouter {
     static let shared = CommandRouter()
-    private init() {}
+    private init() {
+        // Surface the Gemini key from the build-time `.env` to KeyStore so
+        // GoogleProvider can pick it up. Host-app onboarding can still
+        // overwrite this later via KeyStore.shared.setGoogleKey(_:).
+        if !Secrets.geminiApiKey.isEmpty,
+           (KeyStore.shared[.google] ?? "").isEmpty {
+            KeyStore.shared.setGoogleKey(Secrets.geminiApiKey)
+        }
+    }
 
     // Registered providers.
-    // Cloud providers (Anthropic, Google, OpenAI) are intentionally NOT
-    // registered while we test against the local LM Studio endpoint.
-    // To re-enable them later, just add their entries back here.
+    // GoogleProvider (Gemini) is registered so text commands can route to
+    // Gemini when a key is present in `.env`. Anthropic/OpenAI remain
+    // unregistered until we wire host-app key entry for them.
     private let providers: [ProviderID: AIProvider] = [
         .fal:      FalProvider(),
         .lmstudio: LMStudioProvider(),
+        .google:   GoogleProvider(),
     ]
 
     // Default model per command.
-    // All text commands route to the local Gemma 4 for testing.
-    // /cap stays on Flux 2 via the Spark gateway.
-    private let defaultRoutes: [String: AIModel] = [
-        "cap":   ModelRegistry.flux2,
-        "fix":   ModelRegistry.gemma4,
-        "tone":  ModelRegistry.gemma4,
-        "reply": ModelRegistry.gemma4,
-        "tl":    ModelRegistry.gemma4,
-        "ask":   ModelRegistry.gemma4,
-        "org":   ModelRegistry.gemma4,
-    ]
+    // When a Gemini key is present in Secrets, every command (text + /cap)
+    // routes to Gemini, matching the Android client. Without a key, text falls
+    // back to local Gemma via LM Studio and /cap falls back to Flux 2 via the
+    // Spark gateway.
+    private var hasGeminiKey: Bool { !Secrets.geminiApiKey.isEmpty }
+
+    private var textDefault: AIModel {
+        hasGeminiKey ? ModelRegistry.geminiFlash : ModelRegistry.gemma4
+    }
+
+    private var imageDefault: AIModel {
+        hasGeminiKey ? ModelRegistry.geminiImage : ModelRegistry.flux2
+    }
+
+    private var defaultRoutes: [String: AIModel] {
+        let txt = textDefault
+        return [
+            "cap":   imageDefault,
+            "fix":   txt,
+            "tone":  txt,
+            "reply": txt,
+            "tl":    txt,
+            "ask":   txt,
+            "org":   txt,
+        ]
+    }
 
     // TODO: migrate to shared App Group defaults once App Groups are wired
     private let defaults: UserDefaults = .standard
