@@ -41,6 +41,27 @@
 		HH000074HH000074HH000074 /* SplitSheetsClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000075HH000075HH000075 /* SplitSheetsClient.swift */; };
 		HH000076HH000076HH000076 /* SplitDriveClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000077HH000077HH000077 /* SplitDriveClient.swift */; };
 		HH000078HH000078HH000078 /* SplitCloudSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000079HH000079HH000079 /* SplitCloudSync.swift */; };
+		HH000331HH000331HH000331 /* SplitFreshTokenProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000330HH000330HH000330 /* SplitFreshTokenProvider.swift */; };
+		HH000332HH000332HH000332 /* SplitFreshTokenProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000330HH000330HH000330 /* SplitFreshTokenProvider.swift */; };
+		HH000334HH000334HH000334 /* SplitKeychainTokenProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000333HH000333HH000333 /* SplitKeychainTokenProvider.swift */; };
+		HH000335HH000335HH000335 /* SplitKeychainTokenProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000333HH000333HH000333 /* SplitKeychainTokenProvider.swift */; };
+		HH000337HH000337HH000337 /* SplitOAuthConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000336HH000336HH000336 /* SplitOAuthConstants.swift */; };
+		HH000338HH000338HH000338 /* SplitOAuthConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000336HH000336HH000336 /* SplitOAuthConstants.swift */; };
+		HH000340HH000340HH000340 /* SplitKeychain.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000071HH000071HH000071 /* SplitKeychain.swift */; };
+		HH000341HH000341HH000341 /* SplitSheetsClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000075HH000075HH000075 /* SplitSheetsClient.swift */; };
+		HH000342HH000342HH000342 /* SplitDriveClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000077HH000077HH000077 /* SplitDriveClient.swift */; };
+		HH000343HH000343HH000343 /* SplitCloudSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000079HH000079HH000079 /* SplitCloudSync.swift */; };
+		HH000350HH000350HH000350 /* ImageVariants.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000351HH000351HH000351 /* ImageVariants.swift */; };
+		HH000360HH000360HH000360 /* PollSheetViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000361HH000361HH000361 /* PollSheetViewController.swift */; };
+		HH000362HH000362HH000362 /* WyrSheetViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000363HH000363HH000363 /* WyrSheetViewController.swift */; };
+		HH000364HH000364HH000364 /* WorkerUrls.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000221HH000221HH000221 /* WorkerUrls.swift */; };
+		HH000365HH000365HH000365 /* PollClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000223HH000223HH000223 /* PollClient.swift */; };
+		HH000366HH000366HH000366 /* WyrClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000231HH000231HH000231 /* WyrClient.swift */; };
+		HH000370HH000370HH000370 /* ImageHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000371HH000371HH000371 /* ImageHistory.swift */; };
+		HH000372HH000372HH000372 /* ImageHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000371HH000371HH000371 /* ImageHistory.swift */; };
+		HH000373HH000373HH000373 /* HistoryViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000374HH000374HH000374 /* HistoryViewController.swift */; };
+		HH000375HH000375HH000375 /* PresetChipStripView.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000376HH000376HH000376 /* PresetChipStripView.swift */; };
+		HH000380HH000380HH000380 /* ImageDownsizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000381HH000381HH000381 /* ImageDownsizer.swift */; };
 		HH000090HH000090HH000090 /* NotionTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000091HH000091HH000091 /* NotionTypes.swift */; };
 		HH000092HH000092HH000092 /* NotionClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000093HH000093HH000093 /* NotionClient.swift */; };
 		HH000094HH000094HH000094 /* NotionLlmBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000095HH000095HH000095 /* NotionLlmBridge.swift */; };
@@ -76,6 +97,10 @@
 		HH000302HH000302HH000302 /* WebPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000303HH000303HH000303 /* WebPanelView.swift */; };
 		HH000310HH000310HH000310 /* SuggestedShortcut.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000311HH000311HH000311 /* SuggestedShortcut.swift */; };
 		HH000312HH000312HH000312 /* SuggestedShortcutCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000313HH000313HH000313 /* SuggestedShortcutCatalog.swift */; };
+		HH000321HH000321HH000321 /* KeyboardTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000320HH000320HH000320 /* KeyboardTheme.swift */; };
+		HH000322HH000322HH000322 /* KeyboardTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000320HH000320HH000320 /* KeyboardTheme.swift */; };
+		HH000324HH000324HH000324 /* KeyboardThemeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000323HH000323HH000323 /* KeyboardThemeManager.swift */; };
+		HH000325HH000325HH000325 /* KeyboardThemeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000323HH000323HH000323 /* KeyboardThemeManager.swift */; };
 		FF000001FF000001FF000001 /* TurtleKeyboardExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = EE000005EE000005EE000005 /* TurtleKeyboardExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -138,6 +163,16 @@
 		HH000075HH000075HH000075 /* SplitSheetsClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitSheetsClient.swift; sourceTree = "<group>"; };
 		HH000077HH000077HH000077 /* SplitDriveClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitDriveClient.swift; sourceTree = "<group>"; };
 		HH000079HH000079HH000079 /* SplitCloudSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitCloudSync.swift; sourceTree = "<group>"; };
+		HH000330HH000330HH000330 /* SplitFreshTokenProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitFreshTokenProvider.swift; sourceTree = "<group>"; };
+		HH000333HH000333HH000333 /* SplitKeychainTokenProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitKeychainTokenProvider.swift; sourceTree = "<group>"; };
+		HH000336HH000336HH000336 /* SplitOAuthConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitOAuthConstants.swift; sourceTree = "<group>"; };
+		HH000351HH000351HH000351 /* ImageVariants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageVariants.swift; sourceTree = "<group>"; };
+		HH000361HH000361HH000361 /* PollSheetViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PollSheetViewController.swift; sourceTree = "<group>"; };
+		HH000363HH000363HH000363 /* WyrSheetViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WyrSheetViewController.swift; sourceTree = "<group>"; };
+		HH000371HH000371HH000371 /* ImageHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageHistory.swift; sourceTree = "<group>"; };
+		HH000374HH000374HH000374 /* HistoryViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryViewController.swift; sourceTree = "<group>"; };
+		HH000376HH000376HH000376 /* PresetChipStripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresetChipStripView.swift; sourceTree = "<group>"; };
+		HH000381HH000381HH000381 /* ImageDownsizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageDownsizer.swift; sourceTree = "<group>"; };
 		HH000091HH000091HH000091 /* NotionTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotionTypes.swift; sourceTree = "<group>"; };
 		HH000093HH000093HH000093 /* NotionClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotionClient.swift; sourceTree = "<group>"; };
 		HH000095HH000095HH000095 /* NotionLlmBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotionLlmBridge.swift; sourceTree = "<group>"; };
@@ -169,6 +204,8 @@
 		HH000303HH000303HH000303 /* WebPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebPanelView.swift; sourceTree = "<group>"; };
 		HH000311HH000311HH000311 /* SuggestedShortcut.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuggestedShortcut.swift; sourceTree = "<group>"; };
 		HH000313HH000313HH000313 /* SuggestedShortcutCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuggestedShortcutCatalog.swift; sourceTree = "<group>"; };
+		HH000320HH000320HH000320 /* KeyboardTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardTheme.swift; sourceTree = "<group>"; };
+		HH000323HH000323HH000323 /* KeyboardThemeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardThemeManager.swift; sourceTree = "<group>"; };
 		EE000004EE000004EE000004 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		EE000005EE000005EE000005 /* TurtleKeyboardExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = TurtleKeyboardExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -219,6 +256,9 @@
 				HH000109HH000109HH000109 /* NotionConnectViewController.swift */,
 				HH000111HH000111HH000111 /* SlackConnectViewController.swift */,
 				HH000143HH000143HH000143 /* PersonalizationViewController.swift */,
+				HH000361HH000361HH000361 /* PollSheetViewController.swift */,
+				HH000363HH000363HH000363 /* WyrSheetViewController.swift */,
+				HH000374HH000374HH000374 /* HistoryViewController.swift */,
 				HH000151HH000151HH000151 /* Secrets.swift */,
 				HH000080HH000080HH000080 /* Cloud */,
 				CC000006CC000006CC000006 /* Info.plist */,
@@ -235,6 +275,9 @@
 				HH000075HH000075HH000075 /* SplitSheetsClient.swift */,
 				HH000077HH000077HH000077 /* SplitDriveClient.swift */,
 				HH000079HH000079HH000079 /* SplitCloudSync.swift */,
+				HH000330HH000330HH000330 /* SplitFreshTokenProvider.swift */,
+				HH000333HH000333HH000333 /* SplitKeychainTokenProvider.swift */,
+				HH000336HH000336HH000336 /* SplitOAuthConstants.swift */,
 				HH000201HH000201HH000201 /* QrRenderer.swift */,
 				HH000105HH000105HH000105 /* NotionAuth.swift */,
 				HH000107HH000107HH000107 /* SlackAuth.swift */,
@@ -259,6 +302,9 @@
 				HH000028HH000028HH000028 /* org_template.html */,
 				HH000031HH000031HH000031 /* html-to-image.js */,
 				HH000033HH000033HH000033 /* OrgImageRenderer.swift */,
+				HH000351HH000351HH000351 /* ImageVariants.swift */,
+				HH000371HH000371HH000371 /* ImageHistory.swift */,
+				HH000381HH000381HH000381 /* ImageDownsizer.swift */,
 			);
 			path = AI;
 			sourceTree = "<group>";
@@ -286,6 +332,9 @@
 				HH000121HH000121HH000121 /* KeyRows.swift */,
 				HH000123HH000123HH000123 /* KeyboardPalette.swift */,
 				HH000131HH000131HH000131 /* QuickPanelView.swift */,
+				HH000376HH000376HH000376 /* PresetChipStripView.swift */,
+				HH000320HH000320HH000320 /* KeyboardTheme.swift */,
+				HH000323HH000323HH000323 /* KeyboardThemeManager.swift */,
 			);
 			path = Keyboard;
 			sourceTree = "<group>";
@@ -520,6 +569,9 @@
 				HH000074HH000074HH000074 /* SplitSheetsClient.swift in Sources */,
 				HH000076HH000076HH000076 /* SplitDriveClient.swift in Sources */,
 				HH000078HH000078HH000078 /* SplitCloudSync.swift in Sources */,
+				HH000331HH000331HH000331 /* SplitFreshTokenProvider.swift in Sources */,
+				HH000334HH000334HH000334 /* SplitKeychainTokenProvider.swift in Sources */,
+				HH000337HH000337HH000337 /* SplitOAuthConstants.swift in Sources */,
 				HH000104HH000104HH000104 /* NotionAuth.swift in Sources */,
 				HH000106HH000106HH000106 /* SlackAuth.swift in Sources */,
 				HH000108HH000108HH000108 /* NotionConnectViewController.swift in Sources */,
@@ -531,6 +583,15 @@
 				HH000142HH000142HH000142 /* PersonalizationViewController.swift in Sources */,
 				HH000144HH000144HH000144 /* PersonalizationKeys.swift in Sources */,
 				HH000150HH000150HH000150 /* Secrets.swift in Sources */,
+				HH000322HH000322HH000322 /* KeyboardTheme.swift in Sources */,
+				HH000325HH000325HH000325 /* KeyboardThemeManager.swift in Sources */,
+				HH000360HH000360HH000360 /* PollSheetViewController.swift in Sources */,
+				HH000362HH000362HH000362 /* WyrSheetViewController.swift in Sources */,
+				HH000364HH000364HH000364 /* WorkerUrls.swift in Sources */,
+				HH000365HH000365HH000365 /* PollClient.swift in Sources */,
+				HH000366HH000366HH000366 /* WyrClient.swift in Sources */,
+				HH000372HH000372HH000372 /* ImageHistory.swift in Sources */,
+				HH000373HH000373HH000373 /* HistoryViewController.swift in Sources */,
 				HH000200HH000200HH000200 /* QrRenderer.swift in Sources */,
 				HH000202HH000202HH000202 /* JoinSplitViewController.swift in Sources */,
 			);
@@ -583,6 +644,19 @@
 				HH000302HH000302HH000302 /* WebPanelView.swift in Sources */,
 				HH000310HH000310HH000310 /* SuggestedShortcut.swift in Sources */,
 				HH000312HH000312HH000312 /* SuggestedShortcutCatalog.swift in Sources */,
+				HH000321HH000321HH000321 /* KeyboardTheme.swift in Sources */,
+				HH000324HH000324HH000324 /* KeyboardThemeManager.swift in Sources */,
+				HH000332HH000332HH000332 /* SplitFreshTokenProvider.swift in Sources */,
+				HH000335HH000335HH000335 /* SplitKeychainTokenProvider.swift in Sources */,
+				HH000338HH000338HH000338 /* SplitOAuthConstants.swift in Sources */,
+				HH000340HH000340HH000340 /* SplitKeychain.swift in Sources */,
+				HH000341HH000341HH000341 /* SplitSheetsClient.swift in Sources */,
+				HH000342HH000342HH000342 /* SplitDriveClient.swift in Sources */,
+				HH000343HH000343HH000343 /* SplitCloudSync.swift in Sources */,
+				HH000350HH000350HH000350 /* ImageVariants.swift in Sources */,
+				HH000370HH000370HH000370 /* ImageHistory.swift in Sources */,
+				HH000375HH000375HH000375 /* PresetChipStripView.swift in Sources */,
+				HH000380HH000380HH000380 /* ImageDownsizer.swift in Sources */,
 				HH000240HH000240HH000240 /* Secrets.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

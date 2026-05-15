@@ -13,6 +13,10 @@ enum PersonalizationKeys {
     static let webEnabled         = "personalization.web.enabled"
     static let quickPanelEnabled  = "personalization.keyboard.quickpanel"
     static let voiceEnabled       = "personalization.keyboard.voice"
+    /// Theme preference: "auto" | "turtle" | "light" | "dark". Source of truth
+    /// owned by `KeyboardThemeManager.preferenceKey`; mirrored here so the
+    /// host app and the keyboard can read/write through the same name.
+    static let themePreference    = "personalization.theme.preference"
 
     /// Whether the integration with `id` is currently enabled. Defaults
     /// to true when the key has never been written.

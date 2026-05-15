@@ -42,6 +42,19 @@ struct CommandPayload {
     let prompt: String      // text typed after command name  e.g. "formal" in /tone formal
     let context: String     // text before the slash  (the content to act on)
     let locale: String
+    /// PNG bytes of a reference image used by image-edit commands (/edit).
+    /// Nil for every other command. Mirrors Android's `InlineImage`.
+    let referenceImage: Data?
+
+    init(command: String, model: AIModel, prompt: String, context: String,
+         locale: String, referenceImage: Data? = nil) {
+        self.command = command
+        self.model = model
+        self.prompt = prompt
+        self.context = context
+        self.locale = locale
+        self.referenceImage = referenceImage
+    }
 }
 
 // MARK: - Command result  (provider → keyboard)

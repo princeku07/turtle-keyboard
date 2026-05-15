@@ -53,8 +53,9 @@ class ViewController: UIViewController {
         let chooseBtn  = makeButton(title: "2. Switch to Turtle Keyboard", action: #selector(openKeyboardSettings))
         let personalizeBtn = makeButton(title: "Personalize",        action: #selector(openPersonalize))
         let splitsBtn      = makeButton(title: "Saved splits",       action: #selector(openSplits))
+        let historyBtn     = makeButton(title: "Image history",      action: #selector(openHistory))
 
-        let stack = UIStackView(arrangedSubviews: [titleLabel, subtitleLabel, enableBtn, chooseBtn, personalizeBtn, splitsBtn])
+        let stack = UIStackView(arrangedSubviews: [titleLabel, subtitleLabel, enableBtn, chooseBtn, personalizeBtn, splitsBtn, historyBtn])
         stack.axis = .vertical
         stack.spacing = 16
         stack.alignment = .fill
@@ -69,6 +70,7 @@ class ViewController: UIViewController {
             chooseBtn.heightAnchor.constraint(equalToConstant: 50),
             personalizeBtn.heightAnchor.constraint(equalToConstant: 50),
             splitsBtn.heightAnchor.constraint(equalToConstant: 50),
+            historyBtn.heightAnchor.constraint(equalToConstant: 50),
         ])
     }
 
@@ -79,6 +81,11 @@ class ViewController: UIViewController {
 
     @objc private func openSplits() {
         let nav = UINavigationController(rootViewController: SplitDetailViewController())
+        present(nav, animated: true)
+    }
+
+    @objc private func openHistory() {
+        let nav = UINavigationController(rootViewController: HistoryViewController())
         present(nav, animated: true)
     }
 

@@ -54,6 +54,7 @@ final class CommandRouter {
         let txt = textDefault
         return [
             "cap":   imageDefault,
+            "edit":  imageDefault,
             "fix":   txt,
             "tone":  txt,
             "reply": txt,
@@ -88,7 +89,8 @@ final class CommandRouter {
 
     // MARK: - Execution
 
-    func execute(command: String, prompt: String, context: String) async throws -> CommandResult {
+    func execute(command: String, prompt: String, context: String,
+                 referenceImage: Data? = nil) async throws -> CommandResult {
         let model = model(for: command)
 
         guard let capability = Self.requiredCapability(for: command),
@@ -105,7 +107,8 @@ final class CommandRouter {
             model: model,
             prompt: prompt,
             context: context,
-            locale: Locale.current.identifier
+            locale: Locale.current.identifier,
+            referenceImage: referenceImage
         )
         return try await provider.execute(payload)
     }
@@ -114,7 +117,7 @@ final class CommandRouter {
 
     static func requiredCapability(for command: String) -> ModelCapability? {
         switch command {
-        case "cap":               return .imageGeneration
+        case "cap", "edit":       return .imageGeneration
         case "fix", "tone", "org": return .textEdit
         case "reply", "ask":      return .chat
         case "tl":                return .translation
@@ -127,6 +130,10 @@ final class CommandRouter {
 
     static func systemPrompt(for command: String, prompt: String) -> String {
         switch command {
+        case "edit":
+            return PromptLoader.load(id: "edit")
+                ?? "Edit the supplied image following the user's instruction. Return ONLY the edited image; do not explain or annotate."
+
         case "fix":
             return "You are a grammar and spelling corrector. Fix the grammar, spelling, and punctuation of the given text. Return ONLY the corrected text — no explanation, no preamble."
 

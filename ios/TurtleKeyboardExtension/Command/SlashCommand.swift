@@ -6,6 +6,7 @@ import Foundation
 /// backend.
 enum SlashCommand: String {
     case cap    = "cap"
+    case edit   = "edit"
     case fix    = "fix"
     case tone   = "tone"
     case reply  = "reply"
@@ -25,6 +26,7 @@ enum SlashCommand: String {
     var emoji: String {
         switch self {
         case .cap:           return "🎨"
+        case .edit:          return "🖌️"
         case .fix:           return "✏️"
         case .tone:          return "🎭"
         case .reply:         return "💬"
@@ -43,7 +45,7 @@ enum SlashCommand: String {
 
     var needsPrompt: Bool {
         switch self {
-        case .cap, .tone, .tl, .ask, .org, .split,
+        case .cap, .edit, .tone, .tl, .ask, .org, .split,
              .notion, .note, .slack, .msg, .poll, .web: return true
         case .fix, .reply, .splits, .wyr:               return false
         }
@@ -52,6 +54,7 @@ enum SlashCommand: String {
     var buttonTitle: String {
         switch self {
         case .cap:               return "Generate"
+        case .edit:              return "Apply"
         case .split:             return "Split"
         case .splits:            return "Open"
         case .notion, .note:     return "Create"
@@ -76,6 +79,7 @@ enum SlashCommand: String {
     var completionBanner: String {
         switch self {
         case .cap:           return "🎨 Image ready — long-press field to paste"
+        case .edit:          return "🖌️ Edit ready — long-press field to paste"
         case .fix:           return "✏️ Grammar fixed"
         case .tone:          return "🎭 Tone applied"
         case .reply:         return "💬 Reply inserted"

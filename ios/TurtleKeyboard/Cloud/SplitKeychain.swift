@@ -5,20 +5,31 @@ import Security
 /// access to the user's Sheets/Drive — they belong in Keychain, not
 /// `UserDefaults`. Keys are namespaced under `com.turtlekeyboard.split`.
 ///
-/// Synchronous; all reads/writes are sub-millisecond. No App Group sharing
-/// because cloud sync runs only in the host app for now.
+/// Synchronous; all reads/writes are sub-millisecond. Items are stored
+/// under a Keychain Access Group so the host app (writer) and the
+/// keyboard extension (reader) can both see the refresh token. The
+/// access-group value must match the `keychain-access-groups` entry in
+/// both targets' entitlements (`$(AppIdentifierPrefix)` + this string).
 enum SplitKeychain {
 
     private static let service = "com.turtlekeyboard.split"
 
-    static func set(_ value: String, forKey key: String) {
-        let data = Data(value.utf8)
-        let query: [String: Any] = [
+    /// Group both targets must declare in their entitlements. Xcode prefixes
+    /// this with the team identifier at signing time.
+    static let accessGroup = "com.turtlekeyboard.split"
+
+    private static func baseQuery(forKey key: String) -> [String: Any] {
+        [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: key,
+            kSecAttrAccessGroup as String: accessGroup,
         ]
-        // Try update first; on item-not-found, add.
+    }
+
+    static func set(_ value: String, forKey key: String) {
+        let data = Data(value.utf8)
+        let query = baseQuery(forKey: key)
         let attributes: [String: Any] = [
             kSecValueData as String: data,
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
@@ -33,13 +44,9 @@ enum SplitKeychain {
     }
 
     static func get(_ key: String) -> String? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: key,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-        ]
+        var query = baseQuery(forKey: key)
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
         var ref: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &ref)
         guard status == errSecSuccess,
@@ -50,11 +57,7 @@ enum SplitKeychain {
     }
 
     static func delete(_ key: String) {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: key,
-        ]
+        let query = baseQuery(forKey: key)
         SecItemDelete(query as CFDictionary)
     }
 

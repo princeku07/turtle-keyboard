@@ -28,8 +28,17 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return route(url: url)
     }
 
-    /// Routes a `turtlekeyboard://<screen-id>` URL to the matching host
-    /// screen. Returning false signals iOS that the URL wasn't handled.
+    /// Routes a `turtlekeyboard://<screen-id>[/<id>]` URL to the matching
+    /// host screen. Returning false signals iOS that the URL wasn't handled.
+    ///
+    /// Supported routes:
+    ///   • `turtlekeyboard://split-detail`            → SplitDetailViewController
+    ///   • `turtlekeyboard://join?sheetId=…&owner=…`  → JoinSplitViewController
+    ///   • `turtlekeyboard://notion-connect`          → NotionConnectViewController
+    ///   • `turtlekeyboard://slack-connect`           → SlackConnectViewController
+    ///   • `turtlekeyboard://personalization`         → PersonalizationViewController
+    ///   • `turtlekeyboard://poll/<id>`               → PollSheetViewController
+    ///   • `turtlekeyboard://wyr/<id>`                → WyrSheetViewController
     @discardableResult
     private func route(url: URL) -> Bool {
         guard url.scheme == "turtlekeyboard" else { return false }
@@ -52,9 +61,32 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         case "personalization", "personalize":
             present(PersonalizationViewController())
             return true
+        case "poll":
+            guard let id = artifactId(in: url) else { return false }
+            present(PollSheetViewController(pollId: id))
+            return true
+        case "wyr":
+            guard let id = artifactId(in: url) else { return false }
+            present(WyrSheetViewController(wyrId: id))
+            return true
         default:
             return false
         }
+    }
+
+    /// Pulls the trailing path component as the artifact id. Accepts both
+    /// `turtlekeyboard://poll/<id>` and `turtlekeyboard://poll?id=<id>`
+    /// since Android-emitted URLs use the path form but the query form is
+    /// trivial to support and forgiving when copy-pasted by hand.
+    private func artifactId(in url: URL) -> String? {
+        let trimmed = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        if !trimmed.isEmpty { return trimmed.split(separator: "/").last.map(String.init) }
+        if let q = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?.first(where: { $0.name == "id" })?.value,
+           !q.isEmpty {
+            return q
+        }
+        return nil
     }
 
     private func present(_ vc: UIViewController) {

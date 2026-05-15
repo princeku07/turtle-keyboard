@@ -226,7 +226,10 @@ final class SplitDetailViewController: UIViewController {
             cloudActionButton.setTitle("Sign out", for: .normal)
             syncButton.isHidden = false
             inviteButton.isHidden = !sync.isOwner
-            inviteButton.setTitle(sync.isMembershipOpen ? "Stop sharing" : "Invite", for: .normal)
+            // Always offers the share/QR modal — "Stop sharing" lives as a
+            // secondary action inside that modal now, so users can re-open
+            // the QR after dismissing it without accidentally toggling off.
+            inviteButton.setTitle(sync.isMembershipOpen ? "Share QR" : "Invite", for: .normal)
         } else {
             cloudStatusLabel.text = "Sign in with Google to back up your splits to your own private spreadsheet."
             cloudActionButton.setTitle("Sign in", for: .normal)
@@ -286,17 +289,55 @@ final class SplitDetailViewController: UIViewController {
     }
 
     @objc private func inviteTapped() {
-        guard sync.isOwner else { return }
-        if sync.isMembershipOpen {
-            Task { @MainActor in
-                _ = await sync.closeMembership()
-                refreshCloudUI()
+        presentShareFlow()
+    }
+
+    /// Idempotent entry point for the share/QR flow. Handles every state:
+    ///   • OAuth not configured → config alert.
+    ///   • Not signed in       → kick off sign-in, retry on success.
+    ///   • Signed in as joiner → "only owner can share" alert.
+    ///   • Owner + closed     → openMembership → showInviteQr.
+    ///   • Owner + open        → buildJoinDeepLink → showInviteQr
+    ///                            (no toggle-off — that's a button inside
+    ///                            the modal now).
+    private func presentShareFlow() {
+        if !oauth.isConfigured {
+            showAlert(title: "Cloud sync not configured",
+                      message: "Open OAUTH_SETUP_iOS.md, create a Google OAuth client, then paste the client ID into .env.")
+            return
+        }
+        if !oauth.isSignedIn {
+            oauth.signIn { [weak self] result in
+                DispatchQueue.main.async {
+                    guard let self = self else { return }
+                    switch result {
+                    case .success:
+                        Task { @MainActor in
+                            _ = await self.sync.ensureSheet()
+                            self.refreshCloudUI()
+                            self.presentShareFlow()
+                        }
+                    case .failure(let e):
+                        self.showAlert(title: "Sign-in failed", message: e.localizedDescription)
+                    }
+                }
             }
+            return
+        }
+        guard sync.isOwner else {
+            showAlert(title: "Only the owner can share",
+                      message: "This sheet belongs to someone else. Sign in with the account that originally created it to share the QR.")
+            return
+        }
+        if sync.isMembershipOpen {
+            // Already sharing — just re-show the QR, don't toggle.
+            showInviteQr(deepLink: sync.buildJoinDeepLink())
             return
         }
         Task { @MainActor in
             guard let link = await sync.openMembership() else {
-                showAlert(title: "Invite failed", message: "Could not enable sharing. Try again.")
+                showAlert(title: "Invite failed",
+                          message: "Could not enable sharing. Check your connection and try again.")
                 return
             }
             refreshCloudUI()
@@ -365,7 +406,22 @@ final class SplitDetailViewController: UIViewController {
         buttonRow.axis = .horizontal
         buttonRow.distribution = .fillEqually
 
-        let stack = UIStackView(arrangedSubviews: [title, sub, qrView, link, buttonRow])
+        // Secondary, destructive action — stop sharing without dismissing
+        // the modal first. Visible only while membership is open.
+        let stopBtn = UIButton(type: .system)
+        stopBtn.setTitle("Stop sharing", for: .normal)
+        stopBtn.titleLabel?.font = .systemFont(ofSize: 13)
+        stopBtn.setTitleColor(.systemRed, for: .normal)
+        stopBtn.addAction(UIAction { [weak self, weak sheet] _ in
+            guard let self = self, let sheet = sheet else { return }
+            Task { @MainActor in
+                _ = await self.sync.closeMembership()
+                self.refreshCloudUI()
+                sheet.dismiss(animated: true)
+            }
+        }, for: .touchUpInside)
+
+        let stack = UIStackView(arrangedSubviews: [title, sub, qrView, link, buttonRow, stopBtn])
         stack.axis = .vertical
         stack.spacing = 12
         stack.alignment = .fill

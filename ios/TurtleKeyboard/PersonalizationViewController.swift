@@ -92,6 +92,50 @@ final class PersonalizationViewController: UIViewController {
             title: "Voice mic key",
             subtitle: "Show the 🎙 button in the slash-command bar so you can dictate prompts.",
             enabledKey: PersonalizationKeys.voiceEnabled))
+        stack.addArrangedSubview(themePickerCard())
+    }
+
+    // MARK: - Theme picker
+
+    private func themePickerCard() -> UIView {
+        let card = makeCard()
+
+        let title = UILabel()
+        title.text = "Theme"
+        title.font = .systemFont(ofSize: 16, weight: .semibold)
+        title.textColor = .white
+
+        let sub = subtitle("Auto follows the system Dark Mode setting. Turtle is the brand green look.")
+
+        let order: [ThemePreference] = [.auto, .turtle, .light, .dark]
+        let labels = order.map { pref -> String in
+            switch pref {
+            case .auto:   return "Auto"
+            case .turtle: return "Turtle"
+            case .light:  return "Light"
+            case .dark:   return "Dark"
+            }
+        }
+        let picker = UISegmentedControl(items: labels)
+        picker.selectedSegmentTintColor = .white
+        picker.setTitleTextAttributes([.foregroundColor: UIColor.white], for: .normal)
+        picker.setTitleTextAttributes([.foregroundColor: brandGreen], for: .selected)
+
+        let current = KeyboardThemeManager.shared.preference(store: store)
+        picker.selectedSegmentIndex = order.firstIndex(of: current) ?? 1
+
+        picker.addAction(UIAction { [weak self] _ in
+            guard let self = self else { return }
+            let pick = order[picker.selectedSegmentIndex]
+            KeyboardThemeManager.shared.setPreference(pick, store: self.store)
+        }, for: .valueChanged)
+
+        let inner = UIStackView(arrangedSubviews: [title, sub, picker])
+        inner.axis = .vertical
+        inner.spacing = 8
+        inner.translatesAutoresizingMaskIntoConstraints = false
+        embed(inner, in: card)
+        return card
     }
 
     // MARK: - Builders

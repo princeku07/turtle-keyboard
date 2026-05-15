@@ -9,7 +9,7 @@ import AuthenticationServices
 /// Tokens live in `SplitKeychain`; sheet/owner pointers live in `SplitStore`.
 /// Access tokens last ~1 hour; we use the refresh token to mint fresh ones
 /// silently.
-final class SplitOAuth: NSObject {
+final class SplitOAuth: NSObject, SplitFreshTokenProvider {
 
     // MARK: - User-supplied configuration
     //
@@ -21,10 +21,7 @@ final class SplitOAuth: NSObject {
     /// web client only as a last resort — Google Web clients reject
     /// custom-scheme redirects, so without the iOS client this flow
     /// can't complete on iOS.
-    static var clientID: String {
-        let ios = Secrets.splitOauthIosClientId
-        return ios.isEmpty ? Secrets.splitOauthWebClientId : ios
-    }
+    static var clientID: String { SplitOAuthConstants.clientID }
 
     /// True when an iOS OAuth client is configured. Drives which redirect
     /// scheme we use.
@@ -60,31 +57,13 @@ final class SplitOAuth: NSObject {
     ]
 
     static let authEndpoint = URL(string: "https://accounts.google.com/o/oauth2/v2/auth")!
-    static let tokenEndpoint = URL(string: "https://oauth2.googleapis.com/token")!
+    static var tokenEndpoint: URL { SplitOAuthConstants.tokenEndpoint }
     static let userinfoEndpoint = URL(string: "https://www.googleapis.com/oauth2/v3/userinfo")!
 
     /// Buffer subtracted from token expiry so we refresh before it dies.
-    static let refreshSkewSeconds: TimeInterval = 60
+    static var refreshSkewSeconds: TimeInterval { SplitOAuthConstants.refreshSkewSeconds }
 
-    enum AuthError: Error, LocalizedError {
-        case notConfigured
-        case userCancelled
-        case missingCode
-        case http(Int, String)
-        case noRefreshToken
-        case decode(String)
-
-        var errorDescription: String? {
-            switch self {
-            case .notConfigured:        return "OAuth client ID not set — see OAUTH_SETUP_iOS.md"
-            case .userCancelled:        return "Sign-in cancelled"
-            case .missingCode:          return "No auth code in redirect"
-            case .http(let code, let m):return "HTTP \(code): \(m)"
-            case .noRefreshToken:       return "No refresh token stored — sign in again"
-            case .decode(let m):        return "Decode error: \(m)"
-            }
-        }
-    }
+    typealias AuthError = SplitOAuthConstants.AuthError
 
     private let store: SplitStore
     private weak var anchor: UIWindow?

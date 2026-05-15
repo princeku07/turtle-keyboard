@@ -27,6 +27,15 @@ final class GoogleProvider: AIProvider {
         let userContent  = userMessage(from: payload)
 
         if payload.model.supports(.imageGeneration) {
+            // /edit and friends supply a reference image — route through
+            // the multi-part path that prepends inlineData to the content.
+            if let ref = payload.referenceImage, !ref.isEmpty {
+                let png = try await editImage(modelID: payload.model.id,
+                                              systemPrompt: systemPrompt,
+                                              userPrompt: userContent,
+                                              reference: ref)
+                return .imageData(png)
+            }
             let png = try await generateImage(modelID: payload.model.id,
                                               systemPrompt: systemPrompt,
                                               userPrompt: userContent)
@@ -95,9 +104,44 @@ final class GoogleProvider: AIProvider {
         throw ProviderError.badResponse("No inline image part in Gemini response")
     }
 
+    // MARK: - Image edit (multipart: inlineData + text)
+    //
+    // Mirrors android/.../ai/GeminiClient.doImageEdit. The single `contents`
+    // entry carries two parts — the reference image inline (base64 PNG)
+    // followed by the user's instruction text. Gemini's flash-image model
+    // reads both and returns the edited image as inlineData in the response.
+
+    private func editImage(modelID: String,
+                           systemPrompt: String,
+                           userPrompt: String,
+                           reference: Data) async throws -> Data {
+        let data = try await callGenerateContent(modelID: modelID,
+                                                 systemPrompt: systemPrompt,
+                                                 userPrompt: userPrompt,
+                                                 reference: reference)
+
+        guard let json       = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let candidates = json["candidates"] as? [[String: Any]],
+              let content    = candidates.first?["content"] as? [String: Any],
+              let parts      = content["parts"] as? [[String: Any]] else {
+            throw ProviderError.badResponse("Unexpected Gemini edit response shape")
+        }
+        for part in parts {
+            let inline = (part["inlineData"] as? [String: Any]) ?? (part["inline_data"] as? [String: Any])
+            if let b64 = inline?["data"] as? String,
+               let bytes = Data(base64Encoded: b64, options: [.ignoreUnknownCharacters]) {
+                return bytes
+            }
+        }
+        throw ProviderError.badResponse("No edited-image part in Gemini response")
+    }
+
     // MARK: - HTTP
 
-    private func callGenerateContent(modelID: String, systemPrompt: String, userPrompt: String) async throws -> Data {
+    private func callGenerateContent(modelID: String,
+                                     systemPrompt: String,
+                                     userPrompt: String,
+                                     reference: Data? = nil) async throws -> Data {
         let key = try KeyStore.shared.requireKey(for: .google)
 
         guard let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(modelID):generateContent") else {
@@ -110,9 +154,20 @@ final class GoogleProvider: AIProvider {
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue(key, forHTTPHeaderField: "X-goog-api-key")
 
-        var body: [String: Any] = [
-            "contents": [["parts": [["text": userPrompt]]]]
-        ]
+        var parts: [[String: Any]] = []
+        if let ref = reference, !ref.isEmpty {
+            // Inline image first, then the text instruction. Same order
+            // Gemini's docs use for image-edit prompts.
+            parts.append([
+                "inlineData": [
+                    "mimeType": "image/png",
+                    "data": ref.base64EncodedString(),
+                ]
+            ])
+        }
+        parts.append(["text": userPrompt])
+
+        var body: [String: Any] = ["contents": [["parts": parts]]]
         if !systemPrompt.isEmpty {
             body["systemInstruction"] = ["parts": [["text": systemPrompt]]]
         }

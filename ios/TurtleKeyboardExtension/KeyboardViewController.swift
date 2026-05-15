@@ -1,4 +1,5 @@
 import UIKit
+import PhotosUI
 
 class KeyboardViewController: UIInputViewController {
 
@@ -23,6 +24,17 @@ class KeyboardViewController: UIInputViewController {
     private var commandPromptText = ""
     private var isGenerating      = false
     private var pendingSuggestions: [String] = []
+
+    /// PNG bytes of the image picked for the active `/edit` session, or
+    /// `nil` when nothing is staged. Cleared after the command sends, when
+    /// the command bar dismisses, or when the user picks again. Mirrors
+    /// Android's `stagedImage` on `LmStudioAiClient`.
+    private var stagedEditImage: Data?
+
+    /// True while the PHPicker for `/edit` is on screen — prevents
+    /// `showCommandBar(.edit)` from re-presenting on its second call
+    /// (after the user picks and the picker dismisses).
+    private var editPickerActive = false
 
     // While the user is composing a slash command, every keystroke is routed
     // into this buffer instead of `textDocumentProxy.insertText`. The host app
@@ -104,6 +116,12 @@ class KeyboardViewController: UIInputViewController {
     private var voicePromptPrefix: String?
     private var cmdSuggestionsStack: UIStackView!
     private var cmdSuggestionBtns:   [UIButton] = []
+    private var cmdPresetStrip:      PresetChipStripView!
+    /// 2 pt-wide blinking caret pinned to the right edge of the prompt
+    /// label's rendered text. Visible whenever `cmdPromptLabel` is on
+    /// screen so the user can tell which surface accepts their keystrokes.
+    private var cmdCaret:            UIView!
+    private var cmdCaretLeading:     NSLayoutConstraint!
     private var bannerContainer:     UIView!
     private var bannerLabel:         UILabel!
     private var keyboardContainer:   UIView!
@@ -159,6 +177,7 @@ class KeyboardViewController: UIInputViewController {
         super.viewDidLoad()
         haptic.prepare()
         view.backgroundColor = .clear
+        resolveAndCacheTheme()
         setupContainers()
         buildKeyboard()
         // Set once — never changed again anywhere in this file.
@@ -170,6 +189,47 @@ class KeyboardViewController: UIInputViewController {
         // collapses it to zero on iPad.
         suppressSystemShortcutBar()
 
+        // Re-apply when the user picks a new theme in the host app's
+        // Personalization screen (writes into the shared App Group store,
+        // then posts this notification on its way out).
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(themePreferenceDidChange),
+            name: KeyboardThemeManager.preferenceDidChange,
+            object: nil
+        )
+    }
+
+    override func traitCollectionDidChange(_ previous: UITraitCollection?) {
+        super.traitCollectionDidChange(previous)
+        // When the user picked Auto, system Dark Mode flips should track.
+        if previous?.userInterfaceStyle != traitCollection.userInterfaceStyle {
+            applyTheme()
+        }
+    }
+
+    @objc private func themePreferenceDidChange() {
+        applyTheme()
+    }
+
+    private func resolveAndCacheTheme() {
+        KeyboardPalette.current = KeyboardThemeManager.shared.resolve(
+            store: personalizationStore,
+            traitCollection: traitCollection
+        )
+    }
+
+    /// Re-resolve the active theme, restamp container/banner colors that
+    /// were set once at setup time, then rebuild the key grid so every
+    /// button picks up the new palette via `KeyboardPalette.*`.
+    private func applyTheme() {
+        resolveAndCacheTheme()
+        keyboardContainer?.backgroundColor = KeyboardPalette.bg
+        commandBar?.backgroundColor       = KeyboardPalette.barBg
+        bannerContainer?.backgroundColor  = KeyboardPalette.bannerBg
+        // Integration panel host (Web etc.) — repaint if currently up.
+        integrationPanelHost?.backgroundColor = KeyboardPalette.bg
+        rebuildKeyboard()
     }
 
     private func suppressSystemShortcutBar() {
@@ -200,7 +260,7 @@ class KeyboardViewController: UIInputViewController {
     // "Copy to clipboard" (puts it on the pasteboard so they can long-press
     // and paste in the chat field) or "Close" to discard.
 
-    private func showImagePreview(_ image: UIImage) {
+    private func showImagePreview(_ image: UIImage, command: String = "", prompt: String = "") {
         if previewOverlay == nil { buildPreviewOverlay() }
         pendingPreviewImage = image
         previewImageView?.image = image
@@ -209,6 +269,12 @@ class KeyboardViewController: UIInputViewController {
             keyboardContainer.bringSubviewToFront(overlay)
         }
         hideCommandBar()
+        // Append to the persistent image history for the host-app
+        // History screen. Skipped when caller didn't supply a command —
+        // e.g. internal previews that aren't user-facing artifacts.
+        if !command.isEmpty {
+            ImageHistory.record(image: image, command: command, prompt: prompt)
+        }
     }
 
     private func dismissPreview() {
@@ -216,15 +282,29 @@ class KeyboardViewController: UIInputViewController {
         pendingPreviewImage = nil
     }
 
-    @objc private func previewCopyTapped() {
-        if let img = pendingPreviewImage {
-            UIPasteboard.general.image = img
-            showBanner("📋 Copied — long-press field to paste")
-        }
+    @objc private func previewCloseTapped() {
         dismissPreview()
     }
 
-    @objc private func previewCloseTapped() {
+    /// Variant buttons all funnel through here. `sender.tag` carries the
+    /// `ImageVariants.Variant` raw index. Encodes the variant, drops it on
+    /// the clipboard with the matching UTI, and surfaces a confirmation
+    /// banner so the user knows what's been copied.
+    @objc private func previewVariantTapped(_ sender: UIButton) {
+        guard let img = pendingPreviewImage else { dismissPreview(); return }
+        let variant: ImageVariants.Variant
+        switch sender.tag {
+        case 0: variant = .image
+        case 1: variant = .sticker
+        case 2: variant = .gif
+        default: dismissPreview(); return
+        }
+        guard let result = ImageVariants.make(img, variant: variant) else {
+            showBanner("⚠️ Couldn't encode \(variant.label.lowercased())")
+            return
+        }
+        UIPasteboard.general.setData(result.data, forPasteboardType: result.uti)
+        showBanner("📋 \(result.bannerNoun) copied — long-press field to paste")
         dismissPreview()
     }
 
@@ -255,25 +335,48 @@ class KeyboardViewController: UIInputViewController {
         imageView.translatesAutoresizingMaskIntoConstraints = false
         overlay.addSubview(imageView)
 
-        let copyBtn = UIButton(type: .system)
-        copyBtn.setTitle("📋  Copy", for: .normal)
-        copyBtn.setTitleColor(UIColor(red: 0.106, green: 0.369, blue: 0.125, alpha: 1.0), for: .normal)
-        copyBtn.titleLabel?.font = .boldSystemFont(ofSize: 14)
-        copyBtn.backgroundColor = .white
-        copyBtn.layer.cornerRadius = 8
-        copyBtn.translatesAutoresizingMaskIntoConstraints = false
-        copyBtn.addTarget(self, action: #selector(previewCopyTapped), for: .touchUpInside)
-        overlay.addSubview(copyBtn)
+        // Variant row — Image · Sticker · GIF · ✕. Mirrors Android's
+        // ImagePreviewView 4-button layout. Variant buttons share a
+        // single action via `sender.tag` so the encode/clipboard path
+        // is centralized in `previewVariantTapped(_:)`.
+        let brandGreen = UIColor(red: 0.106, green: 0.369, blue: 0.125, alpha: 1.0)
+        func makeVariantButton(label: String, tag: Int) -> UIButton {
+            let b = UIButton(type: .system)
+            b.tag = tag
+            b.setTitle(label, for: .normal)
+            b.setTitleColor(brandGreen, for: .normal)
+            b.titleLabel?.font = .boldSystemFont(ofSize: 13)
+            b.backgroundColor = .white
+            b.layer.cornerRadius = 8
+            b.addTarget(self, action: #selector(previewVariantTapped(_:)), for: .touchUpInside)
+            return b
+        }
+        let imageBtn   = makeVariantButton(label: "Image",   tag: 0)
+        let stickerBtn = makeVariantButton(label: "Sticker", tag: 1)
+        let gifBtn     = makeVariantButton(label: "GIF",     tag: 2)
 
         let closeBtn = UIButton(type: .system)
-        closeBtn.setTitle("✕  Close", for: .normal)
+        closeBtn.setTitle("✕", for: .normal)
         closeBtn.setTitleColor(.white, for: .normal)
-        closeBtn.titleLabel?.font = .systemFont(ofSize: 14, weight: .medium)
+        closeBtn.titleLabel?.font = .systemFont(ofSize: 16, weight: .medium)
         closeBtn.backgroundColor = UIColor.white.withAlphaComponent(0.18)
         closeBtn.layer.cornerRadius = 8
-        closeBtn.translatesAutoresizingMaskIntoConstraints = false
         closeBtn.addTarget(self, action: #selector(previewCloseTapped), for: .touchUpInside)
-        overlay.addSubview(closeBtn)
+
+        let buttonRow = UIStackView(arrangedSubviews: [imageBtn, stickerBtn, gifBtn, closeBtn])
+        buttonRow.axis = .horizontal
+        buttonRow.spacing = 6
+        // Variant buttons share width; Close is narrower (matches Android's
+        // 0.6 weight close-button + 1.0 weight variant buttons).
+        imageBtn.translatesAutoresizingMaskIntoConstraints = false
+        stickerBtn.translatesAutoresizingMaskIntoConstraints = false
+        gifBtn.translatesAutoresizingMaskIntoConstraints = false
+        closeBtn.translatesAutoresizingMaskIntoConstraints = false
+        stickerBtn.widthAnchor.constraint(equalTo: imageBtn.widthAnchor).isActive = true
+        gifBtn.widthAnchor.constraint(equalTo: imageBtn.widthAnchor).isActive = true
+        closeBtn.widthAnchor.constraint(equalTo: imageBtn.widthAnchor, multiplier: 0.5).isActive = true
+        buttonRow.translatesAutoresizingMaskIntoConstraints = false
+        overlay.addSubview(buttonRow)
 
         NSLayoutConstraint.activate([
             title.topAnchor.constraint(equalTo: overlay.topAnchor, constant: 8),
@@ -281,19 +384,14 @@ class KeyboardViewController: UIInputViewController {
 
             imageView.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 6),
             imageView.centerXAnchor.constraint(equalTo: overlay.centerXAnchor),
-            imageView.bottomAnchor.constraint(equalTo: copyBtn.topAnchor, constant: -10),
+            imageView.bottomAnchor.constraint(equalTo: buttonRow.topAnchor, constant: -10),
             imageView.widthAnchor.constraint(equalTo: imageView.heightAnchor),
             imageView.leadingAnchor.constraint(greaterThanOrEqualTo: overlay.leadingAnchor, constant: 16),
 
-            copyBtn.leadingAnchor.constraint(equalTo: overlay.leadingAnchor, constant: 12),
-            copyBtn.trailingAnchor.constraint(equalTo: overlay.centerXAnchor, constant: -6),
-            copyBtn.bottomAnchor.constraint(equalTo: overlay.bottomAnchor, constant: -10),
-            copyBtn.heightAnchor.constraint(equalToConstant: 42),
-
-            closeBtn.leadingAnchor.constraint(equalTo: overlay.centerXAnchor, constant: 6),
-            closeBtn.trailingAnchor.constraint(equalTo: overlay.trailingAnchor, constant: -12),
-            closeBtn.bottomAnchor.constraint(equalTo: overlay.bottomAnchor, constant: -10),
-            closeBtn.heightAnchor.constraint(equalToConstant: 42),
+            buttonRow.leadingAnchor.constraint(equalTo: overlay.leadingAnchor, constant: 12),
+            buttonRow.trailingAnchor.constraint(equalTo: overlay.trailingAnchor, constant: -12),
+            buttonRow.bottomAnchor.constraint(equalTo: overlay.bottomAnchor, constant: -10),
+            buttonRow.heightAnchor.constraint(equalToConstant: 38),
         ])
 
         overlay.isHidden = true
@@ -362,6 +460,25 @@ class KeyboardViewController: UIInputViewController {
         cmdPromptLabel.translatesAutoresizingMaskIntoConstraints = false
         commandBar.addSubview(cmdPromptLabel)
 
+        // Preset chip strip — shares the prompt-label's slot. Visible only
+        // while a needsPrompt command is active, the user hasn't typed
+        // anything yet, AND the command has presets in PresetCatalog.
+        cmdPresetStrip = PresetChipStripView()
+        cmdPresetStrip.translatesAutoresizingMaskIntoConstraints = false
+        cmdPresetStrip.isHidden = true
+        commandBar.addSubview(cmdPresetStrip)
+
+        // Blinking text caret — visual cue that the prompt label is the
+        // current write surface. Positioned right after the rendered text
+        // via a dynamic leading constraint that `updateCaretPosition()`
+        // refreshes whenever the label text changes.
+        cmdCaret = UIView()
+        cmdCaret.translatesAutoresizingMaskIntoConstraints = false
+        cmdCaret.backgroundColor = .white
+        cmdCaret.layer.cornerRadius = 1
+        cmdCaret.isHidden = true
+        commandBar.addSubview(cmdCaret)
+
         // Spinner
         cmdSpinner = UIActivityIndicatorView(style: .medium)
         cmdSpinner.color            = .white
@@ -425,7 +542,7 @@ class KeyboardViewController: UIInputViewController {
 
         // ── Banner — overlays the command bar slot ────────────────────────────
         bannerContainer = UIView()
-        bannerContainer.backgroundColor = UIColor(red: 0.051, green: 0.247, blue: 0.071, alpha: 1.0)
+        bannerContainer.backgroundColor = KeyboardPalette.bannerBg
         bannerContainer.isHidden        = true
         bannerContainer.translatesAutoresizingMaskIntoConstraints = false
         keyboardContainer.addSubview(bannerContainer)
@@ -469,6 +586,15 @@ class KeyboardViewController: UIInputViewController {
             cmdPromptLabel.centerYAnchor.constraint(equalTo: commandBar.centerYAnchor),
             cmdPromptLabel.trailingAnchor.constraint(equalTo: cmdMicButton.leadingAnchor, constant: -6),
 
+            cmdPresetStrip.leadingAnchor.constraint(equalTo: cmdPill.trailingAnchor, constant: 6),
+            cmdPresetStrip.centerYAnchor.constraint(equalTo: commandBar.centerYAnchor),
+            cmdPresetStrip.trailingAnchor.constraint(equalTo: cmdMicButton.leadingAnchor, constant: -6),
+            cmdPresetStrip.heightAnchor.constraint(equalToConstant: 30),
+
+            cmdCaret.centerYAnchor.constraint(equalTo: commandBar.centerYAnchor),
+            cmdCaret.widthAnchor.constraint(equalToConstant: 2),
+            cmdCaret.heightAnchor.constraint(equalToConstant: 18),
+
             cmdMicButton.trailingAnchor.constraint(equalTo: cmdSendButton.leadingAnchor, constant: -4),
             cmdMicButton.centerYAnchor.constraint(equalTo: commandBar.centerYAnchor),
             cmdMicButton.widthAnchor.constraint(equalToConstant: cmdMicW),
@@ -486,6 +612,13 @@ class KeyboardViewController: UIInputViewController {
             cmdSuggestionsStack.centerYAnchor.constraint(equalTo: commandBar.centerYAnchor),
             cmdSuggestionsStack.heightAnchor.constraint(equalToConstant: 36),
         ])
+
+        // Caret's leading constraint is dynamic — `updateCaretPosition()`
+        // mutates `.constant` to follow the rendered text width.
+        cmdCaretLeading = cmdCaret.leadingAnchor.constraint(
+            equalTo: cmdPromptLabel.leadingAnchor, constant: 0)
+        cmdCaretLeading.isActive = true
+        startCaretBlink()
     }
 
     // MARK: - Build keyboard
@@ -557,37 +690,40 @@ class KeyboardViewController: UIInputViewController {
         let c15  = UIImage.SymbolConfiguration(pointSize: 15, weight: .medium)
         let c15r = UIImage.SymbolConfiguration(pointSize: 15, weight: .regular)
 
+        let specialText = KeyboardPalette.keyTextSpecial
+        let normalText  = KeyboardPalette.keyText
+
         switch label {
         case "🌐":
             btn.setImage(UIImage(systemName: "globe", withConfiguration: c15r), for: .normal)
-            btn.tintColor = .white; btn.backgroundColor = keySpecial
+            btn.tintColor = specialText; btn.backgroundColor = keySpecial
         case "↵":
             btn.setImage(UIImage(systemName: "return", withConfiguration: c16), for: .normal)
-            btn.tintColor = .white; btn.backgroundColor = keySpecial
+            btn.tintColor = specialText; btn.backgroundColor = keySpecial
         case "⇧" where isShiftActive:
             btn.setImage(UIImage(systemName: isCapsLock ? "capslock.fill" : "shift.fill",
                                  withConfiguration: c15), for: .normal)
-            btn.tintColor = .white; btn.backgroundColor = keyShiftOn
+            btn.tintColor = specialText; btn.backgroundColor = keyShiftOn
         case "⇧":
             btn.setImage(UIImage(systemName: "shift", withConfiguration: c15), for: .normal)
-            btn.tintColor = .white; btn.backgroundColor = keySpecial
+            btn.tintColor = specialText; btn.backgroundColor = keySpecial
         case "⌫":
             btn.setImage(UIImage(systemName: "delete.backward", withConfiguration: c15r), for: .normal)
-            btn.tintColor = .white; btn.backgroundColor = keySpecial
+            btn.tintColor = specialText; btn.backgroundColor = keySpecial
         case "space":
             btn.setTitle("space", for: .normal)
             btn.titleLabel?.font = .systemFont(ofSize: 16)
-            btn.setTitleColor(UIColor.white.withAlphaComponent(0.7), for: .normal)
+            btn.setTitleColor(normalText.withAlphaComponent(0.7), for: .normal)
             btn.backgroundColor = keyNormal
         case _ where isSpecial(label):
             btn.setTitle(label, for: .normal)
             btn.titleLabel?.font = .systemFont(ofSize: 15, weight: .medium)
-            btn.setTitleColor(.white, for: .normal)
+            btn.setTitleColor(specialText, for: .normal)
             btn.backgroundColor = keySpecial
         default:
             btn.setTitle(displayTitle(for: label), for: .normal)
             btn.titleLabel?.font = .systemFont(ofSize: 22, weight: .light)
-            btn.setTitleColor(.white, for: .normal)
+            btn.setTitleColor(normalText, for: .normal)
             btn.backgroundColor = keyNormal
         }
 
@@ -820,13 +956,19 @@ class KeyboardViewController: UIInputViewController {
         unmountIntegrationPanel()
     }
 
-    /// Order the user sees in the panel grid. Integrations' commands come
-    /// first (most recently added flows surface earliest), then the
-    /// AI-routed commands. Local-only `/splits` follows `/split`.
+    /// Order the user sees in the panel grid. AI-routed commands come
+    /// first in stable declaration order; the local integration commands
+    /// follow, sourced from `integrationRegistry.allCommands` so the
+    /// user's Personalization toggles are honoured — disabling Poll on
+    /// the host strips it from the grid here.
     private func allCommandsForQuickPanel() -> [SlashCommand] {
-        // Show every case in declaration order — keeps the layout stable.
-        [.cap, .fix, .tone, .reply, .tl, .ask, .org,
-         .split, .splits, .notion, .note, .slack, .msg]
+        let aiCommands: [SlashCommand] = [.cap, .edit, .fix, .tone, .reply, .tl, .ask, .org]
+        // Walk the live registry so commands added later (poll, wyr,
+        // web, …) flow through automatically without touching this list.
+        let localCommands: [SlashCommand] = integrationRegistry.allCommands.compactMap {
+            SlashCommand(rawValue: $0.name.lowercased())
+        }
+        return aiCommands + localCommands
     }
 
     // MARK: - Slash command detection
@@ -977,7 +1119,9 @@ class KeyboardViewController: UIInputViewController {
         }
         // Hide normal command-bar controls; show only the chips
         [cmdPill, cmdPromptLabel, cmdSendButton, cmdCancelButton].forEach { $0.isHidden = true }
+        cmdPresetStrip?.isHidden = true
         cmdSuggestionsStack.isHidden = false
+        updateCaret()
 
         if commandBar.isHidden {
             commandBar.alpha = 0
@@ -1003,6 +1147,16 @@ class KeyboardViewController: UIInputViewController {
         activeCommand = cmd
         suggestionMode = .slashCommand
 
+        // /edit needs a reference image before the user can describe an
+        // edit — fire the system image picker on first entry. The picker
+        // callback re-invokes `showCommandBar(.edit)`, at which point
+        // `stagedEditImage` is non-nil and we fall through to render.
+        if cmd == .edit, stagedEditImage == nil, !editPickerActive {
+            editPickerActive = true
+            presentEditImagePicker()
+            return
+        }
+
         // Coming from word-suggestion mode? Restore normal controls first.
         [cmdPill, cmdPromptLabel, cmdSendButton, cmdCancelButton].forEach { $0.isHidden = false }
         cmdSuggestionsStack.isHidden = true
@@ -1010,12 +1164,32 @@ class KeyboardViewController: UIInputViewController {
         cmdPill.text = "  \(cmd.emoji) /\(cmd.rawValue)  "
         cmdSendButton.setTitle(cmd.buttonTitle, for: .normal)
 
-        if commandPromptText.isEmpty {
-            cmdPromptLabel.text      = cmd.needsPrompt ? "type prompt above…" : "ready — tap \(cmd.buttonTitle)"
-            cmdPromptLabel.textColor = UIColor.white.withAlphaComponent(0.40)
+        // Surface the preset chip strip only on a fresh, prompt-needing
+        // command when the catalog has presets for it. As soon as the
+        // user starts typing, the strip yields the slot back to the
+        // prompt label so the typed text is visible.
+        let presets = PresetCatalog.presets(for: cmd.rawValue)
+        let showPresets = cmd.needsPrompt && commandPromptText.isEmpty && !presets.isEmpty
+        if showPresets {
+            cmdPresetStrip.setPresets(presets) { [weak self] value in
+                self?.handlePresetTap(value)
+            }
+            cmdPresetStrip.isHidden = false
+            cmdPromptLabel.isHidden = true
         } else {
-            cmdPromptLabel.text      = commandPromptText
-            cmdPromptLabel.textColor = UIColor.white.withAlphaComponent(0.90)
+            cmdPresetStrip.isHidden = true
+            cmdPromptLabel.isHidden = false
+            if commandPromptText.isEmpty {
+                if cmd == .edit && stagedEditImage != nil {
+                    cmdPromptLabel.text      = "📎 image ready · describe the edit…"
+                } else {
+                    cmdPromptLabel.text      = cmd.needsPrompt ? "type prompt above…" : "ready — tap \(cmd.buttonTitle)"
+                }
+                cmdPromptLabel.textColor = UIColor.white.withAlphaComponent(0.40)
+            } else {
+                cmdPromptLabel.text      = commandPromptText
+                cmdPromptLabel.textColor = UIColor.white.withAlphaComponent(0.90)
+            }
         }
 
         if commandBar.isHidden {
@@ -1023,6 +1197,8 @@ class KeyboardViewController: UIInputViewController {
             commandBar.isHidden = false
             UIView.animate(withDuration: 0.18) { self.commandBar.alpha = 1 }
         }
+        commandBar.layoutIfNeeded()
+        updateCaret()
     }
 
     // Shown while the buffer is `/` or `/xy` — i.e. the user is mid-typing a
@@ -1051,6 +1227,8 @@ class KeyboardViewController: UIInputViewController {
             commandBar.isHidden = false
             UIView.animate(withDuration: 0.15) { self.commandBar.alpha = 1 }
         }
+        commandBar.layoutIfNeeded()
+        updateCaret()
     }
 
     private func hideCommandBar() {
@@ -1058,6 +1236,9 @@ class KeyboardViewController: UIInputViewController {
         activeCommand = nil
         pendingSuggestions = []
         suggestionMode = .none
+        // Drop any staged /edit reference — the user backed out before
+        // describing the edit. Re-entering /edit will re-launch the picker.
+        stagedEditImage = nil
         UIView.animate(withDuration: 0.15, animations: {
             self.commandBar.alpha = 0
         }, completion: { _ in
@@ -1161,12 +1342,17 @@ class KeyboardViewController: UIInputViewController {
         }
 
         let context = contextBeforeSlash()
+        // Consume the staged image for /edit (cleared after the request
+        // builds so a failed call doesn't trap the bytes in memory).
+        let referenceImage: Data? = (cmd == .edit) ? stagedEditImage : nil
+        if cmd == .edit { stagedEditImage = nil }
         Task { @MainActor in
             do {
                 let result = try await CommandRouter.shared.execute(
                     command: cmd.rawValue,
                     prompt: prompt,
-                    context: context
+                    context: context,
+                    referenceImage: referenceImage
                 )
                 isGenerating = false
                 cmdSpinner.stopAnimating()
@@ -1177,7 +1363,7 @@ class KeyboardViewController: UIInputViewController {
                     if cmd == .org {
                         hideCommandBar()
                         if let image = OrgImageRenderer.render(json: text) {
-                            showImagePreview(image)
+                            showImagePreview(image, command: cmd.rawValue, prompt: prompt)
                         } else {
                             showBanner("⚠️ Layout render failed")
                         }
@@ -1192,7 +1378,7 @@ class KeyboardViewController: UIInputViewController {
                     do {
                         let data = try await downloadImageData(from: urlString)
                         if let image = UIImage(data: data) {
-                            showImagePreview(image)
+                            showImagePreview(image, command: cmd.rawValue, prompt: prompt)
                         }
                     } catch {
                         showBanner("⚠️ Image download failed")
@@ -1201,7 +1387,7 @@ class KeyboardViewController: UIInputViewController {
                 case .imageData(let data):
                     hideCommandBar()
                     if let image = UIImage(data: data) {
-                        showImagePreview(image)
+                        showImagePreview(image, command: cmd.rawValue, prompt: prompt)
                     } else {
                         showBanner("⚠️ Image decode failed")
                     }
@@ -1316,6 +1502,76 @@ class KeyboardViewController: UIInputViewController {
     private func resetCommandBarMode() {
         [cmdPill, cmdPromptLabel, cmdSendButton, cmdCancelButton].forEach { $0.isHidden = false }
         cmdSuggestionsStack.isHidden = true
+        cmdPresetStrip?.isHidden = true
+        updateCaret()
+    }
+
+    // MARK: - Prompt caret
+    //
+    // The cmdPromptLabel is a UILabel (not a UITextField), so iOS doesn't
+    // give us a system caret for free. We draw our own — a 2 pt-wide
+    // white pill animated 1.0 → 0.0 → 1.0 forever — pinned to the end of
+    // the rendered text via a leading constraint whose `.constant` we
+    // recompute on every text change.
+
+    private func startCaretBlink() {
+        cmdCaret.alpha = 1
+        UIView.animateKeyframes(
+            withDuration: 1.0,
+            delay: 0,
+            options: [.repeat, .allowUserInteraction, .calculationModeLinear],
+            animations: { [weak self] in
+                UIView.addKeyframe(withRelativeStartTime: 0.0, relativeDuration: 0.5) {
+                    self?.cmdCaret.alpha = 1
+                }
+                UIView.addKeyframe(withRelativeStartTime: 0.5, relativeDuration: 0.5) {
+                    self?.cmdCaret.alpha = 0
+                }
+            },
+            completion: nil
+        )
+    }
+
+    /// Re-evaluate caret visibility + position. Called whenever the label
+    /// text changes or the command-bar mode flips.
+    private func updateCaret() {
+        guard let label = cmdPromptLabel else { return }
+        // Only show the caret when the prompt label is the visible
+        // surface — preset strip / word suggestions / hidden bar all
+        // suppress it.
+        let visible = !label.isHidden && !commandBar.isHidden
+        cmdCaret.isHidden = !visible
+        guard visible else { return }
+        updateCaretPosition()
+    }
+
+    private func updateCaretPosition() {
+        guard let label = cmdPromptLabel,
+              let text = label.text, !text.isEmpty,
+              let font = label.font else {
+            cmdCaretLeading.constant = 0
+            return
+        }
+        let size = (text as NSString).size(withAttributes: [.font: font])
+        // Cap inside the label's frame width so the caret can't drift
+        // past the mic button when the prompt overflows.
+        let maxWidth = max(0, label.bounds.width - 2)
+        cmdCaretLeading.constant = min(size.width, maxWidth) + 1
+    }
+
+    /// Tap callback from `cmdPresetStrip`. Treats the chip value as the
+    /// user's prompt for the active command and fires immediately —
+    /// mirrors Android's `PresetChipStripView.onTap`.
+    private func handlePresetTap(_ value: String) {
+        guard let cmd = activeCommand else { return }
+        commandPromptText = value
+        cmdPresetStrip.isHidden = true
+        cmdPromptLabel.isHidden = false
+        cmdPromptLabel.text = value
+        cmdPromptLabel.textColor = UIColor.white.withAlphaComponent(0.90)
+        commandBar.layoutIfNeeded()
+        updateCaret()
+        executeCommand(cmd, prompt: value)
     }
 
     // MARK: - Banner
@@ -1605,6 +1861,53 @@ private final class LMStudioLlmService: LlmService {
             return content
         }
         return nil
+    }
+}
+
+// MARK: - PHPickerViewControllerDelegate (/edit image picker)
+//
+// `/edit` needs a reference image from the user's Photos library.
+// `PHPickerViewController` is the only library-access path that works
+// from a keyboard extension — it's an out-of-process picker, no Photos
+// permission needed (the system returns just what the user selects),
+// and it presents like a normal modal from `self.present(_:animated:)`.
+
+@available(iOS 14.0, *)
+extension KeyboardViewController: PHPickerViewControllerDelegate {
+
+    func presentEditImagePicker() {
+        var config = PHPickerConfiguration(photoLibrary: .shared())
+        config.filter = .images
+        config.selectionLimit = 1
+        config.preferredAssetRepresentationMode = .current
+        let picker = PHPickerViewController(configuration: config)
+        picker.delegate = self
+        picker.modalPresentationStyle = .fullScreen
+        present(picker, animated: true)
+    }
+
+    func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+        picker.dismiss(animated: true) { [weak self] in
+            guard let self = self else { return }
+            self.editPickerActive = false
+            guard let provider = results.first?.itemProvider,
+                  provider.canLoadObject(ofClass: UIImage.self) else {
+                // User cancelled or picked something unreadable — keep the
+                // command bar open at /edit with no staged image; user can
+                // tap the bar's `×` to back out or try again.
+                self.showCommandBar(.edit)
+                return
+            }
+            provider.loadObject(ofClass: UIImage.self) { object, _ in
+                let image = object as? UIImage
+                DispatchQueue.main.async {
+                    if let img = image, let png = ImageDownsizer.downsizedPNG(img) {
+                        self.stagedEditImage = png
+                    }
+                    self.showCommandBar(.edit)
+                }
+            }
+        }
     }
 }
 

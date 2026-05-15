@@ -9,12 +9,16 @@ import Foundation
 final class SplitCloudSync {
 
     private let store: SplitStore
-    private let oauth: SplitOAuth
+    private let oauth: SplitFreshTokenProvider
 
-    init(store: SplitStore, oauth: SplitOAuth) {
+    init(store: SplitStore, oauth: SplitFreshTokenProvider) {
         self.store = store
         self.oauth = oauth
     }
+
+    /// Passthrough for callers that want to short-circuit when no user has
+    /// signed in. Mirrors the same flag every internal method checks.
+    var isSignedIn: Bool { oauth.isSignedIn }
 
     // MARK: - Provisioning
 
@@ -215,7 +219,7 @@ final class SplitCloudSync {
         try await Self.freshToken(oauth: oauth)
     }
 
-    private static func freshToken(oauth: SplitOAuth) async throws -> String {
+    private static func freshToken(oauth: SplitFreshTokenProvider) async throws -> String {
         try await withCheckedThrowingContinuation { cont in
             oauth.freshAccessToken { result in
                 cont.resume(with: result)

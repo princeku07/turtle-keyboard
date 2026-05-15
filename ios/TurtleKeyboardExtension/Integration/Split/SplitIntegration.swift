@@ -54,6 +54,29 @@ final class SplitIntegration: KeyboardIntegration {
         objc_setAssociatedObject(view, &Self.coordinatorKey, coordinator, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
         ctx.showPanel(view)
         ctx.hideChip()
+
+        // Fire-and-forget cloud pull. Refreshes the view in place if any
+        // remote rows arrived. No-op when the user isn't signed in (host
+        // app owns sign-in UI).
+        Task { @MainActor in
+            let sync = cloudSync(ctx: ctx)
+            guard sync.isSignedIn else { return }
+            let changed = await sync.fetchAndMerge()
+            if changed {
+                let fresh = history.all()
+                view.show(entries: fresh, listener: coordinator)
+                view.setSnapshot(fresh)
+            }
+        }
+    }
+
+    /// Build a `SplitCloudSync` wired to the same shared store the keyboard
+    /// uses + a refresh-only token provider that reads tokens from the
+    /// shared Keychain Access Group. Returns a fresh instance each call —
+    /// `SplitCloudSync` itself is stateless beyond what's in the store.
+    private static func cloudSync(ctx: IntegrationContext) -> SplitCloudSync {
+        let provider = SplitKeychainTokenProvider(store: ctx.store)
+        return SplitCloudSync(store: ctx.store, oauth: provider)
     }
 
     static func showPanel(ctx: IntegrationContext, amount: String) {
@@ -82,10 +105,16 @@ final class SplitIntegration: KeyboardIntegration {
 
         func splitPanelDidSave(amount: Double, people: Int) {
             let history = SplitHistory(store: ctx.store)
-            history.add(amount: amount, people: people)
+            let ts = history.add(amount: amount, people: people)
             ctx.store.setInt(people, forKey: SplitKeys.defaultPeople)
             ctx.hidePanel()
             ctx.showBanner("Split saved 💸", autoHideMs: 1500)
+
+            // Mirror to the cloud sheet. Fire-and-forget — local write
+            // already happened, network failure stays silent. Matches
+            // android/split/SplitIntegration.java's push-on-save.
+            let sync = SplitIntegration.cloudSync(ctx: ctx)
+            sync.pushSave(amount: amount, people: people, timestampMs: ts)
         }
 
         func splitPanelDidCancel() {
@@ -113,6 +142,8 @@ final class SplitIntegration: KeyboardIntegration {
             history.clear()
             view?.show(entries: [], listener: self)
             view?.setSnapshot([])
+            // Mirror clear to cloud — wipes only this device's rows.
+            SplitIntegration.cloudSync(ctx: ctx).pushClear()
         }
 
         func splitHistoryDidDismiss() {
