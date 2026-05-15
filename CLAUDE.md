@@ -14,7 +14,7 @@ The repo currently contains three sub-projects:
 | `ios/` | Native iOS keyboard (Swift, `UIInputViewController`) |
 | `lading-app/` | Marketing landing page (Next.js 16, React 19, Tailwind v4) |
 
-iOS keyboard does not live in this repo yet (separate repo or not started).
+See `ios/CLAUDE.md` and `android/CLAUDE.md` (if present) for per-platform deep dives. The iOS side is currently the most feature-complete: slash-command router, multi-provider AI stack (LM Studio default, fal for images, Anthropic/Google/OpenAI implemented but unregistered), three integrations (Split / Notion / Slack) with OAuth, Quick Panel, and voice input.
 
 ---
 
@@ -74,7 +74,7 @@ Mirrors the Android project 1-to-1:
   - Banner is a `UIView` above the keys; `preferredContentSize` is updated to include/exclude its 32 pt height.
   - `RequestsOpenAccess = true` in `Info.plist` enables Full Access (required for future network calls to the backend API).
 
-The slash command parser, API calls, and command routing are **not yet implemented** in the iOS codebase, matching Android parity.
+The slash command parser, multi-provider AI stack, and per-integration command handlers **are implemented on iOS** — see `ios/CLAUDE.md` for the full file map. Highlights: `TurtleKeyboardExtension/Command/SlashCommand.swift` (command enum), `AI/CommandRouter.swift` (model routing), `Integration/{Split,Notion,Slack}/` (local commands + OAuth-gated cloud calls), `Keyboard/QuickPanelView.swift` (double-tap-space picker), `Voice/VoiceInputController.swift` (mic key).
 
 ---
 
