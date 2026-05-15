@@ -142,6 +142,14 @@
                 android:text="View image history" />
 
             <Button
+                android:id="@+id/btn_mcp_servers"
+                style="@style/ButtonBrutalSecondary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="MCP servers" />
+
+            <Button
                 android:id="@+id/btn_preview_sheet"
                 style="@style/ButtonBrutalSecondary"
                 android:layout_width="match_parent"

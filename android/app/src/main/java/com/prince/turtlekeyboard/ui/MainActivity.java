@@ -29,6 +29,7 @@ import com.prince.split.SplitOAuthScopes;
 import com.prince.split.ui.SplitActivity;
 import com.prince.turtlekeyboard.databinding.ActivityMainBinding;
 import com.prince.turtlekeyboard.integration.drive.DriveLinkActivity;
+import com.prince.turtlekeyboard.ui.mcp.McpServersActivity;
 import com.prince.turtlekeyboard.overlay.BottomSheetActivity;
 import com.prince.turtlekeyboard.overlay.OverlayUrls;
 import com.prince.turtlekeyboard.settings.Prefs;
@@ -82,6 +83,8 @@ public class MainActivity extends AppCompatActivity {
                 startActivity(new Intent(this, DriveLinkActivity.class)));
         binding.btnHistory.setOnClickListener(v ->
                 startActivity(new Intent(this, HistoryActivity.class)));
+        binding.btnMcpServers.setOnClickListener(v ->
+                startActivity(new Intent(this, McpServersActivity.class)));
         // Dev button — direct-launches BottomSheetActivity with a synthetic URL so the
         // sheet rails can be verified without depending on deep-link routing (which
         // requires assetlinks.json hosted on the App Link domain). Remove once Cloudflare

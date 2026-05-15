@@ -19,6 +19,7 @@ import com.prince.kbd.core.GeminiService;
 import com.prince.kbd.core.GoogleAuth;
 import com.prince.kbd.core.IntegrationContext;
 import com.prince.kbd.core.KeyValueStore;
+import com.prince.kbd.core.McpService;
 import com.prince.turtlekeyboard.ime.view.KeyboardRootView;
 import com.prince.turtlekeyboard.input.InputCommitter;
 
@@ -38,6 +39,7 @@ public class KeyboardIntegrationContextImpl implements IntegrationContext {
     private final KeyValueStore rootStore;
     private final AppProfileRegistry profiles;
     private final GeminiService ai;
+    private final McpService mcp;
     private final GoogleAuth googleAuth;
 
     public KeyboardIntegrationContextImpl(Context appContext,
@@ -46,6 +48,7 @@ public class KeyboardIntegrationContextImpl implements IntegrationContext {
                                           KeyValueStore rootStore,
                                           AppProfileRegistry profiles,
                                           GeminiService ai,
+                                          McpService mcp,
                                           GoogleAuth googleAuth) {
         this.appContext = appContext;
         this.root = root;
@@ -53,6 +56,7 @@ public class KeyboardIntegrationContextImpl implements IntegrationContext {
         this.rootStore = rootStore;
         this.profiles = profiles;
         this.ai = ai;
+        this.mcp = mcp;
         this.googleAuth = googleAuth;
     }
 
@@ -107,6 +111,8 @@ public class KeyboardIntegrationContextImpl implements IntegrationContext {
     @Override public AppProfileRegistry profiles() { return profiles; }
 
     @Override public GeminiService ai() { return ai; }
+
+    @Override public McpService mcp() { return mcp; }
 
     @Override public GoogleAuth googleAuth() { return googleAuth; }
 

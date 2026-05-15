@@ -37,6 +37,7 @@ import com.prince.slack.SlackIntegration;
 import com.prince.split.SplitIntegration;
 import com.prince.turtlekeyboard.integration.drive.DriveIntegration;
 import com.prince.turtlekeyboard.integration.poll.PollIntegration;
+import com.prince.turtlekeyboard.integration.usermcp.UserMcpIntegration;
 import com.prince.turtlekeyboard.integration.wyr.WyrIntegration;
 import com.prince.web.WebIntegration;
 import com.prince.kbd.core.CommandProvider;
@@ -239,6 +240,10 @@ public class TurtleInputMethodService extends InputMethodService
         // command now owns its prompt + dispatch in its own integration.
         com.prince.kbd.core.GeminiService gemini = new com.prince.ai.GeminiClient(
                 com.prince.turtlekeyboard.BuildConfig.GEMINI_API_KEY);
+        // Single shared MCP client — pure JSON-RPC tools/call transport. Endpoint URL
+        // and per-user auth token are owned by the calling integration (mirrors how
+        // each integration owns its system prompts for ctx.ai()).
+        com.prince.kbd.core.McpService mcp = new com.prince.ai.McpClient();
         // Shared Google OAuth — every module that hits Google APIs (Split for Sheets/Drive,
         // Drive for /us reference photos, future Calendar / Gmail / Photos integrations)
         // reuses this single instance via ctx.googleAuth(). Storage in the "google" namespace
@@ -247,7 +252,7 @@ public class TurtleInputMethodService extends InputMethodService
                 getApplicationContext(), prefs.root().scoped("google"));
         IntegrationContext integrationCtx = new KeyboardIntegrationContextImpl(
                 getApplicationContext(), root, committer, prefs.root(), appProfiles,
-                gemini, googleAuth);
+                gemini, mcp, googleAuth);
         java.util.List<KeyboardIntegration> integrationList = java.util.Arrays.asList(
                 new SplitIntegration(),
                 new NotionIntegration(),
@@ -255,7 +260,11 @@ public class TurtleInputMethodService extends InputMethodService
                 new WebIntegration(),
                 new DriveIntegration(),
                 new PollIntegration(),
-                new WyrIntegration());
+                new WyrIntegration(),
+                // Generic MCP integration — registers N slash commands at construction
+                // time, one per user-added McpBinding from the host app's MCP Servers
+                // screen. Must come last so user bindings can't shadow built-in commands.
+                new UserMcpIntegration(integrationCtx));
         java.util.List<CommandProvider> builtins = java.util.Arrays.asList(new BuiltinAiCommands());
         integrations = new IntegrationRegistry(integrationList, builtins, integrationCtx, registry);
 
@@ -827,36 +836,38 @@ public class TurtleInputMethodService extends InputMethodService
     private final VoiceInputController.Sink voiceSink = new VoiceInputController.Sink() {
         @Override public void onListeningStarted() {
             root.banner().clear();
-            // Mini banner-row bars are redundant once the full stage takes over —
+            // Mini banner-row bars are redundant once the stage takes over —
             // keep one voice indicator on screen, not two.
             root.voiceListening().stop();
-            // Lock the stage's height to whatever the keyboard is currently
-            // occupying, then hide the keyboard. The LinearLayout sum stays
-            // the same, so the IME window height does not change.
+
+            // The stage is a translucent overlay; we want it to occupy the
+            // same vertical slot as the keyboard without growing the IME
+            // window. Trick: height = keyboard.height, topMargin = -that —
+            // so its contribution to the LinearLayout's height is 0 while
+            // it visually overlaps the keys.
             int kh = root.keyboardView().getHeight();
             if (kh > 0) {
                 android.view.ViewGroup.LayoutParams lp = root.voiceStage().getLayoutParams();
                 lp.height = kh;
+                if (lp instanceof android.widget.LinearLayout.LayoutParams) {
+                    ((android.widget.LinearLayout.LayoutParams) lp).topMargin = -kh;
+                }
                 root.voiceStage().setLayoutParams(lp);
             }
 
-            // Mic stays visible in the strip throughout listening, so its
-            // window-space centre is stable. The stage resolves the local
-            // coordinate inside post() after layout settles, so passing
-            // window coords here is safe even though we're about to swap
-            // visibilities.
+            // Mic stays put in the suggestion strip throughout listening, so
+            // its window-space centre is stable; the stage resolves the local
+            // coordinate inside post() once layout settles.
             View mic = root.strip().micButton();
             int[] micLoc = new int[2];
             mic.getLocationInWindow(micLoc);
             int micCx = micLoc[0] + mic.getWidth() / 2;
             int micCy = micLoc[1] + mic.getHeight() / 2;
 
-            root.keyboardView().setVisibility(View.GONE);
             root.voiceStage().start(micCx, micCy);
         }
         @Override public void onListeningStopped() {
             root.voiceStage().stop();
-            root.keyboardView().setVisibility(View.VISIBLE);
         }
         @Override public void onRms(float dB) { root.voiceStage().setRms(dB); }
         @Override public void onPartial(String text) {
@@ -875,7 +886,6 @@ public class TurtleInputMethodService extends InputMethodService
         }
         @Override public void onError(String userVisibleMessage) {
             root.voiceStage().stop();
-            root.keyboardView().setVisibility(View.VISIBLE);
             root.banner().showAndAutoHide(userVisibleMessage, 1500);
         }
     };

@@ -88,6 +88,18 @@
             android:label="Connect Drive"
             android:parentActivityName=".ui.MainActivity" />
 
+        <activity
+            android:name=".ui.mcp.McpServersActivity"
+            android:exported="false"
+            android:label="MCP Servers"
+            android:parentActivityName=".ui.MainActivity" />
+
+        <activity
+            android:name=".ui.mcp.McpAddBindingActivity"
+            android:exported="false"
+            android:label="Add MCP binding"
+            android:parentActivityName=".ui.mcp.McpServersActivity" />
+
         <!-- Bottom-sheet overlay host. Launched by tapping a Turtle App Link
              (https://www.turtlekeyboard.com/<routeKey>/<id>) from a chat / share intent. The
              activity itself is a thin shell; the registered SheetView (see

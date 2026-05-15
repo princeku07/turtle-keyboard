@@ -34,20 +34,30 @@ import java.util.Random;
 public class GeneratingLoaderView extends FrameLayout {
 
     private static final int BG = 0xFF000000;
-    private static final int GLOW_CORE = 0xCC2F5AA8;   // brighter blue core so the drift reads
-    private static final int GLOW_RIM = 0x00000000;    // fully transparent at the rim
-    private static final int TEXT_DIM = 0xFF6A6A6A;    // base text shade
-    private static final int TEXT_BRIGHT = 0xFFFFFFFF; // shimmer peak
+    // Three-stop blue: a hot lighter-blue centre, a mid cobalt tail, then
+    // fully transparent so it fades into the black surface. Single-stop
+    // gradients flattened out in the visible band — the inner stop is what
+    // gives the panel its visible "spotlight" punch.
+    private static final int GLOW_HOT  = 0xFF7AA0E0;   // hot bright centre
+    private static final int GLOW_MID  = 0xCC3A5896;   // long blue tail
+    private static final int GLOW_RIM  = 0x00000000;   // transparent at the rim
+    // Text shimmer is a 5-stop ramp so the reflection reads as light
+    // wrapping around the type rather than a hard white sweep:
+    //   DIM → HALO (cool blue tint) → PEARL (almost-white peak) → HALO → DIM
+    // The HALO stops carry a faint cobalt tint borrowed from the ball, so
+    // the text picks up the same hue as its 'light source' just before /
+    // after the brightest point — tonally cohesive with the glow.
+    private static final int TEXT_DIM   = 0xFF7A7A7A;  // base text shade
+    private static final int TEXT_HALO  = 0xFFA8C0E2;  // soft cool tint around the peak
+    private static final int TEXT_PEARL = 0xFFE8EEF8;  // cool pearl peak (no pure white)
 
     private static final int GRAIN_TILE = 96;
     private static final float GRAIN_ALPHA = 0.07f;
-    private static final long SHIMMER_CYCLE_MS = 1500L;
 
     private final Paint glowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint grainPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     @Nullable private Bitmap grain;
-    @Nullable private ValueAnimator shimmer;
     @Nullable private ValueAnimator drift;
     @Nullable private LinearGradient shimmerShader;
     private final Matrix shimmerMatrix = new Matrix();
@@ -91,12 +101,12 @@ public class GeneratingLoaderView extends FrameLayout {
         stopDrift();
     }
 
-    /** Classic text shimmer — a bright peak sweeps across the message left-to-
-     *  right. The base text colour is dimmed; a {@link LinearGradient} painted
-     *  through the TextView's paint draws the brighter "shine" wherever the
-     *  shader's local matrix currently lands. */
+    /** The text shimmer is now driven by the ball's horizontal position
+     *  (see {@link #onDraw}). We install the gradient shader once and let
+     *  each draw frame translate its local matrix so the bright peak lands
+     *  underneath wherever the ball currently is — the text reads as 'lit
+     *  up' only when the ball is passing overhead. */
     private void startShimmer() {
-        if (shimmer != null && shimmer.isRunning()) return;
         // Defer until the TextView has laid out (we need its measured width
         // to size the gradient).
         message.post(this::installShimmerShader);
@@ -109,30 +119,19 @@ public class GeneratingLoaderView extends FrameLayout {
             message.post(this::installShimmerShader);
             return;
         }
-        // Gradient spans roughly twice the text width with the bright peak in
-        // the middle. Translating its matrix makes the peak slide through.
+        // Narrow band gradient: outside the [0.30, 0.70] range the shader
+        // clamps to TEXT_DIM, so the text only brightens when the ball's
+        // x-position pulls the peak into the text's bounds.
         shimmerShader = new LinearGradient(
                 0f, 0f, textW, 0f,
                 new int[]{ TEXT_DIM, TEXT_BRIGHT, TEXT_DIM },
                 new float[]{ 0.30f, 0.50f, 0.70f },
                 Shader.TileMode.CLAMP);
         message.getPaint().setShader(shimmerShader);
-
-        shimmer = ValueAnimator.ofFloat(-1.2f, 1.2f);
-        shimmer.setDuration(SHIMMER_CYCLE_MS);
-        shimmer.setRepeatCount(ValueAnimator.INFINITE);
-        shimmer.setInterpolator(new LinearInterpolator());
-        shimmer.addUpdateListener(a -> {
-            float fraction = (float) a.getAnimatedValue();
-            shimmerMatrix.setTranslate(textW * fraction, 0f);
-            if (shimmerShader != null) shimmerShader.setLocalMatrix(shimmerMatrix);
-            message.invalidate();
-        });
-        shimmer.start();
+        message.invalidate();
     }
 
     private void stopShimmer() {
-        if (shimmer != null) { shimmer.cancel(); shimmer = null; }
         message.getPaint().setShader(null);
         shimmerShader = null;
         message.invalidate();
@@ -178,25 +177,34 @@ public class GeneratingLoaderView extends FrameLayout {
         int h = getHeight();
         if (w == 0 || h == 0) return;
 
-        // Soft off-centre radial glow biased toward the upper-left so the
-        // panel doesn't read as a symmetric "spotlight". Fades fully to the
-        // black surface at the rim — no hard edges. While loading, the centre
-        // and radius drift on independent low-frequency sines so the glow
-        // breathes rather than sits still.
+        // Centre lives at the TOP edge so the hot core lands inside the
+        // visible band — at 56 dp tall, putting it in the middle hid most
+        // of the gradient's structure. With cy at the top, the bright peak
+        // is right at y=0 and the full radial falloff plays through the
+        // strip downward. Drift is X-only so the hot spot sweeps across.
         float t = (System.currentTimeMillis() - driftStartedAt) / 1000f;
-        // Larger amplitudes + faster periods so the gradient drift reads at a
-        // glance instead of feeling like a slow background tide.
-        float ampX = w * 0.38f;
-        float ampY = h * 0.55f;
-        float cx = w * 0.40f + ampX * (float) Math.sin(t * 1.10f);
-        float cy = h * 0.50f + ampY * (float) Math.cos(t * 0.85f + 0.6f);
-        float r = (float) Math.hypot(w, h) * (0.55f + 0.18f * (float) Math.sin(t * 0.70f));
+        float ampX = w * 0.22f;
+        float cx = w * 0.42f + ampX * (float) Math.sin(t * 0.55f);
+        float cy = 0f;
+        float r = w * (0.75f + 0.10f * (float) Math.sin(t * 0.40f));
         RadialGradient g = new RadialGradient(cx, cy, r,
-                new int[]{ GLOW_CORE, GLOW_RIM },
-                new float[]{ 0f, 1f },
+                new int[]{ GLOW_HOT, GLOW_MID, GLOW_RIM },
+                new float[]{ 0f, 0.35f, 1f },
                 Shader.TileMode.CLAMP);
         glowPaint.setShader(g);
         c.drawRect(0, 0, w, h, glowPaint);
+
+        // Drive the text shimmer from the ball's cx. The text sits centred
+        // at w/2, so translating its gradient by (cx - w/2) puts the bright
+        // peak directly underneath wherever the ball currently is. When the
+        // ball drifts off the text, the shader clamps to TEXT_DIM and the
+        // text dims back down — so the text "reacts" to the ball passing
+        // overhead instead of running an independent shimmer cycle.
+        if (shimmerShader != null) {
+            shimmerMatrix.setTranslate(cx - w * 0.5f, 0f);
+            shimmerShader.setLocalMatrix(shimmerMatrix);
+            message.invalidate();
+        }
 
         if (grain != null) {
             BitmapShader bs = new BitmapShader(grain,

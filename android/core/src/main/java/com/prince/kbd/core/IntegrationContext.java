@@ -49,6 +49,12 @@ public interface IntegrationContext {
      *  is opt-in — modules that don't need AI simply don't call this. */
     GeminiService ai();
 
+    /** MCP primitive — JSON-RPC {@code tools/call} transport against any MCP-over-HTTP
+     *  server. Endpoint URL + per-user auth token are owned by the integration (same
+     *  pattern as {@link #ai()} owning its prompts). Opt-in — modules that don't talk
+     *  to MCP servers simply don't call this. */
+    McpService mcp();
+
     /** Cross-module Google OAuth. Modules declare the scopes they need per call; tokens
      *  are cached and shared across modules, so a feature that asks for a scope already
      *  granted to another feature reuses the same token without a second consent dialog.
