@@ -18,6 +18,27 @@
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Turtle Keyboard connects to a local AI server to run slash commands without sending text to the cloud.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Turtle Keyboard uses the microphone for voice-to-text dictation when you tap the mic key.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Turtle Keyboard transcribes your voice into text for the field you're typing in. Recognition runs on-device when supported.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>192.168.0.106</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+			</dict>
+		</dict>
+	</dict>
 	<key>NSExtension</key>
 	<dict>
 		<key>NSExtensionAttributes</key>
@@ -29,7 +50,7 @@
 			<key>PrimaryLanguage</key>
 			<string>en-US</string>
 			<key>RequestsOpenAccess</key>
-			<false/>
+			<true/>
 		</dict>
 		<key>NSExtensionPointIdentifier</key>
 		<string>com.apple.keyboard-service</string>

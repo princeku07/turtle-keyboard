@@ -28,6 +28,13 @@ OUT_DIR="$ROOT/ios/Generated"
 # Keys we expose. Order doesn't matter; values are looked up by name.
 KEYS=(
   "SPLIT_OAUTH_WEB_CLIENT_ID"
+  "SPLIT_OAUTH_IOS_CLIENT_ID"
+  "NOTION_OAUTH_CLIENT_ID"
+  "NOTION_OAUTH_CLIENT_SECRET"
+  "NOTION_OAUTH_REDIRECT_URI"
+  "SLACK_OAUTH_CLIENT_ID"
+  "SLACK_OAUTH_CLIENT_SECRET"
+  "SLACK_OAUTH_REDIRECT_URI"
 )
 
 mkdir -p "$OUT_DIR"
