@@ -1,293 +1,375 @@
 import Foundation
 #if os(iOS)
-import AVFoundation
-import Speech
+import UIKit
 
-/// iOS port of Android's `VoiceInputController`. Wraps `SFSpeechRecognizer` +
-/// `AVAudioEngine` so the IME can call `toggle(sink:)` from the mic key without
-/// caring about lifecycle. Streams partial transcripts via `Sink.onPartial` for
-/// live banner updates and emits the locked-in transcript via `onFinal` on
-/// stop, silence, or error.
+/// Wispr-Flow-style voice input. The keyboard extension can't reliably hold
+/// the mic (audio session fights, intermittent `engine.start` failures inside
+/// the appex sandbox), so we hand recording off to the host app:
 ///
-/// Permissions: `NSMicrophoneUsageDescription` + `NSSpeechRecognitionUsageDescription`
-/// in **both** the host app and the keyboard extension Info.plist. The keyboard
-/// also requires the user to enable Allow Full Access (`RequestsOpenAccess = true`).
+///   1. User taps the mic key.
+///   2. `start(sink:)` clears any stale transcript in the shared App Group and
+///      asks the system to open `turtlekeyboard://voice` — iOS backgrounds the
+///      current app and foregrounds Turtle.
+///   3. The Turtle host app's URL handler presents a recording sheet, runs
+///      `SFSpeechRecognizer` + `AVAudioEngine` (full app entitlements, no
+///      sandbox restriction), and on stop writes the transcript to the shared
+///      `UserDefaults(suiteName: AppGroup.id)` and posts a Darwin notification.
+///   4. The user swipes back to the original app. The keyboard re-appears,
+///      this controller reads the pending transcript and delivers it via
+///      `Sink.onFinal`. `KeyboardViewController` inserts it as if it had been
+///      typed.
+///
+/// No mic / speech permission prompts ever happen inside the extension —
+/// that's all in the host app, which has the entitlements and Info.plist
+/// strings to do it correctly. `Allow Full Access` is still required because
+/// `extensionContext.open(_:completionHandler:)` is gated on it.
+extension VoiceInputController.Sink {
+    /// Backwards-compatible default — older sinks treat info messages
+    /// like errors. Concrete sinks should override to keep listening
+    /// state armed.
+    func onInfo(_ userVisibleMessage: String) { onError(userVisibleMessage) }
+}
+
 final class VoiceInputController {
 
+    /// Kept identical to the previous version so `KeyboardViewController`
+    /// doesn't need to change. `onPartial` is no longer fired (the host app
+    /// owns the recognizer); only `onFinal` / `onError` arrive.
     protocol Sink: AnyObject {
-        /// Called repeatedly with the latest in-flight transcript guess.
         func onPartial(_ text: String)
-        /// Called once when recognition locks in. `text` may be empty.
         func onFinal(_ text: String)
-        /// Recognition could not start or aborted with a fatal error.
         func onError(_ userVisibleMessage: String)
-        /// Lifecycle hooks for UI state (banner pulse etc.).
         func onListeningStarted()
         func onListeningStopped()
+        /// Non-fatal status update. Used for the "swipe to Turtle app"
+        /// coachmark — the listening state stays armed because the user
+        /// is mid-flow, not in an error path. Default impl forwards to
+        /// `onError` so older Sinks still see the message.
+        func onInfo(_ userVisibleMessage: String)
     }
 
-    private let audioEngine = AVAudioEngine()
-    private var recognizer: SFSpeechRecognizer?
-    private var request: SFSpeechAudioBufferRecognitionRequest?
-    private var task: SFSpeechRecognitionTask?
+    // Shared with the host app. Must match `group.com.turtlekeyboard.split`
+    // declared in both `.entitlements` files.
+    private static let appGroupID = "group.com.turtlekeyboard.split"
+    private static let kPartial    = "voice.partialTranscript"
+    private static let kTranscript = "voice.pendingTranscript"
+    private static let kError      = "voice.pendingError"
+    private static let kStartedAt  = "voice.startedAt"
+    private static let kStop       = "voice.stopRequested"
+    private static let kCancel     = "voice.cancelRequested"
+    /// Rendezvous flag the host app reads in `applicationDidBecomeActive`
+    /// — when set & recent, the host presents the recording sheet.
+    private static let kVoiceRequested = "voice.requested"
+    /// Darwin notification names (kept narrowly scoped to this feature).
+    /// `finishedName` — host wrote final transcript / error / cancel.
+    /// `partialName`  — host pushed a new partial.
+    /// `controlName`  — keyboard signals stop / cancel to the host.
+    private static let finishedName: CFString = "com.turtlekeyboard.voice.didFinish" as CFString
+    private static let partialName:  CFString = "com.turtlekeyboard.voice.didPartial" as CFString
+    private static let controlName:  CFString = "com.turtlekeyboard.voice.control"    as CFString
+    /// Deep link the host app handles when programmatic open is allowed.
+    private static let launchURL   = URL(string: "turtlekeyboard://voice")!
 
     private(set) var isListening: Bool = false
     private weak var activeSink: Sink?
+    /// Weak ref to the input view controller so we can call `open(_:)`.
+    private weak var hostInputVC: UIInputViewController?
+    private var finishedObserver: UnsafeMutableRawPointer?
+    private var partialObserver:  UnsafeMutableRawPointer?
+    /// Repaint timer — Darwin notifications can be coalesced under load,
+    /// so we also poll the App Group every 200 ms while listening.
+    private var pollTimer: Timer?
 
-    init(locale: Locale = .current) {
-        self.recognizer = SFSpeechRecognizer(locale: locale) ?? SFSpeechRecognizer()
+    init() {
+        registerDarwinObservers()
     }
 
-    // MARK: - Permissions
-
-    /// Mic + speech-recognition both authorized? Keyboard extensions can't
-    /// trigger system permission prompts directly when Full Access is off, so
-    /// callers should route the user to the host app for the first grant.
-    static var hasPermissions: Bool {
-        let mic: Bool
-        if #available(iOS 17.0, *) {
-            mic = AVAudioApplication.shared.recordPermission == .granted
-        } else {
-            mic = AVAudioSession.sharedInstance().recordPermission == .granted
-        }
-        return mic && SFSpeechRecognizer.authorizationStatus() == .authorized
+    deinit {
+        unregisterDarwinObservers()
+        pollTimer?.invalidate()
     }
 
-    /// Request both permissions. Safe to call from the host app; in the
-    /// extension this is a no-op when Full Access is off.
+    // MARK: - Public API — API-compatible with the old controller
+
+    /// No-op stubs preserved for source compatibility with the old class.
+    /// Permission lives in the host app now.
+    static var hasPermissions: Bool { true }
     static func requestPermissions(_ completion: @escaping (Bool) -> Void) {
-        SFSpeechRecognizer.requestAuthorization { speechStatus in
-            let speechOK = (speechStatus == .authorized)
-            let micCb: (Bool) -> Void = { micOK in
-                DispatchQueue.main.async { completion(speechOK && micOK) }
-            }
-            if #available(iOS 17.0, *) {
-                AVAudioApplication.requestRecordPermission(completionHandler: micCb)
-            } else {
-                AVAudioSession.sharedInstance().requestRecordPermission(micCb)
-            }
-        }
+        DispatchQueue.main.async { completion(true) }
     }
 
-    // MARK: - Public API
-
-    /// Tap-to-toggle. If already listening, stops and emits the final transcript.
-    func toggle(sink: Sink) {
-        if isListening { stop() } else { start(sink: sink) }
-    }
-
-    func start(sink: Sink) {
+    /// `KeyboardViewController` passes itself as both `sink` and `host` — it
+    /// is a `UIInputViewController`, so the second arg comes for free in the
+    /// existing call site. (If your KVC call still passes only `sink:`, see
+    /// the convenience overload below.)
+    func start(sink: Sink, host: UIInputViewController) {
         guard !isListening else { return }
-
-        guard Self.hasPermissions else {
-            sink.onError("Microphone permission required")
+        guard let defaults = UserDefaults(suiteName: Self.appGroupID) else {
+            sink.onError("App Group misconfigured")
             return
         }
-        guard let recognizer = recognizer, recognizer.isAvailable else {
-            sink.onError("Speech recognition not available")
-            return
-        }
-
-        // Configure + activate the audio session BEFORE reading the input
-        // node's format — the format reports 0 Hz / 0 channels until the
-        // session is active, which makes installTap throw.
-        //
-        // Keyboard extensions share the host app's audio session, so the
-        // host's existing config can reject ours. Try Apple's recommended
-        // speech config first; if the host owns playback, retry with
-        // `.playAndRecord` + `.mixWithOthers` so we coexist instead of
-        // fighting for exclusive control.
-        let session = AVAudioSession.sharedInstance()
-        if let error = activateSession(session) {
-            sink.onError("Audio session: \(error.localizedDescription)")
-            return
-        }
-
-        // Reset clears any residual nodes/state from a prior session that
-        // ended in an error path before teardown completed.
-        audioEngine.reset()
-
-        // Following Apple's SpeakToMe sample order exactly — this matters in
-        // a keyboard extension where the audio path is fragile:
-        //   1. build request (NO `requiresOnDeviceRecognition` — that flag
-        //      makes the recognizer refuse to bind audio until the on-device
-        //      language model is ready, which throws 561145187 at engine.start
-        //      on devices/locales where the model isn't downloaded).
-        //   2. start recognitionTask BEFORE installing the tap, so the
-        //      recognizer is holding the audio path open when buffers arrive.
-        //   3. install tap on the input node.
-        //   4. prepare + start the engine last.
-        let request = SFSpeechAudioBufferRecognitionRequest()
-        request.shouldReportPartialResults = true
-        self.request = request
-
-        var lastPartial = ""
-        self.task = recognizer.recognitionTask(with: request) { [weak self] result, error in
-            guard let self = self else { return }
-            if let result = result {
-                let text = result.bestTranscription.formattedString
-                if text != lastPartial {
-                    lastPartial = text
-                    DispatchQueue.main.async { self.activeSink?.onPartial(text) }
-                }
-                if result.isFinal { self.finish(withFinalText: text) }
-            }
-            if let error = error {
-                let nsError = error as NSError
-                if nsError.domain == "kAFAssistantErrorDomain"
-                    && (nsError.code == 203 || nsError.code == 216 || nsError.code == 1110) {
-                    self.finish(withFinalText: lastPartial)
-                } else {
-                    self.fail(with: Self.describe(error: nsError))
-                }
-            }
-        }
-
-        let inputNode = audioEngine.inputNode
-        // Apple's sample uses `outputFormat(forBus: 0)` here — that returns
-        // the node's *connection* format which the engine has agreed to
-        // produce, vs. inputFormat which is the raw hardware format the
-        // engine may still be negotiating.
-        let format = inputNode.outputFormat(forBus: 0)
-        guard format.sampleRate > 0 else {
-            // Diagnostic dump so we know which session knob failed.
-            sink.onError("Mic format invalid — \(diagnosticDump(session: session))")
-            cancel()
-            return
-        }
-        inputNode.removeTap(onBus: 0)
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
-            self?.request?.append(buffer)
-        }
-
-        audioEngine.prepare()
-        // Re-activate the session immediately before engine.start. Inside a
-        // keyboard extension the system can silently deactivate us between
-        // setActive and any subsequent work — this closes the window. The
-        // diagnostic in the field showed inputAvail=true / route=BuiltIn at
-        // engine.start, meaning the session was set up correctly but had
-        // been quietly dropped from this process.
-        try? session.setActive(true, options: .notifyOthersOnDeactivation)
-        do {
-            try audioEngine.start()
-        } catch {
-            let dump = diagnosticDump(session: session)
-            cancel()
-            sink.onError("Engine.start \((error as NSError).code): \(dump)")
-            return
-        }
+        let now = Date().timeIntervalSince1970
+        // Clear stale state from a prior round.
+        defaults.removeObject(forKey: Self.kTranscript)
+        defaults.removeObject(forKey: Self.kPartial)
+        defaults.removeObject(forKey: Self.kError)
+        defaults.removeObject(forKey: Self.kStop)
+        defaults.removeObject(forKey: Self.kCancel)
+        defaults.set(now, forKey: Self.kStartedAt)
+        defaults.set(now, forKey: Self.kVoiceRequested)
 
         self.activeSink = sink
+        self.hostInputVC = host
         self.isListening = true
+        sink.onListeningStarted()
+        startPollTimer()
 
-        DispatchQueue.main.async { sink.onListeningStarted() }
+        // Best-effort programmatic launch. On iOS 18+ this returns false
+        // for keyboard extensions, but the rendezvous flag means the host
+        // will still start recording when the user swipes to it manually.
+        openHostApp(from: host) { [weak self] opened in
+            guard let self = self, self.isListening else { return }
+            DispatchQueue.main.async {
+                if !opened {
+                    sink.onInfo("Swipe up to Turtle app to start dictation")
+                }
+            }
+        }
     }
 
-    /// Stop capturing and let the recognizer flush its final hypothesis.
-    /// `Sink.onFinal` (or `onError`) will fire shortly after.
-    func stop() {
+    /// User tapped ✓ in the keyboard's listening overlay. Tell the host
+    /// to flush its final hypothesis.
+    func requestStop() {
         guard isListening else { return }
-        request?.endAudio()
-        // Tear down the audio path now; the recognition task continues until
-        // it emits its final result, which lands in the closure above.
-        audioEngine.inputNode.removeTap(onBus: 0)
-        audioEngine.stop()
+        if let d = UserDefaults(suiteName: Self.appGroupID) {
+            d.set(true, forKey: Self.kStop)
+        }
+        postControlSignal()
     }
 
-    /// Throw away whatever is in flight. No `onFinal` is delivered.
+    /// Convenience overload for the existing `voiceController.start(sink: self)`
+    /// call site. Falls back to walking the responder chain to find the
+    /// input view controller.
+    func start(sink: Sink) {
+        if let host = (sink as? UIInputViewController) ?? findInputVC(from: sink) {
+            start(sink: sink, host: host)
+        } else {
+            sink.onError("Voice unavailable: no host controller")
+        }
+    }
+
+    /// User tapped mic again — treat as ✓ in the listening overlay.
+    func stop() { requestStop() }
+
+    /// User tapped X in the listening overlay (or hit cancel some other way).
+    /// Tell the host to throw away whatever it's captured.
     func cancel() {
         guard isListening else { return }
-        task?.cancel()
-        audioEngine.inputNode.removeTap(onBus: 0)
-        audioEngine.stop()
-        teardown()
+        if let d = UserDefaults(suiteName: Self.appGroupID) {
+            d.set(true, forKey: Self.kCancel)
+            d.removeObject(forKey: Self.kPartial)
+            d.removeObject(forKey: Self.kTranscript)
+        }
+        postControlSignal()
+        // Drop local state immediately so the UI snaps back; the host
+        // will see the cancel flag on its next Darwin notification and
+        // tear down.
+        stopPollTimer()
+        let sink = activeSink
+        isListening = false
+        activeSink = nil
+        hostInputVC = nil
+        DispatchQueue.main.async { sink?.onListeningStopped() }
+    }
+
+    private func postControlSignal() {
+        CFNotificationCenterPostNotification(
+            CFNotificationCenterGetDarwinNotifyCenter(),
+            CFNotificationName(Self.controlName), nil, nil, true)
     }
 
     func destroy() {
         cancel()
-        recognizer = nil
+        unregisterDarwinObservers()
+    }
+
+    /// Drains all known App Group state and delivers it to the sink in the
+    /// right order: error > final > partial. Called from
+    /// `viewDidAppear`, the Darwin observer, and the poll timer.
+    func consumePendingTranscript() {
+        guard let d = UserDefaults(suiteName: Self.appGroupID) else { return }
+        if let err = d.string(forKey: Self.kError) {
+            d.removeObject(forKey: Self.kError)
+            d.removeObject(forKey: Self.kPartial)
+            deliverError(err)
+            return
+        }
+        if let text = d.string(forKey: Self.kTranscript) {
+            d.removeObject(forKey: Self.kTranscript)
+            d.removeObject(forKey: Self.kPartial)
+            deliverFinal(text)
+            return
+        }
+        if isListening, let partial = d.string(forKey: Self.kPartial) {
+            deliverPartial(partial)
+        }
+    }
+
+    private var lastPartialDelivered: String?
+
+    private func deliverPartial(_ text: String) {
+        guard text != lastPartialDelivered else { return }
+        lastPartialDelivered = text
+        let sink = activeSink
+        DispatchQueue.main.async { sink?.onPartial(text) }
     }
 
     // MARK: - Internal
 
-    private func finish(withFinalText text: String) {
+    private func openHostApp(from host: UIInputViewController,
+                             completion: @escaping (Bool) -> Void) {
+        // Two prerequisites that were missing earlier and caused this to
+        // silently fail:
+        //   1. `LSApplicationQueriesSchemes` in the extension's Info.plist
+        //      must list `turtlekeyboard`. Without it iOS denies the open
+        //      regardless of Full Access.
+        //   2. Use the typed `extensionContext.open(_:completionHandler:)`
+        //      — it's the only API Apple actually honours from a keyboard
+        //      extension. The `openURL:` selector-walk works on older iOS
+        //      and is kept here as a fallback.
+        let url = Self.launchURL
+
+        if let ctx = host.extensionContext {
+            ctx.open(url) { [weak self] success in
+                if success {
+                    DispatchQueue.main.async { completion(true) }
+                    return
+                }
+                // System refused. Try the responder-chain walk before
+                // giving up — some older iOS keyboards still allow it.
+                DispatchQueue.main.async {
+                    self?.openViaResponderChain(from: host, url: url,
+                                                completion: completion)
+                }
+            }
+            return
+        }
+        openViaResponderChain(from: host, url: url, completion: completion)
+    }
+
+    private func openViaResponderChain(from host: UIInputViewController,
+                                       url: URL,
+                                       completion: @escaping (Bool) -> Void) {
+        let openSel = NSSelectorFromString("openURL:")
+        // Walk from view → window → application, which is the chain order
+        // most likely to surface UIApplication on older iOS.
+        let starts: [UIResponder?] = [
+            host.viewIfLoaded?.window,
+            host.viewIfLoaded,
+            host,
+        ]
+        for start in starts {
+            var responder: UIResponder? = start
+            while let r = responder {
+                if let app = r as? UIApplication, app.responds(to: openSel) {
+                    let result = app.perform(openSel, with: url)
+                    completion(result != nil)
+                    return
+                }
+                responder = r.next
+            }
+        }
+        completion(false)
+    }
+
+    private func findInputVC(from any: AnyObject) -> UIInputViewController? {
+        var r: UIResponder? = any as? UIResponder
+        while let cur = r {
+            if let ivc = cur as? UIInputViewController { return ivc }
+            r = cur.next
+        }
+        return nil
+    }
+
+    private func deliverFinal(_ text: String) {
+        guard isListening else { return }
+        stopPollTimer()
+        isListening = false
         let sink = activeSink
-        teardown()
+        activeSink = nil
+        hostInputVC = nil
+        lastPartialDelivered = nil
         DispatchQueue.main.async {
             sink?.onFinal(text)
             sink?.onListeningStopped()
         }
     }
 
-    private func fail(with message: String) {
+    private func deliverError(_ message: String) {
+        guard isListening else { return }
+        stopPollTimer()
+        isListening = false
         let sink = activeSink
-        audioEngine.inputNode.removeTap(onBus: 0)
-        audioEngine.stop()
-        teardown()
+        activeSink = nil
+        hostInputVC = nil
+        lastPartialDelivered = nil
         DispatchQueue.main.async {
             sink?.onError(message)
             sink?.onListeningStopped()
         }
     }
 
-    /// Try a sequence of audio-session configurations and return nil on the
-    /// first one that activates, or the last error if all fail. Order matters:
-    /// the most speech-optimal config first, then progressively more lenient
-    /// fallbacks for hosts that already hold an exclusive session.
-    private func activateSession(_ session: AVAudioSession) -> Error? {
-        let configs: [(AVAudioSession.Category, AVAudioSession.Mode, AVAudioSession.CategoryOptions)] = [
-            (.record,        .measurement, []),
-            (.record,        .default,     []),
-            (.playAndRecord, .default,     [.mixWithOthers, .allowBluetooth]),
-            (.playAndRecord, .default,     [.mixWithOthers, .defaultToSpeaker, .allowBluetooth]),
-        ]
-        var lastError: Error?
-        for (cat, mode, opts) in configs {
-            do {
-                try session.setCategory(cat, mode: mode, options: opts)
-                // Speech recognition wants 16 kHz mono; making it explicit
-                // avoids AVAudioEngine negotiating a hardware rate that it
-                // then can't bind inside the extension sandbox.
-                try? session.setPreferredSampleRate(16_000)
-                try? session.setPreferredIOBufferDuration(0.02)
-                try session.setActive(true, options: .notifyOthersOnDeactivation)
-                return nil
-            } catch {
-                lastError = error
-                // Deactivate before trying the next config; some failures
-                // leave the session half-attached.
-                try? session.setActive(false, options: .notifyOthersOnDeactivation)
-                continue
-            }
+    // MARK: - Polling
+
+    private func startPollTimer() {
+        stopPollTimer()
+        // Run on main RunLoop in common modes so it ticks during touch
+        // tracking (the user may still be holding the keyboard area).
+        let t = Timer(timeInterval: 0.2, repeats: true) { [weak self] _ in
+            self?.consumePendingTranscript()
         }
-        return lastError
+        RunLoop.main.add(t, forMode: .common)
+        pollTimer = t
     }
 
-    private func diagnosticDump(session: AVAudioSession) -> String {
-        let cat = session.category.rawValue
-        let mode = session.mode.rawValue
-        let inputAvail = session.isInputAvailable
-        let route = session.currentRoute.inputs.map { $0.portType.rawValue }.joined(separator: ",")
-        return "cat=\(cat) mode=\(mode) inputAvail=\(inputAvail) route=[\(route)]"
+    private func stopPollTimer() {
+        pollTimer?.invalidate()
+        pollTimer = nil
     }
 
-    private func teardown() {
-        request = nil
-        task = nil
-        activeSink = nil
-        isListening = false
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-    }
+    // MARK: - Darwin notification bridge
 
-    private static func describe(error: NSError) -> String {
-        switch error.code {
-        case 1: return "Mic permission missing"
-        case 2: return "Speech recognition not authorized"
-        case 102, 201: return "Recognizer unavailable"
-        case 203: return "Didn't catch that"
-        case 209, 216: return "No speech detected"
-        default: return "Mic error \(error.code)"
+    private func registerDarwinObservers() {
+        let center = CFNotificationCenterGetDarwinNotifyCenter()
+        let observer = Unmanaged.passUnretained(self).toOpaque()
+        self.finishedObserver = observer
+        self.partialObserver = observer
+        let callback: CFNotificationCallback = { _, ptr, _, _, _ in
+            guard let ptr = ptr else { return }
+            let me = Unmanaged<VoiceInputController>
+                .fromOpaque(ptr).takeUnretainedValue()
+            DispatchQueue.main.async { me.consumePendingTranscript() }
         }
+        CFNotificationCenterAddObserver(
+            center, observer, callback,
+            Self.finishedName, nil, .deliverImmediately)
+        CFNotificationCenterAddObserver(
+            center, observer, callback,
+            Self.partialName, nil, .deliverImmediately)
+    }
+
+    private func unregisterDarwinObservers() {
+        let center = CFNotificationCenterGetDarwinNotifyCenter()
+        if let observer = finishedObserver {
+            CFNotificationCenterRemoveObserver(
+                center, observer, CFNotificationName(Self.finishedName), nil)
+        }
+        if let observer = partialObserver {
+            CFNotificationCenterRemoveObserver(
+                center, observer, CFNotificationName(Self.partialName), nil)
+        }
+        finishedObserver = nil
+        partialObserver = nil
     }
 }
 #endif

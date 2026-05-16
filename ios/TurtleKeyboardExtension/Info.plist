@@ -18,6 +18,10 @@
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>turtlekeyboard</string>
+	</array>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Turtle Keyboard connects to a local AI server to run slash commands without sending text to the cloud.</string>
 	<key>NSMicrophoneUsageDescription</key>

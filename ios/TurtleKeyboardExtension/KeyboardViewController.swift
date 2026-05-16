@@ -250,6 +250,11 @@ class KeyboardViewController: UIInputViewController {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        // If the user just returned from the Turtle host app after dictating,
+        // a transcript is sitting in the App Group waiting to be inserted.
+        // The Darwin notification handles the live case; this catches the
+        // suspended-appex case where we missed the notification.
+        voiceController.consumePendingTranscript()
         // Surface suggested-shortcut chips as soon as the keyboard mounts
         // on an empty field. Subsequent text changes refresh via textDidChange.
         updateWordSuggestions()
@@ -1110,7 +1115,10 @@ class KeyboardViewController: UIInputViewController {
                 btn.isHidden = true
             }
         }
-        [cmdPill, cmdPromptLabel, cmdSendButton, cmdCancelButton].forEach { $0.isHidden = true }
+        // Mic only makes sense while composing a slash-command prompt;
+        // hide it in the suggestions strip so it doesn't crowd the chips.
+        [cmdPill, cmdPromptLabel, cmdSendButton, cmdCancelButton, cmdMicButton]
+            .forEach { $0.isHidden = true }
         cmdSuggestionsStack.isHidden = false
 
         if commandBar.isHidden {
@@ -1128,8 +1136,10 @@ class KeyboardViewController: UIInputViewController {
             btn.setTitle(i < items.count ? items[i] : nil, for: .normal)
             btn.isHidden = i >= items.count
         }
-        // Hide normal command-bar controls; show only the chips
-        [cmdPill, cmdPromptLabel, cmdSendButton, cmdCancelButton].forEach { $0.isHidden = true }
+        // Hide normal command-bar controls (including the mic — it only
+        // belongs in slash-command compose mode); show only the chips.
+        [cmdPill, cmdPromptLabel, cmdSendButton, cmdCancelButton, cmdMicButton]
+            .forEach { $0.isHidden = true }
         cmdPresetStrip?.isHidden = true
         cmdSuggestionsStack.isHidden = false
         updateCaret()
@@ -1172,7 +1182,12 @@ class KeyboardViewController: UIInputViewController {
         }
 
         // Coming from word-suggestion mode? Restore normal controls first.
+        // Mic only un-hides when the user has voice enabled in
+        // Personalization — keep that gate honoured here.
+        let voiceEnabled = personalizationStore.int(
+            forKey: PersonalizationKeys.voiceEnabled, fallback: 1) != 0
         [cmdPill, cmdPromptLabel, cmdSendButton, cmdCancelButton].forEach { $0.isHidden = false }
+        cmdMicButton.isHidden = !voiceEnabled
         cmdSuggestionsStack.isHidden = true
 
         cmdPill.text = "  \(cmd.emoji) /\(cmd.rawValue)  "
@@ -1225,7 +1240,13 @@ class KeyboardViewController: UIInputViewController {
         activeCommand  = nil
         suggestionMode = .slashCommand
 
+        // The slash compose bar is the "prompt area" the user wants the
+        // mic in — un-hide it alongside the other controls (still gated
+        // on the Personalization voice toggle).
+        let voiceEnabled = personalizationStore.int(
+            forKey: PersonalizationKeys.voiceEnabled, fallback: 1) != 0
         [cmdPill, cmdPromptLabel, cmdSendButton, cmdCancelButton].forEach { $0.isHidden = false }
+        cmdMicButton.isHidden = !voiceEnabled
         cmdPresetStrip?.isHidden = true
         cmdSpinner.stopAnimating()
         cmdSuggestionsStack.isHidden = true
@@ -2064,18 +2085,34 @@ extension KeyboardViewController: VoiceInputController.Sink {
 
     func onListeningStarted() {
         setMicListeningUI(true)
+        showListeningOverlay()
     }
 
     func onListeningStopped() {
         setMicListeningUI(false)
+        hideListeningOverlay()
     }
 
     func onPartial(_ text: String) {
+        listeningOverlay?.updateTranscript(text)
         appendDictation(text)
     }
 
     func onFinal(_ text: String) {
-        appendDictation(text)
+        // Two destinations:
+        //   • If the user invoked voice from inside a slash-command flow
+        //     (`/ask hello`) the existing path stuffs the transcript into
+        //     the command bar.
+        //   • Otherwise, insert the transcript straight into the host
+        //     text field — that's the Wispr-Flow-style chat dictation.
+        if voicePromptPrefix != nil {
+            appendDictation(text)
+        } else {
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                textDocumentProxy.insertText(trimmed)
+            }
+        }
         voicePromptPrefix = nil
     }
 
@@ -2084,10 +2121,208 @@ extension KeyboardViewController: VoiceInputController.Sink {
         showBanner("⚠️ \(userVisibleMessage)")
     }
 
+    func onInfo(_ userVisibleMessage: String) {
+        // Don't reset voicePromptPrefix — the user is mid-flow (switching
+        // to the Turtle app to dictate) and will return here for insertion.
+        showBanner("🐢 \(userVisibleMessage)")
+    }
+
     private func appendDictation(_ spoken: String) {
         guard let prefix = voicePromptPrefix else { return }
         let trimmed = spoken.trimmingCharacters(in: .whitespacesAndNewlines)
         slashBuffer = prefix + trimmed
         updateCommandDetection()
+    }
+
+    // MARK: - Listening overlay (Wispr-style "Listening / iPad Microphone")
+
+    private static var listeningOverlayKey: UInt8 = 0
+    private var listeningOverlay: ListeningOverlayView? {
+        get { objc_getAssociatedObject(self, &Self.listeningOverlayKey) as? ListeningOverlayView }
+        set { objc_setAssociatedObject(self, &Self.listeningOverlayKey, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC) }
+    }
+
+    private func showListeningOverlay() {
+        guard listeningOverlay == nil else { return }
+        let overlay = ListeningOverlayView()
+        overlay.translatesAutoresizingMaskIntoConstraints = false
+        overlay.onConfirm = { [weak self] in self?.voiceController.requestStop() }
+        overlay.onCancel  = { [weak self] in self?.voiceController.cancel() }
+        keyboardContainer.addSubview(overlay)
+        NSLayoutConstraint.activate([
+            overlay.topAnchor.constraint(equalTo: keyboardContainer.topAnchor),
+            overlay.leadingAnchor.constraint(equalTo: keyboardContainer.leadingAnchor),
+            overlay.trailingAnchor.constraint(equalTo: keyboardContainer.trailingAnchor),
+            overlay.bottomAnchor.constraint(equalTo: keyboardContainer.bottomAnchor),
+        ])
+        keyboardContainer.bringSubviewToFront(overlay)
+        listeningOverlay = overlay
+    }
+
+    private func hideListeningOverlay() {
+        listeningOverlay?.removeFromSuperview()
+        listeningOverlay = nil
+    }
+}
+
+// MARK: - ListeningOverlayView
+
+/// Mirrors Wispr Flow's in-keyboard listening surface (image 18): black
+/// background, a pulsing dot pattern + "Listening / iPad Microphone"
+/// caption, and X / ✓ buttons in the corners. Live transcripts replace
+/// the caption when the recognizer reports partials.
+private final class ListeningOverlayView: UIView {
+
+    var onConfirm: (() -> Void)?
+    var onCancel:  (() -> Void)?
+
+    private let transcriptLabel = UILabel()
+    private let captionStack    = UIStackView()
+    private let dotsView        = PulsingDotsView()
+    private let listeningLabel  = UILabel()
+    private let micLabel        = UILabel()
+    private let cancelButton    = UIButton(type: .system)
+    private let confirmButton   = UIButton(type: .system)
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = .black
+        layout()
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    func updateTranscript(_ text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            transcriptLabel.text = ""
+            transcriptLabel.isHidden = true
+            captionStack.isHidden = false
+        } else {
+            transcriptLabel.text = trimmed
+            transcriptLabel.isHidden = false
+            captionStack.isHidden = true
+        }
+    }
+
+    private func layout() {
+        // ✕ — cancel
+        cancelButton.setImage(UIImage(systemName: "xmark"), for: .normal)
+        cancelButton.tintColor = .white
+        cancelButton.backgroundColor = UIColor.white.withAlphaComponent(0.14)
+        cancelButton.layer.cornerRadius = 22
+        cancelButton.addTarget(self, action: #selector(cancelPressed), for: .touchUpInside)
+
+        // ✓ — confirm
+        confirmButton.setImage(UIImage(systemName: "checkmark"), for: .normal)
+        confirmButton.tintColor = .black
+        confirmButton.backgroundColor = .white
+        confirmButton.layer.cornerRadius = 26
+        confirmButton.addTarget(self, action: #selector(confirmPressed), for: .touchUpInside)
+
+        // Caption shown when there's no transcript yet.
+        listeningLabel.text = "Listening"
+        listeningLabel.textColor = .white
+        listeningLabel.font = .systemFont(ofSize: 18, weight: .medium)
+        listeningLabel.textAlignment = .center
+
+        micLabel.text = "iPad Microphone"
+        micLabel.textColor = UIColor.white.withAlphaComponent(0.55)
+        micLabel.font = .systemFont(ofSize: 14)
+        micLabel.textAlignment = .center
+
+        captionStack.axis = .vertical
+        captionStack.alignment = .center
+        captionStack.spacing = 4
+        captionStack.addArrangedSubview(listeningLabel)
+        captionStack.addArrangedSubview(micLabel)
+
+        // Live transcript, hidden until first partial.
+        transcriptLabel.textColor = .white
+        transcriptLabel.font = .systemFont(ofSize: 20, weight: .regular)
+        transcriptLabel.numberOfLines = 3
+        transcriptLabel.textAlignment = .center
+        transcriptLabel.isHidden = true
+
+        [cancelButton, confirmButton, dotsView, captionStack, transcriptLabel]
+            .forEach {
+                $0.translatesAutoresizingMaskIntoConstraints = false
+                addSubview($0)
+            }
+
+        NSLayoutConstraint.activate([
+            // ✕ top-left (matches Wispr image 18 top-left position).
+            cancelButton.topAnchor.constraint(equalTo: topAnchor, constant: 14),
+            cancelButton.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 18),
+            cancelButton.widthAnchor.constraint(equalToConstant: 44),
+            cancelButton.heightAnchor.constraint(equalToConstant: 44),
+
+            // ✓ top-right.
+            confirmButton.topAnchor.constraint(equalTo: topAnchor, constant: 10),
+            confirmButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -18),
+            confirmButton.widthAnchor.constraint(equalToConstant: 52),
+            confirmButton.heightAnchor.constraint(equalToConstant: 52),
+
+            // Dots + caption stacked vertically in the centre.
+            dotsView.centerXAnchor.constraint(equalTo: centerXAnchor),
+            dotsView.centerYAnchor.constraint(equalTo: centerYAnchor, constant: -12),
+            dotsView.widthAnchor.constraint(equalToConstant: 140),
+            dotsView.heightAnchor.constraint(equalToConstant: 12),
+
+            captionStack.topAnchor.constraint(equalTo: dotsView.bottomAnchor, constant: 18),
+            captionStack.centerXAnchor.constraint(equalTo: centerXAnchor),
+
+            transcriptLabel.topAnchor.constraint(equalTo: dotsView.bottomAnchor, constant: 18),
+            transcriptLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 32),
+            transcriptLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -32),
+        ])
+
+        dotsView.startAnimating()
+    }
+
+    @objc private func confirmPressed() { onConfirm?() }
+    @objc private func cancelPressed()  { onCancel?() }
+}
+
+/// Eight white dots pulsing in sequence — purely decorative.
+private final class PulsingDotsView: UIView {
+    private let dotCount = 8
+    private var dotLayers: [CALayer] = []
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        for _ in 0..<dotCount {
+            let layer = CALayer()
+            layer.backgroundColor = UIColor.white.cgColor
+            self.layer.addSublayer(layer)
+            dotLayers.append(layer)
+        }
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let size: CGFloat = 6
+        let totalW = bounds.width
+        let gap = (totalW - CGFloat(dotCount) * size) / CGFloat(dotCount - 1)
+        var x: CGFloat = 0
+        let y = (bounds.height - size) / 2
+        for layer in dotLayers {
+            layer.frame = CGRect(x: x, y: y, width: size, height: size)
+            layer.cornerRadius = size / 2
+            x += size + gap
+        }
+    }
+
+    func startAnimating() {
+        for (i, layer) in dotLayers.enumerated() {
+            let anim = CABasicAnimation(keyPath: "opacity")
+            anim.fromValue = 0.3
+            anim.toValue = 1.0
+            anim.duration = 0.6
+            anim.autoreverses = true
+            anim.repeatCount = .infinity
+            anim.beginTime = CACurrentMediaTime() + Double(i) * 0.08
+            layer.add(anim, forKey: "pulse")
+        }
     }
 }

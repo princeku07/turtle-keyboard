@@ -5,6 +5,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
 
+    // App Group rendezvous key the keyboard sets when the user taps mic.
+    // Keep in sync with VoiceInputController.kVoiceRequested.
+    private static let voiceAppGroup    = "group.com.turtlekeyboard.split"
+    private static let kVoiceRequested  = "voice.requested"
+    // Anything older than this is ignored — guards against firing the
+    // recorder on unrelated app activations (e.g. the user launched
+    // Turtle from Springboard).
+    private static let voiceRequestTTL: TimeInterval = 30
+
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
@@ -20,6 +29,21 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             DispatchQueue.main.async { _ = self.route(url: url) }
         }
         return true
+    }
+
+    /// On iOS 18+, keyboard extensions can't programmatically open their
+    /// container app — so the keyboard sets an App Group flag and asks the
+    /// user to switch apps. When the user does, this handler picks up the
+    /// flag and auto-presents the recording sheet.
+    func applicationDidBecomeActive(_ application: UIApplication) {
+        guard let d = UserDefaults(suiteName: Self.voiceAppGroup) else { return }
+        let requestedAt = d.double(forKey: Self.kVoiceRequested)
+        guard requestedAt > 0 else { return }
+        let age = Date().timeIntervalSince1970 - requestedAt
+        // Always clear the flag so we don't re-fire on the next activation.
+        d.removeObject(forKey: Self.kVoiceRequested)
+        guard age >= 0, age <= Self.voiceRequestTTL else { return }
+        DispatchQueue.main.async { self.presentVoice() }
     }
 
     func application(_ app: UIApplication,
@@ -69,6 +93,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             guard let id = artifactId(in: url) else { return false }
             present(WyrSheetViewController(wyrId: id))
             return true
+        case "voice":
+            presentVoice()
+            return true
         default:
             return false
         }
@@ -106,5 +133,18 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     private func presentSplitDetail() {
         present(SplitDetailViewController())
+    }
+
+    /// Full-screen modal because the user is going to swipe back to their
+    /// host app anyway — the recording UI is throwaway, not a nav-stack
+    /// destination.
+    private func presentVoice() {
+        guard let nav = window?.rootViewController as? UINavigationController else { return }
+        // Don't stack a second recording sheet on top of an existing one
+        // — can happen if the user re-activates while it's still up.
+        if nav.presentedViewController is VoiceRecordingViewController { return }
+        let vc = VoiceRecordingViewController()
+        vc.modalPresentationStyle = .fullScreen
+        nav.dismiss(animated: false) { nav.present(vc, animated: true) }
     }
 }

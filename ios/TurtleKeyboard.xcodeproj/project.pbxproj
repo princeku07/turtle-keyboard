@@ -54,6 +54,7 @@
 		HH000350HH000350HH000350 /* ImageVariants.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000351HH000351HH000351 /* ImageVariants.swift */; };
 		HH000360HH000360HH000360 /* PollSheetViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000361HH000361HH000361 /* PollSheetViewController.swift */; };
 		HH000362HH000362HH000362 /* WyrSheetViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000363HH000363HH000363 /* WyrSheetViewController.swift */; };
+		HH000400HH000400HH000400 /* VoiceRecordingViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000401HH000401HH000401 /* VoiceRecordingViewController.swift */; };
 		HH000364HH000364HH000364 /* WorkerUrls.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000221HH000221HH000221 /* WorkerUrls.swift */; };
 		HH000365HH000365HH000365 /* PollClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000223HH000223HH000223 /* PollClient.swift */; };
 		HH000366HH000366HH000366 /* WyrClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000231HH000231HH000231 /* WyrClient.swift */; };
@@ -169,6 +170,7 @@
 		HH000351HH000351HH000351 /* ImageVariants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageVariants.swift; sourceTree = "<group>"; };
 		HH000361HH000361HH000361 /* PollSheetViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PollSheetViewController.swift; sourceTree = "<group>"; };
 		HH000363HH000363HH000363 /* WyrSheetViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WyrSheetViewController.swift; sourceTree = "<group>"; };
+		HH000401HH000401HH000401 /* VoiceRecordingViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceRecordingViewController.swift; sourceTree = "<group>"; };
 		HH000371HH000371HH000371 /* ImageHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageHistory.swift; sourceTree = "<group>"; };
 		HH000374HH000374HH000374 /* HistoryViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryViewController.swift; sourceTree = "<group>"; };
 		HH000376HH000376HH000376 /* PresetChipStripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresetChipStripView.swift; sourceTree = "<group>"; };
@@ -258,6 +260,7 @@
 				HH000143HH000143HH000143 /* PersonalizationViewController.swift */,
 				HH000361HH000361HH000361 /* PollSheetViewController.swift */,
 				HH000363HH000363HH000363 /* WyrSheetViewController.swift */,
+				HH000401HH000401HH000401 /* VoiceRecordingViewController.swift */,
 				HH000374HH000374HH000374 /* HistoryViewController.swift */,
 				HH000151HH000151HH000151 /* Secrets.swift */,
 				HH000080HH000080HH000080 /* Cloud */,
@@ -587,6 +590,7 @@
 				HH000325HH000325HH000325 /* KeyboardThemeManager.swift in Sources */,
 				HH000360HH000360HH000360 /* PollSheetViewController.swift in Sources */,
 				HH000362HH000362HH000362 /* WyrSheetViewController.swift in Sources */,
+				HH000400HH000400HH000400 /* VoiceRecordingViewController.swift in Sources */,
 				HH000364HH000364HH000364 /* WorkerUrls.swift in Sources */,
 				HH000365HH000365HH000365 /* PollClient.swift in Sources */,
 				HH000366HH000366HH000366 /* WyrClient.swift in Sources */,
