@@ -136,6 +136,12 @@ class KeyboardViewController: UIInputViewController {
     private var bannerContainer:     UIView!
     private var bannerLabel:         UILabel!
     private var keyboardContainer:   UIView!
+    /// Strip of slash-command matches, mounted just below the command
+    /// bar above the keys. Matches Android's `CommandSuggestionStripView`
+    /// behaviour 1:1.
+    private var slashStrip:          CommandSuggestionStripView!
+    private var slashStripHeight:    NSLayoutConstraint!
+    private let slashStripH: CGFloat = 34
     private var heightConstraint:    NSLayoutConstraint!
     private var hideBannerTimer:     Timer?
     private var backspaceTimer:      Timer?
@@ -570,15 +576,37 @@ class KeyboardViewController: UIInputViewController {
         bannerLabel.translatesAutoresizingMaskIntoConstraints = false
         bannerContainer.addSubview(bannerLabel)
 
+        // ── Slash autocomplete strip — sits between the command bar and
+        // the keys, mirrors Android's `CommandSuggestionStripView`. Its
+        // height collapses to 0 when no matches are showing so the keys
+        // get the full row back.
+        slashStrip = CommandSuggestionStripView()
+        slashStrip.onPick = { [weak self] cmd in
+            self?.handleSlashSuggestionTap(cmd.rawValue)
+        }
+        keyboardContainer.addSubview(slashStrip)
+        slashStripHeight = slashStrip.heightAnchor.constraint(equalToConstant: 0)
+
         NSLayoutConstraint.activate([
-            // Command bar fills the top commandBarH of keyboardContainer
-            commandBar.topAnchor.constraint(equalTo: keyboardContainer.topAnchor),
+            // Slash strip sits at the very top of the keyboardContainer,
+            // above the prompt area. Height toggles between 0 (hidden)
+            // and `slashStripH` (visible) — when visible the keyboard
+            // grows by that amount so nothing else has to move.
+            slashStrip.topAnchor.constraint(equalTo: keyboardContainer.topAnchor),
+            slashStrip.leadingAnchor.constraint(equalTo: keyboardContainer.leadingAnchor),
+            slashStrip.trailingAnchor.constraint(equalTo: keyboardContainer.trailingAnchor),
+            slashStripHeight,
+
+            // Command bar now hangs off the strip's bottom so it shifts
+            // down by `slashStripH` when the strip is visible.
+            commandBar.topAnchor.constraint(equalTo: slashStrip.bottomAnchor),
             commandBar.leadingAnchor.constraint(equalTo: keyboardContainer.leadingAnchor),
             commandBar.trailingAnchor.constraint(equalTo: keyboardContainer.trailingAnchor),
             commandBar.heightAnchor.constraint(equalToConstant: commandBarH),
 
-            // Banner occupies the same top slot
-            bannerContainer.topAnchor.constraint(equalTo: keyboardContainer.topAnchor),
+            // Banner shares the command bar's slot (only one visible at
+            // a time) so it follows the same anchor.
+            bannerContainer.topAnchor.constraint(equalTo: slashStrip.bottomAnchor),
             bannerContainer.leadingAnchor.constraint(equalTo: keyboardContainer.leadingAnchor),
             bannerContainer.trailingAnchor.constraint(equalTo: keyboardContainer.trailingAnchor),
             bannerContainer.heightAnchor.constraint(equalToConstant: commandBarH),
@@ -640,16 +668,26 @@ class KeyboardViewController: UIInputViewController {
     // MARK: - Build keyboard
 
     private func buildKeyboard() {
-        // Remove previous key rows (not commandBar / bannerContainer)
+        // Remove previous key rows (not commandBar / bannerContainer /
+        // slashStrip — the slash autocomplete strip is a persistent Auto
+        // Layout child and must survive a rebuild).
         keyboardContainer.subviews
-            .filter { $0 !== commandBar && $0 !== bannerContainer }
+            .filter { $0 !== commandBar
+                   && $0 !== bannerContainer
+                   && $0 !== slashStrip }
             .forEach { $0.removeFromSuperview() }
 
         let rows = currentRows()
+        // When the slash strip is visible above the prompt, every key
+        // row shifts down by its height — keys are frame-positioned and
+        // don't track the new constraint layout otherwise.
+        let stripOffset = (slashStrip?.isHidden == false) ? slashStripH : 0
         for (i, keys) in rows.enumerated() {
-            // Rows always start below the command bar slot
-            let y = commandBarH + rowGap + CGFloat(i) * (rowH + rowGap)
+            let y = stripOffset + commandBarH + rowGap + CGFloat(i) * (rowH + rowGap)
             keyboardContainer.addSubview(buildRow(keys: keys, rowIndex: i, totalRows: rows.count, y: y))
+        }
+        if let strip = slashStrip {
+            keyboardContainer.bringSubviewToFront(strip)
         }
     }
 
@@ -1173,6 +1211,9 @@ class KeyboardViewController: UIInputViewController {
         // Leaving draft mode — let the caret measure full label text again.
         caretAnchorWidth = nil
         slashAutocompleteTopMatch = nil
+        // User picked / fully typed a command — collapse the strip so
+        // the keys get their full vertical space back.
+        hideSlashStrip()
 
         // /edit needs a reference image before the user can describe an
         // edit — fire the system image picker on first entry. The picker
@@ -1254,14 +1295,26 @@ class KeyboardViewController: UIInputViewController {
         cmdSpinner.stopAnimating()
         cmdSuggestionsStack.isHidden = true
 
-        cmdPill.text = "  /  "
-
         // Strip the leading "/" and lowercase for matching.
         let body = buffer.hasPrefix("/")
             ? String(buffer.dropFirst()).lowercased()
             : buffer.lowercased()
-        let topMatch = slashAutocompleteTopMatch(query: body)
+        let allMatches = slashAutocompleteAllMatches(query: body)
+        let topMatch = allMatches.first
         slashAutocompleteTopMatch = topMatch?.rawValue
+
+        // Mount the slash strip above the keys whenever there are 2+
+        // candidates — Android's exact behaviour (`/sp` → `/split`,
+        // `/splits`). Single match falls through to the existing ghost
+        // completion inside the prompt label.
+        if !body.isEmpty, allMatches.count > 1 {
+            showSlashStrip(matches: allMatches)
+        } else {
+            hideSlashStrip()
+        }
+
+        cmdSuggestionsStack.isHidden = true
+        cmdPill.text = "  /  "
 
         if body.isEmpty {
             // User just typed `/`. No ghost yet — the empty pill says
@@ -1339,12 +1392,50 @@ class KeyboardViewController: UIInputViewController {
     /// over substring — `/c` returns `/cap`, never `/notion`. Nil if
     /// nothing matches.
     private func slashAutocompleteTopMatch(query: String) -> SlashCommand? {
-        guard !query.isEmpty else { return nil }
+        slashAutocompleteAllMatches(query: query).first
+    }
+
+    /// All matching commands ordered prefix-first then substring. Powers
+    /// the chip strip when the user is mid-type and has 2+ candidates
+    /// (e.g. `/sp` → `/split`, `/splits`). Capped at `cmdSuggestionBtns`
+    /// length so we never overflow the suggestion slot.
+    private func slashAutocompleteAllMatches(query: String) -> [SlashCommand] {
+        guard !query.isEmpty else { return [] }
         let all = SlashCommand.allCases
-        if let prefix = all.first(where: { $0.rawValue.lowercased().hasPrefix(query) }) {
-            return prefix
+        let prefixes = all.filter { $0.rawValue.lowercased().hasPrefix(query) }
+        let substrings = all.filter {
+            let s = $0.rawValue.lowercased()
+            return !s.hasPrefix(query) && s.contains(query)
         }
-        return all.first { $0.rawValue.lowercased().contains(query) }
+        return Array((prefixes + substrings).prefix(cmdSuggestionBtns.count))
+    }
+
+    private func showSlashStrip(matches: [SlashCommand]) {
+        slashStrip.show(matches)
+        slashStripHeight.constant = slashStripH
+        adjustKeyboardHeight(stripVisible: true)
+        keyboardContainer.bringSubviewToFront(slashStrip)
+    }
+
+    private func hideSlashStrip() {
+        let wasVisible = !slashStrip.isHidden
+        slashStrip.hide()
+        slashStripHeight.constant = 0
+        if wasVisible { adjustKeyboardHeight(stripVisible: false) }
+    }
+
+    /// Grow the keyboard by `slashStripH` while the strip is visible so
+    /// the strip lives ABOVE the prompt area without eating into the keys.
+    /// preferredContentSize tracks the container height so iOS reserves
+    /// the right amount of input-view space.
+    private func adjustKeyboardHeight(stripVisible visible: Bool) {
+        let target = totalH + (visible ? slashStripH : 0)
+        guard heightConstraint.constant != target else { return }
+        heightConstraint.constant = target
+        preferredContentSize = CGSize(width: 0, height: target)
+        // Key rows are frame-positioned starting at y = commandBarH +
+        // strip offset. Rebuild so they re-render at the new offset.
+        rebuildKeyboard()
     }
 
     /// Tap-to-accept handler invoked from the Send button while the bar
@@ -1365,6 +1456,7 @@ class KeyboardViewController: UIInputViewController {
         suggestionMode = .none
         caretAnchorWidth = nil
         slashAutocompleteTopMatch = nil
+        hideSlashStrip()
         // Drop any staged /edit reference — the user backed out before
         // describing the edit. Re-entering /edit will re-launch the picker.
         stagedEditImage = nil
