@@ -197,8 +197,12 @@ class KeyboardViewController: UIInputViewController {
         resolveAndCacheTheme()
         setupContainers()
         buildKeyboard()
-        // Set once — never changed again anywhere in this file.
-        preferredContentSize = CGSize(width: 0, height: totalH)
+        // Initial height = just the key rows. `recomputeKeyboardHeight`
+        // grows the keyboard whenever the prompt area or slash strip
+        // become visible, and shrinks it back when they go away.
+        let initialH = rowsH
+        heightConstraint.constant = initialH
+        preferredContentSize = CGSize(width: 0, height: initialH)
 
         // Try to suppress the iPad system shortcut bar (undo / redo / clipboard).
         // This bar is owned by the host app's UITextField; a keyboard extension
@@ -424,15 +428,26 @@ class KeyboardViewController: UIInputViewController {
     // MARK: - Container setup
 
     private func setupContainers() {
-        // ── Keyboard container — fixed height, always pinned to bottom ──────
+        // ── Keyboard container — fills the input view exactly so iOS
+        //    actually resizes the host's keyboard region when we change
+        //    `heightConstraint`. Anchoring just to `view.bottomAnchor`
+        //    with a height constraint on the container itself caused the
+        //    container to overflow upward into the host app whenever we
+        //    grew it past `rowsH` (slash strip / banner). Putting the
+        //    constraint on `view.heightAnchor` instead makes iOS adjust
+        //    the actual keyboard frame.
         keyboardContainer = UIView()
         keyboardContainer.backgroundColor = bgColor
         keyboardContainer.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(keyboardContainer)
 
-        heightConstraint = keyboardContainer.heightAnchor.constraint(equalToConstant: totalH)
+        // Container is glued to all four sides of view; view drives the
+        // size via its own height constraint.
+        heightConstraint = view.heightAnchor.constraint(equalToConstant: totalH)
+        heightConstraint.priority = .required - 1
 
         NSLayoutConstraint.activate([
+            keyboardContainer.topAnchor.constraint(equalTo: view.topAnchor),
             keyboardContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             keyboardContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             keyboardContainer.bottomAnchor.constraint(equalTo: view.bottomAnchor),
@@ -678,12 +693,11 @@ class KeyboardViewController: UIInputViewController {
             .forEach { $0.removeFromSuperview() }
 
         let rows = currentRows()
-        // When the slash strip is visible above the prompt, every key
-        // row shifts down by its height — keys are frame-positioned and
-        // don't track the new constraint layout otherwise.
-        let stripOffset = (slashStrip?.isHidden == false) ? slashStripH : 0
+        // y-origin tracks the dynamic top chrome: strip + prompt bar if
+        // either is currently showing, zero otherwise (collapsed mode).
+        let topOffset = effectiveChromeH
         for (i, keys) in rows.enumerated() {
-            let y = stripOffset + commandBarH + rowGap + CGFloat(i) * (rowH + rowGap)
+            let y = topOffset + rowGap + CGFloat(i) * (rowH + rowGap)
             keyboardContainer.addSubview(buildRow(keys: keys, rowIndex: i, totalRows: rows.count, y: y))
         }
         if let strip = slashStrip {
@@ -1165,6 +1179,7 @@ class KeyboardViewController: UIInputViewController {
         if commandBar.isHidden {
             commandBar.alpha = 0
             commandBar.isHidden = false
+            recomputeKeyboardHeight()
             UIView.animate(withDuration: 0.15) { self.commandBar.alpha = 1 }
         }
     }
@@ -1188,6 +1203,7 @@ class KeyboardViewController: UIInputViewController {
         if commandBar.isHidden {
             commandBar.alpha = 0
             commandBar.isHidden = false
+            recomputeKeyboardHeight()
             UIView.animate(withDuration: 0.15) { self.commandBar.alpha = 1 }
         }
     }
@@ -1268,6 +1284,7 @@ class KeyboardViewController: UIInputViewController {
         if commandBar.isHidden {
             commandBar.alpha  = 0
             commandBar.isHidden = false
+            recomputeKeyboardHeight()
             UIView.animate(withDuration: 0.18) { self.commandBar.alpha = 1 }
         }
         commandBar.layoutIfNeeded()
@@ -1382,6 +1399,7 @@ class KeyboardViewController: UIInputViewController {
         if commandBar.isHidden {
             commandBar.alpha    = 0
             commandBar.isHidden = false
+            recomputeKeyboardHeight()
             UIView.animate(withDuration: 0.15) { self.commandBar.alpha = 1 }
         }
         commandBar.layoutIfNeeded()
@@ -1413,28 +1431,41 @@ class KeyboardViewController: UIInputViewController {
     private func showSlashStrip(matches: [SlashCommand]) {
         slashStrip.show(matches)
         slashStripHeight.constant = slashStripH
-        adjustKeyboardHeight(stripVisible: true)
+        recomputeKeyboardHeight()
         keyboardContainer.bringSubviewToFront(slashStrip)
     }
 
     private func hideSlashStrip() {
-        let wasVisible = !slashStrip.isHidden
         slashStrip.hide()
         slashStripHeight.constant = 0
-        if wasVisible { adjustKeyboardHeight(stripVisible: false) }
+        recomputeKeyboardHeight()
     }
 
-    /// Grow the keyboard by `slashStripH` while the strip is visible so
-    /// the strip lives ABOVE the prompt area without eating into the keys.
-    /// preferredContentSize tracks the container height so iOS reserves
-    /// the right amount of input-view space.
-    private func adjustKeyboardHeight(stripVisible visible: Bool) {
-        let target = totalH + (visible ? slashStripH : 0)
-        guard heightConstraint.constant != target else { return }
+    /// Height of the chrome above the keys right now — sum of whatever is
+    /// actually visible: slash strip (if showing matches) + prompt area
+    /// (when command bar or banner is up). When nothing is showing, the
+    /// keyboard collapses to just the key rows.
+    private var effectiveChromeH: CGFloat {
+        let strip: CGFloat = (slashStrip?.isHidden == false) ? slashStripH : 0
+        let promptUp = (commandBar?.isHidden == false) || (bannerContainer?.isHidden == false)
+        let bar: CGFloat = promptUp ? commandBarH : 0
+        return strip + bar
+    }
+
+    /// Recompute the keyboard's height from current chrome visibility and
+    /// kick a key-rows rebuild so frame-positioned keys snap to the new
+    /// y-origin. Safe to call from any visibility-changing site; bails
+    /// out if the target height already matches.
+    private func recomputeKeyboardHeight() {
+        let target = effectiveChromeH + rowsH
+        guard abs(heightConstraint.constant - target) > 0.5 else { return }
         heightConstraint.constant = target
         preferredContentSize = CGSize(width: 0, height: target)
-        // Key rows are frame-positioned starting at y = commandBarH +
-        // strip offset. Rebuild so they re-render at the new offset.
+        // Force the input view to resize in the same frame so we don't
+        // see the container overflow upward into the host app for a
+        // beat while iOS is processing `preferredContentSize`.
+        view.setNeedsLayout()
+        view.layoutIfNeeded()
         rebuildKeyboard()
     }
 
@@ -1466,6 +1497,7 @@ class KeyboardViewController: UIInputViewController {
             self.commandBar.isHidden = true
             self.commandBar.alpha    = 1
             self.resetCommandBarMode()
+            self.recomputeKeyboardHeight()
         })
     }
 
@@ -1815,6 +1847,7 @@ class KeyboardViewController: UIInputViewController {
         bannerLabel.text          = text
         bannerContainer.alpha     = 0
         bannerContainer.isHidden  = false
+        recomputeKeyboardHeight()
         UIView.animate(withDuration: 0.15) { self.bannerContainer.alpha = 1 }
         hideBannerTimer?.invalidate()
         hideBannerTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: false) { [weak self] _ in
@@ -1823,6 +1856,7 @@ class KeyboardViewController: UIInputViewController {
             }, completion: { _ in
                 self?.bannerContainer.isHidden = true
                 self?.bannerContainer.alpha    = 1
+                self?.recomputeKeyboardHeight()
             })
         }
     }
