@@ -57,17 +57,28 @@ final class VoiceInputController {
     private static let kStartedAt  = "voice.startedAt"
     private static let kStop       = "voice.stopRequested"
     private static let kCancel     = "voice.cancelRequested"
-    /// Rendezvous flag the host app reads in `applicationDidBecomeActive`
-    /// — when set & recent, the host presents the recording sheet.
+    /// Rendezvous flag the host app reads when it cold-launches or
+    /// foregrounds. Once the host is alive in the background, recording
+    /// is driven by the Darwin notification — no need to set this.
     private static let kVoiceRequested = "voice.requested"
+    /// Heartbeat the host's `VoiceSessionManager` writes on activate +
+    /// each Darwin trigger. Recent timestamp → take the fast path
+    /// (no swipe). Stale / missing → host has been suspended, fall back
+    /// to swipe + cold-launch.
+    private static let kHostAliveAt   = "voice.hostAliveAt"
+    private static let hostAliveTTL: TimeInterval = 60 * 30  // 30 minutes
+
     /// Darwin notification names (kept narrowly scoped to this feature).
-    /// `finishedName` — host wrote final transcript / error / cancel.
-    /// `partialName`  — host pushed a new partial.
-    /// `controlName`  — keyboard signals stop / cancel to the host.
-    private static let finishedName: CFString = "com.turtlekeyboard.voice.didFinish" as CFString
-    private static let partialName:  CFString = "com.turtlekeyboard.voice.didPartial" as CFString
-    private static let controlName:  CFString = "com.turtlekeyboard.voice.control"    as CFString
-    /// Deep link the host app handles when programmatic open is allowed.
+    /// `finishedName`  — host wrote final transcript / error / cancel.
+    /// `partialName`   — host pushed a new partial.
+    /// `controlName`   — keyboard signals stop / cancel to the host.
+    /// `requestedName` — keyboard tells the host to start recording.
+    private static let finishedName:  CFString = "com.turtlekeyboard.voice.didFinish"  as CFString
+    private static let partialName:   CFString = "com.turtlekeyboard.voice.didPartial" as CFString
+    private static let controlName:   CFString = "com.turtlekeyboard.voice.control"    as CFString
+    private static let requestedName: CFString = "com.turtlekeyboard.voice.requested"  as CFString
+    /// Deep link used only when the host has been killed and we have to
+    /// cold-launch it. The day-to-day path is the Darwin notification.
     private static let launchURL   = URL(string: "turtlekeyboard://voice")!
 
     private(set) var isListening: Bool = false
@@ -116,6 +127,8 @@ final class VoiceInputController {
         defaults.removeObject(forKey: Self.kStop)
         defaults.removeObject(forKey: Self.kCancel)
         defaults.set(now, forKey: Self.kStartedAt)
+        // Always set the rendezvous flag — if the host has to cold-launch
+        // it will pick this up via `applicationDidBecomeActive`.
         defaults.set(now, forKey: Self.kVoiceRequested)
 
         self.activeSink = sink
@@ -124,16 +137,80 @@ final class VoiceInputController {
         sink.onListeningStarted()
         startPollTimer()
 
-        // Best-effort programmatic launch. On iOS 18+ this returns false
-        // for keyboard extensions, but the rendezvous flag means the host
-        // will still start recording when the user swipes to it manually.
-        openHostApp(from: host) { [weak self] opened in
+        // Fire the Darwin "requested" signal. If the host is alive in the
+        // background (recent heartbeat) it will start recording within
+        // ~100 ms and the user never has to leave the current app.
+        postRequestedSignal()
+
+        if isHostAliveInBackground(defaults: defaults, now: now) {
+            // Fast path: host is warm, expect partials shortly. Arm a
+            // 1.5s watchdog — if neither a partial nor a fresh heartbeat
+            // arrives, the host was killed after the last heartbeat
+            // (e.g. force-quit) and we fall through to the toast path.
+            armWatchdog(sink: sink, host: host, sentAt: now)
+            return
+        }
+
+        // Host is dead (force-quit, never opened this session, cleared by
+        // iOS). Don't try to launch it programmatically — iOS denies that
+        // for keyboard extensions anyway. Show a toast asking the user to
+        // open Turtle. The rendezvous flag we set above means the host
+        // will pick up where we left off as soon as it foregrounds.
+        promptUserToOpenHost(sink: sink)
+    }
+
+    private func promptUserToOpenHost(sink: Sink) {
+        // Tear down the listening state — recording isn't happening yet.
+        // We'll arm a new listening session when the user re-taps mic
+        // after opening Turtle (host will then be alive in background).
+        stopPollTimer()
+        isListening = false
+        let host = hostInputVC
+        activeSink = nil
+        hostInputVC = nil
+        DispatchQueue.main.async {
+            sink.onListeningStopped()
+            sink.onInfo("Opening Turtle app to enable voice…")
+        }
+        // Try to launch Turtle directly. iOS 18+ keyboard extensions
+        // usually have this denied, but when it works the host pops up
+        // with the coachmark and the user just has to swipe back. When
+        // it fails the toast above stays on screen so the user can open
+        // Turtle by hand.
+        if let host = host {
+            openHostApp(from: host) { _ in /* completion-only logging */ }
+        }
+    }
+
+    private func postRequestedSignal() {
+        CFNotificationCenterPostNotification(
+            CFNotificationCenterGetDarwinNotifyCenter(),
+            CFNotificationName(Self.requestedName), nil, nil, true)
+    }
+
+    private func isHostAliveInBackground(defaults: UserDefaults, now: TimeInterval) -> Bool {
+        let alive = defaults.double(forKey: Self.kHostAliveAt)
+        guard alive > 0 else { return false }
+        return (now - alive) <= Self.hostAliveTTL
+    }
+
+    private var watchdog: Timer?
+    private func armWatchdog(sink: Sink, host: UIInputViewController, sentAt: TimeInterval) {
+        watchdog?.invalidate()
+        watchdog = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: false) {
+            [weak self] _ in
             guard let self = self, self.isListening else { return }
-            DispatchQueue.main.async {
-                if !opened {
-                    sink.onInfo("Swipe up to Turtle app to start dictation")
-                }
+            // Two signals that the host is alive and just waiting for the
+            // user to speak: a partial already came in, OR the host wrote
+            // a fresher heartbeat than the one we read at start().
+            if self.lastPartialDelivered != nil { return }
+            if let d = UserDefaults(suiteName: Self.appGroupID) {
+                let freshHeartbeat = d.double(forKey: Self.kHostAliveAt)
+                if freshHeartbeat > sentAt { return }
             }
+            // Heartbeat was stale (host force-quit between heartbeats).
+            // Same UX as the never-alive path: ask the user to open it.
+            self.promptUserToOpenHost(sink: sink)
         }
     }
 
@@ -261,8 +338,11 @@ final class VoiceInputController {
                                        url: URL,
                                        completion: @escaping (Bool) -> Void) {
         let openSel = NSSelectorFromString("openURL:")
-        // Walk from view → window → application, which is the chain order
-        // most likely to surface UIApplication on older iOS.
+
+        // 1) Responder-chain walk. On iOS versions where UIApplication is
+        //    reachable from a UIInputViewController this is the cleanest
+        //    way to call `openURL:`. The cast is `as? UIApplication` because
+        //    the class IS available in extensions — only `.shared` is not.
         let starts: [UIResponder?] = [
             host.viewIfLoaded?.window,
             host.viewIfLoaded,
@@ -279,6 +359,23 @@ final class VoiceInputController {
                 responder = r.next
             }
         }
+
+        // 2) Runtime `+[UIApplication sharedApplication]` lookup. Apple's
+        //    static analyser flags this pattern in extensions, but it's the
+        //    path that actually delivers the open on iOS 18+ where neither
+        //    `extensionContext.open` nor the responder chain works. Wispr
+        //    Flow and other dictation keyboards rely on this.
+        let sharedSel = NSSelectorFromString("sharedApplication")
+        if let appClass = NSClassFromString("UIApplication") as? NSObject.Type,
+           appClass.responds(to: sharedSel),
+           let unmanaged = appClass.perform(sharedSel),
+           let app = unmanaged.takeUnretainedValue() as? NSObject,
+           app.responds(to: openSel) {
+            _ = app.perform(openSel, with: url)
+            completion(true)
+            return
+        }
+
         completion(false)
     }
 
@@ -335,6 +432,8 @@ final class VoiceInputController {
     private func stopPollTimer() {
         pollTimer?.invalidate()
         pollTimer = nil
+        watchdog?.invalidate()
+        watchdog = nil
     }
 
     // MARK: - Darwin notification bridge

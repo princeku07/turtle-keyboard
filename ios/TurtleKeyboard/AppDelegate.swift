@@ -22,6 +22,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         window?.rootViewController = UINavigationController(rootViewController: ViewController())
         window?.makeKeyAndVisible()
 
+        // Spin up the headless voice manager. Once it's registered the
+        // keyboard can drive recording via Darwin notifications — the user
+        // does NOT need to swipe to Turtle on every mic tap, as long as
+        // this host process is still alive in the background.
+        VoiceSessionManager.shared.register()
+
         // Cold-launch via URL — iOS hands the URL through launchOptions
         // instead of (or in addition to) calling application(_:open:options:),
         // so route it here too.
@@ -31,19 +37,31 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return true
     }
 
-    /// On iOS 18+, keyboard extensions can't programmatically open their
-    /// container app — so the keyboard sets an App Group flag and asks the
-    /// user to switch apps. When the user does, this handler picks up the
-    /// flag and auto-presents the recording sheet.
+    /// Swipe-to-Turtle path: the user tapped mic in the keyboard while
+    /// this process was dead, saw the toast asking them to open Turtle,
+    /// and just did. Present the "Swipe back to your app" coachmark.
+    /// `VoiceRecordingViewController` itself listens for the user
+    /// swiping back and kicks `VoiceSessionManager.startIfRequested()`
+    /// at that moment — by then the keep-alive engine is primed.
     func applicationDidBecomeActive(_ application: UIApplication) {
+        VoiceSessionManager.shared.writeHeartbeat()
+        presentVoiceCoachmarkIfRequested()
+    }
+
+    private func presentVoiceCoachmarkIfRequested() {
         guard let d = UserDefaults(suiteName: Self.voiceAppGroup) else { return }
         let requestedAt = d.double(forKey: Self.kVoiceRequested)
         guard requestedAt > 0 else { return }
         let age = Date().timeIntervalSince1970 - requestedAt
-        // Always clear the flag so we don't re-fire on the next activation.
-        d.removeObject(forKey: Self.kVoiceRequested)
-        guard age >= 0, age <= Self.voiceRequestTTL else { return }
-        DispatchQueue.main.async { self.presentVoice() }
+        guard age >= 0, age <= Self.voiceRequestTTL else {
+            d.removeObject(forKey: Self.kVoiceRequested)
+            return
+        }
+        guard let nav = window?.rootViewController as? UINavigationController else { return }
+        if nav.presentedViewController is VoiceRecordingViewController { return }
+        let vc = VoiceRecordingViewController()
+        vc.modalPresentationStyle = .fullScreen
+        nav.dismiss(animated: false) { nav.present(vc, animated: true) }
     }
 
     func application(_ app: UIApplication,
@@ -94,7 +112,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             present(WyrSheetViewController(wyrId: id))
             return true
         case "voice":
-            presentVoice()
+            // Used only when the keyboard's old programmatic-open path
+            // happens to succeed on a given iOS version. Otherwise the
+            // user opens Turtle manually and we hit
+            // `applicationDidBecomeActive` instead — both routes funnel
+            // into the same coachmark.
+            VoiceSessionManager.shared.writeHeartbeat()
+            presentVoiceCoachmarkIfRequested()
             return true
         default:
             return false
@@ -135,16 +159,4 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         present(SplitDetailViewController())
     }
 
-    /// Full-screen modal because the user is going to swipe back to their
-    /// host app anyway — the recording UI is throwaway, not a nav-stack
-    /// destination.
-    private func presentVoice() {
-        guard let nav = window?.rootViewController as? UINavigationController else { return }
-        // Don't stack a second recording sheet on top of an existing one
-        // — can happen if the user re-activates while it's still up.
-        if nav.presentedViewController is VoiceRecordingViewController { return }
-        let vc = VoiceRecordingViewController()
-        vc.modalPresentationStyle = .fullScreen
-        nav.dismiss(animated: false) { nav.present(vc, animated: true) }
-    }
 }
