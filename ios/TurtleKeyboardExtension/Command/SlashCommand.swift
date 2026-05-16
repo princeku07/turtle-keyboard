@@ -22,6 +22,7 @@ enum SlashCommand: String, CaseIterable {
     case poll   = "poll"
     case wyr    = "wyr"
     case web    = "web"
+    case history = "history"
 
     var emoji: String {
         switch self {
@@ -40,14 +41,15 @@ enum SlashCommand: String, CaseIterable {
         case .poll:          return "📊"
         case .wyr:           return "🤔"
         case .web:           return "🌐"
+        case .history:       return "🖼️"
         }
     }
 
     var needsPrompt: Bool {
         switch self {
         case .cap, .edit, .tone, .tl, .ask, .org, .split,
-             .notion, .note, .slack, .msg, .poll, .web: return true
-        case .fix, .reply, .splits, .wyr:               return false
+             .notion, .note, .slack, .msg, .poll, .web:    return true
+        case .fix, .reply, .splits, .wyr, .history:        return false
         }
     }
 
@@ -62,6 +64,7 @@ enum SlashCommand: String, CaseIterable {
         case .poll:              return "Create"
         case .wyr:               return "Play"
         case .web:               return "Open"
+        case .history:           return "Open"
         default:                 return "Send"
         }
     }
@@ -69,7 +72,8 @@ enum SlashCommand: String, CaseIterable {
     /// Local commands run inside the keyboard with no AI round-trip.
     var isLocal: Bool {
         switch self {
-        case .split, .splits, .notion, .note, .slack, .msg, .poll, .wyr, .web: return true
+        case .split, .splits, .notion, .note, .slack, .msg,
+             .poll, .wyr, .web, .history: return true
         default: return false
         }
     }
@@ -93,6 +97,7 @@ enum SlashCommand: String, CaseIterable {
         case .poll:          return "📊 Poll"
         case .wyr:           return "🤔 Game ready"
         case .web:           return "🌐 Web"
+        case .history:       return "🖼️ History"
         }
     }
 }

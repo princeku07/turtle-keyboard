@@ -984,7 +984,10 @@ class KeyboardViewController: UIInputViewController {
         let localCommands: [SlashCommand] = integrationRegistry.allCommands.compactMap {
             SlashCommand(rawValue: $0.name.lowercased())
         }
-        return aiCommands + localCommands
+        // /history is a keyboard-local command (not an Integration) that
+        // browses past /cap and /org outputs. Pin it after the integration
+        // commands so it sits at the end of the grid.
+        return aiCommands + localCommands + [.history]
     }
 
     // MARK: - Slash command detection
@@ -2057,6 +2060,13 @@ extension KeyboardViewController: QuickPanelDelegate {
 
     func quickPanelDidSelect(_ command: SlashCommand) {
         dismissQuickPanel()
+        // /history is keyboard-local with its own panel — no IntegrationKit
+        // wiring, no AI round-trip. Mount it directly so it shares the
+        // overlay slot the Quick Panel just vacated.
+        if command == .history {
+            showHistoryPanel()
+            return
+        }
         if command.needsPrompt {
             // Open the command bar pre-loaded with the command and an
             // empty prompt; the user types (or dictates) the body and
@@ -2072,6 +2082,15 @@ extension KeyboardViewController: QuickPanelDelegate {
             updateCommandDetection()
             sendCommand()
         }
+    }
+
+    private func showHistoryPanel() {
+        let panel = HistoryPanelView(columns: isPad ? 6 : 4)
+        panel.onDismiss = { [weak self] in self?.unmountIntegrationPanel() }
+        panel.onCopied  = { [weak self] in
+            self?.showBanner("📋 Image copied — long-press field to paste")
+        }
+        mountIntegrationPanel(panel)
     }
 
     func quickPanelDidDismiss() {

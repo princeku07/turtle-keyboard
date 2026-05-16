@@ -83,6 +83,7 @@
 		HH000122HH000122HH000122 /* KeyboardPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000123HH000123HH000123 /* KeyboardPalette.swift */; };
 		HH000124HH000124HH000124 /* SlashCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000125HH000125HH000125 /* SlashCommand.swift */; };
 		HH000130HH000130HH000130 /* QuickPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000131HH000131HH000131 /* QuickPanelView.swift */; };
+		HH000420HH000420HH000420 /* HistoryPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000421HH000421HH000421 /* HistoryPanelView.swift */; };
 		HH000140HH000140HH000140 /* PersonalizationKeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000141HH000141HH000141 /* PersonalizationKeys.swift */; };
 		HH000142HH000142HH000142 /* PersonalizationViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000143HH000143HH000143 /* PersonalizationViewController.swift */; };
 		HH000144HH000144HH000144 /* PersonalizationKeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000141HH000141HH000141 /* PersonalizationKeys.swift */; };
@@ -192,6 +193,7 @@
 		HH000123HH000123HH000123 /* KeyboardPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardPalette.swift; sourceTree = "<group>"; };
 		HH000125HH000125HH000125 /* SlashCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlashCommand.swift; sourceTree = "<group>"; };
 		HH000131HH000131HH000131 /* QuickPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickPanelView.swift; sourceTree = "<group>"; };
+		HH000421HH000421HH000421 /* HistoryPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryPanelView.swift; sourceTree = "<group>"; };
 		HH000141HH000141HH000141 /* PersonalizationKeys.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalizationKeys.swift; sourceTree = "<group>"; };
 		HH000143HH000143HH000143 /* PersonalizationViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalizationViewController.swift; sourceTree = "<group>"; };
 		HH000151HH000151HH000151 /* Secrets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Secrets.swift"; path = "../Generated/Secrets.swift"; sourceTree = "<group>"; };
@@ -338,6 +340,7 @@
 				HH000121HH000121HH000121 /* KeyRows.swift */,
 				HH000123HH000123HH000123 /* KeyboardPalette.swift */,
 				HH000131HH000131HH000131 /* QuickPanelView.swift */,
+				HH000421HH000421HH000421 /* HistoryPanelView.swift */,
 				HH000376HH000376HH000376 /* PresetChipStripView.swift */,
 				HH000320HH000320HH000320 /* KeyboardTheme.swift */,
 				HH000323HH000323HH000323 /* KeyboardThemeManager.swift */,
@@ -642,6 +645,7 @@
 				HH000122HH000122HH000122 /* KeyboardPalette.swift in Sources */,
 				HH000124HH000124HH000124 /* SlashCommand.swift in Sources */,
 				HH000130HH000130HH000130 /* QuickPanelView.swift in Sources */,
+				HH000420HH000420HH000420 /* HistoryPanelView.swift in Sources */,
 				HH000140HH000140HH000140 /* PersonalizationKeys.swift in Sources */,
 				HH000220HH000220HH000220 /* WorkerUrls.swift in Sources */,
 				HH000222HH000222HH000222 /* PollClient.swift in Sources */,
