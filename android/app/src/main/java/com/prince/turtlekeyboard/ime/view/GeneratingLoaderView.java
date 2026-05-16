@@ -34,12 +34,13 @@ import java.util.Random;
 public class GeneratingLoaderView extends FrameLayout {
 
     private static final int BG = 0xFF000000;
-    // Three-stop blue: a hot lighter-blue centre, a mid cobalt tail, then
-    // fully transparent so it fades into the black surface. Single-stop
-    // gradients flattened out in the visible band — the inner stop is what
-    // gives the panel its visible "spotlight" punch.
-    private static final int GLOW_HOT  = 0xFF7AA0E0;   // hot bright centre
-    private static final int GLOW_MID  = 0xCC3A5896;   // long blue tail
+    // Four-stop blue: hot core, a short plateau at the peak so the centre
+    // reads as a solid blob (not a single-pixel peak), a mid cobalt tail,
+    // then transparent. Alphas dialled back from the brighter pass — with
+    // SCREEN blending and three overlapping blobs, lower per-blob alpha
+    // keeps the merged liquid mass from feeling overpowering.
+    private static final int GLOW_HOT  = 0xCC7AA0DE;   // softer hot centre
+    private static final int GLOW_MID  = 0xAA3858A0;   // cobalt tail
     private static final int GLOW_RIM  = 0x00000000;   // transparent at the rim
     // Text shimmer is a 5-stop ramp so the reflection reads as light
     // wrapping around the type rather than a hard white sweep:
@@ -82,6 +83,11 @@ public class GeneratingLoaderView extends FrameLayout {
         message.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         message.setGravity(Gravity.CENTER);
         message.setIncludeFontPadding(false);
+        // Lighter weight + slight tracking — reads as a refined status line
+        // rather than a chunky label. Pairs better with the soft gradient.
+        message.setTypeface(android.graphics.Typeface.create("sans-serif-light",
+                android.graphics.Typeface.NORMAL));
+        message.setLetterSpacing(0.04f);
         LayoutParams lp = new LayoutParams(LayoutParams.WRAP_CONTENT,
                 LayoutParams.WRAP_CONTENT);
         lp.gravity = Gravity.CENTER;
@@ -119,13 +125,15 @@ public class GeneratingLoaderView extends FrameLayout {
             message.post(this::installShimmerShader);
             return;
         }
-        // Narrow band gradient: outside the [0.30, 0.70] range the shader
-        // clamps to TEXT_DIM, so the text only brightens when the ball's
-        // x-position pulls the peak into the text's bounds.
+        // 5-stop ramp: dim → cool halo → pearl peak → cool halo → dim.
+        // Wider lit zone (0.12 → 0.88) than the previous 0.30/0.70 band so
+        // more of the text breathes with the ball, and the halo carries
+        // the same cool tint as the glow so the reflection reads as 'lit
+        // by the ball' rather than 'a different-coloured stripe'.
         shimmerShader = new LinearGradient(
                 0f, 0f, textW, 0f,
-                new int[]{ TEXT_DIM, TEXT_BRIGHT, TEXT_DIM },
-                new float[]{ 0.30f, 0.50f, 0.70f },
+                new int[]{ TEXT_DIM, TEXT_HALO, TEXT_PEARL, TEXT_HALO, TEXT_DIM },
+                new float[]{ 0.12f, 0.36f, 0.50f, 0.64f, 0.88f },
                 Shader.TileMode.CLAMP);
         message.getPaint().setShader(shimmerShader);
         message.invalidate();
@@ -177,29 +185,33 @@ public class GeneratingLoaderView extends FrameLayout {
         int h = getHeight();
         if (w == 0 || h == 0) return;
 
-        // Centre lives at the TOP edge so the hot core lands inside the
-        // visible band — at 56 dp tall, putting it in the middle hid most
-        // of the gradient's structure. With cy at the top, the bright peak
-        // is right at y=0 and the full radial falloff plays through the
-        // strip downward. Drift is X-only so the hot spot sweeps across.
+        // Single large blob with non-harmonic multi-sine drift on both
+        // axes. Two sines per axis at different periods means the path
+        // never resolves into a clean ellipse — it wanders, so the eye
+        // reads it as a random walk rather than an animation loop. The
+        // primary horizontal sine carries most of the motion; the
+        // smaller secondary sines on each axis perturb the path so the
+        // blob doesn't repeat itself.
         float t = (System.currentTimeMillis() - driftStartedAt) / 1000f;
-        float ampX = w * 0.22f;
-        float cx = w * 0.42f + ampX * (float) Math.sin(t * 0.55f);
-        float cy = 0f;
-        float r = w * (0.75f + 0.10f * (float) Math.sin(t * 0.40f));
+
+        float cx = w * 0.50f
+                + w * 0.22f * (float) Math.sin(t * 0.55f)
+                + w * 0.08f * (float) Math.sin(t * 0.31f + 1.7f);
+        // cy stays near the top edge so the radial peak lands inside the
+        // 56 dp visible strip, with a small wobble for vertical interest.
+        float cy = h * 0.10f * (float) Math.sin(t * 0.42f + 0.9f)
+                + h * 0.05f * (float) Math.cos(t * 0.27f);
+        float r = w * (0.55f + 0.10f * (float) Math.sin(t * 0.40f));
+
         RadialGradient g = new RadialGradient(cx, cy, r,
-                new int[]{ GLOW_HOT, GLOW_MID, GLOW_RIM },
-                new float[]{ 0f, 0.35f, 1f },
+                new int[]{ GLOW_HOT, GLOW_HOT, GLOW_MID, GLOW_RIM },
+                new float[]{ 0f, 0.22f, 0.55f, 0.70f },
                 Shader.TileMode.CLAMP);
         glowPaint.setShader(g);
         c.drawRect(0, 0, w, h, glowPaint);
 
-        // Drive the text shimmer from the ball's cx. The text sits centred
-        // at w/2, so translating its gradient by (cx - w/2) puts the bright
-        // peak directly underneath wherever the ball currently is. When the
-        // ball drifts off the text, the shader clamps to TEXT_DIM and the
-        // text dims back down — so the text "reacts" to the ball passing
-        // overhead instead of running an independent shimmer cycle.
+        // Text shimmer tracks the blob's cx so the lit-letter zone follows
+        // wherever the blob currently is.
         if (shimmerShader != null) {
             shimmerMatrix.setTranslate(cx - w * 0.5f, 0f);
             shimmerShader.setLocalMatrix(shimmerMatrix);

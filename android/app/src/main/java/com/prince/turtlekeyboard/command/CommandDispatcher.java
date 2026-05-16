@@ -17,12 +17,6 @@ import com.prince.turtlekeyboard.input.InputCommitter;
  */
 public class CommandDispatcher {
 
-    /** Temporary visual-test mode: skip the AI round-trip so the dispatcher only
-     *  shows the loader (and auto-hides it after {@link #LOADER_TEST_HIDE_MS}).
-     *  Flip back to false once we're done iterating on the loader's look. */
-    private static final boolean LOADER_TEST_MODE = true;
-    private static final long LOADER_TEST_HIDE_MS = 10000L;
-
     public interface ResultUi {
         void showStatus(String message);
         void showSuggestions(String[] suggestions);
@@ -75,11 +69,6 @@ public class CommandDispatcher {
                 ? e.loadingMessage
                 : "/" + cmd.name;
         ui.showStatus(base + "…");
-        if (LOADER_TEST_MODE) {
-            new android.os.Handler(android.os.Looper.getMainLooper())
-                    .postDelayed(ui::clearStatus, LOADER_TEST_HIDE_MS);
-            return;
-        }
         client.execute(cmd, result -> handle(result));
     }
 

@@ -85,6 +85,11 @@ public class TurtleInputMethodService extends InputMethodService
     private CommandComposer composer;
     private CommandDispatcher dispatcher;
     @Nullable private String currentPkg;
+    // Package the user was in when the *current* AI command fired. Snapshotted
+    // at loader-show time so that if the keyboard is gone by result time we
+    // can still offer a direct "Share to <originating app>" action in the
+    // notification — preserves the chat-thread context they started from.
+    @Nullable private String pendingSourcePkg;
     private com.prince.turtlekeyboard.integration.PersistentAppProfileRegistry appProfiles;
     private com.prince.turtlekeyboard.integration.EnrolledShortcutsManager enrolledShortcuts;
     private SuggestionProvider suggestionProvider;
@@ -223,6 +228,7 @@ public class TurtleInputMethodService extends InputMethodService
         root.strip().setOnPasteTapListener(this::pasteFromClipboard);
         root.strip().setOnSettingsTapListener(this::openHostDetailView);
         root.cmdSuggestions().setOnPickListener(this::onCommandSuggestionPicked);
+        root.cmdSuggestions().setOnDismissListener(this::dismissCommandSuggestions);
 
         // Build the integration context off the freshly inflated views, then construct the
         // registry — its constructor pumps each integration's commands into the registry.
@@ -610,8 +616,11 @@ public class TurtleInputMethodService extends InputMethodService
     /** Posts a {@code BigPictureStyle} notification with the generated image when the
      *  keyboard is hidden at result time. Tapping the notification opens a system
      *  share sheet seeded with the image's FileProvider URI, so the user can drop
-     *  it into whichever app they're now in. */
-    private void notifyImageReady(java.io.File img, Uri uri) {
+     *  it into whichever app they're now in. If {@code originPkg} is the app the
+     *  user was prompting from (e.g. WhatsApp), a one-tap "Share to <App>" action
+     *  is added that routes the ACTION_SEND straight to that package — skipping
+     *  the chooser. */
+    private void notifyImageReady(java.io.File img, Uri uri, @Nullable String originPkg) {
         android.app.NotificationManager nm =
                 (android.app.NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         if (nm == null) {
@@ -671,6 +680,53 @@ public class TurtleInputMethodService extends InputMethodService
             b.setLargeIcon(big);
             b.setStyle(new androidx.core.app.NotificationCompat.BigPictureStyle()
                     .bigPicture(big));
+        }
+        // One-tap share back to the originating app. Two gotchas:
+        //   1. Intent.resolveActivity(pm) calls MATCH_DEFAULT_ONLY and misses
+        //      non-default receivers (e.g. WhatsApp's ContactPicker), so we
+        //      use queryIntentActivities(0) and pin the explicit component
+        //      that handles it. With a hard ComponentName, tapping the action
+        //      bypasses the system chooser entirely.
+        //   2. The FileProvider URI permission grant on a PendingIntent
+        //      doesn't reliably reach a setPackage target — grant it
+        //      explicitly so the target can actually read the image.
+        if (originPkg != null) {
+            Intent direct = new Intent(Intent.ACTION_SEND);
+            direct.setType("image/png");
+            direct.putExtra(Intent.EXTRA_STREAM, uri);
+            direct.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            direct.setPackage(originPkg);
+            android.content.pm.PackageManager pm = getPackageManager();
+            java.util.List<android.content.pm.ResolveInfo> hits =
+                    pm.queryIntentActivities(direct, 0);
+            if (!hits.isEmpty()) {
+                android.content.pm.ActivityInfo target = hits.get(0).activityInfo;
+                direct.setComponent(new android.content.ComponentName(
+                        target.packageName, target.name));
+                // Explicit URI grant — survives the PendingIntent hop into the
+                // target package's process.
+                grantUriPermission(originPkg, uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                CharSequence label;
+                try {
+                    android.content.pm.ApplicationInfo ai = pm.getApplicationInfo(originPkg, 0);
+                    label = pm.getApplicationLabel(ai);
+                } catch (android.content.pm.PackageManager.NameNotFoundException e) {
+                    label = originPkg;
+                }
+                android.app.PendingIntent directPi = android.app.PendingIntent.getActivity(
+                        this, 1, direct,
+                        android.app.PendingIntent.FLAG_IMMUTABLE
+                                | android.app.PendingIntent.FLAG_UPDATE_CURRENT);
+                b.addAction(new androidx.core.app.NotificationCompat.Action.Builder(
+                        R.mipmap.ic_launcher, "Share to " + label, directPi).build());
+                Log.d("TurtleIME", "notify: direct action wired pkg=" + originPkg
+                        + " activity=" + target.name);
+            } else {
+                Log.d("TurtleIME", "notify: origin pkg " + originPkg
+                        + " has no ACTION_SEND handler for image/png — "
+                        + "skipping direct action");
+            }
         }
         try {
             int id = (int) (System.currentTimeMillis() & 0x7fffffff);
@@ -1104,6 +1160,14 @@ public class TurtleInputMethodService extends InputMethodService
         root.cmdSuggestions().show(registry.matchesFor(prefix, currentPkg));
     }
 
+    private void dismissCommandSuggestions() {
+        // Close ✕ pill on the strip: exit NAME mode AND hide the strip so
+        // further typing goes through as plain text instead of restarting
+        // the suggestion flow on the next keystroke.
+        composer.cancel();
+        root.cmdSuggestions().hide();
+    }
+
     private void onCommandSuggestionPicked(CommandRegistry.Entry entry) {
         // No-prompt commands have nothing for the user to type or confirm — fire
         // immediately on pick so e.g. /history doesn't need an extra Go-tap. The
@@ -1145,6 +1209,10 @@ public class TurtleInputMethodService extends InputMethodService
         // arrives. Any other status (errors, completions) hides it and falls
         // through to the transient banner.
         if (message != null && message.endsWith("…")) {
+            // Remember which app the user was in *as the request fires* — if
+            // they background the keyboard before the result lands, the
+            // notification can route a one-tap share straight back to it.
+            pendingSourcePkg = currentPkg;
             root.generatingLoader().show(message);
             root.shimmer().stop();
             return;
@@ -1189,9 +1257,15 @@ public class TurtleInputMethodService extends InputMethodService
         Log.d("TurtleIME", "showImage visible=" + inputViewVisible + " path="
                 + (inputViewVisible ? "preview" : "notification"));
         if (!inputViewVisible) {
-            notifyImageReady(source, uri);
+            String originPkg = pendingSourcePkg;
+            pendingSourcePkg = null;
+            notifyImageReady(source, uri, originPkg);
             return;
         }
+        // Result landed while the keyboard is still visible — preview path
+        // takes over, so drop the pending origin so a later command doesn't
+        // inherit it.
+        pendingSourcePkg = null;
         boolean ok = root.preview().show(source, new com.prince.turtlekeyboard.ime.view.ImagePreviewView.Listener() {
             @Override public void onShare(com.prince.turtlekeyboard.ai.ImageVariants.Type type) {
                 root.preview().hide();
@@ -1259,6 +1333,7 @@ public class TurtleInputMethodService extends InputMethodService
         root.shimmer().stop();
         root.generatingLoader().hide();
         root.banner().clear();
+        pendingSourcePkg = null;
     }
 
     // ===== KeyboardView.OnKeyboardActionListener stubs =====
