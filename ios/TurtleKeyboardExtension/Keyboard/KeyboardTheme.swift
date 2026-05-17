@@ -32,6 +32,15 @@ struct KeyboardTheme: Equatable {
     // Brand
     let accent: UIColor           // return-key fill / preview-overlay highlight
 
+    // Command-bar chrome (pill, send button, suggestion chips, slash strip).
+    // Pulled out so the chips in the slash-autocomplete and word-suggestion
+    // strips don't have to hardcode white-on-green.
+    let chipBg: UIColor
+    let chipText: UIColor
+    /// Glyph + label colour for items rendered INSIDE the command bar
+    /// (cancel ✕, send arrow, prompt label). Was hardcoded white before.
+    let barText: UIColor
+
     // MARK: - Presets
 
     /// Current brand look — turtle green. Default for existing installs.
@@ -46,24 +55,30 @@ struct KeyboardTheme: Equatable {
         keyShiftOn: UIColor(red: 0.290, green: 0.580, blue: 0.305, alpha: 1.0),
         keyText:    .white,
         keyTextSpecial: .white,
-        accent:    UIColor(red: 0.082, green: 0.502, blue: 0.239, alpha: 1.0)
+        accent:    UIColor(red: 0.082, green: 0.502, blue: 0.239, alpha: 1.0),
+        chipBg:    UIColor(white: 1.0, alpha: 0.18),
+        chipText:  .white,
+        barText:   .white
     )
 
     /// Light keyboard look — pale gray surface, white keys, dark glyphs.
-    /// Command bar + banner keep the brand dark-green so command-bar
-    /// text (white) reads consistently across themes.
+    /// Now fully light: bar, banner, chips all stay in the light palette
+    /// instead of dropping a green bar onto a white keyboard.
     static let light = KeyboardTheme(
         id: "light",
         displayName: "Light",
         bg:        UIColor(red: 0.820, green: 0.827, blue: 0.851, alpha: 1.0),
-        barBg:     UIColor(red: 0.045, green: 0.180, blue: 0.060, alpha: 1.0),
-        bannerBg:  UIColor(red: 0.082, green: 0.502, blue: 0.239, alpha: 1.0),
+        barBg:     UIColor(red: 0.890, green: 0.894, blue: 0.910, alpha: 1.0),
+        bannerBg:  UIColor(red: 0.890, green: 0.894, blue: 0.910, alpha: 1.0),
         keyNormal: .white,
         keySpecial: UIColor(red: 0.675, green: 0.690, blue: 0.741, alpha: 1.0),
         keyShiftOn: UIColor(red: 0.082, green: 0.502, blue: 0.239, alpha: 1.0),
         keyText:    UIColor(red: 0.047, green: 0.047, blue: 0.047, alpha: 1.0),
         keyTextSpecial: UIColor(red: 0.047, green: 0.047, blue: 0.047, alpha: 1.0),
-        accent:    UIColor(red: 0.082, green: 0.502, blue: 0.239, alpha: 1.0)
+        accent:    UIColor(red: 0.082, green: 0.502, blue: 0.239, alpha: 1.0),
+        chipBg:    UIColor(white: 0.0, alpha: 0.08),
+        chipText:  UIColor(red: 0.047, green: 0.047, blue: 0.047, alpha: 1.0),
+        barText:   UIColor(red: 0.047, green: 0.047, blue: 0.047, alpha: 1.0)
     )
 
     /// Dark keyboard look — near-black surface, dark gray keys, white glyphs.
@@ -72,13 +87,16 @@ struct KeyboardTheme: Equatable {
         displayName: "Dark",
         bg:        UIColor(red: 0.110, green: 0.110, blue: 0.118, alpha: 1.0),
         barBg:     UIColor(red: 0.055, green: 0.055, blue: 0.063, alpha: 1.0),
-        bannerBg:  UIColor(red: 0.082, green: 0.502, blue: 0.239, alpha: 1.0),
+        bannerBg:  UIColor(red: 0.055, green: 0.055, blue: 0.063, alpha: 1.0),
         keyNormal: UIColor(red: 0.173, green: 0.173, blue: 0.180, alpha: 1.0),
         keySpecial: UIColor(red: 0.110, green: 0.110, blue: 0.118, alpha: 1.0),
         keyShiftOn: UIColor(red: 0.310, green: 0.557, blue: 0.361, alpha: 1.0),
         keyText:    .white,
         keyTextSpecial: .white,
-        accent:    UIColor(red: 0.310, green: 0.557, blue: 0.361, alpha: 1.0)
+        accent:    UIColor(red: 0.310, green: 0.557, blue: 0.361, alpha: 1.0),
+        chipBg:    UIColor(white: 1.0, alpha: 0.14),
+        chipText:  UIColor(white: 0.96, alpha: 1.0),
+        barText:   .white
     )
 
     static let allPresets: [KeyboardTheme] = [.turtle, .light, .dark]

@@ -17,10 +17,6 @@ import UIKit
 /// the same when toggled between platforms.
 final class CommandSuggestionStripView: UIScrollView {
 
-    private static let bgColor:      UIColor = .black
-    private static let chipFill:     UIColor = UIColor(white: 1.0, alpha: 0.13)
-    private static let textPrimary:  UIColor = UIColor(white: 0.96, alpha: 1.0)
-
     /// Called when the user taps a pill. The string is the bare command
     /// name (no leading `/`), matching Android's `OnPickListener.onPick`.
     var onPick: ((SlashCommand) -> Void)?
@@ -33,8 +29,24 @@ final class CommandSuggestionStripView: UIScrollView {
     }
     required init?(coder: NSCoder) { fatalError() }
 
+    /// Restamp every styled subview from the current `KeyboardPalette`.
+    /// Called from `KeyboardViewController.applyTheme()` so the strip
+    /// matches the rest of the keyboard whenever the user (or system
+    /// Dark Mode) flips themes.
+    func applyTheme() {
+        backgroundColor = KeyboardPalette.barBg
+        for pill in row.arrangedSubviews {
+            pill.backgroundColor = KeyboardPalette.chipBg
+            for sub in pill.subviews {
+                if let label = sub as? UILabel {
+                    label.textColor = KeyboardPalette.chipText
+                }
+            }
+        }
+    }
+
     private func configure() {
-        backgroundColor = Self.bgColor
+        backgroundColor = KeyboardPalette.barBg
         showsHorizontalScrollIndicator = false
         showsVerticalScrollIndicator = false
         translatesAutoresizingMaskIntoConstraints = false
@@ -74,13 +86,13 @@ final class CommandSuggestionStripView: UIScrollView {
 
     private func makePill(for cmd: SlashCommand) -> UIView {
         let pill = UIControl()
-        pill.backgroundColor = Self.chipFill
+        pill.backgroundColor = KeyboardPalette.chipBg
         pill.layer.cornerRadius = 14
         pill.translatesAutoresizingMaskIntoConstraints = false
 
         let label = UILabel()
         label.text = "\(cmd.emoji)  /\(cmd.rawValue)"
-        label.textColor = Self.textPrimary
+        label.textColor = KeyboardPalette.chipText
         label.font = .systemFont(ofSize: 13, weight: .medium)
         label.translatesAutoresizingMaskIntoConstraints = false
         label.isUserInteractionEnabled = false

@@ -250,7 +250,35 @@ class KeyboardViewController: UIInputViewController {
         bannerContainer?.backgroundColor  = KeyboardPalette.bannerBg
         // Integration panel host (Web etc.) — repaint if currently up.
         integrationPanelHost?.backgroundColor = KeyboardPalette.bg
+        // Slash autocomplete strip + every styled element inside the
+        // command bar (pill, prompt label, send, mic, suggestion chips).
+        slashStrip?.applyTheme()
+        restampCommandBarColors()
         rebuildKeyboard()
+    }
+
+    /// Restamp every hardcoded `UIColor.white` / `barText` site in the
+    /// command bar so the bar follows the active theme.
+    private func restampCommandBarColors() {
+        let text = KeyboardPalette.barText
+        let chipBg = KeyboardPalette.chipBg
+
+        cmdCancelButton?.tintColor = text.withAlphaComponent(0.6)
+        cmdPill?.backgroundColor = chipBg
+        cmdPill?.textColor = text
+        cmdPromptLabel?.textColor = text.withAlphaComponent(0.90)
+        cmdMicButton?.tintColor = text.withAlphaComponent(0.85)
+        cmdMicButton?.backgroundColor = chipBg.withAlphaComponent(0.7)
+        cmdSendButton?.setTitleColor(text, for: .normal)
+        cmdSendButton?.backgroundColor = chipBg
+        cmdCaret?.backgroundColor = text
+
+        for btn in cmdSuggestionBtns {
+            btn.setTitleColor(text, for: .normal)
+            btn.backgroundColor = chipBg
+        }
+
+        bannerLabel?.textColor = text
     }
 
     private func suppressSystemShortcutBar() {
@@ -467,7 +495,7 @@ class KeyboardViewController: UIInputViewController {
             UIImage(systemName: "xmark",
                     withConfiguration: UIImage.SymbolConfiguration(pointSize: 12, weight: .medium)),
             for: .normal)
-        cmdCancelButton.tintColor = UIColor.white.withAlphaComponent(0.6)
+        cmdCancelButton.tintColor = KeyboardPalette.barText.withAlphaComponent(0.6)
         cmdCancelButton.addTarget(self, action: #selector(cancelCommand), for: .touchUpInside)
         cmdCancelButton.translatesAutoresizingMaskIntoConstraints = false
         commandBar.addSubview(cmdCancelButton)
@@ -476,7 +504,8 @@ class KeyboardViewController: UIInputViewController {
         cmdPill = UILabel()
         cmdPill.font               = .monospacedSystemFont(ofSize: 12, weight: .bold)
         cmdPill.textColor          = .white
-        cmdPill.backgroundColor    = UIColor.white.withAlphaComponent(0.15)
+        cmdPill.backgroundColor    = KeyboardPalette.chipBg
+        cmdPill.textColor          = KeyboardPalette.barText
         cmdPill.layer.cornerRadius = 5
         cmdPill.clipsToBounds      = true
         cmdPill.textAlignment      = .center
@@ -490,7 +519,7 @@ class KeyboardViewController: UIInputViewController {
         // truncation) before any of those clip when the row is narrow.
         cmdPromptLabel = UILabel()
         cmdPromptLabel.font      = .systemFont(ofSize: 15)
-        cmdPromptLabel.textColor = UIColor.white.withAlphaComponent(0.45)
+        cmdPromptLabel.textColor = KeyboardPalette.barText.withAlphaComponent(0.45)
         cmdPromptLabel.lineBreakMode = .byTruncatingTail
         cmdPromptLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
         cmdPromptLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
@@ -534,8 +563,8 @@ class KeyboardViewController: UIInputViewController {
             UIImage(systemName: "mic.fill",
                     withConfiguration: UIImage.SymbolConfiguration(pointSize: 15, weight: .medium)),
             for: .normal)
-        cmdMicButton.tintColor = UIColor.white.withAlphaComponent(0.85)
-        cmdMicButton.backgroundColor = UIColor.white.withAlphaComponent(0.12)
+        cmdMicButton.tintColor = KeyboardPalette.barText.withAlphaComponent(0.85)
+        cmdMicButton.backgroundColor = KeyboardPalette.chipBg.withAlphaComponent(0.7)
         cmdMicButton.layer.cornerRadius = 8
         cmdMicButton.setContentHuggingPriority(.required, for: .horizontal)
         cmdMicButton.addTarget(self, action: #selector(micTapped), for: .touchUpInside)
@@ -545,8 +574,8 @@ class KeyboardViewController: UIInputViewController {
         // Send / Generate button
         cmdSendButton = UIButton(type: .system)
         cmdSendButton.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
-        cmdSendButton.setTitleColor(.white, for: .normal)
-        cmdSendButton.backgroundColor    = UIColor.white.withAlphaComponent(0.18)
+        cmdSendButton.setTitleColor(KeyboardPalette.barText, for: .normal)
+        cmdSendButton.backgroundColor    = KeyboardPalette.chipBg
         cmdSendButton.layer.cornerRadius = 8
         cmdSendButton.contentEdgeInsets  = UIEdgeInsets(top: cmdSendInsetV, left: cmdSendInsetH, bottom: cmdSendInsetV, right: cmdSendInsetH)
         cmdSendButton.setContentHuggingPriority(.required, for: .horizontal)
@@ -568,8 +597,8 @@ class KeyboardViewController: UIInputViewController {
             btn.tag = i
             btn.titleLabel?.font          = .systemFont(ofSize: 12, weight: .medium)
             btn.titleLabel?.lineBreakMode = .byTruncatingTail
-            btn.setTitleColor(.white, for: .normal)
-            btn.backgroundColor           = UIColor.white.withAlphaComponent(0.18)
+            btn.setTitleColor(KeyboardPalette.barText, for: .normal)
+            btn.backgroundColor           = KeyboardPalette.chipBg
             btn.layer.cornerRadius        = 8
             btn.contentEdgeInsets         = UIEdgeInsets(top: 0, left: 8, bottom: 0, right: 8)
             btn.addTarget(self, action: #selector(suggestionTapped(_:)), for: .touchUpInside)
@@ -716,11 +745,15 @@ class KeyboardViewController: UIInputViewController {
 
         if isBottom {
             // iPad bottom row: 5 keys [🌐, ?123, space, ?123, ↵]
-            // iPhone bottom row: 6 keys [🌐, ?123, ',', space, '.', ↵]
+            // iPhone bottom row: 4 keys [?123, 🌐, space, ↵] —
+            // matches Apple's stock keyboard layout so iPhone users get
+            // the familiar dominant spacebar and compact symbol/return
+            // keys.
             let props: [CGFloat]
             switch keys.count {
             case 5:  props = [9, 13, 48, 13, 17]                // iPad
-            default: props = [8, 12, 7, 42, 7, 24]              // iPhone
+            case 4:  props = [15, 15, 50, 20]                   // iPhone (Apple-style)
+            default: props = [8, 12, 7, 42, 7, 24]              // legacy 6-key fallback
             }
             let avail = w - keyGap * CGFloat(keys.count + 1)
             widths = props.map { avail * $0 / 100 }
@@ -1274,10 +1307,10 @@ class KeyboardViewController: UIInputViewController {
                 } else {
                     cmdPromptLabel.text      = cmd.needsPrompt ? "type prompt above…" : "ready — tap \(cmd.buttonTitle)"
                 }
-                cmdPromptLabel.textColor = UIColor.white.withAlphaComponent(0.40)
+                cmdPromptLabel.textColor = KeyboardPalette.barText.withAlphaComponent(0.40)
             } else {
                 cmdPromptLabel.text      = commandPromptText
-                cmdPromptLabel.textColor = UIColor.white.withAlphaComponent(0.90)
+                cmdPromptLabel.textColor = KeyboardPalette.barText.withAlphaComponent(0.90)
             }
         }
 
@@ -1355,14 +1388,14 @@ class KeyboardViewController: UIInputViewController {
             let attr = NSMutableAttributedString(
                 string: typed,
                 attributes: [
-                    .foregroundColor: UIColor.white.withAlphaComponent(0.95),
+                    .foregroundColor: KeyboardPalette.barText.withAlphaComponent(0.95),
                     .font: cmdPromptLabel.font as Any,
                 ])
             if !ghost.isEmpty {
                 attr.append(NSAttributedString(
                     string: ghost,
                     attributes: [
-                        .foregroundColor: UIColor.white.withAlphaComponent(0.32),
+                        .foregroundColor: KeyboardPalette.barText.withAlphaComponent(0.32),
                         .font: cmdPromptLabel.font as Any,
                     ]))
             }
@@ -1380,13 +1413,13 @@ class KeyboardViewController: UIInputViewController {
             let attr = NSMutableAttributedString(
                 string: body,
                 attributes: [
-                    .foregroundColor: UIColor.white.withAlphaComponent(0.95),
+                    .foregroundColor: KeyboardPalette.barText.withAlphaComponent(0.95),
                     .font: cmdPromptLabel.font as Any,
                 ])
             attr.append(NSAttributedString(
                 string: "  no match",
                 attributes: [
-                    .foregroundColor: UIColor.white.withAlphaComponent(0.32),
+                    .foregroundColor: KeyboardPalette.barText.withAlphaComponent(0.32),
                     .font: cmdPromptLabel.font as Any,
                 ]))
             cmdPromptLabel.attributedText = attr
@@ -1547,10 +1580,10 @@ class KeyboardViewController: UIInputViewController {
     private func setMicListeningUI(_ listening: Bool) {
         cmdMicButton.tintColor = listening
             ? UIColor(red: 1.0, green: 0.35, blue: 0.35, alpha: 1.0)
-            : UIColor.white.withAlphaComponent(0.85)
+            : KeyboardPalette.barText.withAlphaComponent(0.85)
         cmdMicButton.backgroundColor = listening
-            ? UIColor.white.withAlphaComponent(0.22)
-            : UIColor.white.withAlphaComponent(0.12)
+            ? KeyboardPalette.chipBg
+            : KeyboardPalette.chipBg.withAlphaComponent(0.7)
         let symbol = listening ? "stop.fill" : "mic.fill"
         cmdMicButton.setImage(
             UIImage(systemName: symbol,
