@@ -17,26 +17,28 @@ enum KeyRows {
     enum Mode { case qwerty, symbols, symbolsShift }
 
     // iPhone — 4 rows fit in ~334pt total.
-    // Bottom row mirrors Apple's stock iPhone keyboard: 4 keys with the
-    // spacebar dominating, no inline comma/period chips. Matches the
-    // user-expected layout for thumb typing on a phone.
+    // Bottom row drops Apple's globe (next-keyboard) key in favour of a
+    // direct `/` for triggering slash commands — that's the primary action
+    // of this keyboard, so it should be one tap away from qwerty without
+    // hopping into symbols mode. Spacebar slides left into the gap the
+    // globe used to occupy.
     static let iphoneQwerty: [[String]] = [
         ["q","w","e","r","t","y","u","i","o","p"],
         ["a","s","d","f","g","h","j","k","l"],
         ["⇧","z","x","c","v","b","n","m","⌫"],
-        ["?123","🌐","space","↵"]
+        ["?123","space","/","↵"]
     ]
     static let iphoneSymbols: [[String]] = [
         ["1","2","3","4","5","6","7","8","9","0"],
         ["-","/",":",";","(",")","$","&","@","\""],
         ["=\\<",".",",","?","!","'","⌫"],
-        ["ABC","🌐","space","↵"]
+        ["ABC","space","/","↵"]
     ]
     static let iphoneSymbolsShift: [[String]] = [
         ["[","]","{","}","#","%","^","*","+","="],
         ["_","\\","|","~","<",">","€","£","¥","•"],
         ["?123",".",",","?","!","'","⌫"],
-        ["ABC","🌐","space","↵"]
+        ["ABC","space","/","↵"]
     ]
 
     // iPad — 5 rows: number row + 3 letter rows + modifier row

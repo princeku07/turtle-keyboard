@@ -197,10 +197,11 @@ class KeyboardViewController: UIInputViewController {
         resolveAndCacheTheme()
         setupContainers()
         buildKeyboard()
-        // Initial height = just the key rows. `recomputeKeyboardHeight`
-        // grows the keyboard whenever the prompt area or slash strip
-        // become visible, and shrinks it back when they go away.
-        let initialH = rowsH
+        // Initial height includes the always-reserved command-bar slot at
+        // the top so word-suggestion chips don't shove the keys when they
+        // appear. `recomputeKeyboardHeight` grows / shrinks from here when
+        // the slash strip toggles or the image-preview chrome takes over.
+        let initialH = effectiveChromeH + rowsH
         heightConstraint.constant = initialH
         preferredContentSize = CGSize(width: 0, height: initialH)
 
@@ -293,9 +294,21 @@ class KeyboardViewController: UIInputViewController {
         // The Darwin notification handles the live case; this catches the
         // suspended-appex case where we missed the notification.
         voiceController.consumePendingTranscript()
+        // Re-hydrate any in-progress slash draft the user left behind when
+        // they switched apps (e.g. `/ca`, `/cap a samurai cat`). Must run
+        // before updateWordSuggestions — when the draft restores, the
+        // command bar takes over the suggestion slot.
+        restoreDraftStateIfFresh()
         // Surface suggested-shortcut chips as soon as the keyboard mounts
         // on an empty field. Subsequent text changes refresh via textDidChange.
         updateWordSuggestions()
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        // Stash the in-progress slash draft so the next keyboard mount
+        // (returning from another app) picks it up where the user left off.
+        persistDraftState()
     }
 
     override func textDidChange(_ textInput: UITextInput?) {
@@ -323,6 +336,11 @@ class KeyboardViewController: UIInputViewController {
             keyboardContainer.bringSubviewToFront(overlay)
         }
         hideCommandBar()
+        // hideCommandBar's animation completion will recompute the height
+        // ~0.15s later; force a recompute now so the preview has the full
+        // keyboard canvas immediately and isPreviewVisible is honored even
+        // if the command bar was already hidden (guard would skip it).
+        recomputeKeyboardHeight()
         // Append to the persistent image history for the host-app
         // History screen. Skipped when caller didn't supply a command —
         // e.g. internal previews that aren't user-facing artifacts.
@@ -334,6 +352,7 @@ class KeyboardViewController: UIInputViewController {
     private func dismissPreview() {
         previewOverlay?.isHidden = true
         pendingPreviewImage = nil
+        recomputeKeyboardHeight()
     }
 
     @objc private func previewCloseTapped() {
@@ -367,19 +386,17 @@ class KeyboardViewController: UIInputViewController {
         overlay.backgroundColor = bgColor
         overlay.translatesAutoresizingMaskIntoConstraints = false
         keyboardContainer.addSubview(overlay)
+        // Preview is a fixed-height chrome slot at the TOP of the keyboard
+        // — the keys stay mounted underneath at their normal y-origin
+        // (effectiveChromeH bumps to previewH while preview is up). This
+        // mirrors the Android layout: image + variant pills above, full
+        // QWERTY below.
         NSLayoutConstraint.activate([
             overlay.topAnchor.constraint(equalTo: keyboardContainer.topAnchor),
             overlay.leadingAnchor.constraint(equalTo: keyboardContainer.leadingAnchor),
             overlay.trailingAnchor.constraint(equalTo: keyboardContainer.trailingAnchor),
-            overlay.bottomAnchor.constraint(equalTo: keyboardContainer.bottomAnchor),
+            overlay.heightAnchor.constraint(equalToConstant: previewH),
         ])
-
-        let title = UILabel()
-        title.text = "Preview"
-        title.font = .boldSystemFont(ofSize: 13)
-        title.textColor = .white
-        title.translatesAutoresizingMaskIntoConstraints = false
-        overlay.addSubview(title)
 
         let imageView = UIImageView()
         imageView.contentMode = .scaleAspectFit
@@ -433,10 +450,7 @@ class KeyboardViewController: UIInputViewController {
         overlay.addSubview(buttonRow)
 
         NSLayoutConstraint.activate([
-            title.topAnchor.constraint(equalTo: overlay.topAnchor, constant: 8),
-            title.centerXAnchor.constraint(equalTo: overlay.centerXAnchor),
-
-            imageView.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 6),
+            imageView.topAnchor.constraint(equalTo: overlay.topAnchor, constant: 12),
             imageView.centerXAnchor.constraint(equalTo: overlay.centerXAnchor),
             imageView.bottomAnchor.constraint(equalTo: buttonRow.topAnchor, constant: -10),
             imageView.widthAnchor.constraint(equalTo: imageView.heightAnchor),
@@ -712,13 +726,19 @@ class KeyboardViewController: UIInputViewController {
     // MARK: - Build keyboard
 
     private func buildKeyboard() {
-        // Remove previous key rows (not commandBar / bannerContainer /
-        // slashStrip — the slash autocomplete strip is a persistent Auto
-        // Layout child and must survive a rebuild).
+        // Remove previous key rows. Persistent overlays that are mounted as
+        // siblings of the rows (command bar, banner, slash strip, preview,
+        // integration / quick / listening panels) must survive a rebuild —
+        // recomputeKeyboardHeight() calls into here after toggling chrome,
+        // and we'd otherwise yank a visible preview out from under the user.
         keyboardContainer.subviews
             .filter { $0 !== commandBar
                    && $0 !== bannerContainer
-                   && $0 !== slashStrip }
+                   && $0 !== slashStrip
+                   && $0 !== previewOverlay
+                   && $0 !== integrationPanelHost
+                   && $0 !== quickPanelView
+                   && $0 !== listeningOverlay }
             .forEach { $0.removeFromSuperview() }
 
         let rows = currentRows()
@@ -731,6 +751,20 @@ class KeyboardViewController: UIInputViewController {
         }
         if let strip = slashStrip {
             keyboardContainer.bringSubviewToFront(strip)
+        }
+        // Newly-added key rows land on top of the stacking order; lift any
+        // preserved overlay back above them so the user keeps seeing it.
+        if let overlay = previewOverlay, overlay.isHidden == false {
+            keyboardContainer.bringSubviewToFront(overlay)
+        }
+        if let panel = integrationPanelHost, panel.isHidden == false {
+            keyboardContainer.bringSubviewToFront(panel)
+        }
+        if let quick = quickPanelView {
+            keyboardContainer.bringSubviewToFront(quick)
+        }
+        if let listening = listeningOverlay {
+            keyboardContainer.bringSubviewToFront(listening)
         }
     }
 
@@ -745,14 +779,15 @@ class KeyboardViewController: UIInputViewController {
 
         if isBottom {
             // iPad bottom row: 5 keys [🌐, ?123, space, ?123, ↵]
-            // iPhone bottom row: 4 keys [?123, 🌐, space, ↵] —
-            // matches Apple's stock keyboard layout so iPhone users get
-            // the familiar dominant spacebar and compact symbol/return
-            // keys.
+            // iPhone bottom row: 4 keys [?123, space, /, ↵] — the globe
+            // is dropped in favour of a dedicated `/` (the slash-command
+            // trigger); space slides left into the freed slot. Widths
+            // still sum to 100, with space dominant and `/` sized like a
+            // compact special key.
             let props: [CGFloat]
             switch keys.count {
             case 5:  props = [9, 13, 48, 13, 17]                // iPad
-            case 4:  props = [15, 15, 50, 20]                   // iPhone (Apple-style)
+            case 4:  props = [15, 53, 12, 20]                   // iPhone [?123, space, /, ↵]
             default: props = [8, 12, 7, 42, 7, 24]              // legacy 6-key fallback
             }
             let avail = w - keyGap * CGFloat(keys.count + 1)
@@ -1075,6 +1110,60 @@ class KeyboardViewController: UIInputViewController {
         return aiCommands + localCommands + [.history]
     }
 
+    // MARK: - Draft state persistence
+    //
+    // `slashBuffer` is the only piece of state we need to round-trip across
+    // app switches — `updateCommandDetection()` re-derives `activeCommand`,
+    // `commandPromptText`, and the right UI surface (draft bar, prompt bar,
+    // suggestion chip strip) from it. We stash it in the App Group so the
+    // next time the keyboard mounts on the same field it picks up where the
+    // user left off.
+    //
+    // A short TTL keeps stale drafts from re-surfacing days later in an
+    // unrelated field — the keyboard extension has no reliable "is this the
+    // same field?" signal across launches, so the timestamp is our cheapest
+    // safety net.
+
+    private static let draftBufferKey       = "TurtleKB.draftSlashBuffer"
+    private static let draftBufferAtKey     = "TurtleKB.draftSlashBufferAt"
+    private static let draftBufferTTL: TimeInterval = 5 * 60  // 5 minutes
+
+    private var draftStateStore: UserDefaults {
+        UserDefaults(suiteName: SplitContract.storageSuiteName) ?? .standard
+    }
+
+    private func persistDraftState() {
+        let store = draftStateStore
+        if let buf = slashBuffer, !buf.isEmpty {
+            store.set(buf, forKey: Self.draftBufferKey)
+            store.set(Date().timeIntervalSince1970, forKey: Self.draftBufferAtKey)
+        } else {
+            store.removeObject(forKey: Self.draftBufferKey)
+            store.removeObject(forKey: Self.draftBufferAtKey)
+        }
+    }
+
+    private func restoreDraftStateIfFresh() {
+        let store = draftStateStore
+        let savedAt = store.double(forKey: Self.draftBufferAtKey)
+        let age = Date().timeIntervalSince1970 - savedAt
+        guard savedAt > 0, age >= 0, age <= Self.draftBufferTTL,
+              let buf = store.string(forKey: Self.draftBufferKey),
+              !buf.isEmpty
+        else {
+            // Either nothing was stashed, or it's gone stale. Clear so we
+            // don't keep paying the read on every appearance.
+            store.removeObject(forKey: Self.draftBufferKey)
+            store.removeObject(forKey: Self.draftBufferAtKey)
+            return
+        }
+        // Don't clobber an active typing session — if the user is already
+        // mid-command on this mount, the live state wins over the snapshot.
+        guard slashBuffer == nil, activeCommand == nil, !isGenerating else { return }
+        slashBuffer = buf
+        updateCommandDetection()
+    }
+
     // MARK: - Slash command detection
 
     private func updateCommandDetection() {
@@ -1353,11 +1442,13 @@ class KeyboardViewController: UIInputViewController {
         let topMatch = allMatches.first
         slashAutocompleteTopMatch = topMatch?.rawValue
 
-        // Mount the slash strip above the keys whenever there are 2+
-        // candidates — Android's exact behaviour (`/sp` → `/split`,
-        // `/splits`). Single match falls through to the existing ghost
-        // completion inside the prompt label.
-        if !body.isEmpty, allMatches.count > 1 {
+        // Keep the suggestion chip strip mounted for the entire draft
+        // state — as long as the user has typed something past `/` and
+        // *any* command still matches. It used to require 2+ candidates,
+        // so narrowing `/c` → `/ca` (only `cap` left) made the strip blink
+        // out. The strip stays visible until either no command matches or
+        // the user commits a command (space → prompt mode).
+        if !body.isEmpty, !allMatches.isEmpty {
             showSlashStrip(matches: allMatches)
         } else {
             hideSlashStrip()
@@ -1378,8 +1469,11 @@ class KeyboardViewController: UIInputViewController {
             caretAnchorWidth = 0
         } else if let match = topMatch {
             // Best match found. Render typed prefix opaque white, the
-            // rest of the command name as a dimmer ghost. Send button
-            // doubles as a one-tap accept.
+            // rest of the command name as a dimmer ghost. Tapping Send
+            // still accepts the suggestion — we just don't echo the
+            // command name onto the button, which made the prompt bar
+            // look cluttered (the chip strip above already names every
+            // candidate).
             let typed = body
             let full = match.rawValue
             let ghost = full.hasPrefix(typed)
@@ -1400,7 +1494,7 @@ class KeyboardViewController: UIInputViewController {
                     ]))
             }
             cmdPromptLabel.attributedText = attr
-            cmdSendButton.setTitle("→ /\(match.rawValue)", for: .normal)
+            cmdSendButton.setTitle("Send", for: .normal)
             // Caret sits right after the typed prefix, just before the
             // dim-gray ghost. Measure only the typed portion.
             let typedWidth = (typed as NSString)
@@ -1474,16 +1568,31 @@ class KeyboardViewController: UIInputViewController {
         recomputeKeyboardHeight()
     }
 
-    /// Height of the chrome above the keys right now — sum of whatever is
-    /// actually visible: slash strip (if showing matches) + prompt area
-    /// (when command bar or banner is up). When nothing is showing, the
-    /// keyboard collapses to just the key rows.
+    /// Height of the chrome above the keys right now.
+    ///
+    /// - The command-bar slot (`commandBarH`) is **always** reserved at
+    ///   the top, even when the bar is empty. This is the slot that hosts
+    ///   word-suggestion chips, shortcut chips, and the slash prompt UI —
+    ///   if we let it collapse to 0 whenever it's empty, the keys would
+    ///   visibly jump every time suggestions appeared or disappeared.
+    /// - The slash autocomplete strip stacks above the command bar.
+    /// - When the image preview is up it displaces the command-bar slot
+    ///   entirely (the preview owns the chrome) and uses its own height.
     private var effectiveChromeH: CGFloat {
+        if isPreviewVisible { return previewH }
         let strip: CGFloat = (slashStrip?.isHidden == false) ? slashStripH : 0
-        let promptUp = (commandBar?.isHidden == false) || (bannerContainer?.isHidden == false)
-        let bar: CGFloat = promptUp ? commandBarH : 0
-        return strip + bar
+        return strip + commandBarH
     }
+
+    private var isPreviewVisible: Bool {
+        previewOverlay != nil && previewOverlay?.isHidden == false
+    }
+
+    /// Fixed slot height for the image-preview chrome that sits above the
+    /// keys after /cap, /org, etc. Sized to fit a comfortable square image
+    /// plus the variant button row (Image · Sticker · GIF · ✕) and a bit of
+    /// padding. The keys stay visible and usable below this slot.
+    private var previewH: CGFloat { isPad ? 300 : 260 }
 
     /// Recompute the keyboard's height from current chrome visibility and
     /// kick a key-rows rebuild so frame-positioned keys snap to the new
@@ -1940,8 +2049,14 @@ extension KeyboardViewController {
             host.backgroundColor = bgColor
             host.translatesAutoresizingMaskIntoConstraints = false
             keyboardContainer.addSubview(host)
+            // Anchor to the very top of the keyboardContainer (not
+            // `commandBarH` below it). The host needs to cover the
+            // always-reserved command-bar slot too, otherwise the top
+            // strip of key rows leaks through above the Quick Panel / web
+            // panel — the iPad number row was visibly poking out before
+            // this change.
             NSLayoutConstraint.activate([
-                host.topAnchor.constraint(equalTo: keyboardContainer.topAnchor, constant: commandBarH),
+                host.topAnchor.constraint(equalTo: keyboardContainer.topAnchor),
                 host.leadingAnchor.constraint(equalTo: keyboardContainer.leadingAnchor),
                 host.trailingAnchor.constraint(equalTo: keyboardContainer.trailingAnchor),
                 host.bottomAnchor.constraint(equalTo: keyboardContainer.bottomAnchor),
