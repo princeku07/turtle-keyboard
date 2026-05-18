@@ -29,7 +29,10 @@ host app writes.
 | `JoinSplitViewController.swift` | Receives the joiner side of the `turtlekeyboard://join` deep link and points the local Split store at the owner's sheet. |
 | `NotionConnectViewController.swift` | Notion OAuth + parent-page picker. |
 | `SlackConnectViewController.swift` | Slack OAuth + default-channel picker. |
-| `PersonalizationViewController.swift` | Per-integration on/off + Quick Panel / voice toggles. Writes keys defined in `Integration/PersonalizationKeys.swift`. |
+| `PersonalizationViewController.swift` | Per-integration on/off + Quick Panel / voice toggles + theme picker. Writes keys defined in `Integration/PersonalizationKeys.swift`. |
+| `HistoryViewController.swift` | Browser for the persistent `/cap` / `/org` image history (the same store the keyboard's in-line history panel reads from). |
+| `PollSheetViewController.swift`, `WyrSheetViewController.swift` | Host-app sheets the `/poll` and `/wyr` keyboard integrations push the user into to author a poll / WYR round; result lands back in the chat field via the App Group. |
+| `VoiceRecordingViewController.swift`, `VoiceSessionManager.swift` | Host-app voice capture screen + session manager. Used when the keyboard mic taps over to the host app for long-form dictation (the extension itself runs the short-form `SFSpeechRecognizer` path). Final transcript is dropped into the App Group; the keyboard picks it up on next mount. |
 | `Info.plist` | Host metadata + `CFBundleURLTypes` for all three OAuth callbacks (`com.googleusercontent.apps.*`, `turtleknotionoauth`, `turtleslackoauth`) + `NSLocalNetworkUsageDescription` + ATS exception for LM Studio LAN. |
 | `TurtleKeyboard.entitlements` | App Group membership. |
 
@@ -57,7 +60,7 @@ OAuth setup steps for Google / Notion / Slack live in `ios/OAUTH_SETUP_iOS.md`.
 
 | File | What it is |
 |---|---|
-| `KeyboardViewController.swift` | The keyboard UI: layout, key handling, command bar, suggestions, preview overlay, Quick Panel host, voice mic. Single class, ~1000 lines. |
+| `KeyboardViewController.swift` | The keyboard UI: dynamic-height layout, key handling, command bar, slash-autocomplete strip, word/shortcut suggestions, preview overlay, integration panel host, Quick Panel host, voice mic, draft-state persistence. Single class, ~2500 lines — see the architecture section below before reaching for it. |
 | `Info.plist` | `RequestsOpenAccess = true` (required for network + speech), `NSMicrophoneUsageDescription`, `NSSpeechRecognitionUsageDescription`, ATS + Local Network keys for LM Studio. |
 | `Models.swift` | Shared data types used outside the AI module. |
 | `APIClient.swift` | Legacy HTTP client; current providers in `AI/` each use their own `URLSession`. Kept for reference. |
@@ -78,7 +81,11 @@ Remote commands (AI-backed) flow through `AI/CommandRouter`. Local commands
 | File | What it is |
 |---|---|
 | `KeyboardPalette.swift` | Brand colours (turtle green bg, key gray, return-key green, command-bar bg). Pulled out so integration views can reuse them. |
-| `KeyRows.swift` | Static iPhone + iPad key-row data for QWERTY / symbols / shifted symbols. |
+| `KeyboardTheme.swift`, `KeyboardThemeManager.swift` | Theme descriptors + resolver that reads the user's Personalization choice from the App Group store and re-stamps `KeyboardPalette.current` on every keyboard mount / mode flip. |
+| `KeyRows.swift` | Static iPhone + iPad key-row data for QWERTY / symbols / shifted symbols. **iPhone bottom row is `[?123, space, /, ↵]`** — the system globe is dropped in favour of a dedicated `/` (the slash-command trigger) so the user never has to hop into symbols mode just to start a command. |
+| `CommandSuggestionStripView.swift` | The slash-autocomplete chip strip mounted above the command bar while the user is mid-draft. Stays visible for the entire draft state — disappears only when the typed body matches zero commands or the user commits with space. |
+| `PresetChipStripView.swift` | Inline preset chips for prompt-needing commands (e.g. `/tone` → `formal`, `friendly`, `concise`). Shown inside the command-bar prompt slot before the user starts typing. |
+| `HistoryPanelView.swift` | In-keyboard `/history` panel that browses past `/cap` / `/org` outputs via `ImageHistory` and re-runs the preview surface for each. |
 | `QuickPanelView.swift` | Tap-driven grid of every registered slash command, opened by double-tap space. Tap a command: needs-prompt → opens command bar; otherwise fires immediately. |
 
 ### Voice — `TurtleKeyboardExtension/Voice/`
@@ -102,6 +109,11 @@ explicitly via `/cmd`.
 | `Split/` | `/split` + `/splits`. `SplitIntegration`, `SplitPanelView`, `SplitHistoryView`, `SplitTypes`. Local-only; no AI hop. |
 | `Notion/` | `/notion` + `/note`. `NotionIntegration`, `NotionClient`, `NotionLlmBridge` (LLM-structures the prompt into Notion blocks), `NotionTypes`. |
 | `Slack/` | `/slack` + `/msg`. `SlackIntegration`, `SlackClient`, `SlackTypes`. `#channel` prefix overrides the default channel. |
+| `Poll/` | `/poll`. Mounts a poll-config sheet in the host app, then back-fills a formatted poll into the chat field. |
+| `Wyr/` | `/wyr` (Would You Rather). Same host-app-sheet pattern as Poll. |
+| `Web/` | `/web`. Mounts an in-keyboard `WKWebView` panel via `IntegrationContext.showPanel`. |
+| `SuggestedShortcut.swift`, `SuggestedShortcutCatalog.swift` | The chip-strip suggestions shown when the field is empty (e.g. quick-reply seeds). Powers `suggestionMode == .suggestedShortcuts`. |
+| `WorkerUrls.swift` | Shared Cloudflare Worker base URLs used by integrations that proxy through the closed-source backend. |
 
 ### AI providers — `TurtleKeyboardExtension/AI/`
 
@@ -167,28 +179,40 @@ then this flag can be removed.
 
 ## KeyboardViewController architecture
 
-Single file. Key sections in order:
+Single file (~2500 lines). Key sections in order:
 
-1. **State** — `SlashCommand` use, `KeyboardMode`, shift/caps flags, double-tap timers, `previewOverlay` state, voice + Quick Panel state.
-2. **Layout constants** — iPhone vs iPad dimensions (`isPad` switch). iPad: `rowH=42, rowGap=6, commandBarH=40, totalH=290` (constrained by iPad portrait input view height).
-3. **Palette** — pulled from `Keyboard/KeyboardPalette.swift`.
-4. **Key row data** — pulled from `Keyboard/KeyRows.swift`. iPad has 5 rows; iPhone 4.
-5. **`setupContainers()`** — Auto Layout. `keyboardContainer` pinned to `view.bottomAnchor` with fixed `heightConstraint`. Banner + command bar + preview overlay + Quick Panel all live inside.
-6. **`buildKeyboard()` / `buildRow()`** — frame-based layout *inside* `keyboardContainer`.
-7. **Command bar** — slash-command UI. Local commands resolve through `IntegrationRegistry.shared.command(named:)` and run inline; remote commands call `CommandRouter.shared.execute(...)` and dispatch the `CommandResult` to the right UI surface.
-8. **Quick Panel** — `QuickPanelView` shown via double-tap space when the user has it enabled in Personalization.
-9. **Voice mic** — `VoiceInputController` toggled from the mic key; partials drive a live banner.
-10. **`/org` and `/cap` flow** — both produce a `UIImage` and call `showImagePreview(_:)`, which surfaces the image in the preview overlay with **Copy** + **Close** buttons. iOS keyboards cannot insert images directly; user long-presses the chat field and taps **Paste**.
-11. **Word suggestions** — `UITextChecker` driven completions inside our own command bar (system shortcut bar suppressed via `inputAssistantItem.leadingBarButtonGroups = []`).
-12. **Backspace repeat** — `UILongPressGestureRecognizer` with 0.4s delay + 0.08s repeat interval.
+1. **State** — `SlashCommand` use, `KeyboardMode`, shift/caps flags, double-tap timers, `slashBuffer` (single source of truth for any in-progress slash command), `previewOverlay` state, voice + Quick Panel state.
+2. **Layout constants** — iPhone vs iPad dimensions (`isPad` switch). Per-device: `rowH`, `rowGap`, `commandBarH`, `previewH`. Total keyboard height is **dynamic**, computed each frame as `effectiveChromeH + rowsH`:
+   - The command-bar slot (`commandBarH`) is **always** reserved at the top — even when empty — so word-suggestion / shortcut chips appearing or disappearing don't make the keys jump.
+   - The slash autocomplete strip (`slashStripH = 34`) stacks above the command bar when there are matches.
+   - The image-preview slot (`previewH` = 260 iPhone / 300 iPad) **displaces** the command-bar slot when `/cap`, `/org`, etc. produce a result — preview sits at the top, keys stay tappable underneath.
+3. **Palette** — pulled from `Keyboard/KeyboardPalette.swift`, re-stamped from `KeyboardThemeManager` when the user changes themes in Personalization.
+4. **Key row data** — pulled from `Keyboard/KeyRows.swift`. iPad has 5 rows; iPhone 4. iPhone bottom row is `[?123, space, /, ↵]` (no system globe).
+5. **`setupContainers()`** — Auto Layout. `keyboardContainer` is pinned to all four sides of `view`; `view.heightAnchor` carries the dynamic `heightConstraint` that `recomputeKeyboardHeight()` writes to. Slash strip, command bar (or banner in its place), preview overlay, integration panel, Quick Panel, and listening overlay all mount inside the container.
+6. **`buildKeyboard()` / `buildRow()`** — frame-based layout *inside* `keyboardContainer`. Persistent overlays (`commandBar`, `bannerContainer`, `slashStrip`, `previewOverlay`, `integrationPanelHost`, `quickPanelView`, `listeningOverlay`) are excluded from the per-rebuild teardown and `bringSubviewToFront`-ed afterwards so a rebuild triggered by a height change doesn't yank them out from under the user.
+7. **`recomputeKeyboardHeight()`** — single sink for height changes. Reads `effectiveChromeH`, writes `heightConstraint.constant` + `preferredContentSize`, flushes layout, and kicks `rebuildKeyboard()` so frame-positioned key rows snap to the new y-origin. Every chrome toggle (`hideCommandBar`, `showSlashStrip`, `showImagePreview`, `dismissPreview`, etc.) routes through here.
+8. **Command bar** — slash-command UI. Local commands resolve through `IntegrationRegistry.shared.command(named:)` and run inline; remote commands call `CommandRouter.shared.execute(...)` and dispatch the `CommandResult` to the right UI surface.
+9. **Quick Panel** — `QuickPanelView` shown via double-tap space when the user has it enabled in Personalization. Mounted through `mountIntegrationPanel`, which anchors the panel host to the very **top** of `keyboardContainer` so it covers the always-reserved command-bar slot — otherwise the top strip of key rows would leak through above the grid.
+10. **Voice mic** — `VoiceInputController` toggled from the mic key; partials drive a live banner.
+11. **`/org` and `/cap` flow** — both produce a `UIImage` and call `showImagePreview(_:)`. The preview is a **fixed-height chrome slot** at the top of the keyboard (height = `previewH`) with an image + variant pill row (`Image · Sticker · GIF · ✕`). The keys remain mounted underneath at y = `previewH` and stay tappable so the user can keep typing the message they're sending the image into. Tapping a variant pill encodes the right format and drops it on `UIPasteboard.general` with the matching UTI — iOS keyboards cannot insert images directly, so the user long-presses the chat field and taps **Paste**.
+12. **Word suggestions** — `UITextChecker` driven completions inside our own command bar (system shortcut bar suppressed via `inputAssistantItem.leadingBarButtonGroups = []`). The bar's slot is always reserved (see Layout constants), so chips appearing / disappearing never shift the keys.
+13. **Draft state persistence** — `viewWillDisappear` stashes `slashBuffer` + a timestamp into the App Group `UserDefaults`; `viewDidAppear` reads it back if it's < 5 minutes old and replays through `updateCommandDetection()` so a user who switches apps mid-command (e.g. `/ca`, or `/cap a samurai cat`) returns to exactly the same surface. See `persistDraftState()` / `restoreDraftStateIfFresh()`.
+14. **Backspace repeat** — `UILongPressGestureRecognizer` with 0.4s delay + 0.08s repeat interval.
 
 ---
 
 ## Key invariants — don't break these
 
-- `preferredContentSize` is set **once** in `viewDidLoad` and updated only inside `rebuildKeyboard()`. Setting it in `viewWillAppear` / `viewDidLayoutSubviews` causes a feedback loop that grows the keyboard full-screen.
+- `preferredContentSize` and `heightConstraint.constant` are updated **only** inside `recomputeKeyboardHeight()`. Setting them from `viewWillAppear` / `viewDidLayoutSubviews` / individual visibility toggles causes a feedback loop that either grows the keyboard full-screen or fights the in-flight chrome animation. Every chrome show/hide site must call `recomputeKeyboardHeight()` (or a function that does).
+- The command-bar slot (`commandBarH`) is **always** reserved at the top of the keyboard — `effectiveChromeH` returns at least `commandBarH` whenever the preview is not showing. Don't add a conditional to collapse it to 0; it exists so word suggestions / shortcut chips don't shove the keys.
+- `effectiveChromeH` returns `previewH` (not `previewH + commandBarH`) while the image preview is up. The preview owns the chrome slot — adding the command-bar slot on top of it would push the keys off-screen on iPhone.
+- The image preview overlay is a **fixed-height top slot** (height = `previewH`), not a full overlay. Don't reintroduce a `bottomAnchor` constraint or set `isHidden = true` on the keys — the user is meant to keep typing while the preview is up.
+- `integrationPanelHost` is anchored to `keyboardContainer.topAnchor` (constant `0`), not `+ commandBarH`. The host must cover the always-reserved command-bar slot or the iPad number row will visibly poke out above the Quick Panel / web panel.
+- `buildKeyboard()` removes everything except `commandBar`, `bannerContainer`, `slashStrip`, `previewOverlay`, `integrationPanelHost`, `quickPanelView`, `listeningOverlay`, and re-fronts every preserved overlay after the rows are rebuilt. New persistent overlays must be added to both lists or a height change will yank them out mid-display.
+- `slashBuffer` is the single source of truth for any in-progress slash command — everything else (`activeCommand`, `commandPromptText`, the chip strip, the right UI surface) is re-derived by `updateCommandDetection()`. Don't persist or restore other slash-related fields independently; round-trip the buffer.
+- Draft state TTL is 5 minutes (`draftBufferTTL`). Keep it short — the extension has no reliable "same field" signal across launches, and a `/cap` resurfacing in an unrelated field after a long delay is a worse UX than just losing it.
 - Width is always read from `UIScreen.main.bounds.width`, never `view.bounds.width` (which is 0 at layout time).
-- `keyboardContainer` uses Auto Layout (`bottomAnchor`); its *contents* use frames. Don't mix Auto Layout into `buildRow()`.
+- `keyboardContainer`'s *contents* use frames (key rows); the container itself and persistent overlays use Auto Layout. Don't mix Auto Layout into `buildRow()`.
 - `RequestsOpenAccess` in the extension `Info.plist` must stay `true` for HTTP requests to LM Studio / fal *and* for `SFSpeechRecognizer` to work. iOS will additionally require the user to flip "Allow Full Access" in Settings.
 - The `192.168.1.10` ATS exception in both `Info.plist` files is required for plaintext HTTP to the LAN LM Studio endpoint. Don't broaden it.
 - `OrgImageRenderer` is synchronous and runs on the main thread — fine because Core Graphics on a 500×500 canvas is sub-millisecond. Do **not** reintroduce a WKWebView path inside the keyboard extension; rAF is paused on detached webviews and the process is too memory-constrained for an in-hierarchy one.
@@ -203,7 +227,7 @@ Single file. Key sections in order:
 2. Add a `case` to `SlashCommand` in `TurtleKeyboardExtension/Command/SlashCommand.swift`.
 3. **Remote (AI) command:** update `requiredCapability(for:)` and `defaultRoutes` in `AI/CommandRouter.swift`. If the prompt is non-trivial, drop the `.txt` in `commands/prompts/` and add it to the Run Script's `inputPaths`/`outputPaths`. `PromptLoader.load(id:)` will pick it up.
 4. **Local (integration) command:** add a `CommandSpec` to the relevant integration in `Integration/<Provider>/`, or create a new `KeyboardIntegration` and register it in `IntegrationRegistry`.
-5. If the command produces an image, route the `CommandResult.text(...)` (or `.image(...)`) through `showImagePreview(_:)` so the user gets the same Copy/Close UX as `/org` and `/cap`.
+5. If the command produces an image, route the `CommandResult.text(...)` (or `.image(...)`) through `showImagePreview(_:)` so the user gets the same fixed-slot preview + `Image · Sticker · GIF · ✕` variant pills as `/org` and `/cap` (image stays above the keys, keys stay tappable).
 
 ---
 
