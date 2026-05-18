@@ -85,7 +85,7 @@ class KeyboardViewController: UIInputViewController {
     // and the keyboard too tall.
     private var rowH:        CGFloat { isPad ? 42 : 44 }
     private var rowGap:      CGFloat { isPad ? 6  : 8 }
-    private var commandBarH: CGFloat { isPad ? 40 : 44 }
+    private var commandBarH: CGFloat { isPad ? 46 : 50 }
     private var keyGap:      CGFloat { isPad ? 8  : 6 }
     private var bottomPad:   CGFloat { isPad ? 4  : 6 }
 
@@ -94,8 +94,12 @@ class KeyboardViewController: UIInputViewController {
     // iPhone widths (375-393pt portrait) don't have headroom for the
     // generous iPad spacing.
     private var cmdSidePadding:   CGFloat { isPad ? 12 : 6 }
-    private var cmdMicW:          CGFloat { isPad ? 32 : 28 }
-    private var cmdMicH:          CGFloat { isPad ? 30 : 26 }
+    // Square so `cmdMicH / 2` corner radius renders as a perfect circle
+    // instead of a vertical oval. iOS native mic / FAB buttons are
+    // circular; matching that here keeps the bar's pill row visually
+    // consistent.
+    private var cmdMicH:          CGFloat { isPad ? 34 : 32 }
+    private var cmdMicW:          CGFloat { cmdMicH }
     private var cmdSendInsetH:    CGFloat { isPad ? 14 : 10 }
     private var cmdSendInsetV:    CGFloat { isPad ? 7  : 5 }
 
@@ -115,7 +119,7 @@ class KeyboardViewController: UIInputViewController {
     // MARK: - UI references
 
     private var commandBar:          UIView!
-    private var cmdPill:             UILabel!
+    private var cmdPill:             PaddedLabel!
     private var cmdPromptScrollView: UIScrollView!
     private var cmdPromptLabel:      UILabel!
     private var cmdSendButton:       UIButton!
@@ -153,7 +157,7 @@ class KeyboardViewController: UIInputViewController {
     /// behaviour 1:1.
     private var slashStrip:          CommandSuggestionStripView!
     private var slashStripHeight:    NSLayoutConstraint!
-    private let slashStripH: CGFloat = 34
+    private let slashStripH: CGFloat = 42
     private var heightConstraint:    NSLayoutConstraint!
     private var hideBannerTimer:     Timer?
     private var backspaceTimer:      Timer?
@@ -286,8 +290,8 @@ class KeyboardViewController: UIInputViewController {
         cmdPill?.backgroundColor = chipBg
         cmdPill?.textColor = text
         cmdPromptLabel?.textColor = text.withAlphaComponent(0.90)
-        cmdMicButton?.tintColor = text.withAlphaComponent(0.85)
-        cmdMicButton?.backgroundColor = chipBg.withAlphaComponent(0.7)
+        cmdMicButton?.tintColor = text
+        cmdMicButton?.backgroundColor = chipBg
         cmdSendButton?.setTitleColor(text, for: .normal)
         cmdSendButton?.backgroundColor = chipBg
         cmdCaret?.backgroundColor = text
@@ -505,7 +509,8 @@ class KeyboardViewController: UIInputViewController {
             b.setTitleColor(brandGreen, for: .normal)
             b.titleLabel?.font = .boldSystemFont(ofSize: 13)
             b.backgroundColor = .white
-            b.layer.cornerRadius = 8
+            // Capsule — row height is 38pt, so 19 reads as fully rounded.
+            b.layer.cornerRadius = 19
             b.addTarget(self, action: #selector(previewVariantTapped(_:)), for: .touchUpInside)
             return b
         }
@@ -518,7 +523,7 @@ class KeyboardViewController: UIInputViewController {
         closeBtn.setTitleColor(.white, for: .normal)
         closeBtn.titleLabel?.font = .systemFont(ofSize: 16, weight: .medium)
         closeBtn.backgroundColor = UIColor.white.withAlphaComponent(0.18)
-        closeBtn.layer.cornerRadius = 8
+        closeBtn.layer.cornerRadius = 19  // matches the variant pills
         closeBtn.addTarget(self, action: #selector(previewCloseTapped), for: .touchUpInside)
 
         let buttonRow = UIStackView(arrangedSubviews: [imageBtn, stickerBtn, gifBtn, closeBtn])
@@ -591,12 +596,19 @@ class KeyboardViewController: UIInputViewController {
         keyboardContainer.addSubview(commandBar)
 
         // Command pill  "🎨 /cap"
-        cmdPill = UILabel()
+        cmdPill = PaddedLabel()
+        // Pixel-symmetric padding — space characters don't render at
+        // identical widths in mono fonts, so adding " " before vs after
+        // the command name used to look unbalanced. `textInsets` is
+        // measured in points and is identical on left and right.
+        cmdPill.textInsets = UIEdgeInsets(top: 0, left: 8, bottom: 0, right: 8)
         cmdPill.font               = .monospacedSystemFont(ofSize: 12, weight: .bold)
         cmdPill.textColor          = .white
         cmdPill.backgroundColor    = KeyboardPalette.chipBg
         cmdPill.textColor          = KeyboardPalette.barText
-        cmdPill.layer.cornerRadius = 5
+        // Capsule — matches the pill height (locked to `cmdMicH` below)
+        // so the pill + mic + send all share the same capsule shape.
+        cmdPill.layer.cornerRadius = cmdMicH / 2
         cmdPill.clipsToBounds      = true
         cmdPill.textAlignment      = .center
         cmdPill.setContentHuggingPriority(.required, for: .horizontal)
@@ -672,9 +684,9 @@ class KeyboardViewController: UIInputViewController {
             UIImage(systemName: "mic.fill",
                     withConfiguration: UIImage.SymbolConfiguration(pointSize: 15, weight: .medium)),
             for: .normal)
-        cmdMicButton.tintColor = KeyboardPalette.barText.withAlphaComponent(0.85)
-        cmdMicButton.backgroundColor = KeyboardPalette.chipBg.withAlphaComponent(0.7)
-        cmdMicButton.layer.cornerRadius = 8
+        cmdMicButton.tintColor = KeyboardPalette.barText
+        cmdMicButton.backgroundColor = KeyboardPalette.chipBg  // match Send weight
+        cmdMicButton.layer.cornerRadius = cmdMicH / 2          // perfect circle
         cmdMicButton.setContentHuggingPriority(.required, for: .horizontal)
         cmdMicButton.addTarget(self, action: #selector(micTapped), for: .touchUpInside)
         cmdMicButton.translatesAutoresizingMaskIntoConstraints = false
@@ -685,7 +697,7 @@ class KeyboardViewController: UIInputViewController {
         cmdSendButton.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
         cmdSendButton.setTitleColor(KeyboardPalette.barText, for: .normal)
         cmdSendButton.backgroundColor    = KeyboardPalette.chipBg
-        cmdSendButton.layer.cornerRadius = 8
+        cmdSendButton.layer.cornerRadius = cmdMicH / 2  // capsule, matches mic
         cmdSendButton.contentEdgeInsets  = UIEdgeInsets(top: cmdSendInsetV, left: cmdSendInsetH, bottom: cmdSendInsetV, right: cmdSendInsetH)
         cmdSendButton.setContentHuggingPriority(.required, for: .horizontal)
         cmdSendButton.addTarget(self, action: #selector(sendCommand), for: .touchUpInside)
@@ -708,8 +720,8 @@ class KeyboardViewController: UIInputViewController {
             btn.titleLabel?.lineBreakMode = .byTruncatingTail
             btn.setTitleColor(KeyboardPalette.barText, for: .normal)
             btn.backgroundColor           = KeyboardPalette.chipBg
-            btn.layer.cornerRadius        = 8
-            btn.contentEdgeInsets         = UIEdgeInsets(top: 0, left: 8, bottom: 0, right: 8)
+            btn.layer.cornerRadius        = 18  // capsule on the 36pt stack height
+            btn.contentEdgeInsets         = UIEdgeInsets(top: 0, left: 10, bottom: 0, right: 10)
             btn.addTarget(self, action: #selector(suggestionTapped(_:)), for: .touchUpInside)
             cmdSuggestionsStack.addArrangedSubview(btn)
             cmdSuggestionBtns.append(btn)
@@ -775,7 +787,7 @@ class KeyboardViewController: UIInputViewController {
             // buffer is the cancel affordance now.
             cmdPill.leadingAnchor.constraint(equalTo: commandBar.leadingAnchor, constant: cmdSidePadding),
             cmdPill.centerYAnchor.constraint(equalTo: commandBar.centerYAnchor),
-            cmdPill.heightAnchor.constraint(equalToConstant: 26),
+            cmdPill.heightAnchor.constraint(equalToConstant: cmdMicH),
 
             // Prompt scroll view fills the slot between pill and mic. The
             // label inside it can be wider than the frame — that's what
@@ -817,6 +829,12 @@ class KeyboardViewController: UIInputViewController {
 
             cmdSendButton.trailingAnchor.constraint(equalTo: commandBar.trailingAnchor, constant: -cmdSidePadding),
             cmdSendButton.centerYAnchor.constraint(equalTo: commandBar.centerYAnchor),
+            // Lock the Send button to the same height as the mic so the
+            // two buttons read as one capsule pair across the bar's
+            // trailing edge. Without this the Send button heights
+            // depended on its text + contentEdgeInsets and ended up
+            // visibly different from the mic.
+            cmdSendButton.heightAnchor.constraint(equalToConstant: cmdMicH),
 
             // Suggestions stack fills the space to the right of the cancel button
             cmdSuggestionsStack.leadingAnchor.constraint(equalTo: commandBar.leadingAnchor, constant: cmdSidePadding),
@@ -1573,10 +1591,10 @@ class KeyboardViewController: UIInputViewController {
         cmdMicButton.isHidden = !voiceEnabled
         cmdSuggestionsStack.isHidden = true
 
-        // Single-space padding on each side so the emoji doesn't butt
-        // against the pill's rounded corner. Two was the previous value,
-        // which left a visible gap on the left of the palette.
-        cmdPill.text = " \(cmd.emoji) /\(cmd.rawValue) "
+        // Padding now lives in `PaddedLabel.textInsets` (set at setup
+        // time), so the text itself carries no whitespace. Left + right
+        // inset are identical so the pill always looks symmetric.
+        cmdPill.text = "\(cmd.emoji) /\(cmd.rawValue)"
         cmdSendButton.setTitle(cmd.buttonTitle, for: .normal)
 
         // Surface the preset chip strip only on a fresh, prompt-needing
@@ -1637,12 +1655,17 @@ class KeyboardViewController: UIInputViewController {
         activeCommand  = nil
         suggestionMode = .slashCommand
 
-        // The slash compose bar is the "prompt area" the user wants the
-        // mic in — un-hide it alongside the other controls (still gated
-        // on the Personalization voice toggle).
+        // Draft mode: the typed `/cap` lives INSIDE the pill, as a
+        // single attributed run. Keeping it pinned to the pill on the
+        // left avoids the floating-text-in-empty-bar look the previous
+        // approach produced. The prompt label is hidden in draft mode
+        // (and so is the caret, via `updateCaret`'s label-visibility
+        // gate) — the pill IS the visual indicator.
         let voiceEnabled = personalizationStore.int(
             forKey: PersonalizationKeys.voiceEnabled, fallback: 1) != 0
-        [cmdPill, cmdPromptLabel, cmdSendButton].forEach { $0.isHidden = false }
+        cmdPill.isHidden = false
+        cmdPromptLabel.isHidden = true
+        cmdSendButton.isHidden = false
         cmdMicButton.isHidden = !voiceEnabled
         cmdPresetStrip?.isHidden = true
         cmdSpinner.stopAnimating()
@@ -1658,84 +1681,61 @@ class KeyboardViewController: UIInputViewController {
 
         // Keep the suggestion chip strip mounted for the entire draft
         // state — as long as the user has typed something past `/` and
-        // *any* command still matches. It used to require 2+ candidates,
-        // so narrowing `/c` → `/ca` (only `cap` left) made the strip blink
-        // out. The strip stays visible until either no command matches or
-        // the user commits a command (space → prompt mode).
+        // *any* command still matches. The strip stays visible until
+        // either no command matches or the user commits with space.
         if !body.isEmpty, !allMatches.isEmpty {
             showSlashStrip(matches: allMatches)
         } else {
             hideSlashStrip()
         }
 
-        cmdSuggestionsStack.isHidden = true
-        cmdPill.text = " / "
+        // Build the attributed pill content: "/" + typed (opaque) +
+        // ghost completion (dim). The pill grows from a single-character
+        // `/` up to "/cap" as the user types, anchored on the left of
+        // the bar — same slot the committed pill occupies, so the
+        // transition between draft and committed reads as the pill
+        // changing content rather than a layout jump.
+        let font = cmdPill.font ?? .monospacedSystemFont(ofSize: 12, weight: .bold)
+        let typedAttrs: [NSAttributedString.Key: Any] = [
+            .foregroundColor: KeyboardPalette.barText,
+            .font: font,
+        ]
+        let ghostAttrs: [NSAttributedString.Key: Any] = [
+            .foregroundColor: KeyboardPalette.barText.withAlphaComponent(0.40),
+            .font: font,
+        ]
 
         if body.isEmpty {
-            // User just typed `/`. No ghost yet — the empty pill says
-            // enough on its own. A faint placeholder keeps the bar from
-            // looking inert. Caret sits at the start of the placeholder
-            // so it's obviously where the next character will land.
-            cmdPromptLabel.attributedText = nil
-            cmdPromptLabel.text = "type a command…"
-            cmdPromptLabel.textColor = UIColor.white.withAlphaComponent(0.40)
+            // Just `/` — keep the pill compact rather than padding it
+            // out with a hint string (which inflates the pill width on
+            // every initial slash tap).
+            let attr = NSMutableAttributedString(string: "/", attributes: typedAttrs)
+            cmdPill.attributedText = attr
             cmdSendButton.setTitle("Send", for: .normal)
-            caretAnchorWidth = 0
         } else if let match = topMatch {
-            // Best match found. Render typed prefix opaque white, the
-            // rest of the command name as a dimmer ghost. Tapping Send
-            // still accepts the suggestion — we just don't echo the
-            // command name onto the button, which made the prompt bar
-            // look cluttered (the chip strip above already names every
-            // candidate).
             let typed = body
             let full = match.rawValue
             let ghost = full.hasPrefix(typed)
                 ? String(full.dropFirst(typed.count))
                 : ""
-            let attr = NSMutableAttributedString(
-                string: typed,
-                attributes: [
-                    .foregroundColor: KeyboardPalette.barText.withAlphaComponent(0.95),
-                    .font: cmdPromptLabel.font as Any,
-                ])
+            let attr = NSMutableAttributedString(string: "/", attributes: typedAttrs)
+            attr.append(NSAttributedString(string: typed, attributes: typedAttrs))
             if !ghost.isEmpty {
-                attr.append(NSAttributedString(
-                    string: ghost,
-                    attributes: [
-                        .foregroundColor: KeyboardPalette.barText.withAlphaComponent(0.32),
-                        .font: cmdPromptLabel.font as Any,
-                    ]))
+                attr.append(NSAttributedString(string: ghost, attributes: ghostAttrs))
             }
-            cmdPromptLabel.attributedText = attr
+            cmdPill.attributedText = attr
             cmdSendButton.setTitle("Send", for: .normal)
-            // Caret sits right after the typed prefix, just before the
-            // dim-gray ghost. Measure only the typed portion.
-            let typedWidth = (typed as NSString)
-                .size(withAttributes: [.font: cmdPromptLabel.font as Any]).width
-            caretAnchorWidth = typedWidth
         } else {
-            // No match at all. Show the typed body verbatim plus a
-            // small explanatory tail so the user knows nothing's wrong
-            // with the keyboard — they just typed something unknown.
-            let attr = NSMutableAttributedString(
-                string: body,
-                attributes: [
-                    .foregroundColor: KeyboardPalette.barText.withAlphaComponent(0.95),
-                    .font: cmdPromptLabel.font as Any,
-                ])
-            attr.append(NSAttributedString(
-                string: "  no match",
-                attributes: [
-                    .foregroundColor: KeyboardPalette.barText.withAlphaComponent(0.32),
-                    .font: cmdPromptLabel.font as Any,
-                ]))
-            cmdPromptLabel.attributedText = attr
+            let attr = NSMutableAttributedString(string: "/", attributes: typedAttrs)
+            attr.append(NSAttributedString(string: body, attributes: typedAttrs))
+            attr.append(NSAttributedString(string: " · no match", attributes: ghostAttrs))
+            cmdPill.attributedText = attr
             cmdSendButton.setTitle("Send", for: .normal)
-            let typedWidth = (body as NSString)
-                .size(withAttributes: [.font: cmdPromptLabel.font as Any]).width
-            caretAnchorWidth = typedWidth
         }
+        // Caret has no meaningful position in draft mode (the pill is the
+        // indicator). `updateCaret` keys off `cmdPromptLabel.isHidden`,
+        // which is now true, so it'll hide the caret on its own.
+        caretAnchorWidth = nil
 
         if commandBar.isHidden {
             commandBar.alpha    = 0
@@ -2179,21 +2179,14 @@ class KeyboardViewController: UIInputViewController {
         if activeCommand != nil, let idx = promptCaretIndex {
             let prompt = currentPromptText() ?? ""
             if prompt.isEmpty {
-                // Empty prompt = placeholder is what's rendered (e.g. "type
-                // prompt above…"). Anchor the caret to the END of the
-                // placeholder so it visually sits at the tail of the
-                // sentence, not awkwardly to the left of it. Clamp to the
-                // scroll view's visible width so a long placeholder
-                // doesn't push the caret off-screen — once the user
-                // types, the prompt becomes non-empty and the caret
-                // tracks `promptCaretIndex` against real text.
-                let text = label.text ?? ""
-                let w = (text as NSString).size(withAttributes: [.font: font]).width
-                let visibleW = (cmdPromptScrollView?.bounds.width ?? .greatestFiniteMagnitude)
-                // 6pt right margin so the 2pt caret never butts against
-                // the mic button. `visibleW - 6` is the rightmost x where
-                // the caret stays fully inside the scroll view's frame.
-                cmdCaretLeading.constant = min(w, max(0, visibleW - 6))
+                // Empty prompt = the rendered label text is a placeholder
+                // (e.g. "type prompt above…"), not real content. Position
+                // the caret at index 0 — that's where the first typed
+                // character will land, and the placeholder visually
+                // slides aside as the user types. Anchoring to the END
+                // of the placeholder was wrong: it implied the help
+                // text was actual content the user had typed.
+                cmdCaretLeading.constant = 0
                 return
             }
             let clamped = max(0, min(idx, prompt.count))
@@ -2893,5 +2886,42 @@ private final class PulsingDotsView: UIView {
             anim.beginTime = CACurrentMediaTime() + Double(i) * 0.08
             layer.add(anim, forKey: "pulse")
         }
+    }
+}
+
+// MARK: - PaddedLabel
+
+/// `UILabel` with symmetric pixel-based content insets. Used by the
+/// command-bar pill so left / right padding stays balanced regardless of
+/// the font (space-character widths vary by font and weight, so the
+/// previous space-padded approach drifted as we changed fonts).
+fileprivate final class PaddedLabel: UILabel {
+
+    var textInsets: UIEdgeInsets = .zero {
+        didSet { invalidateIntrinsicContentSize() }
+    }
+
+    override var intrinsicContentSize: CGSize {
+        let base = super.intrinsicContentSize
+        return CGSize(
+            width:  base.width  + textInsets.left + textInsets.right,
+            height: base.height + textInsets.top  + textInsets.bottom
+        )
+    }
+
+    override func drawText(in rect: CGRect) {
+        super.drawText(in: rect.inset(by: textInsets))
+    }
+
+    override func textRect(forBounds bounds: CGRect,
+                           limitedToNumberOfLines numberOfLines: Int) -> CGRect {
+        let inset = bounds.inset(by: textInsets)
+        let rect = super.textRect(forBounds: inset, limitedToNumberOfLines: numberOfLines)
+        return CGRect(
+            x: rect.origin.x - textInsets.left,
+            y: rect.origin.y - textInsets.top,
+            width: rect.size.width + textInsets.left + textInsets.right,
+            height: rect.size.height + textInsets.top + textInsets.bottom
+        )
     }
 }

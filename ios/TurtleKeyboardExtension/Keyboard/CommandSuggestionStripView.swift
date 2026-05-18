@@ -55,7 +55,7 @@ final class CommandSuggestionStripView: UIScrollView {
         row.axis = .horizontal
         row.alignment = .center
         row.spacing = 6
-        row.layoutMargins = UIEdgeInsets(top: 6, left: 8, bottom: 6, right: 8)
+        row.layoutMargins = UIEdgeInsets(top: 5, left: 8, bottom: 5, right: 8)
         row.isLayoutMarginsRelativeArrangement = true
         row.translatesAutoresizingMaskIntoConstraints = false
         addSubview(row)
@@ -87,7 +87,11 @@ final class CommandSuggestionStripView: UIScrollView {
     private func makePill(for cmd: SlashCommand) -> UIView {
         let pill = UIControl()
         pill.backgroundColor = KeyboardPalette.chipBg
-        pill.layer.cornerRadius = 14
+        // Capsule. The pill is locked to a 32pt height (matches the
+        // prompt-bar `cmdPill` height for visual unity); the corner
+        // radius is exactly height/2 so the pill renders as a perfect
+        // capsule rather than a rounded rectangle.
+        pill.layer.cornerRadius = 16
         pill.translatesAutoresizingMaskIntoConstraints = false
 
         let label = UILabel()
@@ -99,10 +103,10 @@ final class CommandSuggestionStripView: UIScrollView {
         pill.addSubview(label)
 
         NSLayoutConstraint.activate([
+            pill.heightAnchor.constraint(equalToConstant: 32),
             label.leadingAnchor.constraint(equalTo: pill.leadingAnchor, constant: 12),
             label.trailingAnchor.constraint(equalTo: pill.trailingAnchor, constant: -12),
-            label.topAnchor.constraint(equalTo: pill.topAnchor, constant: 6),
-            label.bottomAnchor.constraint(equalTo: pill.bottomAnchor, constant: -6),
+            label.centerYAnchor.constraint(equalTo: pill.centerYAnchor),
         ])
 
         pill.addAction(UIAction { [weak self, weak pill] _ in
