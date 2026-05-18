@@ -29,9 +29,8 @@ final class KeyStore {
         return key
     }
 
-    // Convenience setters called from the host app / onboarding
-    func setFalKey(_ key: String)       { self[.fal] = key }
-    func setAnthropicKey(_ key: String) { self[.anthropic] = key }
-    func setGoogleKey(_ key: String)    { self[.google] = key }
-    func setOpenAIKey(_ key: String)    { self[.openai] = key }
+    /// Convenience setter called from host-app onboarding and from
+    /// `CommandRouter.init` (which bootstraps the key from the
+    /// build-time `.env` → `Secrets.geminiApiKey`).
+    func setGoogleKey(_ key: String) { self[.google] = key }
 }

@@ -31,10 +31,15 @@ class KeyboardViewController: UIInputViewController {
     /// Android's `stagedImage` on `LmStudioAiClient`.
     private var stagedEditImage: Data?
 
-    /// True while the PHPicker for `/edit` is on screen — prevents
-    /// `showCommandBar(.edit)` from re-presenting on its second call
+    /// True while the PHPicker for `/edit` or `/style` is on screen —
+    /// prevents `showCommandBar` from re-presenting on its second call
     /// (after the user picks and the picker dismisses).
     private var editPickerActive = false
+
+    /// The command that launched the photo picker (`/edit` or `/style`).
+    /// Used by the picker callback to re-enter the right command bar with
+    /// the staged image. Cleared after the callback re-routes.
+    private var pickerSourceCommand: SlashCommand?
 
     /// Top slash-command match for the current draft buffer, or `nil`
     /// when nothing matches. Drives both the ghost completion in the
@@ -89,7 +94,6 @@ class KeyboardViewController: UIInputViewController {
     // iPhone widths (375-393pt portrait) don't have headroom for the
     // generous iPad spacing.
     private var cmdSidePadding:   CGFloat { isPad ? 12 : 6 }
-    private var cmdCancelW:       CGFloat { isPad ? 28 : 24 }
     private var cmdMicW:          CGFloat { isPad ? 32 : 28 }
     private var cmdMicH:          CGFloat { isPad ? 30 : 26 }
     private var cmdSendInsetH:    CGFloat { isPad ? 14 : 10 }
@@ -115,7 +119,6 @@ class KeyboardViewController: UIInputViewController {
     private var cmdPromptScrollView: UIScrollView!
     private var cmdPromptLabel:      UILabel!
     private var cmdSendButton:       UIButton!
-    private var cmdCancelButton:     UIButton!
     private var cmdMicButton:        UIButton!
     private var cmdSpinner:          UIActivityIndicatorView!
 
@@ -157,6 +160,13 @@ class KeyboardViewController: UIInputViewController {
     private var previewOverlay:      UIView?
     private var previewImageView:    UIImageView?
     private var pendingPreviewImage: UIImage?
+
+    /// Raw bytes of the source the preview was built from (PNG for image
+    /// commands, GIF89a for `/gif`). Kept verbatim so that tapping the
+    /// **GIF** variant pill on a `/gif` result pastes the original
+    /// animated bytes instead of a single-frame re-encode of the
+    /// preview's first frame.
+    private var pendingPreviewSourceData: Data?
 
     // Integration panel mount — holds whatever UIView an integration asked
     // us to show via IntegrationContext.showPanel. Sits on top of the key
@@ -273,7 +283,6 @@ class KeyboardViewController: UIInputViewController {
         let text = KeyboardPalette.barText
         let chipBg = KeyboardPalette.chipBg
 
-        cmdCancelButton?.tintColor = text.withAlphaComponent(0.6)
         cmdPill?.backgroundColor = chipBg
         cmdPill?.textColor = text
         cmdPromptLabel?.textColor = text.withAlphaComponent(0.90)
@@ -336,10 +345,20 @@ class KeyboardViewController: UIInputViewController {
     // "Copy to clipboard" (puts it on the pasteboard so they can long-press
     // and paste in the chat field) or "Close" to discard.
 
-    private func showImagePreview(_ image: UIImage, command: String = "", prompt: String = "") {
+    private func showImagePreview(_ image: UIImage,
+                                  sourceData: Data? = nil,
+                                  command: String = "",
+                                  prompt: String = "") {
         if previewOverlay == nil { buildPreviewOverlay() }
         pendingPreviewImage = image
+        pendingPreviewSourceData = sourceData
         previewImageView?.image = image
+        // UIImageView auto-animates an `image` built via
+        // `UIImage.animatedImage(with:duration:)` once it's in a window —
+        // but calling startAnimating explicitly here is cheap and makes
+        // the behaviour deterministic across iOS versions / view-state
+        // edge cases (e.g. re-entering the preview after dismiss).
+        if image.images != nil { previewImageView?.startAnimating() }
         previewOverlay?.isHidden = false
         if let overlay = previewOverlay {
             keyboardContainer.bringSubviewToFront(overlay)
@@ -360,7 +379,9 @@ class KeyboardViewController: UIInputViewController {
 
     private func dismissPreview() {
         previewOverlay?.isHidden = true
+        previewImageView?.stopAnimating()
         pendingPreviewImage = nil
+        pendingPreviewSourceData = nil
         recomputeKeyboardHeight()
     }
 
@@ -381,6 +402,22 @@ class KeyboardViewController: UIInputViewController {
         case 2: variant = .gif
         default: dismissPreview(); return
         }
+
+        // /gif fast-path: when the source is already an animated GIF89a
+        // (produced by `GoogleProvider.runGifPipeline`) and the user tapped
+        // the GIF variant pill, paste the original bytes verbatim. The
+        // `ImageVariants.encodeGIF` re-encode path would only see the
+        // first frame (UIImage doesn't carry multi-frame GIF data without
+        // `animatedImage(with:duration:)`) and would silently produce a
+        // single-frame still — which is what WhatsApp / iMessage were
+        // showing in the user's chats.
+        if variant == .gif, let raw = pendingPreviewSourceData, Self.isAnimatedGIF(raw) {
+            UIPasteboard.general.setData(raw, forPasteboardType: UTType.gif.identifier)
+            showBanner("📋 GIF copied — long-press field to paste")
+            dismissPreview()
+            return
+        }
+
         guard let result = ImageVariants.make(img, variant: variant) else {
             showBanner("⚠️ Couldn't encode \(variant.label.lowercased())")
             return
@@ -388,6 +425,47 @@ class KeyboardViewController: UIInputViewController {
         UIPasteboard.general.setData(result.data, forPasteboardType: result.uti)
         showBanner("📋 \(result.bannerNoun) copied — long-press field to paste")
         dismissPreview()
+    }
+
+    /// True when `data` begins with the GIF magic (`"GIF87a"` or `"GIF89a"`).
+    /// The 4-byte prefix `"GIF8"` is enough to distinguish from PNG/JPEG.
+    private static func isAnimatedGIF(_ data: Data) -> Bool {
+        guard data.count >= 4 else { return false }
+        return data[0] == 0x47 && data[1] == 0x49 && data[2] == 0x46 && data[3] == 0x38
+    }
+
+    /// Build an animated `UIImage` from raw GIF data so the preview's
+    /// `UIImageView` plays the animation. Falls back to nil when the
+    /// data isn't actually a multi-frame GIF — caller should then use
+    /// `UIImage(data:)` to get a still.
+    private static func animatedImage(fromGIFData data: Data) -> UIImage? {
+        guard let src = CGImageSourceCreateWithData(data as CFData, nil) else {
+            return nil
+        }
+        let count = CGImageSourceGetCount(src)
+        guard count > 1 else { return nil }
+        var frames: [UIImage] = []
+        var totalDuration: TimeInterval = 0
+        frames.reserveCapacity(count)
+        for i in 0..<count {
+            guard let cg = CGImageSourceCreateImageAtIndex(src, i, nil) else { continue }
+            frames.append(UIImage(cgImage: cg))
+            // Prefer the unclamped delay; viewers like Twitter ignore the
+            // clamped one when both are present. Default to 100 ms if the
+            // encoder didn't write a delay.
+            var delay: TimeInterval = 0.1
+            if let props = CGImageSourceCopyPropertiesAtIndex(src, i, nil) as? [String: Any],
+               let gif = props[kCGImagePropertyGIFDictionary as String] as? [String: Any] {
+                if let d = gif[kCGImagePropertyGIFUnclampedDelayTime as String] as? Double, d > 0 {
+                    delay = d
+                } else if let d = gif[kCGImagePropertyGIFDelayTime as String] as? Double, d > 0 {
+                    delay = d
+                }
+            }
+            totalDuration += delay
+        }
+        guard !frames.isEmpty else { return nil }
+        return UIImage.animatedImage(with: frames, duration: totalDuration)
     }
 
     private func buildPreviewOverlay() {
@@ -511,17 +589,6 @@ class KeyboardViewController: UIInputViewController {
         commandBar.isHidden        = true
         commandBar.translatesAutoresizingMaskIntoConstraints = false
         keyboardContainer.addSubview(commandBar)
-
-        // ✕ cancel
-        cmdCancelButton = UIButton(type: .system)
-        cmdCancelButton.setImage(
-            UIImage(systemName: "xmark",
-                    withConfiguration: UIImage.SymbolConfiguration(pointSize: 12, weight: .medium)),
-            for: .normal)
-        cmdCancelButton.tintColor = KeyboardPalette.barText.withAlphaComponent(0.6)
-        cmdCancelButton.addTarget(self, action: #selector(cancelCommand), for: .touchUpInside)
-        cmdCancelButton.translatesAutoresizingMaskIntoConstraints = false
-        commandBar.addSubview(cmdCancelButton)
 
         // Command pill  "🎨 /cap"
         cmdPill = UILabel()
@@ -702,13 +769,11 @@ class KeyboardViewController: UIInputViewController {
             bannerLabel.bottomAnchor.constraint(equalTo: bannerContainer.bottomAnchor),
 
             // Command bar internals — most distances narrow on iPhone via
-            // cmdSidePadding / cmdCancelW / cmdMicW / cmdMicH so the
-            // prompt label has room to breathe on a 393pt-wide row.
-            cmdCancelButton.leadingAnchor.constraint(equalTo: commandBar.leadingAnchor, constant: cmdSidePadding),
-            cmdCancelButton.centerYAnchor.constraint(equalTo: commandBar.centerYAnchor),
-            cmdCancelButton.widthAnchor.constraint(equalToConstant: cmdCancelW),
-
-            cmdPill.leadingAnchor.constraint(equalTo: cmdCancelButton.trailingAnchor, constant: 4),
+            // cmdSidePadding / cmdMicW / cmdMicH so the prompt label has
+            // room to breathe on a 393pt-wide row. The leading-side ✕
+            // cancel button was removed; backspace through the slash
+            // buffer is the cancel affordance now.
+            cmdPill.leadingAnchor.constraint(equalTo: commandBar.leadingAnchor, constant: cmdSidePadding),
             cmdPill.centerYAnchor.constraint(equalTo: commandBar.centerYAnchor),
             cmdPill.heightAnchor.constraint(equalToConstant: 26),
 
@@ -754,7 +819,7 @@ class KeyboardViewController: UIInputViewController {
             cmdSendButton.centerYAnchor.constraint(equalTo: commandBar.centerYAnchor),
 
             // Suggestions stack fills the space to the right of the cancel button
-            cmdSuggestionsStack.leadingAnchor.constraint(equalTo: cmdCancelButton.trailingAnchor, constant: 4),
+            cmdSuggestionsStack.leadingAnchor.constraint(equalTo: commandBar.leadingAnchor, constant: cmdSidePadding),
             cmdSuggestionsStack.trailingAnchor.constraint(equalTo: commandBar.trailingAnchor, constant: -cmdSidePadding),
             cmdSuggestionsStack.centerYAnchor.constraint(equalTo: commandBar.centerYAnchor),
             cmdSuggestionsStack.heightAnchor.constraint(equalToConstant: 36),
@@ -1223,7 +1288,7 @@ class KeyboardViewController: UIInputViewController {
     /// user's Personalization toggles are honoured — disabling Poll on
     /// the host strips it from the grid here.
     private func allCommandsForQuickPanel() -> [SlashCommand] {
-        let aiCommands: [SlashCommand] = [.cap, .edit, .fix, .tone, .reply, .tl, .ask, .org]
+        let aiCommands: [SlashCommand] = [.cap, .edit, .style, .sticker, .gif, .fix, .tone, .reply, .tl, .search, .ask, .org]
         // Walk the live registry so commands added later (poll, wyr,
         // web, …) flow through automatically without touching this list.
         let localCommands: [SlashCommand] = integrationRegistry.allCommands.compactMap {
@@ -1419,7 +1484,7 @@ class KeyboardViewController: UIInputViewController {
         }
         // Mic only makes sense while composing a slash-command prompt;
         // hide it in the suggestions strip so it doesn't crowd the chips.
-        [cmdPill, cmdPromptLabel, cmdSendButton, cmdCancelButton, cmdMicButton]
+        [cmdPill, cmdPromptLabel, cmdSendButton, cmdMicButton]
             .forEach { $0.isHidden = true }
         cmdSuggestionsStack.isHidden = false
 
@@ -1441,7 +1506,7 @@ class KeyboardViewController: UIInputViewController {
         }
         // Hide normal command-bar controls (including the mic — it only
         // belongs in slash-command compose mode); show only the chips.
-        [cmdPill, cmdPromptLabel, cmdSendButton, cmdCancelButton, cmdMicButton]
+        [cmdPill, cmdPromptLabel, cmdSendButton, cmdMicButton]
             .forEach { $0.isHidden = true }
         cmdPresetStrip?.isHidden = true
         cmdSuggestionsStack.isHidden = false
@@ -1487,12 +1552,14 @@ class KeyboardViewController: UIInputViewController {
         // the keys get their full vertical space back.
         hideSlashStrip()
 
-        // /edit needs a reference image before the user can describe an
-        // edit — fire the system image picker on first entry. The picker
-        // callback re-invokes `showCommandBar(.edit)`, at which point
-        // `stagedEditImage` is non-nil and we fall through to render.
-        if cmd == .edit, stagedEditImage == nil, !editPickerActive {
+        // /edit and /style both need a reference image before the user can
+        // describe what to do with it — fire the system image picker on
+        // first entry. The picker callback re-invokes `showCommandBar(cmd)`
+        // with `pickerSourceCommand` set, at which point `stagedEditImage`
+        // is non-nil and we fall through to render the prompt bar.
+        if cmd.needsReferenceImage, stagedEditImage == nil, !editPickerActive {
             editPickerActive = true
+            pickerSourceCommand = cmd
             presentEditImagePicker()
             return
         }
@@ -1502,11 +1569,14 @@ class KeyboardViewController: UIInputViewController {
         // Personalization — keep that gate honoured here.
         let voiceEnabled = personalizationStore.int(
             forKey: PersonalizationKeys.voiceEnabled, fallback: 1) != 0
-        [cmdPill, cmdPromptLabel, cmdSendButton, cmdCancelButton].forEach { $0.isHidden = false }
+        [cmdPill, cmdPromptLabel, cmdSendButton].forEach { $0.isHidden = false }
         cmdMicButton.isHidden = !voiceEnabled
         cmdSuggestionsStack.isHidden = true
 
-        cmdPill.text = "  \(cmd.emoji) /\(cmd.rawValue)  "
+        // Single-space padding on each side so the emoji doesn't butt
+        // against the pill's rounded corner. Two was the previous value,
+        // which left a visible gap on the left of the palette.
+        cmdPill.text = " \(cmd.emoji) /\(cmd.rawValue) "
         cmdSendButton.setTitle(cmd.buttonTitle, for: .normal)
 
         // Surface the preset chip strip only on a fresh, prompt-needing
@@ -1525,8 +1595,18 @@ class KeyboardViewController: UIInputViewController {
             cmdPresetStrip.isHidden = true
             cmdPromptLabel.isHidden = false
             if commandPromptText.isEmpty {
-                if cmd == .edit && stagedEditImage != nil {
-                    cmdPromptLabel.text      = "📎 image ready · describe the edit…"
+                if cmd.needsReferenceImage && stagedEditImage != nil {
+                    // Keep these short — the caret is anchored to the END
+                    // of the placeholder text, and a long placeholder
+                    // pushes the caret past the scroll view's visible
+                    // frame so the user can't see it blinking. Examples
+                    // moved into the banner / docs instead.
+                    switch cmd {
+                    case .style:   cmdPromptLabel.text = "📎 pick a style…"
+                    case .sticker: cmdPromptLabel.text = "📎 describe the sticker…"
+                    case .gif:     cmdPromptLabel.text = "📎 describe the animation…"
+                    default:       cmdPromptLabel.text = "📎 describe the edit…"
+                    }
                 } else {
                     cmdPromptLabel.text      = cmd.needsPrompt ? "type prompt above…" : "ready — tap \(cmd.buttonTitle)"
                 }
@@ -1562,7 +1642,7 @@ class KeyboardViewController: UIInputViewController {
         // on the Personalization voice toggle).
         let voiceEnabled = personalizationStore.int(
             forKey: PersonalizationKeys.voiceEnabled, fallback: 1) != 0
-        [cmdPill, cmdPromptLabel, cmdSendButton, cmdCancelButton].forEach { $0.isHidden = false }
+        [cmdPill, cmdPromptLabel, cmdSendButton].forEach { $0.isHidden = false }
         cmdMicButton.isHidden = !voiceEnabled
         cmdPresetStrip?.isHidden = true
         cmdSpinner.stopAnimating()
@@ -1589,7 +1669,7 @@ class KeyboardViewController: UIInputViewController {
         }
 
         cmdSuggestionsStack.isHidden = true
-        cmdPill.text = "  /  "
+        cmdPill.text = " / "
 
         if body.isEmpty {
             // User just typed `/`. No ghost yet — the empty pill says
@@ -1765,9 +1845,11 @@ class KeyboardViewController: UIInputViewController {
         promptCaretIndex = nil
         slashAutocompleteTopMatch = nil
         hideSlashStrip()
-        // Drop any staged /edit reference — the user backed out before
-        // describing the edit. Re-entering /edit will re-launch the picker.
+        // Drop any staged /edit or /style reference — the user backed out
+        // before describing the edit/restyle. Re-entering either command
+        // re-launches the picker.
         stagedEditImage = nil
+        pickerSourceCommand = nil
         UIView.animate(withDuration: 0.15, animations: {
             self.commandBar.alpha = 0
         }, completion: { _ in
@@ -1776,15 +1858,6 @@ class KeyboardViewController: UIInputViewController {
             self.resetCommandBarMode()
             self.recomputeKeyboardHeight()
         })
-    }
-
-    @objc private func cancelCommand() {
-        if voiceController.isListening { voiceController.cancel() }
-        voicePromptPrefix = nil
-        // Nothing was inserted into the host field, so nothing to delete —
-        // just drop the buffer.
-        slashBuffer = nil
-        hideCommandBar()
     }
 
     // MARK: - Voice dictation
@@ -1879,10 +1952,10 @@ class KeyboardViewController: UIInputViewController {
         }
 
         let context = contextBeforeSlash()
-        // Consume the staged image for /edit (cleared after the request
-        // builds so a failed call doesn't trap the bytes in memory).
-        let referenceImage: Data? = (cmd == .edit) ? stagedEditImage : nil
-        if cmd == .edit { stagedEditImage = nil }
+        // Consume the staged image for /edit and /style (cleared after the
+        // request builds so a failed call doesn't trap the bytes in memory).
+        let referenceImage: Data? = cmd.needsReferenceImage ? stagedEditImage : nil
+        if cmd.needsReferenceImage { stagedEditImage = nil }
         Task { @MainActor in
             do {
                 let result = try await CommandRouter.shared.execute(
@@ -1923,8 +1996,19 @@ class KeyboardViewController: UIInputViewController {
 
                 case .imageData(let data):
                     hideCommandBar()
-                    if let image = UIImage(data: data) {
-                        showImagePreview(image, command: cmd.rawValue, prompt: prompt)
+                    // For animated GIFs (`/gif` output) build a multi-frame
+                    // `UIImage` so the preview animates AND retain the raw
+                    // bytes so the GIF variant pill can paste them
+                    // verbatim. `UIImage(data:)` alone would silently keep
+                    // only the first frame.
+                    let image: UIImage? = Self.isAnimatedGIF(data)
+                        ? (Self.animatedImage(fromGIFData: data) ?? UIImage(data: data))
+                        : UIImage(data: data)
+                    if let image = image {
+                        showImagePreview(image,
+                                         sourceData: data,
+                                         command: cmd.rawValue,
+                                         prompt: prompt)
                     } else {
                         showBanner("⚠️ Image decode failed")
                     }
@@ -2037,7 +2121,7 @@ class KeyboardViewController: UIInputViewController {
     }
 
     private func resetCommandBarMode() {
-        [cmdPill, cmdPromptLabel, cmdSendButton, cmdCancelButton].forEach { $0.isHidden = false }
+        [cmdPill, cmdPromptLabel, cmdSendButton].forEach { $0.isHidden = false }
         cmdSuggestionsStack.isHidden = true
         cmdPresetStrip?.isHidden = true
         updateCaret()
@@ -2098,12 +2182,18 @@ class KeyboardViewController: UIInputViewController {
                 // Empty prompt = placeholder is what's rendered (e.g. "type
                 // prompt above…"). Anchor the caret to the END of the
                 // placeholder so it visually sits at the tail of the
-                // sentence, not awkwardly to the left of it. As soon as
-                // the user types, the prompt becomes non-empty and the
-                // caret tracks `promptCaretIndex` against real text.
+                // sentence, not awkwardly to the left of it. Clamp to the
+                // scroll view's visible width so a long placeholder
+                // doesn't push the caret off-screen — once the user
+                // types, the prompt becomes non-empty and the caret
+                // tracks `promptCaretIndex` against real text.
                 let text = label.text ?? ""
                 let w = (text as NSString).size(withAttributes: [.font: font]).width
-                cmdCaretLeading.constant = w
+                let visibleW = (cmdPromptScrollView?.bounds.width ?? .greatestFiniteMagnitude)
+                // 6pt right margin so the 2pt caret never butts against
+                // the mic button. `visibleW - 6` is the rightmost x where
+                // the caret stays fully inside the scroll view's frame.
+                cmdCaretLeading.constant = min(w, max(0, visibleW - 6))
                 return
             }
             let clamped = max(0, min(idx, prompt.count))
@@ -2328,13 +2418,11 @@ private final class KeyboardIntegrationContext: IntegrationContext {
         // App Group will be wired later — falls back to standard defaults
         // for now so saves persist across launches at minimum.
         self.store = UserDefaultsSplitStore(suiteName: SplitContract.storageSuiteName)
-        // Prefer Gemini when a key is wired in .env; otherwise fall back to
-        // the LAN LM Studio endpoint so devs without a key still get a model.
-        if !Secrets.geminiApiKey.isEmpty {
-            self.llm = GeminiLlmService(apiKey: Secrets.geminiApiKey)
-        } else {
-            self.llm = LMStudioLlmService()
-        }
+        // Gemini is the only backend; the key is loaded from the
+        // build-time `.env` via `Secrets.geminiApiKey`. If no key is
+        // configured, requests will surface a clear error from
+        // `GeminiLlmService.complete`.
+        self.llm = GeminiLlmService(apiKey: Secrets.geminiApiKey)
     }
 
     func showPanel(_ view: UIView) {
@@ -2434,79 +2522,6 @@ private final class GeminiLlmService: LlmService {
     }
 }
 
-/// Minimal LlmService backed by the same LM Studio endpoint the rest of
-/// the keyboard's text commands hit. Posts a single user message; returns
-/// the assistant's content stripped of any `<think>…</think>` block that
-/// reasoning models prepend.
-private final class LMStudioLlmService: LlmService {
-    private let endpoint = URL(string: "http://192.168.0.106:1234/api/v1/chat")!
-    /// Must match the model loaded in LM Studio. Keep in sync with
-    /// `LMStudioProvider`'s default.
-    private let model = "google/gemma-4-e4b"
-
-    func complete(
-        prompt: String,
-        onText: @escaping (String) -> Void,
-        onError: @escaping (String) -> Void
-    ) {
-        var req = URLRequest(url: endpoint)
-        req.httpMethod = "POST"
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.timeoutInterval = 30
-        // Custom (non-OpenAI) chat API: { model, system_prompt, input }.
-        // Notion's bridge sends a single combined prompt — pass it as
-        // `input` and leave `system_prompt` empty so the model treats
-        // the whole thing as the user message.
-        let body: [String: Any] = [
-            "model": model,
-            "system_prompt": "",
-            "input": prompt,
-        ]
-        req.httpBody = try? JSONSerialization.data(withJSONObject: body)
-        URLSession.shared.dataTask(with: req) { data, resp, err in
-            if let err = err { onError(err.localizedDescription); return }
-            guard let data = data,
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-            else { onError("non-JSON LLM response"); return }
-            let content = Self.extractContent(from: json)
-            guard let raw = content else {
-                let snippet = String(data: data, encoding: .utf8)?.prefix(200) ?? ""
-                onError("unexpected LLM shape: \(snippet)"); return
-            }
-            // Strip reasoning model think blocks the same way LMStudioProvider does.
-            let cleaned = raw
-                .replacingOccurrences(of: #"(?is)<think>.*?</think>"#,
-                                       with: "", options: .regularExpression)
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            onText(cleaned)
-        }.resume()
-    }
-
-    /// Same defensive parser as `LMStudioProvider.extractContent`.
-    /// Handles `output: [{type, content}]` (new), single-string forms,
-    /// and OpenAI's nested shape.
-    private static func extractContent(from json: [String: Any]) -> String? {
-        if let outputArr = json["output"] as? [[String: Any]] {
-            if let msg = outputArr.first(where: { ($0["type"] as? String) == "message" }),
-               let content = msg["content"] as? String, !content.isEmpty {
-                return content
-            }
-            let merged = outputArr.compactMap { $0["content"] as? String }
-                                   .joined(separator: "\n")
-            if !merged.isEmpty { return merged }
-        }
-        for key in ["output", "response", "text", "content", "answer", "result"] {
-            if let s = json[key] as? String, !s.isEmpty { return s }
-        }
-        if let choices = json["choices"] as? [[String: Any]],
-           let message = choices.first?["message"] as? [String: Any],
-           let content = message["content"] as? String {
-            return content
-        }
-        return nil
-    }
-}
-
 // MARK: - PHPickerViewControllerDelegate (/edit image picker)
 //
 // `/edit` needs a reference image from the user's Photos library.
@@ -2522,7 +2537,11 @@ extension KeyboardViewController: PHPickerViewControllerDelegate {
         var config = PHPickerConfiguration(photoLibrary: .shared())
         config.filter = .images
         config.selectionLimit = 1
-        config.preferredAssetRepresentationMode = .current
+        // `.compatible` asks the system for a JPEG-coded representation;
+        // it's smaller on disk and far cheaper to thumbnail than HEIC's
+        // 10-bit color path. Pairs with ImageIO's CGImageSource thumbnail
+        // decode in the picker callback to keep peak memory bounded.
+        config.preferredAssetRepresentationMode = .compatible
         let picker = PHPickerViewController(configuration: config)
         picker.delegate = self
         picker.modalPresentationStyle = .fullScreen
@@ -2530,24 +2549,51 @@ extension KeyboardViewController: PHPickerViewControllerDelegate {
     }
 
     func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+        // Capture the originating command BEFORE dismissing — if the
+        // extension is under memory pressure, the dismiss completion may
+        // not fire on the same instance, and we want the data we need
+        // pinned in this closure.
+        let cmd = self.pickerSourceCommand ?? .edit
+        self.pickerSourceCommand = nil
+        let provider = results.first?.itemProvider
+
         picker.dismiss(animated: true) { [weak self] in
             guard let self = self else { return }
             self.editPickerActive = false
-            guard let provider = results.first?.itemProvider,
-                  provider.canLoadObject(ofClass: UIImage.self) else {
-                // User cancelled or picked something unreadable — keep the
-                // command bar open at /edit with no staged image; user can
-                // tap the bar's `×` to back out or try again.
-                self.showCommandBar(.edit)
+
+            guard let provider = provider else {
+                // User cancelled — back the command bar out entirely.
+                // Re-entering would just re-launch the picker on the next
+                // showCommandBar(cmd), because the picker's launch guard
+                // is `needsReferenceImage && stagedEditImage == nil &&
+                // !editPickerActive`, all of which are true again here.
+                // The user can re-invoke /edit / /style / /sticker by
+                // typing `/` again or via the Quick Panel.
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self else { return }
+                    self.slashBuffer = nil
+                    self.hideCommandBar()
+                }
                 return
             }
-            provider.loadObject(ofClass: UIImage.self) { object, _ in
-                let image = object as? UIImage
-                DispatchQueue.main.async {
-                    if let img = image, let png = ImageDownsizer.downsizedPNG(img) {
+
+            // Critical: use `loadDataRepresentation` + ImageIO thumbnailing
+            // instead of `loadObject(ofClass: UIImage.self)`. Loading a full
+            // UIImage decodes the entire asset into RAM (~50 MB for a 12 MP
+            // photo) which blows past the keyboard extension's ~50 MB
+            // ceiling and gets the extension killed — the user sees iOS
+            // either crash the extension or hot-swap back to the system
+            // keyboard. The data path streams bytes and decodes straight
+            // to a 1024-pt thumbnail, keeping peak memory at a few MB.
+            let typeID = "public.image"
+            provider.loadDataRepresentation(forTypeIdentifier: typeID) { data, _ in
+                let png: Data? = data.flatMap { ImageDownsizer.downsizedPNG(fromData: $0) }
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self else { return }
+                    if let png = png {
                         self.stagedEditImage = png
                     }
-                    self.showCommandBar(.edit)
+                    self.showCommandBar(cmd)
                 }
             }
         }

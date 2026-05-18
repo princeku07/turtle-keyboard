@@ -5,12 +5,16 @@ import Foundation
 /// registry; remote commands route through `CommandRouter` to the AI
 /// backend.
 enum SlashCommand: String, CaseIterable {
-    case cap    = "cap"
-    case edit   = "edit"
+    case cap     = "cap"
+    case edit    = "edit"
+    case style   = "style"
+    case sticker = "sticker"
+    case gif     = "gif"
     case fix    = "fix"
     case tone   = "tone"
     case reply  = "reply"
     case tl     = "tl"
+    case search = "search"
     case ask    = "ask"
     case org    = "org"
     case split  = "split"
@@ -28,10 +32,14 @@ enum SlashCommand: String, CaseIterable {
         switch self {
         case .cap:           return "🎨"
         case .edit:          return "🖌️"
+        case .style:         return "✨"
+        case .sticker:       return "🏷️"
+        case .gif:           return "🎞️"
         case .fix:           return "✏️"
         case .tone:          return "🎭"
         case .reply:         return "💬"
         case .tl:            return "🌐"
+        case .search:        return "🔍"
         case .ask:           return "❓"
         case .org:           return "📐"
         case .split:         return "💸"
@@ -47,7 +55,7 @@ enum SlashCommand: String, CaseIterable {
 
     var needsPrompt: Bool {
         switch self {
-        case .cap, .edit, .tone, .tl, .ask, .org, .split,
+        case .cap, .edit, .style, .sticker, .gif, .tone, .tl, .search, .ask, .org, .split,
              .notion, .note, .slack, .msg, .poll, .web:    return true
         case .fix, .reply, .splits, .wyr, .history:        return false
         }
@@ -56,7 +64,10 @@ enum SlashCommand: String, CaseIterable {
     var buttonTitle: String {
         switch self {
         case .cap:               return "Generate"
-        case .edit:              return "Apply"
+        case .edit, .style:      return "Apply"
+        case .sticker:           return "Make"
+        case .gif:               return "Animate"
+        case .search:            return "Search"
         case .split:             return "Split"
         case .splits:            return "Open"
         case .notion, .note:     return "Create"
@@ -78,16 +89,30 @@ enum SlashCommand: String, CaseIterable {
         }
     }
 
+    /// Commands that operate on a user-supplied source image. Both `/edit`
+    /// and `/style` take a reference image (staged via the photo picker)
+    /// and a free-form prompt — only the prompt's intent differs.
+    var needsReferenceImage: Bool {
+        switch self {
+        case .edit, .style, .sticker, .gif: return true
+        default:                            return false
+        }
+    }
+
     /// Banner shown after a successful execution. Local commands surface
     /// their own progress banners; this is just for AI commands.
     var completionBanner: String {
         switch self {
         case .cap:           return "🎨 Image ready — long-press field to paste"
         case .edit:          return "🖌️ Edit ready — long-press field to paste"
+        case .style:         return "✨ Restyle ready — long-press field to paste"
+        case .sticker:       return "🏷️ Sticker ready — long-press field to paste"
+        case .gif:           return "🎞️ GIF ready — long-press field to paste"
         case .fix:           return "✏️ Grammar fixed"
         case .tone:          return "🎭 Tone applied"
         case .reply:         return "💬 Reply inserted"
         case .tl:            return "🌐 Translated"
+        case .search:        return "🔍 Inserted"
         case .ask:           return "❓ Answer inserted"
         case .org:           return "📐 Layout ready — long-press field to paste"
         case .split:         return "💸 Split ready"

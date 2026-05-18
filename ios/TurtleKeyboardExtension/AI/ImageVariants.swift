@@ -68,19 +68,23 @@ enum ImageVariants {
         }
     }
 
-    // MARK: - Sticker (512×512, white bg, centered)
+    // MARK: - Sticker (512×512, centered, alpha-preserving)
 
     private static func padToSticker(_ image: UIImage) -> UIImage? {
         let canvas = CGSize(width: stickerSide, height: stickerSide)
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
-        format.opaque = true
+        // Preserve the source's alpha channel. `/sticker` produces a
+        // matted transparent PNG via the two-pass difference matte; the
+        // old `format.opaque = true` + white fill flattened that result
+        // back onto white, silently undoing the whole pipeline. For
+        // opaque sources (`/cap`, `/org`) the drawn rect is fully opaque
+        // anyway — the only visible difference is the unused canvas
+        // margin around the centered image, which is now transparent
+        // instead of white.
+        format.opaque = false
         let renderer = UIGraphicsImageRenderer(size: canvas, format: format)
-        return renderer.image { ctx in
-            UIColor.white.setFill()
-            ctx.fill(CGRect(origin: .zero, size: canvas))
-
-            // Scale source to fit, preserve aspect.
+        return renderer.image { _ in
             let src = image.size
             guard src.width > 0, src.height > 0 else { return }
             let scale = min(stickerSide / src.width, stickerSide / src.height)

@@ -131,6 +131,11 @@ enum PresetCatalog {
             return ["English", "Hindi", "Spanish", "French", "German", "Japanese"]
         case "cap":
             return ["photorealistic", "anime", "watercolor", "3D render", "sketch", "pixel art"]
+        case "style":
+            // Surface the curated style keys defined in `AI/StylePresets.swift`.
+            // Tapping a chip fires `/style <preset>` and CommandRouter's
+            // system-prompt expands the key to the full description.
+            return StylePresets.orderedKeys
         default:
             return []
         }

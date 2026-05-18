@@ -10,21 +10,17 @@
 		CC000003CC000003CC000003 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000002CC000002CC000002 /* AppDelegate.swift */; };
 		CC000005CC000005CC000005 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000004CC000004CC000004 /* ViewController.swift */; };
 		EE000003EE000003EE000003 /* KeyboardViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000002EE000002EE000002 /* KeyboardViewController.swift */; };
-		HH000002HH000002HH000002 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000001HH000001HH000001 /* APIClient.swift */; };
 		HH000004HH000004HH000004 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000003HH000003HH000003 /* Models.swift */; };
 		HH000014HH000014HH000014 /* AITypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000006HH000006HH000006 /* AITypes.swift */; };
 		HH000015HH000015HH000015 /* KeyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000007HH000007HH000007 /* KeyStore.swift */; };
 		HH000016HH000016HH000016 /* ModelRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000008HH000008HH000008 /* ModelRegistry.swift */; };
 		HH000017HH000017HH000017 /* CommandRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000009HH000009HH000009 /* CommandRouter.swift */; };
-		HH000018HH000018HH000018 /* FalProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000010HH000010HH000010 /* FalProvider.swift */; };
-		HH000019HH000019HH000019 /* AnthropicProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000011HH000011HH000011 /* AnthropicProvider.swift */; };
 		HH000020HH000020HH000020 /* GoogleProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000012HH000012HH000012 /* GoogleProvider.swift */; };
-		HH000021HH000021HH000021 /* OpenAIProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000013HH000013HH000013 /* OpenAIProvider.swift */; };
-		HH000023HH000023HH000023 /* LMStudioProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000022HH000022HH000022 /* LMStudioProvider.swift */; };
 		HH000025HH000025HH000025 /* PromptLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000024HH000024HH000024 /* PromptLoader.swift */; };
-		HH000027HH000027HH000027 /* HTMLImageRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000026HH000026HH000026 /* HTMLImageRenderer.swift */; };
-		HH000029HH000029HH000029 /* org_template.html in Resources */ = {isa = PBXBuildFile; fileRef = HH000028HH000028HH000028 /* org_template.html */; };
-		HH000032HH000032HH000032 /* html-to-image.js in Resources */ = {isa = PBXBuildFile; fileRef = HH000031HH000031HH000031 /* html-to-image.js */; };
+		HH000441HH000441HH000441 /* StylePresets.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000440HH000440HH000440 /* StylePresets.swift */; };
+		HH000443HH000443HH000443 /* AlphaMatte.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000442HH000442HH000442 /* AlphaMatte.swift */; };
+		HH000445HH000445HH000445 /* MattePrompts.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000444HH000444HH000444 /* MattePrompts.swift */; };
+		HH000451HH000451HH000451 /* SpriteSheetSlicer.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000450HH000450HH000450 /* SpriteSheetSlicer.swift */; };
 		HH000034HH000034HH000034 /* OrgImageRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000033HH000033HH000033 /* OrgImageRenderer.swift */; };
 		HH000036HH000036HH000036 /* VoiceInputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000035HH000035HH000035 /* VoiceInputController.swift */; };
 		HH000040HH000040HH000040 /* IntegrationKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000041HH000041HH000041 /* IntegrationKit.swift */; };
@@ -138,21 +134,17 @@
 		CC000006CC000006CC000006 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		CC000007CC000007CC000007 /* TurtleKeyboard.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TurtleKeyboard.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		EE000002EE000002EE000002 /* KeyboardViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardViewController.swift; sourceTree = "<group>"; };
-		HH000001HH000001HH000001 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		HH000003HH000003HH000003 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		HH000006HH000006HH000006 /* AITypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITypes.swift; sourceTree = "<group>"; };
 		HH000007HH000007HH000007 /* KeyStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyStore.swift; sourceTree = "<group>"; };
 		HH000008HH000008HH000008 /* ModelRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelRegistry.swift; sourceTree = "<group>"; };
 		HH000009HH000009HH000009 /* CommandRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandRouter.swift; sourceTree = "<group>"; };
-		HH000010HH000010HH000010 /* FalProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FalProvider.swift; sourceTree = "<group>"; };
-		HH000011HH000011HH000011 /* AnthropicProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnthropicProvider.swift; sourceTree = "<group>"; };
 		HH000012HH000012HH000012 /* GoogleProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleProvider.swift; sourceTree = "<group>"; };
-		HH000013HH000013HH000013 /* OpenAIProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIProvider.swift; sourceTree = "<group>"; };
-		HH000022HH000022HH000022 /* LMStudioProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LMStudioProvider.swift; sourceTree = "<group>"; };
 		HH000024HH000024HH000024 /* PromptLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptLoader.swift; sourceTree = "<group>"; };
-		HH000026HH000026HH000026 /* HTMLImageRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTMLImageRenderer.swift; sourceTree = "<group>"; };
-		HH000028HH000028HH000028 /* org_template.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = org_template.html; sourceTree = "<group>"; };
-		HH000031HH000031HH000031 /* html-to-image.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "html-to-image.js"; sourceTree = "<group>"; };
+		HH000440HH000440HH000440 /* StylePresets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StylePresets.swift; sourceTree = "<group>"; };
+		HH000442HH000442HH000442 /* AlphaMatte.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlphaMatte.swift; sourceTree = "<group>"; };
+		HH000444HH000444HH000444 /* MattePrompts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MattePrompts.swift; sourceTree = "<group>"; };
+		HH000450HH000450HH000450 /* SpriteSheetSlicer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpriteSheetSlicer.swift; sourceTree = "<group>"; };
 		HH000033HH000033HH000033 /* OrgImageRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrgImageRenderer.swift; sourceTree = "<group>"; };
 		HH000035HH000035HH000035 /* VoiceInputController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceInputController.swift; sourceTree = "<group>"; };
 		HH000041HH000041HH000041 /* IntegrationKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntegrationKit.swift; sourceTree = "<group>"; };
@@ -302,15 +294,12 @@
 				HH000007HH000007HH000007 /* KeyStore.swift */,
 				HH000008HH000008HH000008 /* ModelRegistry.swift */,
 				HH000009HH000009HH000009 /* CommandRouter.swift */,
-				HH000010HH000010HH000010 /* FalProvider.swift */,
-				HH000011HH000011HH000011 /* AnthropicProvider.swift */,
 				HH000012HH000012HH000012 /* GoogleProvider.swift */,
-				HH000013HH000013HH000013 /* OpenAIProvider.swift */,
-				HH000022HH000022HH000022 /* LMStudioProvider.swift */,
 				HH000024HH000024HH000024 /* PromptLoader.swift */,
-				HH000026HH000026HH000026 /* HTMLImageRenderer.swift */,
-				HH000028HH000028HH000028 /* org_template.html */,
-				HH000031HH000031HH000031 /* html-to-image.js */,
+				HH000440HH000440HH000440 /* StylePresets.swift */,
+				HH000442HH000442HH000442 /* AlphaMatte.swift */,
+				HH000444HH000444HH000444 /* MattePrompts.swift */,
+				HH000450HH000450HH000450 /* SpriteSheetSlicer.swift */,
 				HH000033HH000033HH000033 /* OrgImageRenderer.swift */,
 				HH000351HH000351HH000351 /* ImageVariants.swift */,
 				HH000371HH000371HH000371 /* ImageHistory.swift */,
@@ -323,7 +312,6 @@
 			isa = PBXGroup;
 			children = (
 				EE000002EE000002EE000002 /* KeyboardViewController.swift */,
-				HH000001HH000001HH000001 /* APIClient.swift */,
 				HH000003HH000003HH000003 /* Models.swift */,
 				HH000005HH000005HH000005 /* AI */,
 				HH000037HH000037HH000037 /* Voice */,
@@ -534,8 +522,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				HH000029HH000029HH000029 /* org_template.html in Resources */,
-				HH000032HH000032HH000032 /* html-to-image.js in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -552,6 +538,10 @@
 				"$(SRCROOT)/../commands/prompts/org.txt",
 				"$(SRCROOT)/../commands/prompts/poll.txt",
 				"$(SRCROOT)/../commands/prompts/wyr.txt",
+				"$(SRCROOT)/../commands/prompts/search.txt",
+				"$(SRCROOT)/../commands/prompts/sticker.txt",
+				"$(SRCROOT)/../commands/prompts/sticker_photo.txt",
+				"$(SRCROOT)/../commands/prompts/gif.txt",
 			);
 			name = "Copy shared command prompts";
 			outputPaths = (
@@ -559,6 +549,10 @@
 				"$(BUILT_PRODUCTS_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/org.txt",
 				"$(BUILT_PRODUCTS_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/poll.txt",
 				"$(BUILT_PRODUCTS_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/wyr.txt",
+				"$(BUILT_PRODUCTS_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/search.txt",
+				"$(BUILT_PRODUCTS_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/sticker.txt",
+				"$(BUILT_PRODUCTS_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/sticker_photo.txt",
+				"$(BUILT_PRODUCTS_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/gif.txt",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -616,19 +610,17 @@
 			buildActionMask = 2147483647;
 			files = (
 				EE000003EE000003EE000003 /* KeyboardViewController.swift in Sources */,
-				HH000002HH000002HH000002 /* APIClient.swift in Sources */,
 				HH000004HH000004HH000004 /* Models.swift in Sources */,
 				HH000014HH000014HH000014 /* AITypes.swift in Sources */,
 				HH000015HH000015HH000015 /* KeyStore.swift in Sources */,
 				HH000016HH000016HH000016 /* ModelRegistry.swift in Sources */,
 				HH000017HH000017HH000017 /* CommandRouter.swift in Sources */,
-				HH000018HH000018HH000018 /* FalProvider.swift in Sources */,
-				HH000019HH000019HH000019 /* AnthropicProvider.swift in Sources */,
 				HH000020HH000020HH000020 /* GoogleProvider.swift in Sources */,
-				HH000021HH000021HH000021 /* OpenAIProvider.swift in Sources */,
-				HH000023HH000023HH000023 /* LMStudioProvider.swift in Sources */,
 				HH000025HH000025HH000025 /* PromptLoader.swift in Sources */,
-				HH000027HH000027HH000027 /* HTMLImageRenderer.swift in Sources */,
+				HH000441HH000441HH000441 /* StylePresets.swift in Sources */,
+				HH000443HH000443HH000443 /* AlphaMatte.swift in Sources */,
+				HH000445HH000445HH000445 /* MattePrompts.swift in Sources */,
+				HH000451HH000451HH000451 /* SpriteSheetSlicer.swift in Sources */,
 				HH000034HH000034HH000034 /* OrgImageRenderer.swift in Sources */,
 				HH000036HH000036HH000036 /* VoiceInputController.swift in Sources */,
 				HH000040HH000040HH000040 /* IntegrationKit.swift in Sources */,

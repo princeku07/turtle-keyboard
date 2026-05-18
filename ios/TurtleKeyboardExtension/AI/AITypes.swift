@@ -2,12 +2,13 @@ import Foundation
 
 // MARK: - Provider ID
 
+/// Backend identifier. Currently single-tenant on Google's Generative
+/// Language API ("Gemini") — the multi-provider stack was simplified
+/// down after Flash/Pro proved sufficient for every command. The enum
+/// stays as a single-case enum so future providers can be re-added
+/// without a wide signature change.
 enum ProviderID: String, Codable, CaseIterable {
-    case fal
-    case anthropic
     case google
-    case openai
-    case lmstudio
 }
 
 // MARK: - Model capability

@@ -2,74 +2,21 @@ import Foundation
 
 // MARK: - ModelRegistry
 //
-// Single source of truth for every AI model Turtle Keyboard can route to.
+// Catalog of Gemini models the keyboard routes to. The stack is
+// Gemini-only — earlier multi-provider scaffolding (fal, Anthropic,
+// OpenAI, LM Studio) was removed once Flash + Pro proved sufficient
+// for every command.
 //
-// To add a new model:
-//   1. Add a static let here with its metadata.
-//   2. Make sure the corresponding provider is registered in CommandRouter.providers.
-//   3. Optionally set it as a default route in CommandRouter.defaultRoutes.
+// To swap models: edit a constant here and / or change the matching
+// route in `CommandRouter.defaultRoutes`. Model IDs mirror
+// android/ai/GeminiClient so cross-platform behaviour stays aligned.
 
 enum ModelRegistry {
 
-    // MARK: fal.ai  ──────────────────────────────────────────────────────────
-
-    static let flux2 = AIModel(
-        id: "fal-ai/flux-2",
-        displayName: "Flux 2",
-        provider: .fal,
-        capabilities: [.imageGeneration],
-        isFree: true
-    )
-
-    static let fluxSchnell = AIModel(
-        id: "fal-ai/flux/schnell",
-        displayName: "Flux Schnell",
-        provider: .fal,
-        capabilities: [.imageGeneration],
-        isFree: true
-    )
-
-    static let fluxPro = AIModel(
-        id: "fal-ai/flux-pro",
-        displayName: "Flux Pro",
-        provider: .fal,
-        capabilities: [.imageGeneration],
-        isFree: false
-    )
-
-    // MARK: Local (LM Studio / llama.cpp)  ──────────────────────────────────
-
-    static let gemma4 = AIModel(
-        id: "google/gemma-4-e4b",
-        displayName: "Gemma 4 e4b (local)",
-        provider: .lmstudio,
-        capabilities: [.textEdit, .chat, .translation],
-        isFree: true
-    )
-
-    // MARK: Anthropic  ───────────────────────────────────────────────────────
-
-    static let claudeHaiku = AIModel(
-        id: "claude-haiku-4-5-20251001",
-        displayName: "Claude Haiku",
-        provider: .anthropic,
-        capabilities: [.textEdit, .chat, .translation],
-        isFree: false
-    )
-
-    static let claudeSonnet = AIModel(
-        id: "claude-sonnet-4-6",
-        displayName: "Claude Sonnet",
-        provider: .anthropic,
-        capabilities: [.textEdit, .chat, .translation],
-        isFree: false
-    )
-
-    // MARK: Google  ──────────────────────────────────────────────────────────
-    // Model IDs mirror android/ai/GeminiClient. Flash-Lite is 2-3x faster than
-    // flash-latest for short structured outputs; image gen uses the
-    // "Nano Banana" model.
-
+    /// Text completion — short structured outputs (/fix, /tone, /reply,
+    /// /tl, /search, /ask, /org). Flash-Lite is 2–3× faster than
+    /// flash-latest for the kind of one-paragraph turn the keyboard
+    /// produces and roughly the same quality on these prompts.
     static let geminiFlash = AIModel(
         id: "gemini-2.5-flash-lite",
         displayName: "Gemini Flash Lite",
@@ -78,14 +25,8 @@ enum ModelRegistry {
         isFree: false
     )
 
-    static let geminiPro = AIModel(
-        id: "gemini-flash-latest",
-        displayName: "Gemini Flash",
-        provider: .google,
-        capabilities: [.textEdit, .chat, .translation],
-        isFree: false
-    )
-
+    /// Image generation + edit — Nano Banana (Flash). Drives /cap, /edit,
+    /// /style, and /sticker (pass-1 and pass-2 of the matte pipeline).
     static let geminiImage = AIModel(
         id: "gemini-2.5-flash-image",
         displayName: "Gemini 2.5 Flash Image",
@@ -94,32 +35,21 @@ enum ModelRegistry {
         isFree: false
     )
 
-    // MARK: OpenAI  ──────────────────────────────────────────────────────────
-
-    static let gpt4oMini = AIModel(
-        id: "gpt-4o-mini",
-        displayName: "GPT-4o mini",
-        provider: .openai,
-        capabilities: [.textEdit, .chat, .translation],
+    /// Image edit — Nano Banana Pro. ~3× the per-image cost of Flash but
+    /// holds complex layouts (sprite sheets, multi-cell grids) and
+    /// preserves subject identity across many cells far more reliably.
+    /// Routed to by /gif, which depends on the model returning ONE
+    /// composite 4×N sheet instead of separate per-frame images.
+    static let geminiImagePro = AIModel(
+        id: "gemini-3-pro-image-preview",
+        displayName: "Gemini 3 Pro Image",
+        provider: .google,
+        capabilities: [.imageGeneration],
         isFree: false
     )
-
-    static let gpt4o = AIModel(
-        id: "gpt-4o",
-        displayName: "GPT-4o",
-        provider: .openai,
-        capabilities: [.textEdit, .chat, .translation],
-        isFree: false
-    )
-
-    // MARK: Full catalog  ────────────────────────────────────────────────────
 
     static let all: [AIModel] = [
-        gemma4,
-        flux2, fluxSchnell, fluxPro,
-        claudeHaiku, claudeSonnet,
-        geminiFlash, geminiPro, geminiImage,
-        gpt4oMini, gpt4o,
+        geminiFlash, geminiImage, geminiImagePro,
     ]
 
     static func find(id: String) -> AIModel? {

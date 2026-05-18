@@ -53,7 +53,7 @@ enum APIError: LocalizedError {
             case .notConnectedToInternet:   return "No internet connection"
             case .timedOut:                 return "Request timed out — try again"
             case .cannotFindHost,
-                 .cannotConnectToHost:      return "Backend unreachable — set baseURL in APIClient.swift"
+                 .cannotConnectToHost:      return "Backend unreachable — check Gemini API key"
             default:                        return "Network error: \(e.localizedDescription)"
             }
         }
