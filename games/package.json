@@ -1,0 +1,22 @@
+{
+  "name": "turtle-games",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Build pipeline for Turtle's WebView games. Each game is a Vite build that emits a SINGLE self-contained HTML file (CSS + JS + bridge shim all inlined) via vite-plugin-singlefile. Output lands in dist/<game>/index.html and gets bundled into the Android APK at app/src/main/assets/games/<game>/index.html by Gradle's copyGamesHtml task. No hosting, no network for the shell.",
+  "scripts": {
+    "dev:wyr": "GAME=wyr vite",
+    "dev:puzzle": "GAME=puzzle vite",
+    "build:wyr": "GAME=wyr vite build",
+    "build:puzzle": "GAME=puzzle vite build",
+    "build": "pnpm build:wyr && pnpm build:puzzle",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@types/node": "^25.8.0",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10",
+    "vite-plugin-singlefile": "^2.0.3"
+  }
+}

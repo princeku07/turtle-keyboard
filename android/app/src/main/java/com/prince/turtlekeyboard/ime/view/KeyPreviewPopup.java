@@ -31,11 +31,13 @@ public class KeyPreviewPopup {
     private final int previewHeightPx;
     private final int minPreviewWidthPx;
     private final int verticalOffsetPx;
-    private static final long LINGER_MS = 150L;
+    private static final long LINGER_MS = 40L;
+    private int shownPrimaryCode = Integer.MIN_VALUE;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final Runnable dismissRunnable = new Runnable() {
         @Override public void run() {
             if (window.isShowing()) window.dismiss();
+            shownPrimaryCode = Integer.MIN_VALUE;
         }
     };
 
@@ -43,7 +45,7 @@ public class KeyPreviewPopup {
         this.context = context;
         label = new TextView(context);
         label.setBackgroundResource(R.drawable.key_preview_background);
-        label.setTextColor(Color.parseColor("#0C0C0C"));
+        label.setTextColor(Color.parseColor("#ffffff"));
         label.setTextSize(TypedValue.COMPLEX_UNIT_SP, 28);
         label.setGravity(Gravity.CENTER);
         label.setIncludeFontPadding(false);
@@ -73,6 +75,13 @@ public class KeyPreviewPopup {
         }
         main.removeCallbacks(dismissRunnable);
 
+        // Re-tapping the same key while its preview is still visible: nothing to do.
+        // Reapplying setText/measure/update on PopupWindow causes a brief reflow that
+        // reads as a visible gap above the key on rapid double-taps.
+        if (window.isShowing() && primaryCode == shownPrimaryCode) {
+            return;
+        }
+
         label.setText(key.label);
         // Measure to get the natural width given the label.
         int wSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
@@ -94,6 +103,7 @@ public class KeyPreviewPopup {
             window.setHeight(previewHeightPx);
             window.showAtLocation(kv, Gravity.NO_GRAVITY, x, y);
         }
+        shownPrimaryCode = primaryCode;
     }
 
     public void dismiss() {
@@ -104,6 +114,7 @@ public class KeyPreviewPopup {
     public void dismissNow() {
         main.removeCallbacks(dismissRunnable);
         if (window.isShowing()) window.dismiss();
+        shownPrimaryCode = Integer.MIN_VALUE;
     }
 
     private static Keyboard.Key findKey(List<Keyboard.Key> keys, int primaryCode) {

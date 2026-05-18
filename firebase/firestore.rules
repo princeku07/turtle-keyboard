@@ -1,0 +1,120 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // Polls live in Realtime Database, not Firestore — see firebase/database.rules.json.
+    // RTDB's WebSocket-based listeners feel snappier for live vote counts, and the
+    // 47-minute TTL is implemented by a scheduled Cloud Function sweeper there.
+
+    // Wyr remains on Firestore — it's a 2-player single-submit game, not high-frequency.
+    match /wyr/{wyrId} {
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn()
+        && request.resource.data.createdByUid == request.auth.uid
+        && request.resource.data.questions is list
+        && request.resource.data.questions.size() >= 2
+        && request.resource.data.questions.size() <= 10
+        && request.resource.data.createdAt == request.time;
+
+      allow update, delete: if false;
+
+      match /players/{playerUid} {
+        allow read: if isSignedIn();
+
+        // 2-player cap is NOT enforced here — rules can't count subcollection
+        // docs efficiently. Enforced client-side at v1; a Cloud Function will
+        // delete-or-reject the third player when it lands. Acceptable risk:
+        // wyr is a social game between friends, no abuse vector.
+        allow create: if isSelf(playerUid)
+          && request.resource.data.answers is list
+          && request.resource.data.answers.size() >= 2
+          && request.resource.data.answers.size() <= 10;
+
+        allow update, delete: if false;
+      }
+    }
+
+    // Generic games collection — every WebView-based game writes here. Each doc has
+    // a `type` discriminator; per-type state shape is validated by isValidGameState().
+    // Native poll (collection `polls/`) and the legacy native wyr (`wyr/`) stay in
+    // their own collections — only WebView games funnel through here.
+    match /games/{gameId} {
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn()
+        && request.resource.data.createdByUid == request.auth.uid
+        && request.resource.data.type in ['wyr', 'puzzle']
+        && isValidGameState(request.resource.data.type, request.resource.data.state)
+        && request.resource.data.createdAt == request.time;
+
+      allow update, delete: if false;
+
+      match /players/{playerUid} {
+        allow read: if isSignedIn();
+
+        // Players are immutable at v1 — single submit per uid. Mutable-state games
+        // (e.g. puzzle tile sync) will need a separate rule path or a different
+        // backend (RTDB) entirely; not this match block.
+        allow create: if isSelf(playerUid)
+          && request.resource.data.joinedAt == request.time;
+
+        allow update, delete: if false;
+      }
+    }
+
+    function isValidGameState(type, state) {
+      return type == 'wyr' ? isValidWyrGameState(state)
+           : type == 'puzzle' ? isValidPuzzleGameState(state)
+           : false;
+    }
+
+    function isValidWyrGameState(state) {
+      return state.questions is list
+        && state.questions.size() >= 2
+        && state.questions.size() <= 10;
+    }
+
+    function isValidPuzzleGameState(state) {
+      return state.imageUrl is string
+        && state.imageUrl.size() > 0
+        && state.gridSize is int
+        && state.gridSize >= 3
+        && state.gridSize <= 5;
+    }
+
+    match /users/{uid} {
+      allow read: if isSelf(uid);
+
+      // First write happens after Firebase Auth sign-in. tier must be 'free'
+      // initially — the RevenueCat webhook (Admin SDK, bypasses rules) is the
+      // only path that upgrades tier or writes entitlements.
+      allow create: if isSelf(uid)
+        && request.resource.data.tier == 'free'
+        && !('entitlements' in request.resource.data)
+        && !('revenuecatId' in request.resource.data);
+
+      // Client may update profile fields only. Entitlement state is
+      // server-written via Admin SDK and bypasses these rules — any client
+      // attempt to touch `tier`, `entitlements`, or `revenuecatId` is denied.
+      allow update: if isSelf(uid)
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['email', 'displayName', 'photoUrl', 'updatedAt']);
+
+      allow delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

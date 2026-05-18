@@ -4,7 +4,6 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Typeface;
-import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.util.AttributeSet;
@@ -18,6 +17,8 @@ import android.widget.TextView;
 import java.io.File;
 
 import androidx.annotation.Nullable;
+import androidx.core.graphics.drawable.RoundedBitmapDrawable;
+import androidx.core.graphics.drawable.RoundedBitmapDrawableFactory;
 
 import com.prince.turtlekeyboard.ai.ImageVariants;
 import com.prince.turtlekeyboard.theme.KeyboardTheme;
@@ -134,7 +135,10 @@ public class ImagePreviewView extends LinearLayout {
             this.listener = null;
             return false;
         }
-        image.setImageBitmap(bmp);
+        RoundedBitmapDrawable rounded = RoundedBitmapDrawableFactory.create(getResources(), bmp);
+        rounded.setCornerRadius(dp(12));
+        rounded.setAntiAlias(true);
+        image.setImageDrawable(rounded);
         setVisibility(VISIBLE);
         return true;
     }
@@ -148,10 +152,13 @@ public class ImagePreviewView extends LinearLayout {
     private void recycleCurrent() {
         Drawable d = image.getDrawable();
         image.setImageDrawable(null);
-        if (d instanceof BitmapDrawable) {
-            Bitmap b = ((BitmapDrawable) d).getBitmap();
-            if (b != null && !b.isRecycled()) b.recycle();
+        Bitmap b = null;
+        if (d instanceof RoundedBitmapDrawable) {
+            b = ((RoundedBitmapDrawable) d).getBitmap();
+        } else if (d instanceof android.graphics.drawable.BitmapDrawable) {
+            b = ((android.graphics.drawable.BitmapDrawable) d).getBitmap();
         }
+        if (b != null && !b.isRecycled()) b.recycle();
     }
 
     public boolean isShowing() {

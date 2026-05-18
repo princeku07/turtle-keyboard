@@ -1,43 +1,32 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { fetchPoll } from '@/lib/realtimedb';
 import { PollOptions } from './PollOptions';
 
 /**
  * Web fallback for poll links. Tapped by anyone who doesn't have Turtle installed —
- * shows the question + current vote counts read-only, plus a Play Store CTA so the
- * visitor can install Turtle and vote in-app on a re-tap.
+ * shows the question + current vote counts and lets the visitor vote via Firebase
+ * Anonymous Auth (one vote per browser).
  *
  * <p>For Turtle users on Android the App Link intent-filter intercepts before this page
  * ever renders; this Next.js route only fires when verification fails (no app installed
  * yet, web browser, iOS until Universal Links land).
  *
- * <p>Styling mirrors the landing site exactly — same ocean/abyss gradient body, foam
- * text, cyan accent, glass cards, Geist Sans/Mono. No new visual language; this page
- * has to feel like the rest of turtle.
+ * <p>Reads polls from Realtime Database via {@code @/lib/realtimedb} (public read rule,
+ * no auth needed for the SSR fetch). Voting writes happen client-side from
+ * {@link PollOptions} via the Web SDK + anonymous Firebase Auth.
+ *
+ * <p>Polls have a 47-minute TTL; past that, a Cloud Function sweep deletes them.
+ *
+ * <p>Visual: black canvas + green accent, matching the in-keyboard look (see
+ * {@code KeyboardTheme.turtleLight()}). Deliberately diverges from the marketing
+ * landing's ocean theme — this page is a shareable artifact that ships
+ * alongside chat link previews (see {@code opengraph-image.tsx}); we want it
+ * to feel like the keyboard itself, not the marketing site.
  */
 
-const WORKER_URL =
-  process.env.NEXT_PUBLIC_WORKER_URL || 'https://turtle-worker.trtlk.workers.dev';
 const PLAY_STORE_URL =
   'https://play.google.com/store/apps/details?id=com.prince.turtlekeyboard';
-
-type Option = { label: string; votes: number };
-type Poll = {
-  id: string;
-  createdAt: number;
-  question: string;
-  options: Option[];
-};
-
-async function getPoll(id: string): Promise<Poll | null> {
-  try {
-    const res = await fetch(`${WORKER_URL}/poll/${id}`, { cache: 'no-store' });
-    if (!res.ok) return null;
-    return (await res.json()) as Poll;
-  } catch {
-    return null;
-  }
-}
 
 export async function generateMetadata({
   params,
@@ -45,7 +34,7 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const poll = await getPoll(id);
+  const poll = await fetchPoll(id);
   if (!poll) return { title: 'poll · turtle' };
 
   const url = `/poll/${id}`;
@@ -101,17 +90,28 @@ export default async function PollPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const poll = await getPoll(id);
+  const poll = await fetchPoll(id);
   if (!poll) notFound();
 
   return (
-    <main className="min-h-screen w-full text-foam overflow-x-clip">
-      {/* Nav — matches landing exactly */}
+    <main className="relative min-h-screen w-full overflow-x-clip bg-[#000000] text-[#F5F5F5]">
+      {/* Atmospheric green glow — mirrors the OG card's corner accent so the
+          chat-preview thumbnail and the real page feel like the same surface. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -top-40 -right-40 h-[36rem] w-[36rem] rounded-full opacity-80"
+        style={{
+          background:
+            'radial-gradient(circle, rgba(21, 128, 61, 0.22) 0%, rgba(21, 128, 61, 0) 70%)',
+        }}
+      />
+
+      {/* Nav */}
       <header className="sticky top-0 z-40 backdrop-blur-md">
         <div className="mx-auto max-w-[1400px] px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-3">
           <a
             href="/"
-            className="flex items-center gap-2 font-sans font-semibold text-base sm:text-lg shrink-0 tracking-tight text-foam"
+            className="flex items-center gap-2 font-sans font-semibold text-base sm:text-lg shrink-0 tracking-tight text-[#F5F5F5]"
           >
             <span className="text-xl sm:text-2xl leading-none">🐢</span>
             turtle
@@ -120,7 +120,7 @@ export default async function PollPage({
             href={PLAY_STORE_URL}
             target="_blank"
             rel="noreferrer"
-            className="font-mono text-xs sm:text-sm font-semibold bg-foam text-ink px-3 sm:px-4 py-2 rounded-full hover:bg-cyan transition-colors whitespace-nowrap"
+            className="font-mono text-xs sm:text-sm font-semibold bg-[#15803D] text-[#F5F5F5] px-3 sm:px-4 py-2 rounded-full hover:bg-[#1A9446] transition-colors whitespace-nowrap"
           >
             get app →
           </a>
@@ -130,30 +130,34 @@ export default async function PollPage({
       {/* Poll */}
       <section className="relative">
         <div className="mx-auto max-w-[640px] px-5 sm:px-6 pt-10 pb-20 sm:pt-16 sm:pb-28">
-          <p className="font-mono text-xs tracking-[0.22em] text-foam-dim uppercase">
+          <div className="inline-flex items-center gap-2 rounded-full bg-[#15803D] px-3 py-1 font-mono text-[10px] font-bold tracking-[0.22em] uppercase text-[#F5F5F5]">
             poll
-          </p>
-          <h1 className="mt-3 font-sans font-semibold tracking-[-0.03em] leading-[1.05] text-[clamp(2rem,5.5vw,3.4rem)] text-foam">
+          </div>
+          <h1 className="mt-4 font-sans font-semibold tracking-[-0.03em] leading-[1.05] text-[clamp(2rem,5.5vw,3.4rem)] text-[#F5F5F5]">
             {poll.question}
           </h1>
 
-          <PollOptions pollId={poll.id} initialOptions={poll.options} />
+          <PollOptions
+            pollId={poll.id}
+            initialOptions={poll.options}
+            expired={poll.expired}
+          />
 
           {/* Install CTA */}
-          <div className="mt-16 sm:mt-20 glass rounded-2xl p-6 sm:p-8">
-            <h2 className="font-sans font-semibold tracking-[-0.02em] text-2xl sm:text-3xl text-foam">
+          <div className="mt-16 sm:mt-20 rounded-2xl border border-[#2E2E2E] bg-[#1E1E1E] p-6 sm:p-8">
+            <h2 className="font-sans font-semibold tracking-[-0.02em] text-2xl sm:text-3xl text-[#F5F5F5]">
               vote in the app
             </h2>
-            <p className="mt-3 font-mono text-sm sm:text-[15px] text-foam-dim leading-relaxed">
+            <p className="mt-3 font-mono text-sm sm:text-[15px] text-[#888888] leading-relaxed">
               install the turtle keyboard. type{' '}
-              <span className="text-cyan">/poll</span> in any chat to make your own,
+              <span className="text-[#15803D] font-semibold">/poll</span> in any chat to make your own,
               tap to vote on theirs — all without leaving the conversation.
             </p>
             <a
               href={PLAY_STORE_URL}
               target="_blank"
               rel="noreferrer"
-              className="mt-7 inline-flex items-center gap-2 bg-cyan text-ink font-mono font-semibold px-5 py-3 rounded-full hover:bg-foam transition-colors"
+              className="mt-7 inline-flex items-center gap-2 bg-[#15803D] text-[#F5F5F5] font-mono font-semibold px-5 py-3 rounded-full hover:bg-[#1A9446] transition-colors"
             >
               get turtle <span aria-hidden>↗</span>
             </a>
@@ -161,15 +165,15 @@ export default async function PollPage({
         </div>
       </section>
 
-      {/* Footer — slim variant of the landing footer */}
-      <footer className="border-t border-white/10">
-        <div className="mx-auto max-w-[1400px] px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-xs text-foam/55">
+      {/* Footer */}
+      <footer className="relative border-t border-[#2E2E2E]">
+        <div className="mx-auto max-w-[1400px] px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-xs text-[#888888]">
           <div className="flex items-center gap-3">
             <span className="text-lg leading-none">🐢</span>
-            <span className="font-semibold text-foam">turtle</span>
+            <span className="font-semibold text-[#F5F5F5]">turtle</span>
             <span>© 2026 · MIT</span>
           </div>
-          <a href="/" className="hover:text-foam transition-colors">
+          <a href="/" className="hover:text-[#F5F5F5] transition-colors">
             ← turtle home
           </a>
         </div>

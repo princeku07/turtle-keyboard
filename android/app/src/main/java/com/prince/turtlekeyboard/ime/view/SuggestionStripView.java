@@ -46,6 +46,7 @@ public class SuggestionStripView extends LinearLayout {
     /** Max characters of the clipboard text shown inside the paste preview pill. */
     private static final int PASTE_PREVIEW_MAX_CHARS = 18;
 
+    private final IconButton emojiButton;
     private final IconButton settingsButton;
     private final IconButton micButton;
     private final FrameLayout centerHost;
@@ -56,10 +57,12 @@ public class SuggestionStripView extends LinearLayout {
     @Nullable private OnIconTapListener micListener;
     @Nullable private OnIconTapListener pasteListener;
     @Nullable private OnIconTapListener settingsListener;
+    @Nullable private OnIconTapListener emojiListener;
     private KeyboardTheme theme;
 
     public SuggestionStripView(Context context) {
         super(context);
+        emojiButton = new IconButton(context, IconButton.GLYPH_EMOJI);
         settingsButton = new IconButton(context, IconButton.GLYPH_MENU);
         micButton = new IconButton(context, IconButton.GLYPH_MIC);
         centerHost = new FrameLayout(context);
@@ -70,6 +73,7 @@ public class SuggestionStripView extends LinearLayout {
 
     public SuggestionStripView(Context context, @Nullable AttributeSet attrs) {
         super(context, attrs);
+        emojiButton = new IconButton(context, IconButton.GLYPH_EMOJI);
         settingsButton = new IconButton(context, IconButton.GLYPH_MENU);
         micButton = new IconButton(context, IconButton.GLYPH_MIC);
         centerHost = new FrameLayout(context);
@@ -86,7 +90,14 @@ public class SuggestionStripView extends LinearLayout {
         int padH = dp(6);
         setPadding(padH, 0, padH, 0);
 
-        // Leading: settings icon — opens the host detail view.
+        // Leading: emoji icon — toggles the emoji panel (top-left of keyboard).
+        addView(emojiButton, new LayoutParams(dp(40), dp(40)));
+        emojiButton.setOnClickListener(v -> {
+            v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+            if (emojiListener != null) emojiListener.onTap();
+        });
+
+        // Followed by: settings icon — opens the host detail view.
         addView(settingsButton, new LayoutParams(dp(40), dp(40)));
         settingsButton.setOnClickListener(v -> {
             v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
@@ -125,6 +136,7 @@ public class SuggestionStripView extends LinearLayout {
     public void setOnMicTapListener(@Nullable OnIconTapListener l) { this.micListener = l; }
     public void setOnPasteTapListener(@Nullable OnIconTapListener l) { this.pasteListener = l; }
     public void setOnSettingsTapListener(@Nullable OnIconTapListener l) { this.settingsListener = l; }
+    public void setOnEmojiTapListener(@Nullable OnIconTapListener l) { this.emojiListener = l; }
 
     /**
      * Show or hide the centered paste preview pill. Pass the clipboard's plain-text
@@ -160,6 +172,7 @@ public class SuggestionStripView extends LinearLayout {
     public void applyTheme(KeyboardTheme theme) {
         this.theme = theme;
         setBackgroundColor(theme.background);
+        emojiButton.applyTheme(theme);
         settingsButton.applyTheme(theme);
         micButton.applyTheme(theme);
         pasteChip.applyTheme(theme);
@@ -292,6 +305,7 @@ public class SuggestionStripView extends LinearLayout {
         static final int GLYPH_MIC = 0;
         static final int GLYPH_PASTE = 1;
         static final int GLYPH_MENU = 2;
+        static final int GLYPH_EMOJI = 3;
 
         private final Paint backgroundPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final int glyphKind;
@@ -326,6 +340,7 @@ public class SuggestionStripView extends LinearLayout {
                 case GLYPH_MIC:   return R.drawable.baseline_mic_24;
                 case GLYPH_PASTE: return R.drawable.baseline_paste_24;
                 case GLYPH_MENU:  return R.drawable.baseline_menu_24;
+                case GLYPH_EMOJI: return R.drawable.baseline_mood_24;
                 default:          return 0;
             }
         }

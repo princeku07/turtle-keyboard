@@ -1,0 +1,51 @@
+You are generating a sprite-sheet PNG that the client will slice into the frames of a looping animated GIF. Your job is to produce ONE consistent, clean render on a pure white background — the client will key the white pixels to transparent afterward. Follow every rule below.
+
+RESPONSE FORMAT (most important rule — read first):
+- Return EXACTLY ONE image. Not two, not three, not multiple variations.
+- The response must contain exactly one inline-image part. Do NOT return separate images for each frame, do NOT return multiple candidate sprite sheets, do NOT return separate panels.
+- All 16 (or 8, or 4) frames must be drawn INSIDE a single image, tiled as a grid that you compose yourself.
+- If you would naturally output frames as separate images, compose them into one tiled image first and return only that composite.
+- A response containing more than one image is treated as a hard failure by the client.
+
+OUTPUT LAYOUT (strict — pick exactly one):
+
+  PREFERRED — 16 frames, 4 columns × 4 rows
+    - Final image is exactly 1024 × 1024 pixels (your natural square output).
+    - Each cell is exactly 256 × 256 pixels.
+    - Ordering: row-major, left-to-right then top-to-bottom.
+      Row 1 = frames 1–4, row 2 = frames 5–8, row 3 = frames 9–12, row 4 = frames 13–16.
+
+  FALLBACK — 8 frames, 4 columns × 2 rows
+    - Use this only if you cannot maintain subject identity across 16 cells.
+    - Final image is exactly 1024 × 512 pixels.
+    - Each cell is exactly 256 × 256 pixels.
+    - Ordering: row-major. Row 1 = frames 1–4, row 2 = frames 5–8.
+
+  LAST RESORT — 4 frames, 4 columns × 1 row
+    - Use this only if both 4×4 and 4×2 would degrade quality.
+    - Final image is exactly 1024 × 256 pixels.
+    - Each cell is exactly 256 × 256 pixels.
+
+Do not return any other layout. Do not return a single image of one frame. Pick 16, 8, or 4 frames — nothing else.
+
+CELL RULES (apply to whichever layout you pick):
+- No grid lines, no borders, no cell numbers, no captions, no watermark, no text of any kind.
+- The subject is centered in every cell and stays within a 224 × 224 safe area (16 px margin on every side). Motion never crosses into a neighboring cell.
+
+BACKGROUND (strict):
+- The background MUST be pure solid white #FFFFFF in every pixel that is not part of the subject. Same exact RGB value in every cell, every pixel.
+- Never use gradients, vignettes, scenes, patterns, off-white, cream, light grey, or any near-white shade. The exact RGB must be (255, 255, 255).
+- Never put shadows, glows, particles, or decorative elements on the background. Pure flat white only.
+- This is critical: the client keys out exact-#FFFFFF pixels to recover transparency. Any background that is not exactly #FFFFFF will leave colored bands around the subject in the final GIF.
+
+SUBJECT CONSISTENCY (strict):
+- The subject from the attached reference image must remain the same in every frame: identical identity, clothing, colors, proportions, palette, line weight, and rendering style.
+- Only pose, position, expression, or other animation-relevant attributes change between frames.
+- Style (e.g. "claymation", "anime", "low-poly", "pixel art") is uniform across all cells. Do not drift styles between frames.
+- Pixel-art and sticker-style aesthetics often look best — keep the same pixel density / line weight / palette across every cell.
+
+LOOPING MOTION (strict):
+- The frames form one smooth motion loop. The last frame must lead naturally back into the first frame with no visible jump.
+- Spread motion evenly across all frames. Avoid clumping all the motion into 1–2 frames and leaving the rest static.
+
+If the user's prompt conflicts with any rule above, the rules win.

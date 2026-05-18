@@ -3,6 +3,7 @@ package com.prince.turtlekeyboard.integration;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.drawable.Drawable;
+import android.net.Uri;
 import android.util.Log;
 import android.view.View;
 
@@ -19,6 +20,7 @@ import com.prince.kbd.core.GeminiService;
 import com.prince.kbd.core.GoogleAuth;
 import com.prince.kbd.core.IntegrationContext;
 import com.prince.kbd.core.KeyValueStore;
+import com.prince.kbd.core.McpService;
 import com.prince.turtlekeyboard.ime.view.KeyboardRootView;
 import com.prince.turtlekeyboard.input.InputCommitter;
 
@@ -38,7 +40,9 @@ public class KeyboardIntegrationContextImpl implements IntegrationContext {
     private final KeyValueStore rootStore;
     private final AppProfileRegistry profiles;
     private final GeminiService ai;
+    private final McpService mcp;
     private final GoogleAuth googleAuth;
+    private final ImageBridge imageBridge;
 
     public KeyboardIntegrationContextImpl(Context appContext,
                                           KeyboardRootView root,
@@ -46,14 +50,18 @@ public class KeyboardIntegrationContextImpl implements IntegrationContext {
                                           KeyValueStore rootStore,
                                           AppProfileRegistry profiles,
                                           GeminiService ai,
-                                          GoogleAuth googleAuth) {
+                                          McpService mcp,
+                                          GoogleAuth googleAuth,
+                                          ImageBridge imageBridge) {
         this.appContext = appContext;
         this.root = root;
         this.committer = committer;
         this.rootStore = rootStore;
         this.profiles = profiles;
         this.ai = ai;
+        this.mcp = mcp;
         this.googleAuth = googleAuth;
+        this.imageBridge = imageBridge;
     }
 
     @Override public Context appContext() { return appContext; }
@@ -108,6 +116,8 @@ public class KeyboardIntegrationContextImpl implements IntegrationContext {
 
     @Override public GeminiService ai() { return ai; }
 
+    @Override public McpService mcp() { return mcp; }
+
     @Override public GoogleAuth googleAuth() { return googleAuth; }
 
     @Override public void commitText(CharSequence text) {
@@ -118,6 +128,15 @@ public class KeyboardIntegrationContextImpl implements IntegrationContext {
     }
 
     @Override public void deleteBeforeCursor(int n) { committer.deleteBeforeCursor(n); }
+
+    @Override public void pickImage(ImagePickCallback cb) { imageBridge.pickImage(cb); }
+
+    @Override public void commitImage(Uri uri, String mime) {
+        // Successful image insert means the in-flight work has landed — same as
+        // commitText, drop the gradient loader so it doesn't linger past the result.
+        root.generatingLoader().hide();
+        imageBridge.commitImage(uri, mime);
+    }
 
     @Override public void openScreen(String screenId) {
         Class<?> target;

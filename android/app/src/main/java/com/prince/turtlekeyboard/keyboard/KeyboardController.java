@@ -12,11 +12,12 @@ import com.prince.turtlekeyboard.R;
  */
 public class KeyboardController {
 
-    public enum Layout { QWERTY, SYMBOLS, SYMBOLS_SHIFT }
+    public enum Layout { QWERTY, SYMBOLS, SYMBOLS_SHIFT, DIALPAD }
 
     private final Keyboard qwerty;
     private final Keyboard symbols;
     private final Keyboard symbolsShift;
+    private final Keyboard dialpad;
     private KeyboardView view;
     private Layout active = Layout.QWERTY;
 
@@ -24,6 +25,7 @@ public class KeyboardController {
         this.qwerty = new Keyboard(context, R.xml.qwerty);
         this.symbols = new Keyboard(context, R.xml.symbols);
         this.symbolsShift = new Keyboard(context, R.xml.symbols_shift);
+        this.dialpad = new Keyboard(context, R.xml.dialpad);
     }
 
     public void attach(KeyboardView view) {
@@ -56,6 +58,7 @@ public class KeyboardController {
             case QWERTY: view.setKeyboard(qwerty); break;
             case SYMBOLS: view.setKeyboard(symbols); break;
             case SYMBOLS_SHIFT: view.setKeyboard(symbolsShift); break;
+            case DIALPAD: view.setKeyboard(dialpad); break;
         }
     }
 }

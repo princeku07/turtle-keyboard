@@ -1,6 +1,8 @@
 package com.prince.turtlekeyboard.overlay;
 
+import android.animation.ObjectAnimator;
 import android.content.Intent;
+import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
@@ -10,6 +12,8 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
+import android.view.animation.AccelerateInterpolator;
+import android.view.animation.DecelerateInterpolator;
 import android.widget.FrameLayout;
 
 import androidx.annotation.Nullable;
@@ -34,8 +38,8 @@ import java.util.Map;
  * resulting view inside a card pinned to the bottom of the screen with a dimmed
  * tap-to-dismiss backdrop.
  *
- * <p>Translucent theme + slide-from-bottom window animation gives the perceived
- * "overlay over the user's previous app" without needing
+ * <p>Translucent theme + in-content animators (backdrop fades, card slides up)
+ * give the perceived "overlay over the user's previous app" without needing
  * {@code SYSTEM_ALERT_WINDOW}: the activity is launched in its own task, sits on top
  * of the chat, and dismisses back to wherever the user was.
  *
@@ -47,16 +51,27 @@ public class BottomSheetActivity extends AppCompatActivity {
     private static final String TAG = "BottomSheetActivity";
 
     private static final int BACKDROP = 0x99000000;        // ~60% black
-    private static final int SHEET_FILL = 0xFFFFFFFF;
-    private static final int SHEET_BORDER = 0xFF0C0C0C;    // ink
+    // Sheet chrome matches KeyboardTheme.turtleLight() — black surface so the
+    // WebView games (which render on a #000 background) merge seamlessly with
+    // the sheet edge, and the native PollSheetView's lifted cards still read
+    // clearly as cards floating on top.
+    private static final int SHEET_FILL = 0xFF000000;
+    private static final int SHEET_BORDER = 0xFF2E2E2E;    // border gray
     private static final int SHEET_CORNER_RADIUS_DP = 18;
+    private static final int ANIM_IN_MS = 220;
+    private static final int ANIM_OUT_MS = 180;
 
     @Nullable private SheetView sheetView;
+    @Nullable private FrameLayout rootView;
+    @Nullable private FrameLayout cardView;
+    @Nullable private ColorDrawable backdropDrawable;
+    private boolean dismissing;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        overridePendingTransition(R.anim.sheet_slide_in, 0);
+        // Window enter is instant; backdrop fades and card slides in via in-content animators.
+        overridePendingTransition(0, 0);
 
         // Don't pop the soft keyboard up under us — the sheet has no input target.
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN);
@@ -101,16 +116,60 @@ public class BottomSheetActivity extends AppCompatActivity {
 
         setContentView(buildSheetContainer(content));
         sheetView.onShow();
+        playEnterAnimation();
     }
 
     @Override
     public void finish() {
+        if (dismissing) return;
+        dismissing = true;
         if (sheetView != null) {
             try { sheetView.onDismiss(); } catch (Throwable t) { Log.w(TAG, "onDismiss threw", t); }
             sheetView = null;
         }
-        super.finish();
-        overridePendingTransition(0, R.anim.sheet_slide_out);
+        // Skip animation when there's no sheet on screen (early-exit before setContentView).
+        if (rootView == null || cardView == null || backdropDrawable == null) {
+            super.finish();
+            overridePendingTransition(0, 0);
+            return;
+        }
+        // Disable interaction during exit so taps can't re-trigger finish().
+        rootView.setOnClickListener(null);
+        cardView.setClickable(false);
+        ObjectAnimator.ofInt(backdropDrawable, "alpha", backdropDrawable.getAlpha(), 0)
+                .setDuration(ANIM_OUT_MS)
+                .start();
+        int slideTo = cardView.getHeight();
+        if (slideTo <= 0) slideTo = getResources().getDisplayMetrics().heightPixels;
+        cardView.animate()
+                .translationY(slideTo)
+                .setDuration(ANIM_OUT_MS)
+                .setInterpolator(new AccelerateInterpolator(2f))
+                .withEndAction(() -> {
+                    BottomSheetActivity.super.finish();
+                    overridePendingTransition(0, 0);
+                })
+                .start();
+    }
+
+    /** Fades the backdrop in and slides the card up from off-screen. */
+    private void playEnterAnimation() {
+        if (rootView == null || cardView == null || backdropDrawable == null) return;
+        ObjectAnimator.ofInt(backdropDrawable, "alpha", 0, 255)
+                .setDuration(ANIM_IN_MS)
+                .start();
+        final FrameLayout card = cardView;
+        // post() waits for layout so getHeight() is non-zero before we translate off-screen.
+        card.post(() -> {
+            int h = card.getHeight();
+            if (h <= 0) h = getResources().getDisplayMetrics().heightPixels / 2;
+            card.setTranslationY(h);
+            card.animate()
+                    .translationY(0)
+                    .setDuration(ANIM_IN_MS)
+                    .setInterpolator(new DecelerateInterpolator(2f))
+                    .start();
+        });
     }
 
     /** Builds: full-screen FrameLayout with a tap-to-dismiss backdrop + a bottom-anchored
@@ -119,7 +178,10 @@ public class BottomSheetActivity extends AppCompatActivity {
         FrameLayout root = new FrameLayout(this);
         root.setLayoutParams(new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        root.setBackgroundColor(BACKDROP);
+        // Use a mutable ColorDrawable so we can animate alpha for the fade-in/out.
+        ColorDrawable backdrop = new ColorDrawable(BACKDROP);
+        backdrop.setAlpha(0);
+        root.setBackground(backdrop);
         root.setOnClickListener(v -> finish());
 
         FrameLayout card = new FrameLayout(this);
@@ -142,6 +204,9 @@ public class BottomSheetActivity extends AppCompatActivity {
         card.addView(content, contentLp);
 
         root.addView(card);
+        rootView = root;
+        cardView = card;
+        backdropDrawable = backdrop;
         return root;
     }
 

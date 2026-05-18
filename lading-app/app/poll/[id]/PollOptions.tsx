@@ -1,170 +1,190 @@
 "use client";
 
-import { useCallback, useState, useSyncExternalStore } from "react";
-
-const WORKER_URL =
-  process.env.NEXT_PUBLIC_WORKER_URL || "https://turtle-worker.trtlk.workers.dev";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { onValue, ref, set } from "firebase/database";
+import { auth, db, ensureAnonAuth } from "@/lib/firebase-client";
 
 type Option = { label: string; votes: number };
 
-function getOrCreateDeviceId(): string {
-  let id = window.localStorage.getItem("turtle-device-id");
-  if (!id) {
-    id =
-      typeof crypto !== "undefined" && crypto.randomUUID
-        ? crypto.randomUUID()
-        : `web-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    window.localStorage.setItem("turtle-device-id", id);
-  }
-  return id;
-}
-
-const VOTE_EVENT = "turtle:poll-vote";
-
-function subscribeVote(callback: () => void) {
-  window.addEventListener("storage", callback);
-  window.addEventListener(VOTE_EVENT, callback);
-  return () => {
-    window.removeEventListener("storage", callback);
-    window.removeEventListener(VOTE_EVENT, callback);
-  };
-}
-
-function useStoredVote(pollId: string): [number | null, (n: number | null) => void] {
-  const key = `turtle-poll-vote-${pollId}`;
-  const value = useSyncExternalStore(
-    subscribeVote,
-    () => {
-      const stored = window.localStorage.getItem(key);
-      if (stored === null) return null;
-      const n = Number(stored);
-      return Number.isInteger(n) && n >= 0 ? n : null;
-    },
-    () => null, // SSR: matches the un-voted first paint, hydration-safe.
-  );
-  const setValue = useCallback(
-    (n: number | null) => {
-      if (n === null) window.localStorage.removeItem(key);
-      else window.localStorage.setItem(key, String(n));
-      // Same-tab writes don't fire the native `storage` event — broadcast our own.
-      window.dispatchEvent(new Event(VOTE_EVENT));
-    },
-    [key],
-  );
-  return [value, setValue];
-}
-
+/**
+ * Live web view of a poll. Receives the server-rendered options + initial counts
+ * as a snapshot, then mounts a Firebase Anonymous Auth + RTDB realtime listener
+ * to keep counts in sync with the in-app sheet view in real time.
+ *
+ * <p>Voting writes {@code polls/<id>/voters/<anonUid>: optionIndex}. The anon
+ * uid is sticky per browser (Firebase Auth persists to localStorage), so this
+ * is "one vote per browser install" — same human can vote again from a
+ * different browser / incognito. Acceptable for casual social polls.
+ *
+ * <p>Visual matches {@code opengraph-image.tsx} so the chat preview and the
+ * real page read as the same surface: dark track + green fill, leader gets the
+ * accent, others fade.
+ */
 export function PollOptions({
   pollId,
   initialOptions,
+  expired,
 }: {
   pollId: string;
   initialOptions: Option[];
+  expired: boolean;
 }) {
   const [options, setOptions] = useState<Option[]>(initialOptions);
-  const [votedIndex, setVotedIndex] = useStoredVote(pollId);
-  const [pending, setPending] = useState<number | null>(null);
+  const [myVote, setMyVote] = useState<number | null>(null);
+  const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const myUidRef = useRef<string | null>(null);
 
-  const total = options.reduce((sum, o) => sum + o.votes, 0);
-  const leadingPct =
-    total > 0 ? Math.max(...options.map(o => (o.votes / total) * 100)) : 0;
+  useEffect(() => {
+    if (expired) return;
 
-  async function vote(index: number) {
-    if (votedIndex !== null || pending !== null) return;
-    setError(null);
-    setPending(index);
+    let cancelled = false;
+    let unsubscribe: (() => void) | null = null;
 
-    const deviceId = getOrCreateDeviceId();
-    const snapshot = options;
-    setOptions(opts =>
-      opts.map((o, i) => (i === index ? { ...o, votes: o.votes + 1 } : o)),
-    );
-    setVotedIndex(index);
-
-    try {
-      const res = await fetch(`${WORKER_URL}/poll/${pollId}/vote`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Turtle-Device": deviceId,
-        },
-        body: JSON.stringify({ optionIndex: index }),
-      });
-
-      if (res.status === 409) {
-        // Worker already counted this device — keep the local lock, drop the optimistic +1.
-        setOptions(snapshot);
-        setError("you've already voted on this poll.");
+    (async () => {
+      try {
+        const uid = await ensureAnonAuth();
+        if (cancelled) return;
+        myUidRef.current = uid;
+      } catch (e) {
+        // Anon auth failed — fall back to the SSR snapshot, no live updates.
+        if (typeof console !== "undefined") {
+          console.warn("anon auth failed", e);
+        }
         return;
       }
-      if (!res.ok) throw new Error(`worker ${res.status}`);
 
-      const fresh = await fetch(`${WORKER_URL}/poll/${pollId}`, {
-        cache: "no-store",
+      const pollRef = ref(db, `polls/${pollId}`);
+      const off = onValue(pollRef, snap => {
+        if (!snap.exists()) return;
+        const data = snap.val() as {
+          options?: unknown;
+          voters?: Record<string, unknown>;
+        };
+        const labels = Array.isArray(data.options)
+          ? data.options.filter((o): o is string => typeof o === "string")
+          : [];
+        if (labels.length === 0) return;
+
+        const counts = new Array<number>(labels.length).fill(0);
+        const uid = myUidRef.current ?? auth.currentUser?.uid ?? null;
+        let mine: number | null = null;
+        if (data.voters && typeof data.voters === "object") {
+          for (const [voterUid, idx] of Object.entries(data.voters)) {
+            if (typeof idx === "number" && idx >= 0 && idx < counts.length) {
+              counts[idx]++;
+              if (uid && voterUid === uid) mine = idx;
+            }
+          }
+        }
+        setOptions(labels.map((label, i) => ({ label, votes: counts[i] })));
+        setMyVote(mine);
       });
-      if (fresh.ok) {
-        const data = (await fresh.json()) as { options: Option[] };
-        setOptions(data.options);
+      unsubscribe = () => off();
+    })();
+
+    return () => {
+      cancelled = true;
+      if (unsubscribe) unsubscribe();
+    };
+  }, [pollId, expired]);
+
+  const total = options.reduce((sum, o) => sum + o.votes, 0);
+  // Leader index — first option with the max votes. Used for the bright
+  // accent bar vs the dimmer accent on losing options.
+  let leaderIdx = -1;
+  if (total > 0) {
+    let leaderVotes = -1;
+    for (let i = 0; i < options.length; i++) {
+      if (options[i].votes > leaderVotes) {
+        leaderVotes = options[i].votes;
+        leaderIdx = i;
       }
-    } catch {
-      setOptions(snapshot);
-      setVotedIndex(null);
-      setError("couldn't record your vote. tap to try again.");
-    } finally {
-      setPending(null);
     }
   }
+  const locked = myVote !== null || expired;
 
-  const locked = votedIndex !== null;
+  const vote = useCallback(
+    async (index: number) => {
+      if (locked || pending) return;
+      setError(null);
+      setPending(true);
+      try {
+        const uid = await ensureAnonAuth();
+        myUidRef.current = uid;
+        await set(ref(db, `polls/${pollId}/voters/${uid}`), index);
+        // No manual setState — the realtime listener will fire with the new
+        // vote and update both `options` and `myVote`.
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message.toLowerCase() : "";
+        if (msg.includes("permission")) {
+          setError("you've already voted on this poll.");
+        } else {
+          setError("couldn't record your vote. try again.");
+        }
+      } finally {
+        setPending(false);
+      }
+    },
+    [pollId, locked, pending],
+  );
 
   return (
     <>
-      <p className="mt-4 font-mono text-sm text-foam-dim">
+      <p className="mt-4 font-mono text-sm text-[#888888]">
         {total} {total === 1 ? "vote" : "votes"}
+        {expired && " · ended"}
       </p>
 
       <div className="mt-10 space-y-3">
         {options.map((opt, i) => {
           const pct = total > 0 ? Math.round((opt.votes / total) * 100) : 0;
-          const isLeader =
-            total > 0 && (opt.votes / total) * 100 === leadingPct && leadingPct > 0;
-          const isMine = votedIndex === i;
-          const isPending = pending === i;
+          const isLeader = i === leaderIdx;
+          const isMine = myVote === i;
+          const isPending = pending;
           return (
             <button
               key={i}
               type="button"
               onClick={() => vote(i)}
-              disabled={locked || pending !== null}
+              disabled={locked || pending}
               aria-pressed={isMine}
-              className={`w-full text-left glass rounded-2xl px-5 py-4 relative overflow-hidden transition-transform ${
+              className={`group relative w-full overflow-hidden rounded-2xl border border-[#2E2E2E] bg-[#1E1E1E] px-5 py-4 text-left transition-transform ${
                 locked
                   ? "cursor-default"
-                  : "cursor-pointer hover:-translate-y-0.5 active:translate-y-0 hover:border-white/25"
-              } ${isMine ? "ring-1 ring-cyan/60" : ""} ${
+                  : "cursor-pointer hover:-translate-y-0.5 active:translate-y-0 hover:border-[#15803D]/40"
+              } ${
+                isMine
+                  ? "ring-2 ring-[#15803D]"
+                  : ""
+              } ${
                 isPending ? "opacity-80" : ""
               }`}
             >
+              {/* Vote bar — track stays a subtle wash, fill is the keyboard
+                  accent (full for leader, dimmed for others). */}
               <div
                 aria-hidden
-                className={`absolute inset-y-0 left-0 transition-[width] duration-500 ease-out ${
-                  isLeader ? "bg-cyan/25" : "bg-cyan/12"
-                }`}
-                style={{ width: `${pct}%` }}
+                className="absolute inset-y-0 left-0 transition-[width] duration-500 ease-out"
+                style={{
+                  width: `${pct}%`,
+                  background: isLeader
+                    ? "rgba(21, 128, 61, 0.32)"
+                    : "rgba(21, 128, 61, 0.10)",
+                }}
               />
               <div className="relative flex items-center justify-between gap-4">
-                <span className="font-sans text-base sm:text-lg text-foam flex items-center gap-3">
+                <span className="font-sans text-base sm:text-lg text-[#F5F5F5] flex items-center gap-3">
                   {opt.label}
                   {isMine && (
-                    <span className="font-mono text-[10px] tracking-[0.18em] uppercase text-cyan">
+                    <span className="font-mono text-[10px] tracking-[0.18em] uppercase text-[#15803D]">
                       your vote
                     </span>
                   )}
                 </span>
                 <span
                   className={`font-mono text-sm font-semibold tabular-nums ${
-                    isLeader ? "text-cyan" : "text-foam-dim"
+                    isLeader ? "text-[#15803D]" : "text-[#888888]"
                   }`}
                 >
                   {pct}%
@@ -175,7 +195,12 @@ export function PollOptions({
         })}
       </div>
 
-      {error && <p className="mt-4 font-mono text-xs text-foam/80">{error}</p>}
+      {error && <p className="mt-4 font-mono text-xs text-[#F5F5F5]/80">{error}</p>}
+      {!expired && (
+        <p className="mt-6 font-mono text-xs text-[#888888]">
+          one vote per browser. install the keyboard for in-chat polls.
+        </p>
+      )}
     </>
   );
 }

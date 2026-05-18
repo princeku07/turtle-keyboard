@@ -1,16 +1,24 @@
 package com.prince.turtlekeyboard.ime.view;
 
 import android.content.Context;
+import android.content.res.ColorStateList;
 import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Outline;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
 import android.util.AttributeSet;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
 import android.view.View;
+import android.view.ViewOutlineProvider;
+import android.view.animation.AccelerateInterpolator;
+import android.view.animation.Interpolator;
+import android.view.animation.PathInterpolator;
 import android.widget.FrameLayout;
 import android.widget.GridLayout;
 import android.widget.LinearLayout;
@@ -22,10 +30,27 @@ import androidx.annotation.Nullable;
 import com.prince.turtlekeyboard.theme.KeyboardTheme;
 
 /**
- * Replaces the keyboard area with a Gboard-style "more options" panel: a top icon
- * row anchored to a green back button, a header, and a grid of action tiles. The
- * IME mounts this view in {@code quickPanelHost} when the user taps the leading
- * hamburger button on the suggestion strip.
+ * Replaces the keyboard area with a Gboard-style "more options" panel: a
+ * top icon row anchored to a green back button, a header, and a grid of
+ * action tiles. The IME mounts this view in {@code quickPanelHost} when
+ * the user taps the leading hamburger button on the suggestion strip.
+ *
+ * <p>Visual language matches the keyboard's other rounded-card panels
+ * (history, emoji, split, generating loader): pure-black inner card with
+ * a 16 dp corner radius and 1 dp hairline stroke, sitting under a 12 dp
+ * top gap so the chrome behind shows through. Tiles are subtle-white
+ * chips with a ripple foreground; the whole card slides up + fades in
+ * with the same Material-emphasized easing.
+ *
+ * <p><b>Trimmed action set.</b> The original layout had eight tiles, four
+ * of which duplicated the four circles in the top quick-shortcut row
+ * (Quick Panel, History, Settings, Voice). The Emoji tile additionally
+ * duplicated the leading 😀 button on the suggestion strip and Voice
+ * tile duplicates the top-row mic. Two of those duplicates are removed
+ * here (Voice + Emoji) so the grid surfaces actions that aren't already
+ * one tap away on another surface; the remaining "duplicated" tiles
+ * (Slash, History, Settings) stay because losing them would leave the
+ * grid uncomfortably sparse and they're the most-tapped actions.
  */
 public class MoreActionsPanelView extends LinearLayout {
 
@@ -45,8 +70,28 @@ public class MoreActionsPanelView extends LinearLayout {
     public static final int ACTION_EMOJI       = 7;
     public static final int ACTION_UNDO        = 8;
 
+    // ── Dark-panel color tokens (mirror HistoryPanelView etc.) ──────────
+    private static final int BG           = 0xFF000000;
+    private static final int TEXT_PRIMARY = 0xFFF5F5F5;
+    private static final int TEXT_MUTED   = 0xA0F5F5F5;
+    private static final int CHIP_FILL    = 0x14FFFFFF;
+    private static final int RIPPLE_WASH  = 0x33FFFFFF;
+    /** Brand lime — same as colors.xml#lime. Used by the back-button fill
+     *  so the dismiss CTA reads as part of Turtle's brand voice. */
+    private static final int ACCENT_LIME  = 0xFF15803D;
+
+    private static final int PANEL_RADIUS_DP = 16;
+    private static final int TILE_RADIUS_DP  = 12;
+    private static final int TOP_GAP_DP      = 12;
+    private static final int SLIDE_OFFSET_DP = 28;
+    private static final int GRID_COLUMNS    = 3;
+    private static final Interpolator ENTER_EASING =
+            new PathInterpolator(0.05f, 0.7f, 0.1f, 1.0f);
+    private static final Interpolator EXIT_EASING =
+            new AccelerateInterpolator(1.2f);
+
     @Nullable private Callbacks callbacks;
-    @Nullable private KeyboardTheme theme;
+    private final LinearLayout cardContainer;
     private final CircleBackButton backButton;
     private final LinearLayout topIconRow;
     private final TextView header;
@@ -60,100 +105,118 @@ public class MoreActionsPanelView extends LinearLayout {
         super(c, a);
         setOrientation(VERTICAL);
 
-        // Top bar: back button + small inline icon shortcuts.
+        // ── Inner rounded card — same chrome as the other panels ──
+        cardContainer = new LinearLayout(c);
+        cardContainer.setOrientation(VERTICAL);
+        final int cardRadius = dp(PANEL_RADIUS_DP);
+        GradientDrawable cardBg = new GradientDrawable();
+        cardBg.setShape(GradientDrawable.RECTANGLE);
+        cardBg.setColor(BG);
+        cardBg.setCornerRadius(cardRadius);
+        cardBg.setStroke(dp(1), 0x33FFFFFF);
+        cardContainer.setBackground(cardBg);
+        cardContainer.setOutlineProvider(new ViewOutlineProvider() {
+            @Override public void getOutline(View view, Outline outline) {
+                outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), cardRadius);
+            }
+        });
+        cardContainer.setClipToOutline(true);
+
+        // ── Top bar: back button + 4 small inline icon shortcuts ──
         LinearLayout topRow = new LinearLayout(c);
         topRow.setOrientation(HORIZONTAL);
         topRow.setGravity(Gravity.CENTER_VERTICAL);
-        int rowPad = dp(10);
-        topRow.setPadding(rowPad, rowPad, rowPad, dp(4));
+        int rowPad = dp(12);
+        topRow.setPadding(rowPad, dp(10), rowPad, dp(4));
 
         backButton = new CircleBackButton(c);
-        LayoutParams backLp = new LayoutParams(dp(40), dp(40));
-        backLp.rightMargin = dp(8);
+        LinearLayout.LayoutParams backLp = new LinearLayout.LayoutParams(dp(40), dp(40));
+        backLp.rightMargin = dp(10);
         topRow.addView(backButton, backLp);
 
         topIconRow = new LinearLayout(c);
         topIconRow.setOrientation(HORIZONTAL);
         topIconRow.setGravity(Gravity.CENTER_VERTICAL);
-        LayoutParams iconRowLp = new LayoutParams(0, LayoutParams.MATCH_PARENT, 1f);
+        LinearLayout.LayoutParams iconRowLp = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.MATCH_PARENT, 1f);
         topRow.addView(topIconRow, iconRowLp);
         addQuickIcon(GlyphIcon.GLYPH_QUICK_PANEL, ACTION_QUICK_PANEL);
         addQuickIcon(GlyphIcon.GLYPH_HISTORY, ACTION_HISTORY);
         addQuickIcon(GlyphIcon.GLYPH_SETTINGS, ACTION_SETTINGS);
         addQuickIcon(GlyphIcon.GLYPH_MIC, ACTION_VOICE);
 
-        addView(topRow, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        cardContainer.addView(topRow, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        // Header label.
+        // ── Header ──
         header = new TextView(c);
         header.setText("More options");
-        header.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f);
+        header.setTextColor(TEXT_MUTED);
+        header.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f);
+        header.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        header.setLetterSpacing(0.04f);
         header.setGravity(Gravity.CENTER);
-        header.setPadding(0, dp(4), 0, dp(8));
-        addView(header, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        header.setIncludeFontPadding(false);
+        header.setPadding(0, dp(6), 0, dp(8));
+        cardContainer.addView(header, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        // Tile grid in a scroller so taller panels stay reachable.
+        // ── Tile grid in a scroller (taller panels stay reachable) ──
         ScrollView scroll = new ScrollView(c);
         scroll.setVerticalScrollBarEnabled(false);
         scroll.setFillViewport(true);
 
         grid = new GridLayout(c);
-        grid.setColumnCount(4);
-        int gridPad = dp(10);
+        grid.setColumnCount(GRID_COLUMNS);
+        int gridPad = dp(12);
         grid.setPadding(gridPad, 0, gridPad, gridPad);
         scroll.addView(grid, new ScrollView.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT));
-        LayoutParams scrollLp = new LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f);
-        addView(scroll, scrollLp);
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT));
+        cardContainer.addView(scroll, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
 
         backButton.setOnClickListener(v -> {
             v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
-            if (callbacks != null) callbacks.onClose();
+            animateOut(() -> { if (callbacks != null) callbacks.onClose(); });
         });
+
+        // Mount card on the outer view with a top gap.
+        LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f);
+        cardLp.topMargin = dp(TOP_GAP_DP);
+        addView(cardContainer, cardLp);
     }
 
     /** Bind callbacks and (re)populate the grid. Safe to call multiple times. */
     public void show(Callbacks callbacks) {
         this.callbacks = callbacks;
         grid.removeAllViews();
-        addTile("🎨", "Theme", ACTION_THEME);
-        addTile("⚡",  "Slash", ACTION_QUICK_PANEL);
-        addTile("🗂",  "History", ACTION_HISTORY);
-        addTile("⚙",   "Settings", ACTION_SETTINGS);
-        addTile("🎤", "Voice", ACTION_VOICE);
+        // Trimmed tile set: Voice (duplicates the top-row mic) and Emoji
+        // (duplicates the suggestion strip's 😀 button) were removed.
+        addTile("🎨", "Theme",     ACTION_THEME);
+        addTile("⚡",  "Slash",     ACTION_QUICK_PANEL);
+        addTile("🗂",  "History",   ACTION_HISTORY);
+        addTile("⚙",   "Settings",  ACTION_SETTINGS);
         addTile("🌐", "Translate", ACTION_TRANSLATE);
-        addTile("😊", "Emoji", ACTION_EMOJI);
-        addTile("↩",   "Undo", ACTION_UNDO);
-        applyThemeIfPresent();
+        addTile("↩",   "Undo",      ACTION_UNDO);
+        animateIn();
     }
 
-    public void applyTheme(KeyboardTheme theme) {
-        this.theme = theme;
-        applyThemeIfPresent();
-    }
-
-    private void applyThemeIfPresent() {
-        if (theme == null) return;
-        setBackgroundColor(theme.background);
-        header.setTextColor(theme.bannerText);
-        backButton.applyTheme(theme);
-        for (int i = 0; i < topIconRow.getChildCount(); i++) {
-            View v = topIconRow.getChildAt(i);
-            if (v instanceof GlyphIcon) ((GlyphIcon) v).applyTheme(theme);
-        }
-        for (int i = 0; i < grid.getChildCount(); i++) {
-            View v = grid.getChildAt(i);
-            if (v instanceof Tile) ((Tile) v).applyTheme(theme);
-        }
-    }
+    /** Kept for API compatibility with the IME's mount path; the panel
+     *  pins itself to the dark palette declared above. */
+    @SuppressWarnings("unused")
+    public void applyTheme(KeyboardTheme theme) { }
 
     private void addQuickIcon(int glyph, int actionId) {
         GlyphIcon icon = new GlyphIcon(getContext(), glyph);
         icon.setOnClickListener(v -> {
             v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
-            if (callbacks != null) callbacks.onAction(actionId);
+            animateOut(() -> { if (callbacks != null) callbacks.onAction(actionId); });
         });
-        LayoutParams lp = new LayoutParams(dp(40), dp(40));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(40), dp(40));
         lp.rightMargin = dp(6);
         topIconRow.addView(icon, lp);
     }
@@ -162,16 +225,53 @@ public class MoreActionsPanelView extends LinearLayout {
         Tile tile = new Tile(getContext(), emoji, label);
         tile.setOnClickListener(v -> {
             v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
-            if (callbacks != null) callbacks.onAction(actionId);
+            animateOut(() -> { if (callbacks != null) callbacks.onAction(actionId); });
         });
         GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
         lp.width = 0;
         lp.height = LayoutParams.WRAP_CONTENT;
         lp.columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1, 1f);
-        int margin = dp(4);
+        int margin = dp(5);
         lp.setMargins(margin, margin, margin, margin);
         tile.setLayoutParams(lp);
         grid.addView(tile);
+    }
+
+    // ── Animation ────────────────────────────────────────────────────
+
+    private void animateIn() {
+        animate().cancel();
+        setAlpha(0f);
+        setTranslationY(dp(SLIDE_OFFSET_DP));
+        animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setDuration(320)
+                .setInterpolator(ENTER_EASING)
+                .start();
+    }
+
+    private void animateOut(Runnable onEnd) {
+        animate().cancel();
+        animate()
+                .alpha(0f)
+                .translationY(dp(SLIDE_OFFSET_DP))
+                .setDuration(220)
+                .setInterpolator(EXIT_EASING)
+                .withEndAction(() -> {
+                    setAlpha(1f);
+                    setTranslationY(0f);
+                    if (onEnd != null) onEnd.run();
+                })
+                .start();
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        animate().cancel();
+        setAlpha(1f);
+        setTranslationY(0f);
     }
 
     private int dp(int v) {
@@ -179,7 +279,9 @@ public class MoreActionsPanelView extends LinearLayout {
                 getResources().getDisplayMetrics());
     }
 
-    /** A green circular back button that mirrors the Enter circle on the keys. */
+    /** Green circular back button — mirrors the Enter circle on the keys
+     *  and keeps the brand-lime accent in this panel even though the rest
+     *  of the chrome is neutral dark. */
     private static class CircleBackButton extends FrameLayout {
         private final Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint arrowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -190,17 +292,26 @@ public class MoreActionsPanelView extends LinearLayout {
             setFocusable(true);
             setWillNotDraw(false);
             fillPaint.setStyle(Paint.Style.FILL);
-            fillPaint.setColor(0xFF15803D);
+            fillPaint.setColor(ACCENT_LIME);
             arrowPaint.setStyle(Paint.Style.STROKE);
             arrowPaint.setStrokeCap(Paint.Cap.ROUND);
             arrowPaint.setStrokeJoin(Paint.Join.ROUND);
-            arrowPaint.setColor(0xFFFFFFFF);
-        }
-
-        void applyTheme(KeyboardTheme theme) {
-            fillPaint.setColor(theme.enterFill);
-            arrowPaint.setColor(theme.enterIcon);
-            invalidate();
+            arrowPaint.setColor(Color.WHITE);
+            // Ripple over the lime fill, clipped to the circle outline so
+            // press feedback stays inside the button's visible shape.
+            setOutlineProvider(new ViewOutlineProvider() {
+                @Override public void getOutline(View view, Outline outline) {
+                    int side = Math.min(view.getWidth(), view.getHeight());
+                    int inset = (int) dp(2);
+                    outline.setOval(inset, inset, side - inset, side - inset);
+                }
+            });
+            setClipToOutline(true);
+            GradientDrawable mask = new GradientDrawable();
+            mask.setShape(GradientDrawable.OVAL);
+            mask.setColor(Color.WHITE);
+            setForeground(new RippleDrawable(
+                    ColorStateList.valueOf(RIPPLE_WASH), null, mask));
         }
 
         @Override
@@ -241,15 +352,24 @@ public class MoreActionsPanelView extends LinearLayout {
             setFocusable(true);
             setWillNotDraw(false);
             fillPaint.setStyle(Paint.Style.FILL);
+            fillPaint.setColor(CHIP_FILL);
             glyphPaint.setStyle(Paint.Style.STROKE);
             glyphPaint.setStrokeCap(Paint.Cap.ROUND);
             glyphPaint.setStrokeJoin(Paint.Join.ROUND);
-        }
-
-        void applyTheme(KeyboardTheme theme) {
-            fillPaint.setColor(theme.chipFill);
-            glyphPaint.setColor(theme.suggestionText);
-            invalidate();
+            glyphPaint.setColor(TEXT_PRIMARY);
+            setOutlineProvider(new ViewOutlineProvider() {
+                @Override public void getOutline(View view, Outline outline) {
+                    int side = Math.min(view.getWidth(), view.getHeight());
+                    int inset = (int) dp(3);
+                    outline.setOval(inset, inset, side - inset, side - inset);
+                }
+            });
+            setClipToOutline(true);
+            GradientDrawable mask = new GradientDrawable();
+            mask.setShape(GradientDrawable.OVAL);
+            mask.setColor(Color.WHITE);
+            setForeground(new RippleDrawable(
+                    ColorStateList.valueOf(RIPPLE_WASH), null, mask));
         }
 
         @Override
@@ -261,9 +381,9 @@ public class MoreActionsPanelView extends LinearLayout {
             glyphPaint.setStrokeWidth(dp(1.8f));
             switch (glyph) {
                 case GLYPH_QUICK_PANEL: drawGrid(c, cx, cy, r); break;
-                case GLYPH_HISTORY: drawHistory(c, cx, cy, r); break;
-                case GLYPH_SETTINGS: drawGear(c, cx, cy, r); break;
-                case GLYPH_MIC: drawMic(c, cx, cy, r); break;
+                case GLYPH_HISTORY:     drawHistory(c, cx, cy, r); break;
+                case GLYPH_SETTINGS:    drawGear(c, cx, cy, r); break;
+                case GLYPH_MIC:         drawMic(c, cx, cy, r); break;
             }
         }
 
@@ -283,7 +403,6 @@ public class MoreActionsPanelView extends LinearLayout {
             float arcR = r * 0.7f;
             RectF arc = new RectF(cx - arcR, cy - arcR, cx + arcR, cy + arcR);
             c.drawArc(arc, 60f, 280f, false, glyphPaint);
-            // tick marks: clock hands.
             c.drawLine(cx, cy, cx, cy - arcR * 0.55f, glyphPaint);
             c.drawLine(cx, cy, cx + arcR * 0.45f, cy, glyphPaint);
         }
@@ -323,64 +442,52 @@ public class MoreActionsPanelView extends LinearLayout {
         }
     }
 
-    /** A grid tile: rounded rect background with a single emoji glyph + label below. */
+    /** A grid tile: rounded-rect chip background with a single emoji glyph
+     *  + label below. Subtle-white chip fill on the panel's black surface,
+     *  ripple foreground for press feedback. */
     private static class Tile extends LinearLayout {
-        private final TextView emojiView;
-        private final TextView labelView;
-        private final GradientDrawable bg;
-        private final TextView background;
-
         Tile(Context c, String emoji, String label) {
             super(c);
             setOrientation(VERTICAL);
             setGravity(Gravity.CENTER);
             setClickable(true);
             setFocusable(true);
+            int padV = (int) dp(14), padH = (int) dp(10);
+            setPadding(padH, padV, padH, padV);
 
-            // Use a TextView purely for the rounded background; cheaper than a drawable nest.
-            background = new TextView(c);
-            // Outer container provides the touch target and stack; the icon "card" is
-            // a smaller rounded square inside it.
-            int padInner = (int) dp(4);
-            setPadding(0, padInner, 0, padInner);
-
-            FrameLayout iconCard = new FrameLayout(c);
-            bg = new GradientDrawable();
+            final float radius = dp(TILE_RADIUS_DP);
+            GradientDrawable bg = new GradientDrawable();
             bg.setShape(GradientDrawable.RECTANGLE);
-            bg.setCornerRadius(dp(14));
-            bg.setColor(0xFFE8F5EE);
-            iconCard.setBackground(bg);
-            iconCard.setMinimumHeight((int) dp(64));
+            bg.setCornerRadius(radius);
+            bg.setColor(CHIP_FILL);
+            setBackground(bg);
 
-            emojiView = new TextView(c);
+            GradientDrawable mask = new GradientDrawable();
+            mask.setShape(GradientDrawable.RECTANGLE);
+            mask.setColor(Color.WHITE);
+            mask.setCornerRadius(radius);
+            setForeground(new RippleDrawable(
+                    ColorStateList.valueOf(RIPPLE_WASH), null, mask));
+
+            TextView emojiView = new TextView(c);
             emojiView.setText(emoji);
             emojiView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 26f);
+            emojiView.setIncludeFontPadding(false);
             emojiView.setGravity(Gravity.CENTER);
-            FrameLayout.LayoutParams emojiLp = new FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.MATCH_PARENT,
-                    FrameLayout.LayoutParams.WRAP_CONTENT);
-            emojiLp.gravity = Gravity.CENTER;
-            int cardPad = (int) dp(14);
-            iconCard.setPadding(cardPad, cardPad, cardPad, cardPad);
-            iconCard.addView(emojiView, emojiLp);
-
-            addView(iconCard, new LayoutParams(LayoutParams.MATCH_PARENT,
+            addView(emojiView, new LayoutParams(LayoutParams.WRAP_CONTENT,
                     LayoutParams.WRAP_CONTENT));
 
-            labelView = new TextView(c);
+            TextView labelView = new TextView(c);
             labelView.setText(label);
             labelView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f);
+            labelView.setTextColor(TEXT_PRIMARY);
+            labelView.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+            labelView.setIncludeFontPadding(false);
             labelView.setGravity(Gravity.CENTER);
-            labelView.setPadding(0, (int) dp(6), 0, 0);
-            labelView.setTypeface(labelView.getTypeface(), Typeface.NORMAL);
-            addView(labelView, new LayoutParams(LayoutParams.MATCH_PARENT,
-                    LayoutParams.WRAP_CONTENT));
-        }
-
-        void applyTheme(KeyboardTheme theme) {
-            bg.setColor(theme.chipFill);
-            labelView.setTextColor(theme.bannerText);
-            background.setTextColor(theme.bannerText);
+            LayoutParams labelLp = new LayoutParams(LayoutParams.WRAP_CONTENT,
+                    LayoutParams.WRAP_CONTENT);
+            labelLp.topMargin = (int) dp(6);
+            addView(labelView, labelLp);
         }
 
         private float dp(float v) {

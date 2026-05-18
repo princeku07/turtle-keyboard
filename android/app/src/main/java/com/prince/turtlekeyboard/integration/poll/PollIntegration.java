@@ -1,7 +1,5 @@
 package com.prince.turtlekeyboard.integration.poll;
 
-import android.os.Handler;
-import android.os.Looper;
 import android.util.Log;
 import android.view.inputmethod.EditorInfo;
 
@@ -18,13 +16,10 @@ import com.prince.kbd.core.SheetViewFactory;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 /**
  * Poll integration — owns the full {@code /poll} flow end-to-end. The local handler:
@@ -33,8 +28,8 @@ import java.util.concurrent.Executors;
  *   <li>Loads {@code assets/prompts/poll.txt} via {@link AssetPrompts}.</li>
  *   <li>Calls {@link GeminiService#text} to shape the user's terse prompt into a
  *       {@code {question, options}} JSON object.</li>
- *   <li>Parses + validates, then POSTs to the {@code turtle-worker} via
- *       {@link PollClient#createPoll}.</li>
+ *   <li>Parses + validates, then writes the poll doc via
+ *       {@link RealtimePollClient#createPoll}.</li>
  *   <li>Commits the returned shareable HTTPS App Link URL into the host field.</li>
  * </ol>
  *
@@ -48,12 +43,9 @@ public class PollIntegration implements KeyboardIntegration {
     /** URL route key — matches {@code https://www.turtlekeyboard.com/poll/<id>}. */
     public static final String ROUTE_KEY = "poll";
 
-    private static final long BUSY_BANNER_MS = 30_000L; // long enough to last through gen + Worker POST
+    private static final long BUSY_BANNER_MS = 30_000L; // long enough to last through gen + Firestore write
     private static final long FAIL_BANNER_MS = 2_500L;
     private static final long EMPTY_BANNER_MS = 2_200L;
-
-    private final ExecutorService io = Executors.newSingleThreadExecutor();
-    private final Handler main = new Handler(Looper.getMainLooper());
 
     @Override public String id() { return "poll"; }
 
@@ -100,7 +92,8 @@ public class PollIntegration implements KeyboardIntegration {
         });
     }
 
-    /** Main thread. Parses Gemini's output, dispatches the Worker POST on the IO executor. */
+    /** Main thread. Parses Gemini's output, dispatches the Firestore write. Firestore
+     *  callbacks fire on the main thread by default, so no Handler hop on either side. */
     private void onModelText(IntegrationContext ctx, String rawJson) {
         String stripped = stripCodeFences(rawJson);
         JSONObject parsed;
@@ -126,16 +119,33 @@ public class PollIntegration implements KeyboardIntegration {
             ctx.showBanner("Couldn't shape that into a poll — try a clearer prompt", FAIL_BANNER_MS);
             return;
         }
-        io.execute(() -> {
-            try {
-                PollClient.CreateResult result = PollClient.createPoll(question, options);
-                main.post(() -> ctx.commitText(result.url));
-            } catch (IOException e) {
-                Log.w(TAG, "PollClient.createPoll failed", e);
-                final String msg = e.getMessage() == null ? "network error" : e.getMessage();
-                main.post(() -> ctx.showBanner("Poll create failed: " + msg, FAIL_BANNER_MS));
+        RealtimePollClient.createPoll(question, options, new RealtimePollClient.CreateCallback() {
+            @Override public void onSuccess(RealtimePollClient.CreateResult result) {
+                ctx.commitText(result.url);
+            }
+            @Override public void onError(String reason) {
+                Log.w(TAG, "RealtimePollClient.createPoll failed: " + reason);
+                ctx.showBanner(bannerForError(reason), FAIL_BANNER_MS);
             }
         });
+    }
+
+    /** Maps {@link RealtimePollClient} error codes to user-facing banner copy. The
+     *  {@code not_signed_in} path is the most likely first-time failure — the IME can't
+     *  host the One Tap UI itself, so we bounce the user toward MainActivity. */
+    private static String bannerForError(String code) {
+        switch (code) {
+            case "not_signed_in":
+                return "Open Turtle and sign in to create polls";
+            case "invalid_payload":
+                return "Couldn't shape that into a poll — try a clearer prompt";
+            case "network":
+                return "Poll create failed — check your connection";
+            case "permission_denied":
+                return "Poll create blocked — try signing out and back in";
+            default:
+                return "Poll create failed: " + code;
+        }
     }
 
     /** Even when told not to, models occasionally wrap JSON in ```json … ```. */

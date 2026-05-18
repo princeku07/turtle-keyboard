@@ -102,17 +102,6 @@
         android:layout_height="56dp"
         android:visibility="gone" />
 
-    <!-- Sibling of keyboard_view. The IME assigns this view's height to match
-         the keyboard's measured height when listening starts, then flips
-         keyboard visibility to GONE — so the IME window height is preserved. -->
-    <com.prince.turtlekeyboard.ime.view.VoiceStageView
-        android:id="@+id/voice_stage"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:clickable="true"
-        android:focusable="true"
-        android:visibility="gone" />
-
     <com.prince.turtlekeyboard.ime.view.TurtleKeyboardView
         android:id="@+id/keyboard_view"
         android:layout_width="match_parent"
@@ -130,5 +119,17 @@
         android:paddingBottom="10dp"
         android:focusable="true"
         android:focusableInTouchMode="true" />
+
+    <!-- Translucent overlay over the keyboard. The IME assigns this view's
+         height to match the keyboard's measured height when listening starts
+         and sets a negative topMargin equal to that height — so it overlaps
+         the keyboard's vertical slot without growing the LinearLayout's
+         total height. Declared AFTER keyboard_view so it draws on top and
+         receives touches first (which it lets fall through to the keys). -->
+    <com.prince.turtlekeyboard.ime.view.VoiceStageView
+        android:id="@+id/voice_stage"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone" />
 
 </com.prince.turtlekeyboard.ime.view.KeyboardRootView>

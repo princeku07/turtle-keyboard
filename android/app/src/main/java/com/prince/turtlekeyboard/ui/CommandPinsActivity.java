@@ -295,7 +295,8 @@ public class CommandPinsActivity extends AppCompatActivity {
                 new WebIntegration(),
                 new DriveIntegration(),
                 new PollIntegration(),
-                new WyrIntegration()}) {
+                new WyrIntegration(),
+                new com.prince.turtlekeyboard.integration.sticker.StickerIntegration()}) {
             for (CommandSpec spec : p.commands()) {
                 out.put(spec.name.toLowerCase(),
                         new CommandMeta(spec.name, spec.label, spec.emoji));

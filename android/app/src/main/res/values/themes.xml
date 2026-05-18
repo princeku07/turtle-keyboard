@@ -9,6 +9,23 @@
         <item name="colorAccent">@color/pink</item>
     </style>
 
+    <!-- Dark variant for screens that should match the keyboard's near-black
+         chrome (HistoryActivity, and any future "viewing generated media"
+         surface). Same brand palette, just inverted: ink background with
+         cream text so the thumbnails read as the primary content. Status
+         bar dropped to ink so the strip above doesn't flash cream against
+         the dark activity. -->
+    <style name="Theme.TurtleKeyboard.Dark" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/ink</item>
+        <item name="android:textColorPrimary">@color/cream</item>
+        <item name="android:textColorSecondary">#A0F4EFE4</item>
+        <item name="android:colorBackground">@color/ink</item>
+        <item name="android:statusBarColor">@color/ink</item>
+        <item name="colorPrimary">@color/lime</item>
+        <item name="colorPrimaryDark">@color/ink</item>
+        <item name="colorAccent">@color/pink</item>
+    </style>
+
     <!-- Translucent host theme for BottomSheetActivity. The activity draws its own
          dimmed backdrop + sheet card programmatically; this theme just makes sure
          the OS window is transparent and doesn't show its own title bar or default

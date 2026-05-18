@@ -80,6 +80,13 @@
             android:name=".ui.HistoryActivity"
             android:exported="false"
             android:label="History"
+            android:parentActivityName=".ui.MainActivity"
+            android:theme="@style/Theme.TurtleKeyboard.Dark" />
+
+        <activity
+            android:name=".ui.SpriteToGifTestActivity"
+            android:exported="false"
+            android:label="Sprite → GIF test"
             android:parentActivityName=".ui.MainActivity" />
 
         <activity
@@ -87,6 +94,18 @@
             android:exported="false"
             android:label="Connect Drive"
             android:parentActivityName=".ui.MainActivity" />
+
+        <activity
+            android:name=".ui.mcp.McpServersActivity"
+            android:exported="false"
+            android:label="MCP Servers"
+            android:parentActivityName=".ui.MainActivity" />
+
+        <activity
+            android:name=".ui.mcp.McpAddBindingActivity"
+            android:exported="false"
+            android:label="Add MCP binding"
+            android:parentActivityName=".ui.mcp.McpServersActivity" />
 
         <!-- Bottom-sheet overlay host. Launched by tapping a Turtle App Link
              (https://www.turtlekeyboard.com/<routeKey>/<id>) from a chat / share intent. The

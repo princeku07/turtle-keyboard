@@ -73,4 +73,63 @@ public class InputCommitter {
         InputConnection ic = connection();
         if (ic != null) ic.deleteSurroundingText(n, 0);
     }
+
+    /**
+     * Delete one "word" before the cursor: first eat trailing whitespace, then eat
+     * back to the next whitespace boundary. Mirrors the Gboard / iOS behavior.
+     */
+    public void deleteWord() {
+        InputConnection ic = connection();
+        if (ic == null) return;
+        CharSequence before = ic.getTextBeforeCursor(2048, 0);
+        if (before == null || before.length() == 0) return;
+        int i = before.length();
+        while (i > 0 && Character.isWhitespace(before.charAt(i - 1))) i--;
+        while (i > 0 && !Character.isWhitespace(before.charAt(i - 1))) i--;
+        int toDelete = before.length() - i;
+        if (toDelete > 0) ic.deleteSurroundingText(toDelete, 0);
+    }
+
+    /**
+     * Delete one "sentence" before the cursor: eat trailing whitespace, then back to
+     * the last sentence-ending punctuation (. ! ?) or a hard line break. If none is
+     * found within the lookback window, deletes everything before the cursor (within
+     * that window).
+     */
+    public void deleteSentence() {
+        InputConnection ic = connection();
+        if (ic == null) return;
+        CharSequence before = ic.getTextBeforeCursor(8192, 0);
+        if (before == null || before.length() == 0) return;
+        int i = before.length();
+        while (i > 0 && Character.isWhitespace(before.charAt(i - 1))) i--;
+        while (i > 0) {
+            char c = before.charAt(i - 1);
+            if (c == '.' || c == '!' || c == '?' || c == '\n') break;
+            i--;
+        }
+        int toDelete = before.length() - i;
+        if (toDelete > 0) ic.deleteSurroundingText(toDelete, 0);
+    }
+
+    /**
+     * Delete every character on both sides of the cursor. We previously used
+     * {@code performContextMenuAction(selectAll)} + {@code commitText("")}, but that
+     * pairing is async in some editors: the select-all hadn't applied yet when the
+     * follow-up commitText ran, leaving the field in an all-selected state — the
+     * next typed character would replace the still-selected text and read as
+     * characters "being deleted." Explicit deletion sidesteps that race.
+     */
+    public void clearAll() {
+        InputConnection ic = connection();
+        if (ic == null) return;
+        ic.finishComposingText();
+        CharSequence before = ic.getTextBeforeCursor(Integer.MAX_VALUE, 0);
+        CharSequence after = ic.getTextAfterCursor(Integer.MAX_VALUE, 0);
+        int beforeLen = before == null ? 0 : before.length();
+        int afterLen = after == null ? 0 : after.length();
+        if (beforeLen > 0 || afterLen > 0) {
+            ic.deleteSurroundingText(beforeLen, afterLen);
+        }
+    }
 }

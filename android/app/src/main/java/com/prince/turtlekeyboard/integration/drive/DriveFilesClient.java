@@ -134,6 +134,55 @@ public final class DriveFilesClient {
     }
 
     /**
+     * Grants {@code anyone with the link} reader permission on a file the app
+     * created. Required for puzzle source images so non-creator players (who never
+     * authorized Drive in their own session) can fetch the image via
+     * {@link #publicImageUrl}. The {@code drive.file} scope DOES allow modifying
+     * permissions on files the app owns — we just don't broaden Drive access.
+     *
+     * <p>Idempotent: re-granting the same role/type to {@code anyone} is a no-op
+     * server-side; Drive returns 200 and an existing permission id.
+     */
+    public static void makePublicReadable(String accessToken, String fileId) throws IOException {
+        HttpURLConnection conn = (HttpURLConnection) new URL(FILES_URL + "/" + fileId + "/permissions").openConnection();
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("Authorization", "Bearer " + accessToken);
+        conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+        conn.setDoOutput(true);
+        conn.setConnectTimeout(15_000);
+        conn.setReadTimeout(15_000);
+        try {
+            JSONObject body = new JSONObject();
+            body.put("role", "reader");
+            body.put("type", "anyone");
+            try (DataOutputStream out = new DataOutputStream(conn.getOutputStream())) {
+                writeUtf8(out, body.toString());
+                out.flush();
+            }
+            int code = conn.getResponseCode();
+            if (code < 200 || code >= 300) {
+                String err = readBody(conn.getErrorStream());
+                throw new IOException("drive permission failed: HTTP " + code
+                        + (err.isEmpty() ? "" : " — " + err));
+            }
+        } catch (JSONException e) {
+            throw new IOException("could not build permission body", e);
+        } finally {
+            conn.disconnect();
+        }
+    }
+
+    /**
+     * URL that serves the raw image bytes of a publicly-readable Drive file.
+     * Google's documented image-embed pattern — works in plain {@code <img src>}
+     * tags without authentication once {@link #makePublicReadable} has been called.
+     * Sized for puzzle display; bigger values still work (Drive scales).
+     */
+    public static String publicImageUrl(String fileId) {
+        return "https://drive.google.com/thumbnail?id=" + fileId + "&sz=w1200";
+    }
+
+    /**
      * Deletes a Drive file by id. {@code 404} is treated as success — the file is
      * already gone, which is what the caller wanted.
      */

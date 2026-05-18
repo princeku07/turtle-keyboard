@@ -51,4 +51,13 @@ public interface GeminiService {
      *  {@code /edit}, {@code /style}, {@code /us}. */
     void imageEdit(@Nullable String systemPrompt, String userPrompt,
                    List<InlineImage> references, ImageCallback cb);
+
+    /** Same as {@link #imageEdit} but pinned to the Nano Banana Pro model
+     *  ({@code gemini-3-pro-image-preview}). Pro holds compositional layout
+     *  (grids, sprite sheets, comics) and instruction following dramatically
+     *  better than Flash, at roughly 3× the per-image cost. Used by {@code /gif}
+     *  where the model has to draw a 4×4 frame grid inside one image — Flash
+     *  reliably fragments that into multiple separate outputs. */
+    void imageEditPro(@Nullable String systemPrompt, String userPrompt,
+                      List<InlineImage> references, ImageCallback cb);
 }

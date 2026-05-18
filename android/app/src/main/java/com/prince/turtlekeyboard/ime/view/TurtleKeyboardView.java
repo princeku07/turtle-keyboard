@@ -33,6 +33,19 @@ public class TurtleKeyboardView extends KeyboardView {
     private static final int CODE_COMMA = 44;
     private static final int CODE_PERIOD = 46;
 
+    /** Notified when the mode-toggle (?123 / ABC) key is long-pressed. */
+    public interface ModeKeyLongPressListener {
+        void onModeKeyLongPress();
+    }
+
+    /** Notified when the backspace key is long-pressed (finger still down at LONGPRESS_TIMEOUT). */
+    public interface BackspaceLongPressListener {
+        void onBackspaceLongPress();
+    }
+
+    private ModeKeyLongPressListener modeKeyLongPressListener;
+    private BackspaceLongPressListener backspaceLongPressListener;
+
     private final Paint facePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint labelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint hintPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -76,6 +89,28 @@ public class TurtleKeyboardView extends KeyboardView {
 
     public TurtleKeyboardView(Context context, AttributeSet attrs, int defStyle) {
         this(context, attrs);
+    }
+
+    public void setModeKeyLongPressListener(ModeKeyLongPressListener l) {
+        this.modeKeyLongPressListener = l;
+    }
+
+    public void setBackspaceLongPressListener(BackspaceLongPressListener l) {
+        this.backspaceLongPressListener = l;
+    }
+
+    @Override
+    protected boolean onLongPress(Keyboard.Key popupKey) {
+        int code = codeOf(popupKey);
+        if (code == CODE_MODE && modeKeyLongPressListener != null) {
+            modeKeyLongPressListener.onModeKeyLongPress();
+            return true;
+        }
+        if (code == CODE_BACKSPACE && backspaceLongPressListener != null) {
+            backspaceLongPressListener.onBackspaceLongPress();
+            return true;
+        }
+        return super.onLongPress(popupKey);
     }
 
     /** Apply theme-driven colors. Safe to call repeatedly. */

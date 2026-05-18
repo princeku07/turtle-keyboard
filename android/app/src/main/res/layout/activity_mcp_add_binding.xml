@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- ============ Step 1: Endpoint + auth ============ -->
+        <LinearLayout
+            android:id="@+id/step_endpoint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                style="@style/TextSectionLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="1. MCP server endpoint" />
+
+            <TextView
+                style="@style/TextBodyMuted"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="12dp"
+                android:text="Paste the server's HTTPS URL. We'll call tools/list to discover what it can do." />
+
+            <EditText
+                android:id="@+id/edit_endpoint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="https://mcp.example.com/mcp"
+                android:inputType="textUri"
+                android:autofillHints="url"
+                android:singleLine="true" />
+
+            <TextView
+                style="@style/TextBodyMuted"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="4dp"
+                android:text="Bearer token (optional)" />
+
+            <EditText
+                android:id="@+id/edit_token"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Leave blank for unauthenticated servers"
+                android:inputType="textPassword"
+                android:autofillHints="password"
+                android:singleLine="true" />
+
+            <Button
+                android:id="@+id/btn_discover"
+                style="@style/ButtonBrutalPrimary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="Discover tools" />
+
+            <TextView
+                android:id="@+id/discover_status"
+                style="@style/TextBodyMuted"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <!-- ============ Step 2: Pick a tool ============ -->
+        <LinearLayout
+            android:id="@+id/step_pick_tool"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                style="@style/TextSectionLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="2. Pick a tool" />
+
+            <RadioGroup
+                android:id="@+id/tools_group"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="vertical" />
+
+            <Button
+                android:id="@+id/btn_use_tool"
+                style="@style/ButtonBrutalPrimary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="Use this tool" />
+        </LinearLayout>
+
+        <!-- ============ Step 3: Name the binding ============ -->
+        <LinearLayout
+            android:id="@+id/step_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                style="@style/TextSectionLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="3. Bind to a slash command" />
+
+            <TextView
+                style="@style/TextBodyMuted"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="4dp"
+                android:text="Command name (no slash)" />
+
+            <EditText
+                android:id="@+id/edit_command"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="e.g. issue"
+                android:inputType="text"
+                android:singleLine="true" />
+
+            <TextView
+                style="@style/TextBodyMuted"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:layout_marginBottom="4dp"
+                android:text="Label (shown in suggestion strip)" />
+
+            <EditText
+                android:id="@+id/edit_label"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="e.g. Create Linear issue"
+                android:inputType="text"
+                android:singleLine="true" />
+
+            <TextView
+                style="@style/TextBodyMuted"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:layout_marginBottom="4dp"
+                android:text="Emoji" />
+
+            <EditText
+                android:id="@+id/edit_emoji"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="🔌"
+                android:inputType="text"
+                android:singleLine="true" />
+
+            <TextView
+                style="@style/TextBodyMuted"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:layout_marginBottom="4dp"
+                android:text="Argument template (JSON). Supports ${prompt}, ${clipboard}, ${recipient}." />
+
+            <EditText
+                android:id="@+id/edit_args"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint='{"title": "${prompt}"}'
+                android:inputType="textMultiLine"
+                android:minLines="3"
+                android:gravity="top|start" />
+
+            <TextView
+                style="@style/TextBodyMuted"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:layout_marginBottom="4dp"
+                android:text="Result format (optional). e.g. ${url} pulls structuredContent.url. Blank = concat all text parts." />
+
+            <EditText
+                android:id="@+id/edit_result_format"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="${url}"
+                android:inputType="text"
+                android:singleLine="true" />
+
+            <Button
+                android:id="@+id/btn_save"
+                style="@style/ButtonBrutalPrimary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="Save binding" />
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>
