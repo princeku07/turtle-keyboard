@@ -112,11 +112,20 @@ class KeyboardViewController: UIInputViewController {
 
     private var commandBar:          UIView!
     private var cmdPill:             UILabel!
+    private var cmdPromptScrollView: UIScrollView!
     private var cmdPromptLabel:      UILabel!
     private var cmdSendButton:       UIButton!
     private var cmdCancelButton:     UIButton!
     private var cmdMicButton:        UIButton!
     private var cmdSpinner:          UIActivityIndicatorView!
+
+    /// Caret position within the **prompt portion** of `slashBuffer` (i.e.
+    /// the substring after the first space). Nil while we're still in draft
+    /// mode (no committed command yet); after committing, defaults to the
+    /// end of the prompt so typing keeps appending as before. The user can
+    /// tap inside the prompt scroll view to move the caret mid-text, after
+    /// which typing inserts and backspace deletes at this index.
+    private var promptCaretIndex:    Int?
 
     // Voice dictation for the prompt area. Lazily created on first mic tap so
     // we don't pull in SFSpeechRecognizer until the user actually wants it.
@@ -528,17 +537,33 @@ class KeyboardViewController: UIInputViewController {
         cmdPill.translatesAutoresizingMaskIntoConstraints = false
         commandBar.addSubview(cmdPill)
 
-        // Prompt preview — must stretch to fill whatever space the fixed
-        // elements (pill + mic + send) leave behind, and shrink (with
-        // truncation) before any of those clip when the row is narrow.
+        // Prompt area — a horizontal scroll view wrapping the prompt label
+        // so long prompts don't truncate. The user can swipe the prompt
+        // text and tap-to-position the caret (see `handlePromptTap`).
+        cmdPromptScrollView = UIScrollView()
+        cmdPromptScrollView.showsHorizontalScrollIndicator = false
+        cmdPromptScrollView.showsVerticalScrollIndicator = false
+        cmdPromptScrollView.alwaysBounceVertical = false
+        cmdPromptScrollView.translatesAutoresizingMaskIntoConstraints = false
+        commandBar.addSubview(cmdPromptScrollView)
+
         cmdPromptLabel = UILabel()
         cmdPromptLabel.font      = .systemFont(ofSize: 15)
         cmdPromptLabel.textColor = KeyboardPalette.barText.withAlphaComponent(0.45)
-        cmdPromptLabel.lineBreakMode = .byTruncatingTail
-        cmdPromptLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        cmdPromptLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        // The scroll view owns overflow now — let the label render full text
+        // (no `.byTruncatingTail`) so its intrinsic content width drives the
+        // scroll view's content size.
+        cmdPromptLabel.lineBreakMode = .byClipping
         cmdPromptLabel.translatesAutoresizingMaskIntoConstraints = false
-        commandBar.addSubview(cmdPromptLabel)
+        cmdPromptScrollView.addSubview(cmdPromptLabel)
+
+        // Tap to position the caret inside the prompt. Lives on the scroll
+        // view rather than the label so taps in trailing whitespace still
+        // hit (the label only covers rendered text width).
+        let promptTap = UITapGestureRecognizer(
+            target: self, action: #selector(handlePromptTap(_:)))
+        promptTap.cancelsTouchesInView = false
+        cmdPromptScrollView.addGestureRecognizer(promptTap)
 
         // Preset chip strip — shares the prompt-label's slot. Visible only
         // while a needsPrompt command is active, the user hasn't typed
@@ -549,15 +574,18 @@ class KeyboardViewController: UIInputViewController {
         commandBar.addSubview(cmdPresetStrip)
 
         // Blinking text caret — visual cue that the prompt label is the
-        // current write surface. Positioned right after the rendered text
-        // via a dynamic leading constraint that `updateCaretPosition()`
-        // refreshes whenever the label text changes.
+        // current write surface. Positioned via a dynamic leading constraint
+        // that `updateCaretPosition()` refreshes from `promptCaretIndex` (in
+        // prompt mode) or `caretAnchorWidth` (in draft mode). Lives inside
+        // the scroll view so it scrolls with the text, and never absorbs
+        // taps — `handlePromptTap` owns those.
         cmdCaret = UIView()
         cmdCaret.translatesAutoresizingMaskIntoConstraints = false
         cmdCaret.backgroundColor = .white
         cmdCaret.layer.cornerRadius = 1
         cmdCaret.isHidden = true
-        commandBar.addSubview(cmdCaret)
+        cmdCaret.isUserInteractionEnabled = false
+        cmdPromptScrollView.addSubview(cmdCaret)
 
         // Spinner
         cmdSpinner = UIActivityIndicatorView(style: .medium)
@@ -684,16 +712,33 @@ class KeyboardViewController: UIInputViewController {
             cmdPill.centerYAnchor.constraint(equalTo: commandBar.centerYAnchor),
             cmdPill.heightAnchor.constraint(equalToConstant: 26),
 
-            cmdPromptLabel.leadingAnchor.constraint(equalTo: cmdPill.trailingAnchor, constant: 6),
-            cmdPromptLabel.centerYAnchor.constraint(equalTo: commandBar.centerYAnchor),
-            cmdPromptLabel.trailingAnchor.constraint(equalTo: cmdMicButton.leadingAnchor, constant: -6),
+            // Prompt scroll view fills the slot between pill and mic. The
+            // label inside it can be wider than the frame — that's what
+            // makes the prompt scroll horizontally.
+            cmdPromptScrollView.leadingAnchor.constraint(equalTo: cmdPill.trailingAnchor, constant: 6),
+            cmdPromptScrollView.trailingAnchor.constraint(equalTo: cmdMicButton.leadingAnchor, constant: -6),
+            cmdPromptScrollView.centerYAnchor.constraint(equalTo: commandBar.centerYAnchor),
+            cmdPromptScrollView.heightAnchor.constraint(equalToConstant: 28),
+
+            // Label fills the scroll view's CONTENT layout guide so its
+            // intrinsic width drives content size. Vertically it matches
+            // the FRAME layout guide so the text stays centered as the
+            // user scrolls horizontally.
+            cmdPromptLabel.topAnchor.constraint(equalTo: cmdPromptScrollView.contentLayoutGuide.topAnchor),
+            cmdPromptLabel.bottomAnchor.constraint(equalTo: cmdPromptScrollView.contentLayoutGuide.bottomAnchor),
+            cmdPromptLabel.leadingAnchor.constraint(equalTo: cmdPromptScrollView.contentLayoutGuide.leadingAnchor),
+            cmdPromptLabel.trailingAnchor.constraint(equalTo: cmdPromptScrollView.contentLayoutGuide.trailingAnchor),
+            cmdPromptLabel.heightAnchor.constraint(equalTo: cmdPromptScrollView.frameLayoutGuide.heightAnchor),
 
             cmdPresetStrip.leadingAnchor.constraint(equalTo: cmdPill.trailingAnchor, constant: 6),
             cmdPresetStrip.centerYAnchor.constraint(equalTo: commandBar.centerYAnchor),
             cmdPresetStrip.trailingAnchor.constraint(equalTo: cmdMicButton.leadingAnchor, constant: -6),
             cmdPresetStrip.heightAnchor.constraint(equalToConstant: 30),
 
-            cmdCaret.centerYAnchor.constraint(equalTo: commandBar.centerYAnchor),
+            // Caret rides in the scroll view's content area (leading from
+            // the label so it scrolls with the text) and centers vertically
+            // on the frame guide so it stays put as content shifts.
+            cmdCaret.centerYAnchor.constraint(equalTo: cmdPromptScrollView.frameLayoutGuide.centerYAnchor),
             cmdCaret.widthAnchor.constraint(equalToConstant: 2),
             cmdCaret.heightAnchor.constraint(equalToConstant: 18),
 
@@ -1001,47 +1046,127 @@ class KeyboardViewController: UIInputViewController {
     }
 
     private func handleSlashBufferKey(_ key: String) {
+        // Prompt mode = there's a space in the buffer (e.g. "/cap a samurai
+        // cat" → command "cap", prompt "a samurai cat"). Mutations there
+        // honour `promptCaretIndex` so the user can edit mid-prompt after
+        // tapping. Draft mode (no space yet) keeps the simpler append /
+        // pop-from-end behaviour — caret has no meaning while the user is
+        // still typing the command name.
+        let inPrompt = splitSlashBuffer() != nil
+
         switch key {
         case "↵":
             // Treat return as "send" if we have a valid command queued.
             if activeCommand != nil { sendCommand() }
             return
+
         case "⌫":
-            guard var buf = slashBuffer else { return }
-            if !buf.isEmpty { buf.removeLast() }
-            if buf.isEmpty {
-                slashBuffer = nil
-                hideCommandBar()
+            if inPrompt {
+                handlePromptBackspace()
             } else {
-                slashBuffer = buf
-            }
-            updateCommandDetection()
-            return
-        case "space":
-            slashBuffer? += " "
-            updateCommandDetection()
-            return
-        default:
-            var text = key
-            if mode == .qwerty, key.count == 1, key.first?.isLetter == true {
-                text = (isCapsLock || isShiftedOnce) ? key.uppercased() : key
-                if isShiftedOnce && !isCapsLock {
-                    isShiftedOnce = false
-                    slashBuffer? += text
-                    updateCommandDetection()
-                    rebuildKeyboard()
-                    return
+                guard var buf = slashBuffer else { return }
+                if !buf.isEmpty { buf.removeLast() }
+                if buf.isEmpty {
+                    slashBuffer = nil
+                    hideCommandBar()
+                } else {
+                    slashBuffer = buf
                 }
             }
-            slashBuffer? += text
+            updateCommandDetection()
+            return
+
+        case "space":
+            if inPrompt {
+                insertIntoPrompt(" ")
+            } else {
+                // Transition into prompt mode — append the space and reset
+                // the caret to the start of the (still-empty) prompt.
+                slashBuffer? += " "
+                promptCaretIndex = 0
+            }
+            updateCommandDetection()
+            return
+
+        default:
+            var text = key
+            let isQwertyLetter = (mode == .qwerty
+                                  && key.count == 1
+                                  && key.first?.isLetter == true)
+            if isQwertyLetter {
+                text = (isCapsLock || isShiftedOnce) ? key.uppercased() : key
+            }
+            if inPrompt {
+                insertIntoPrompt(text)
+            } else {
+                slashBuffer? += text
+            }
+            if isQwertyLetter, isShiftedOnce, !isCapsLock {
+                isShiftedOnce = false
+                updateCommandDetection()
+                rebuildKeyboard()
+                return
+            }
             updateCommandDetection()
         }
     }
 
+    /// `slashBuffer` split into "/cap " (head, with trailing space) plus
+    /// the prompt portion after it. Returns nil while we're still in draft
+    /// mode — i.e. nothing past the slash, or no space typed yet.
+    private func splitSlashBuffer() -> (head: String, prompt: String)? {
+        guard let buf = slashBuffer, let spaceIdx = buf.firstIndex(of: " ") else {
+            return nil
+        }
+        let afterSpace = buf.index(after: spaceIdx)
+        return (head: String(buf[..<afterSpace]), prompt: String(buf[afterSpace...]))
+    }
+
+    /// Current prompt portion of `slashBuffer`, or nil in draft mode.
+    private func currentPromptText() -> String? { splitSlashBuffer()?.prompt }
+
+    /// Insert `text` into the prompt at `promptCaretIndex` and advance the
+    /// caret. The command head ("/cap ") stays untouched.
+    private func insertIntoPrompt(_ text: String) {
+        guard let split = splitSlashBuffer() else { return }
+        var prompt = split.prompt
+        let caret = max(0, min(promptCaretIndex ?? prompt.count, prompt.count))
+        let insertIdx = prompt.index(prompt.startIndex, offsetBy: caret)
+        prompt.insert(contentsOf: text, at: insertIdx)
+        slashBuffer = split.head + prompt
+        promptCaretIndex = caret + text.count
+    }
+
+    /// Backspace at `promptCaretIndex`. If the caret is at the start of the
+    /// prompt and the prompt is empty, this drops the trailing space and
+    /// transitions back to draft mode (so `/cap ` → `/cap`). With caret at
+    /// 0 and a non-empty prompt, this is a no-op — refusing to silently
+    /// merge prompt content into the command name.
+    private func handlePromptBackspace() {
+        guard let split = splitSlashBuffer() else { return }
+        var prompt = split.prompt
+        let caret = max(0, min(promptCaretIndex ?? prompt.count, prompt.count))
+        if caret > 0 {
+            let removeIdx = prompt.index(prompt.startIndex, offsetBy: caret - 1)
+            prompt.remove(at: removeIdx)
+            slashBuffer = split.head + prompt
+            promptCaretIndex = caret - 1
+        } else if prompt.isEmpty {
+            // Drop the trailing space — back to draft mode.
+            slashBuffer = String(split.head.dropLast())
+            promptCaretIndex = nil
+        }
+        // else: caret == 0 && prompt non-empty → no-op.
+    }
+
     private func handleBackspace() {
-        let proxy = textDocumentProxy
-        if let sel = proxy.selectedText, !sel.isEmpty { proxy.insertText("") }
-        else { proxy.deleteBackward() }
+        // `deleteBackward()` already handles both cases per UIKeyInput:
+        // selected text → delete the selection; no selection → delete the
+        // character before the caret. The previous `insertText("")` path
+        // for selected text was unreliable across hosts (Slack, for one,
+        // ignored it and left the selection intact), so the user's tap
+        // looked like a no-op when text was highlighted.
+        textDocumentProxy.deleteBackward()
     }
 
     private func handleShift() {
@@ -1344,6 +1469,15 @@ class KeyboardViewController: UIInputViewController {
 
     private func showCommandBar(_ cmd: SlashCommand) {
         guard !isGenerating else { return }
+        // First entry into prompt mode for this command — anchor the caret
+        // at the end of whatever prompt text already exists (typically 0
+        // for a fresh "/cap " transition). Once set, the caret is owned by
+        // `insertIntoPrompt` / `handlePromptBackspace` / `handlePromptTap`
+        // so subsequent showCommandBar calls (re-rendered on each keystroke)
+        // don't clobber it.
+        if activeCommand == nil {
+            promptCaretIndex = currentPromptText()?.count ?? 0
+        }
         activeCommand = cmd
         suggestionMode = .slashCommand
         // Leaving draft mode — let the caret measure full label text again.
@@ -1628,6 +1762,7 @@ class KeyboardViewController: UIInputViewController {
         pendingSuggestions = []
         suggestionMode = .none
         caretAnchorWidth = nil
+        promptCaretIndex = nil
         slashAutocompleteTopMatch = nil
         hideSlashStrip()
         // Drop any staged /edit reference — the user backed out before
@@ -1945,6 +2080,7 @@ class KeyboardViewController: UIInputViewController {
         cmdCaret.isHidden = !visible
         guard visible else { return }
         updateCaretPosition()
+        scrollCaretIntoView()
     }
 
     private func updateCaretPosition() {
@@ -1952,12 +2088,35 @@ class KeyboardViewController: UIInputViewController {
             cmdCaretLeading.constant = 0
             return
         }
-        let maxWidth = max(0, label.bounds.width - 2)
+        // Prompt mode: caret position is driven by `promptCaretIndex` so
+        // the user can tap mid-text and have inserts / backspaces happen
+        // at that spot. No `maxWidth` clamp here — the scroll view makes
+        // the caret visible even when it lands past the visible frame.
+        if activeCommand != nil, let idx = promptCaretIndex {
+            let prompt = currentPromptText() ?? ""
+            if prompt.isEmpty {
+                // Empty prompt = placeholder is what's rendered (e.g. "type
+                // prompt above…"). Anchor the caret to the END of the
+                // placeholder so it visually sits at the tail of the
+                // sentence, not awkwardly to the left of it. As soon as
+                // the user types, the prompt becomes non-empty and the
+                // caret tracks `promptCaretIndex` against real text.
+                let text = label.text ?? ""
+                let w = (text as NSString).size(withAttributes: [.font: font]).width
+                cmdCaretLeading.constant = w
+                return
+            }
+            let clamped = max(0, min(idx, prompt.count))
+            let prefix = String(prompt.prefix(clamped))
+            let width = (prefix as NSString).size(withAttributes: [.font: font]).width
+            cmdCaretLeading.constant = width
+            return
+        }
         // Draft mode supplies an explicit width so the caret lands between
         // the typed prefix and the ghost completion, not at the end of the
         // ghost.
         if let override = caretAnchorWidth {
-            cmdCaretLeading.constant = min(override, maxWidth) + 1
+            cmdCaretLeading.constant = override
             return
         }
         guard let text = label.text, !text.isEmpty else {
@@ -1965,7 +2124,74 @@ class KeyboardViewController: UIInputViewController {
             return
         }
         let size = (text as NSString).size(withAttributes: [.font: font])
-        cmdCaretLeading.constant = min(size.width, maxWidth) + 1
+        cmdCaretLeading.constant = size.width
+    }
+
+    /// Scroll the prompt area so the caret sits comfortably inside the
+    /// visible frame. Padding keeps the caret away from the trailing edge
+    /// so the user can still see a few characters past it while typing.
+    private func scrollCaretIntoView() {
+        guard let scroll = cmdPromptScrollView else { return }
+        scroll.layoutIfNeeded()
+        let caretX = cmdCaretLeading.constant
+        let visibleW = scroll.bounds.width
+        guard visibleW > 0 else { return }
+        let pad: CGFloat = 24
+        let leftEdge = scroll.contentOffset.x
+        let rightEdge = leftEdge + visibleW
+        var newOffsetX = leftEdge
+        if caretX < leftEdge + pad {
+            newOffsetX = max(0, caretX - pad)
+        } else if caretX > rightEdge - pad {
+            newOffsetX = caretX - visibleW + pad
+        }
+        // Don't scroll past the content — when content fits, contentOffset
+        // stays at 0.
+        let maxOffset = max(0, scroll.contentSize.width - visibleW)
+        newOffsetX = max(0, min(newOffsetX, maxOffset))
+        if abs(newOffsetX - scroll.contentOffset.x) > 0.5 {
+            scroll.setContentOffset(CGPoint(x: newOffsetX, y: 0), animated: false)
+        }
+    }
+
+    /// Tap inside the prompt scroll view → set `promptCaretIndex` to the
+    /// character closest to the tap. Only acts while we're in prompt mode
+    /// (i.e. a command is active); in draft mode the caret has no meaning.
+    @objc private func handlePromptTap(_ gesture: UITapGestureRecognizer) {
+        guard activeCommand != nil,
+              let label = cmdPromptLabel,
+              let font = label.font
+        else { return }
+        guard let prompt = currentPromptText(), !prompt.isEmpty else {
+            promptCaretIndex = 0
+            updateCaret()
+            return
+        }
+        // Tap location relative to the label's leading edge — same
+        // coordinate space as our cumulative-width measurements below.
+        let xInLabel = gesture.location(in: label).x
+        promptCaretIndex = nearestCharIndex(in: prompt, font: font, x: xInLabel)
+        updateCaret()
+    }
+
+    /// Character index in `text` whose left edge is closest to `x` (where
+    /// `x` is measured from the text's leading edge). Iterates char-by-char
+    /// — O(n), fine for the short prompts the command bar holds.
+    private func nearestCharIndex(in text: String, font: UIFont, x: CGFloat) -> Int {
+        let ns = text as NSString
+        var best = 0
+        var bestDist = CGFloat.greatestFiniteMagnitude
+        // 0...length so the caret can land past the final character.
+        for i in 0...ns.length {
+            let prefix = ns.substring(to: i)
+            let width = (prefix as NSString).size(withAttributes: [.font: font]).width
+            let dist = abs(width - x)
+            if dist < bestDist {
+                bestDist = dist
+                best = i
+            }
+        }
+        return best
     }
 
     /// Tap callback from `cmdPresetStrip`. Treats the chip value as the
@@ -2424,6 +2650,10 @@ extension KeyboardViewController: VoiceInputController.Sink {
         guard let prefix = voicePromptPrefix else { return }
         let trimmed = spoken.trimmingCharacters(in: .whitespacesAndNewlines)
         slashBuffer = prefix + trimmed
+        // Dictation overwrites the prompt out-of-band; snap the caret to
+        // the end of the new text so the user can keep typing without the
+        // cursor sitting at index 0 of a freshly-dictated sentence.
+        promptCaretIndex = currentPromptText()?.count
         updateCommandDetection()
     }
 
