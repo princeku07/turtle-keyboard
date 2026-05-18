@@ -64,7 +64,10 @@ public final class BuiltinAiCommands implements CommandProvider {
                 new CommandSpec("cap",     "Image",      "🎨", true,  null, CHAT_AFFINITY,      "Generating image"),
                 new CommandSpec("edit",    "Edit image", "🖼️", true,  null, CHAT_AFFINITY,      "Editing image"),
                 new CommandSpec("style",   "Style",      "✨", true,  null, CHAT_AFFINITY,      "Restyling image"),
-                new CommandSpec("sticker", "Sticker",    "🪄", true,  null, CHAT_AFFINITY,      "Making sticker"),
+                // /sticker is registered by StickerIntegration so it can run
+                // through the two-pass difference-matte pipeline. Don't list
+                // it here too — duplicate registration is treated as an error
+                // by CommandRegistry.
                 new CommandSpec("fix",     "Fix",        "✏️", false, null, WRITING_AFFINITY,   "Fixing text"),
                 new CommandSpec("tone",    "Tone",       "🎭", true,  null, WRITING_AFFINITY,   "Adjusting tone"),
                 new CommandSpec("reply",   "Reply",      "💬", false, null, EMAIL_AFFINITY,     "Drafting reply"),

@@ -1,1 +1,28 @@
-Generate a single sticker-style image. Centered subject with a bold outline, plain white background, expressive cartoon-leaning style, no text or watermark. Square 512x512 framing.
+You are generating a single sticker-style image that the client will post-process into a transparent PNG via a two-pass difference matte. Follow every rule below — the matte recovery depends on the background being exact pure white.
+
+RESPONSE FORMAT (most important rule — read first):
+- Return EXACTLY ONE image. Not two, not three, not multiple variations.
+- The response must contain exactly one inline-image part.
+- A response containing more than one image is treated as a hard failure by the client.
+
+OUTPUT SIZE:
+- Square 1024 × 1024 pixels (your natural square output).
+- No frames, panels, captions, watermarks, signatures, or text of any kind anywhere in the image.
+
+CELL / FRAMING:
+- The subject is centred and lives inside a 896 × 896 safe area (64 px margin on every side).
+- The subject does not touch any image edge.
+
+BACKGROUND (strict — the matte will fail otherwise):
+- The background MUST be pure solid white #FFFFFF in every pixel that is not part of the subject. Same exact RGB value (255, 255, 255) in every background pixel.
+- Never use gradients, vignettes, scenes, patterns, off-white, cream, light grey, or any near-white shade. The exact RGB must be (255, 255, 255).
+- Never put shadows, glows, particles, sparkles, decorative elements, drop shadows, or rim light on the background. Pure flat white only.
+- This is critical: the client takes a second render with the background swapped to black and recovers per-pixel alpha by comparing the two. Any background that is not exactly #FFFFFF will leave colour fringes around the sticker in the final PNG.
+
+SUBJECT STYLE:
+- Expressive, sticker-friendly cartoon-leaning style — bold lines, clear silhouette, saturated colours, simple shapes.
+- A thick outline (white or coloured) around the subject reads as "sticker"; include one unless the user's prompt explicitly wants a frameless look.
+- Keep the palette compact (a handful of dominant colours) — fine textures and noise hurt the matte and read as grainy in chat.
+- The subject must be visually distinct from white so the matte can separate it cleanly. Avoid pure-white interior fills that would dissolve into the background.
+
+If the user's prompt conflicts with any rule above, the rules win.

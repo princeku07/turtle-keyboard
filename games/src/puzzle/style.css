@@ -1,0 +1,122 @@
+:root {
+  /* Keyboard's actual palette — black canvas, green accent. */
+  --bg:        #000000;
+  --surface:   #1E1E1E;
+  --surface-2: #141414;
+  --accent:    #15803D;
+  --accent-2:  #1A9446;
+  --text:      #F5F5F5;
+  --muted:     #888888;
+  --border:    #2E2E2E;
+  --red:       #B91C1C;
+  --piece-outline: #F5F5F5;       /* white-ish, the jigsaw edge color */
+  --piece-outline-target: #15803D; /* green when drop-target during drag */
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+main { max-width: 560px; margin: 0 auto; padding: 16px; }
+
+.card {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 14px;
+}
+.card.center { text-align: center; }
+
+.pill {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--text);
+  margin-bottom: 10px;
+}
+.pill.muted { background: var(--surface-2); color: var(--muted); }
+.pill.red   { background: var(--red); }
+
+h1, h2 { margin: 0 0 6px; letter-spacing: -0.01em; line-height: 1.15; color: var(--text); }
+h1 { font-size: 20px; }
+h2 { font-size: 18px; }
+p.muted { color: var(--muted); margin: 6px 0 0; font-size: 13px; }
+
+/* SVG board — fills the card; touch-action none so vertical drags don't scroll the page. */
+.board {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1 / 1;
+  margin-top: 10px;
+  touch-action: none;
+  background: var(--bg);
+}
+
+/* Each <g class="piece"> wraps an invisible cell-sized <rect> (the click target)
+   plus the visible jigsaw <path>. NO `transform` transition — the drag must be
+   1:1 with the finger; CSS transitions cause lag during pointermove. */
+.piece { cursor: grab; transform-origin: 0 0; }
+.piece .hit { fill: rgba(0, 0, 0, 0); }
+.piece path {
+  stroke: var(--piece-outline);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  transition: stroke 100ms ease-out, stroke-width 100ms ease-out;
+  pointer-events: none;
+}
+.piece.held { cursor: grabbing; }
+
+/* Held piece — green outline on the jigsaw stroke. No halo; the border itself
+   IS the highlight. */
+.piece.held path {
+  stroke: var(--accent);
+  stroke-width: 3;
+}
+
+/* Drop target — same green outline plus a tight drop-shadow on the path so the
+   border looks "lit" (border glow), not a giant aura around the whole shape. */
+.piece.target path {
+  stroke: var(--accent);
+  stroke-width: 3;
+  filter: drop-shadow(0 0 4px var(--accent));
+}
+.piece.solved-flash { animation: solved-pulse 800ms ease-out 2; }
+@keyframes solved-pulse {
+  0%   { filter: brightness(1); }
+  50%  { filter: brightness(1.3); }
+  100% { filter: brightness(1); }
+}
+
+.win-banner {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--text);
+  text-align: center;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+footer {
+  text-align: center;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 16px;
+  letter-spacing: 0.04em;
+}

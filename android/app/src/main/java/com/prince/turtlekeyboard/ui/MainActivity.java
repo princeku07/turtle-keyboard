@@ -18,6 +18,7 @@ import androidx.activity.result.IntentSenderRequest;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.google.firebase.auth.FirebaseUser;
 import com.prince.kbd.core.GoogleAuth;
 import com.prince.kbd.core.GoogleAuthImpl;
 import com.prince.notion.ui.NotionConnectActivity;
@@ -27,6 +28,8 @@ import com.prince.split.SplitContract;
 import com.prince.split.SplitKeys;
 import com.prince.split.SplitOAuthScopes;
 import com.prince.split.ui.SplitActivity;
+import com.prince.turtlekeyboard.R;
+import com.prince.turtlekeyboard.auth.FirebaseAuthBridge;
 import com.prince.turtlekeyboard.databinding.ActivityMainBinding;
 import com.prince.turtlekeyboard.integration.drive.DriveLinkActivity;
 import com.prince.turtlekeyboard.ui.mcp.McpServersActivity;
@@ -53,11 +56,26 @@ public class MainActivity extends AppCompatActivity {
     private Prefs prefs;
     private com.prince.kbd.core.KeyValueStore splitStore;
     private GoogleAuth auth;
+    private FirebaseAuthBridge firebaseBridge;
     private AlertDialog signInDialog;
+
+    /** True between {@code kickoffFirebaseSignIn} firing and its callback resolving.
+     *  Guards against onResume re-kicking the One Tap flow while
+     *  {@code signInWithCredential} is still completing in the background — the result
+     *  launcher callback runs before onResume, but Firebase Auth's network step lands
+     *  later, so {@code currentUser()} is still null when onResume checks. */
+    private boolean firebaseSignInInFlight;
 
     private final ActivityResultLauncher<IntentSenderRequest> authLauncher =
             registerForActivityResult(new ActivityResultContracts.StartIntentSenderForResult(),
                     result -> finishAuth(result.getData()));
+
+    /** Separate from {@link #authLauncher}: the One Tap sign-in intent (used for the
+     *  Firebase ID token path) is structurally identical but carries a different payload,
+     *  so the bridge needs its own result hand-back. */
+    private final ActivityResultLauncher<IntentSenderRequest> firebaseSignInLauncher =
+            registerForActivityResult(new ActivityResultContracts.StartIntentSenderForResult(),
+                    result -> finishFirebaseSignIn(result.getData()));
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -66,7 +84,12 @@ public class MainActivity extends AppCompatActivity {
         setContentView(binding.getRoot());
         prefs = new Prefs(this);
         splitStore = prefs.root().scoped("split");
-        auth = new GoogleAuthImpl(this, prefs.root().scoped("google"));
+        // Web client id comes from google-services.json via the google-services plugin —
+        // required for the Firebase ID-token path; harmless for the existing access-token
+        // path which ignores it.
+        String webClientId = getString(R.string.default_web_client_id);
+        auth = new GoogleAuthImpl(this, prefs.root().scoped("google"), webClientId);
+        firebaseBridge = new FirebaseAuthBridge(this, auth);
 
         binding.btnEnable.setOnClickListener(v -> openInputMethodSettings());
         binding.btnChoose.setOnClickListener(v -> showInputMethodPicker());
@@ -85,6 +108,8 @@ public class MainActivity extends AppCompatActivity {
                 startActivity(new Intent(this, HistoryActivity.class)));
         binding.btnMcpServers.setOnClickListener(v ->
                 startActivity(new Intent(this, McpServersActivity.class)));
+        binding.btnSpriteToGifTest.setOnClickListener(v ->
+                startActivity(new Intent(this, SpriteToGifTestActivity.class)));
         // Dev button — direct-launches BottomSheetActivity with a synthetic URL so the
         // sheet rails can be verified without depending on deep-link routing (which
         // requires assetlinks.json hosted on the App Link domain). Remove once Cloudflare
@@ -126,6 +151,12 @@ public class MainActivity extends AppCompatActivity {
             SplitCloudSync.ensureSheet(this, auth, splitStore, changed -> {
                 SplitCloudSync.fetchAndMerge(MainActivity.this, auth, splitStore, null);
             });
+            // Backfill Firebase Auth for users who signed in before the bridge existed.
+            // No-op if currentUser is already populated (Firebase persists its own session)
+            // or if a sign-in we kicked off earlier is still completing.
+            if (firebaseBridge.currentUser() == null && !firebaseSignInInFlight) {
+                kickoffFirebaseSignIn();
+            }
         }
     }
 
@@ -213,6 +244,56 @@ public class MainActivity extends AppCompatActivity {
         Toast.makeText(this, "Signed in — provisioning sheet…", Toast.LENGTH_SHORT).show();
         SplitCloudSync.ensureSheet(this, auth, splitStore, ready -> {
             SplitCloudSync.fetchAndMerge(MainActivity.this, auth, splitStore, null);
+        });
+        // The user just picked a Google account 0.5s ago for the access-token grant —
+        // Play Services should auto-select silently for the One Tap ID-token path that
+        // backs Firebase Auth. Worst case: One Tap shows a chooser; user picks the same
+        // account; Firebase user materializes. Either way it's fire-and-forget for the
+        // primary Drive/Sheets flow.
+        kickoffFirebaseSignIn();
+    }
+
+    // -- Firebase Auth bridge -----------------------------------------------
+
+    private void kickoffFirebaseSignIn() {
+        firebaseSignInInFlight = true;
+        firebaseBridge.ensureSignedIn(this, new FirebaseAuthBridge.Callback() {
+            @Override public void onSignedIn(FirebaseUser user) {
+                firebaseSignInInFlight = false;
+                // Plumbing — no UI feedback. Poll/wyr features will pick up the session
+                // automatically the next time they read FirebaseAuth.getInstance().
+            }
+            @Override public void onError(String reason, GoogleAuth.PendingUi pendingUi) {
+                if (pendingUi != null) {
+                    // Keep flight flag set — the launcher result handler will land in
+                    // finishFirebaseSignIn, which clears the flag in its callbacks.
+                    runOnUiThread(() -> launchFirebaseSignInUi(pendingUi.intentSender));
+                    return;
+                }
+                firebaseSignInInFlight = false;
+                // Other errors are deliberately swallowed — Firebase Auth failure must
+                // never block the existing Drive/Sheets flow. Bridge already logs.
+            }
+        });
+    }
+
+    private void launchFirebaseSignInUi(IntentSender sender) {
+        try {
+            firebaseSignInLauncher.launch(new IntentSenderRequest.Builder(sender).build());
+        } catch (Exception e) {
+            firebaseSignInInFlight = false;
+            // Non-fatal: user can still use the app without a Firebase session.
+        }
+    }
+
+    private void finishFirebaseSignIn(Intent data) {
+        firebaseBridge.onSignInActivityResult(this, data, new FirebaseAuthBridge.Callback() {
+            @Override public void onSignedIn(FirebaseUser user) {
+                firebaseSignInInFlight = false;
+            }
+            @Override public void onError(String reason, GoogleAuth.PendingUi pendingUi) {
+                firebaseSignInInFlight = false;
+            }
         });
     }
 

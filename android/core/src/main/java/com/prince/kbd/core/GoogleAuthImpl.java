@@ -8,7 +8,9 @@ import androidx.annotation.Nullable;
 
 import com.google.android.gms.auth.api.identity.AuthorizationRequest;
 import com.google.android.gms.auth.api.identity.AuthorizationResult;
+import com.google.android.gms.auth.api.identity.BeginSignInRequest;
 import com.google.android.gms.auth.api.identity.Identity;
+import com.google.android.gms.auth.api.identity.SignInCredential;
 
 import org.json.JSONObject;
 
@@ -46,11 +48,24 @@ public final class GoogleAuthImpl implements GoogleAuth {
 
     private final Context appContext;
     private final KeyValueStore store;
+    @Nullable private final String webClientId;
 
     /** @param store typically {@code prefsRoot.scoped("google")} so all modules share state */
     public GoogleAuthImpl(Context appContext, KeyValueStore store) {
+        this(appContext, store, null);
+    }
+
+    /**
+     * @param webClientId OAuth 2.0 web client ID from Firebase. Required for
+     *                    {@link #freshIdToken}; pass {@code null} from modules
+     *                    that only need access tokens for Google APIs (split,
+     *                    notion, slack) — those keep working unchanged.
+     */
+    public GoogleAuthImpl(Context appContext, KeyValueStore store,
+                          @Nullable String webClientId) {
         this.appContext = appContext.getApplicationContext();
         this.store = store;
+        this.webClientId = (webClientId == null || webClientId.isEmpty()) ? null : webClientId;
     }
 
     @Override public boolean isSignedIn() {
@@ -120,6 +135,63 @@ public final class GoogleAuthImpl implements GoogleAuth {
             AuthorizationResult result = Identity.getAuthorizationClient(activity)
                     .getAuthorizationResultFromIntent(data);
             handleAuthSuccess(result, cb);
+        } catch (Exception e) {
+            cb.onError(e.getMessage(), null);
+        }
+    }
+
+    @Override
+    public void freshIdToken(@Nullable Activity activity, Callback cb) {
+        if (webClientId == null) {
+            cb.onError("id_token_not_configured", null);
+            return;
+        }
+        if (activity == null) {
+            cb.onError("activity required for id token", null);
+            return;
+        }
+        BeginSignInRequest req = BeginSignInRequest.builder()
+                .setGoogleIdTokenRequestOptions(
+                        BeginSignInRequest.GoogleIdTokenRequestOptions.builder()
+                                .setSupported(true)
+                                .setServerClientId(webClientId)
+                                // First-time + Firebase-bootstrap sign-in: show every Google
+                                // account on the device. Once the user picks once, Play Services
+                                // remembers the grant — One Tap returns silently on subsequent
+                                // calls without needing this flipped to true.
+                                .setFilterByAuthorizedAccounts(false)
+                                .build())
+                .setAutoSelectEnabled(true)
+                .build();
+        Identity.getSignInClient(activity).beginSignIn(req)
+                .addOnSuccessListener(result -> cb.onError(ERROR_NEEDS_UI,
+                        new PendingUi(result.getPendingIntent().getIntentSender())))
+                .addOnFailureListener(e -> cb.onError(e.getMessage(), null));
+    }
+
+    @Override
+    public void onSignInResult(@Nullable Activity activity, @Nullable Intent data, Callback cb) {
+        if (activity == null) {
+            cb.onError("activity required to finish sign-in", null);
+            return;
+        }
+        try {
+            SignInCredential credential = Identity.getSignInClient(activity)
+                    .getSignInCredentialFromIntent(data);
+            String idToken = credential.getGoogleIdToken();
+            if (idToken == null || idToken.isEmpty()) {
+                cb.onError("no id token in result", null);
+                return;
+            }
+            // SignInCredential.getId() is the user's email when the credential came
+            // from a Google account — same source of truth as the access-token path
+            // so the shared "google" store stays consistent across both flows.
+            String email = credential.getId();
+            if (email != null && !email.isEmpty()) {
+                store.putString(KEY_SIGNED_IN, "1");
+                store.putString(KEY_ACCOUNT_EMAIL, email);
+            }
+            cb.onToken(idToken);
         } catch (Exception e) {
             cb.onError(e.getMessage(), null);
         }

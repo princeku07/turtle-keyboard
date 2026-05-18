@@ -1,7 +1,5 @@
 package com.prince.turtlekeyboard.integration.wyr;
 
-import android.os.Handler;
-import android.os.Looper;
 import android.util.Log;
 import android.view.inputmethod.EditorInfo;
 
@@ -14,32 +12,35 @@ import com.prince.kbd.core.IntegrationContext;
 import com.prince.kbd.core.IntegrationSession;
 import com.prince.kbd.core.KeyboardIntegration;
 import com.prince.kbd.core.SheetViewFactory;
+import com.prince.turtlekeyboard.integration.web.GamesFirestoreClient;
+import com.prince.turtlekeyboard.integration.web.WebGameSheetView;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 /**
- * Would-you-rather integration — mirrors {@link com.prince.turtlekeyboard.integration.poll.PollIntegration}
- * shape. Local handler owns the full flow:
+ * Would-you-rather integration. Local handler owns the full flow:
  *
  * <ol>
  *   <li>Loads {@code assets/prompts/wyr.txt}.</li>
  *   <li>Calls {@link GeminiService#text} to shape the user's (optional) theme prompt
- *       into 5 dilemma pairs as JSON.</li>
- *   <li>Parses + validates, POSTs to {@link WyrClient#create}.</li>
- *   <li>Commits the returned shareable URL into the host field.</li>
+ *       into dilemma pairs as JSON.</li>
+ *   <li>Writes the artifact via {@link GamesFirestoreClient#createGame} with
+ *       {@code type:"wyr"} — the actual quiz UI lives in the WebView at
+ *       {@code games.turtlekeyboard.com/wyr/} (see {@link WebGameSheetView}).</li>
+ *   <li>Commits the returned shareable App Link URL into the host field.</li>
  * </ol>
  *
- * <p>Empty user prompt is allowed — falls back to "any theme" since the system prompt
- * tells the model to vary across categories.
+ * <p>Unlike {@code PollIntegration} (native sheet), the wyr sheet view is generic
+ * {@link WebGameSheetView} — every future WebView-based game registers the same factory
+ * keyed by its route key. Empty user prompt is allowed; system prompt covers the
+ * no-theme case.
  */
 public class WyrIntegration implements KeyboardIntegration {
 
@@ -49,9 +50,6 @@ public class WyrIntegration implements KeyboardIntegration {
 
     private static final long BUSY_BANNER_MS = 30_000L;
     private static final long FAIL_BANNER_MS = 2_500L;
-
-    private final ExecutorService io = Executors.newSingleThreadExecutor();
-    private final Handler main = new Handler(Looper.getMainLooper());
 
     @Override public String id() { return "wyr"; }
 
@@ -70,7 +68,10 @@ public class WyrIntegration implements KeyboardIntegration {
 
     @Override
     public Map<String, SheetViewFactory> sheetRoutes() {
-        return Collections.singletonMap(ROUTE_KEY, WyrSheetView::new);
+        // WebView shell. Reads game type from SheetContext.routeKey() so one factory
+        // serves every WebView game — wyr's UI lives in JS at
+        // games.turtlekeyboard.com/wyr/, not in Java.
+        return Collections.singletonMap(ROUTE_KEY, WebGameSheetView::new);
     }
 
     private void handleWyr(String prompt, IntegrationContext ctx) {
@@ -95,7 +96,8 @@ public class WyrIntegration implements KeyboardIntegration {
         });
     }
 
-    /** Main thread. Parse JSON, dispatch the Worker POST on the IO executor. */
+    /** Main thread. Parses Gemini's output and writes the artifact via Firestore.
+     *  Firestore callbacks fire on the main thread by default — no Handler hop. */
     private void onModelText(IntegrationContext ctx, String rawJson) {
         String stripped = stripCodeFences(rawJson);
         JSONObject parsed;
@@ -111,29 +113,50 @@ public class WyrIntegration implements KeyboardIntegration {
             ctx.showBanner("Couldn't shape that game — try a clearer prompt", FAIL_BANNER_MS);
             return;
         }
-        final List<WyrClient.Question> questions = new ArrayList<>(qsArr.length());
+        // Build questions as a List<Map> so Firestore serializes them as document arrays
+        // of nested maps. The JS game reads {a, b} directly off each element.
+        final List<Map<String, Object>> questions = new ArrayList<>(qsArr.length());
         for (int i = 0; i < qsArr.length(); i++) {
             JSONObject q = qsArr.optJSONObject(i);
             if (q == null) continue;
             String a = q.optString("a", "").trim();
             String b = q.optString("b", "").trim();
             if (a.isEmpty() || b.isEmpty()) continue;
-            questions.add(new WyrClient.Question(a, b));
+            Map<String, Object> m = new HashMap<>();
+            m.put("a", a);
+            m.put("b", b);
+            questions.add(m);
         }
         if (questions.size() < 2) {
             ctx.showBanner("Couldn't shape that game — try a clearer prompt", FAIL_BANNER_MS);
             return;
         }
-        io.execute(() -> {
-            try {
-                WyrClient.CreateResult result = WyrClient.create(questions);
-                main.post(() -> ctx.commitText(result.url));
-            } catch (IOException e) {
-                Log.w(TAG, "WyrClient.create failed", e);
-                final String msg = e.getMessage() == null ? "network error" : e.getMessage();
-                main.post(() -> ctx.showBanner("Game create failed: " + msg, FAIL_BANNER_MS));
+
+        Map<String, Object> state = new HashMap<>();
+        state.put("questions", questions);
+
+        GamesFirestoreClient.createGame(ROUTE_KEY, state, new GamesFirestoreClient.CreateCallback() {
+            @Override public void onSuccess(GamesFirestoreClient.CreateResult result) {
+                ctx.commitText(result.url);
+            }
+            @Override public void onError(String reason) {
+                Log.w(TAG, "GamesFirestoreClient.createGame(wyr) failed: " + reason);
+                ctx.showBanner(bannerForError(reason), FAIL_BANNER_MS);
             }
         });
+    }
+
+    private static String bannerForError(String code) {
+        switch (code) {
+            case "not_signed_in":
+                return "Open Turtle and sign in to create games";
+            case "network":
+                return "Game create failed — check your connection";
+            case "permission_denied":
+                return "Game create blocked — try signing out and back in";
+            default:
+                return "Game create failed: " + code;
+        }
     }
 
     private static String stripCodeFences(String s) {

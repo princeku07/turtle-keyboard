@@ -3,6 +3,7 @@ package com.prince.turtlekeyboard.integration;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.drawable.Drawable;
+import android.net.Uri;
 import android.util.Log;
 import android.view.View;
 
@@ -41,6 +42,7 @@ public class KeyboardIntegrationContextImpl implements IntegrationContext {
     private final GeminiService ai;
     private final McpService mcp;
     private final GoogleAuth googleAuth;
+    private final ImageBridge imageBridge;
 
     public KeyboardIntegrationContextImpl(Context appContext,
                                           KeyboardRootView root,
@@ -49,7 +51,8 @@ public class KeyboardIntegrationContextImpl implements IntegrationContext {
                                           AppProfileRegistry profiles,
                                           GeminiService ai,
                                           McpService mcp,
-                                          GoogleAuth googleAuth) {
+                                          GoogleAuth googleAuth,
+                                          ImageBridge imageBridge) {
         this.appContext = appContext;
         this.root = root;
         this.committer = committer;
@@ -58,6 +61,7 @@ public class KeyboardIntegrationContextImpl implements IntegrationContext {
         this.ai = ai;
         this.mcp = mcp;
         this.googleAuth = googleAuth;
+        this.imageBridge = imageBridge;
     }
 
     @Override public Context appContext() { return appContext; }
@@ -124,6 +128,15 @@ public class KeyboardIntegrationContextImpl implements IntegrationContext {
     }
 
     @Override public void deleteBeforeCursor(int n) { committer.deleteBeforeCursor(n); }
+
+    @Override public void pickImage(ImagePickCallback cb) { imageBridge.pickImage(cb); }
+
+    @Override public void commitImage(Uri uri, String mime) {
+        // Successful image insert means the in-flight work has landed — same as
+        // commitText, drop the gradient loader so it doesn't linger past the result.
+        root.generatingLoader().hide();
+        imageBridge.commitImage(uri, mime);
+    }
 
     @Override public void openScreen(String screenId) {
         Class<?> target;

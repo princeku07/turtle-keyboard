@@ -2,6 +2,7 @@ package com.prince.kbd.core;
 
 import android.content.Context;
 import android.graphics.drawable.Drawable;
+import android.net.Uri;
 import android.view.View;
 
 import androidx.annotation.Nullable;
@@ -11,6 +12,23 @@ import androidx.annotation.Nullable;
  * call so integrations don't reach into the IME's internals.
  */
 public interface IntegrationContext {
+
+    /** Result of a {@link #pickImage} call. Bytes are pre-downsized so integrations
+     *  don't have to repeat the heap-safety work the IME's picker already does. */
+    final class PickedImage {
+        public final byte[] bytes;
+        public final String mime;
+        public PickedImage(byte[] bytes, String mime) {
+            this.bytes = bytes;
+            this.mime = mime;
+        }
+    }
+
+    interface ImagePickCallback {
+        /** Fires once, on the main thread. {@code picked == null} means the user
+         *  cancelled or the picker was unavailable. */
+        void onPicked(@Nullable PickedImage picked);
+    }
 
     Context appContext();
 
@@ -67,6 +85,18 @@ public interface IntegrationContext {
 
     /** Delete {@code n} characters before the cursor in the host editor. */
     void deleteBeforeCursor(int n);
+
+    /** Launch the shared system photo picker. The callback fires once on the main
+     *  thread with downsized bytes (~bounded heap), or with null if the user cancels
+     *  or no picker is available. Integrations don't need to be an Activity — the
+     *  IME owns an invisible shim Activity for the {@code ACTION_GET_CONTENT} hand-off. */
+    void pickImage(ImagePickCallback cb);
+
+    /** Insert an image into the host editor. Uses {@code commitContent()} where the
+     *  host field accepts {@code mime}; falls back to placing the URI on the clipboard
+     *  with a "tap to paste" banner. Same path {@code /cap} and {@code /edit} use to
+     *  deliver their results today. */
+    void commitImage(Uri uri, String mime);
 
     /**
      * Hand off to a deeper screen the host app provides. The {@code screenId} is a stable

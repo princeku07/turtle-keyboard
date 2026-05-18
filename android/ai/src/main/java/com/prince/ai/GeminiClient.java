@@ -43,6 +43,13 @@ public final class GeminiClient implements GeminiService {
     private static final String GEMINI_IMAGE_URL =
             "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent";
 
+    /** Nano Banana Pro — Google's higher-quality image model, ~3× per-image cost
+     *  but dramatically better at compositional tasks (sprite sheets, grids,
+     *  comics, multi-frame layouts). Used by {@code /gif} where Flash reliably
+     *  fragments grids into multiple separate image outputs. */
+    private static final String GEMINI_IMAGE_PRO_URL =
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent";
+
     private static final int CONNECT_TIMEOUT_MS = 5_000;
     private static final int READ_TIMEOUT_MS = 90_000;
 
@@ -96,17 +103,34 @@ public final class GeminiClient implements GeminiService {
     @Override
     public void imageEdit(String systemPrompt, String userPrompt,
                           List<InlineImage> references, ImageCallback cb) {
+        runImageEdit(GEMINI_IMAGE_URL, "imageEdit",
+                systemPrompt, userPrompt, references, cb);
+    }
+
+    @Override
+    public void imageEditPro(String systemPrompt, String userPrompt,
+                             List<InlineImage> references, ImageCallback cb) {
+        runImageEdit(GEMINI_IMAGE_PRO_URL, "imageEditPro",
+                systemPrompt, userPrompt, references, cb);
+    }
+
+    /** Shared async wrapper for {@link #imageEdit} and {@link #imageEditPro} —
+     *  same request shape, different target URL (Flash vs Pro model). */
+    private void runImageEdit(String url, String tag, String systemPrompt,
+                              String userPrompt, List<InlineImage> references,
+                              ImageCallback cb) {
         if (apiKey.isEmpty()) {
             main.post(() -> cb.onError("ai_no_api_key"));
             return;
         }
         io.execute(() -> {
             try {
-                byte[] png = doImageEdit(systemPrompt, userPrompt, references);
+                byte[] png = doImageEdit(url, systemPrompt, userPrompt, references);
                 main.post(() -> cb.onImage(png));
             } catch (Exception e) {
-                Log.w(TAG, "imageEdit failed", e);
-                String reason = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+                Log.w(TAG, tag + " failed", e);
+                String reason = e.getMessage() == null
+                        ? e.getClass().getSimpleName() : e.getMessage();
                 main.post(() -> cb.onError(reason));
             }
         });
@@ -167,9 +191,9 @@ public final class GeminiClient implements GeminiService {
         }
     }
 
-    private byte[] doImageEdit(String systemPrompt, String userPrompt,
+    private byte[] doImageEdit(String url, String systemPrompt, String userPrompt,
                                List<InlineImage> refs) throws Exception {
-        HttpURLConnection conn = openConn(GEMINI_IMAGE_URL);
+        HttpURLConnection conn = openConn(url);
         try {
             JSONArray parts = new JSONArray();
             if (refs != null) {
@@ -224,27 +248,80 @@ public final class GeminiClient implements GeminiService {
         return readAll(conn.getInputStream());
     }
 
-    /** Walks {@code candidates[0].content.parts} for the first {@code inlineData} entry
-     *  (camelCase or snake_case) and Base64-decodes it. */
+    /** Walks {@code candidates[0].content.parts} for {@code inlineData} entries
+     *  (camelCase or snake_case) and Base64-decodes the first one. Counts the
+     *  total number of image parts and logs it — when nano banana is asked for
+     *  a sprite sheet it sometimes returns each frame as a separate image part
+     *  instead of compositing them into one tile, and the count tells us
+     *  whether the prompt successfully forced a single-image response. */
     private static byte[] decodeImagePart(String raw) throws Exception {
         JSONObject resp = new JSONObject(raw);
         JSONArray candidates = resp.optJSONArray("candidates");
         if (candidates == null || candidates.length() == 0) {
             throw new RuntimeException("no candidates: " + raw);
         }
-        JSONObject content = candidates.getJSONObject(0).optJSONObject("content");
-        if (content == null) throw new RuntimeException("no content: " + raw);
+        JSONObject cand0 = candidates.getJSONObject(0);
+        JSONObject content = cand0.optJSONObject("content");
+        if (content == null) {
+            // Model returned a finish reason without any content block —
+            // this is a refusal / safety-filter trip (e.g. IMAGE_OTHER,
+            // IMAGE_SAFETY, PROHIBITED_CONTENT). Pull out the reason and
+            // human-readable message so the caller can show "try
+            // rephrasing" instead of a generic "Gemini unreachable".
+            throw new RuntimeException(describeRefusal(cand0));
+        }
         JSONArray parts = content.optJSONArray("parts");
         if (parts == null) throw new RuntimeException("no parts: " + raw);
+
+        byte[] first = null;
+        int imagePartCount = 0;
         for (int i = 0; i < parts.length(); i++) {
             JSONObject part = parts.getJSONObject(i);
             JSONObject inline = part.optJSONObject("inlineData");
             if (inline == null) inline = part.optJSONObject("inline_data");
             if (inline != null && inline.has("data")) {
-                return Base64.decode(inline.getString("data"), Base64.DEFAULT);
+                imagePartCount++;
+                if (first == null) {
+                    first = Base64.decode(inline.getString("data"), Base64.DEFAULT);
+                }
             }
         }
-        throw new RuntimeException("no image part in response");
+        if (imagePartCount > 1) {
+            Log.w(TAG, "response contained " + imagePartCount + " image parts — "
+                    + "model fragmented the output instead of returning a single "
+                    + "composite. Using the first part; the rest are discarded.");
+        } else {
+            Log.d(TAG, "response contained 1 image part (" + (first == null ? 0
+                    : first.length) + " bytes)");
+        }
+        if (first == null) throw new RuntimeException("no image part in response");
+        return first;
+    }
+
+    /** Build a short user-facing message from a refusal candidate. The Gemini
+     *  image API returns {@code finishReason} (e.g. {@code IMAGE_OTHER},
+     *  {@code IMAGE_SAFETY}, {@code PROHIBITED_CONTENT}) and an optional
+     *  human-readable {@code finishMessage} that often contains a markdown
+     *  link to docs — we strip the link syntax and trim length so the
+     *  banner can show the text without wrapping into a wall. */
+    private static String describeRefusal(JSONObject candidate) {
+        String reason = candidate.optString("finishReason", "");
+        String msg    = candidate.optString("finishMessage", "");
+        StringBuilder out = new StringBuilder("model refused");
+        if (!reason.isEmpty()) out.append(" (").append(reason).append(")");
+        if (!msg.isEmpty()) {
+            // [text](url) → text. The doc link in IMAGE_OTHER refusals
+            // is useful in the API console but unhelpful in a 2.5-second
+            // toast banner.
+            String clean = msg.replaceAll("\\[([^\\]]+)\\]\\([^)]*\\)", "$1");
+            if (clean.length() > 120) clean = clean.substring(0, 117) + "…";
+            out.append(": ").append(clean);
+        } else {
+            // Common case: no message, just a reason. Steer the user
+            // toward the most likely fix.
+            out.append(" — try rephrasing");
+        }
+        return out.toString();
     }
 
     private static String readAll(InputStream is) throws Exception {

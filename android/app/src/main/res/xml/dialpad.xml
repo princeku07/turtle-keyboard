@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Phone-dialer style number pad. Reached by long-pressing ?123 on QWERTY.
+     Layout is a 4×4 grid (25%p columns): digits on the left three columns,
+     control keys (⌫ / ABC / ⏎) on the right column. Bottom row is true
+     dialer (* 0 #) with the 4th cell intentionally empty. -->
+<Keyboard xmlns:android="http://schemas.android.com/apk/res/android"
+    android:keyWidth="25%p"
+    android:horizontalGap="0dp"
+    android:verticalGap="6dp"
+    android:keyHeight="60dp">
+
+    <Row>
+        <Key android:codes="49" android:keyLabel="1" android:keyEdgeFlags="left"/>
+        <Key android:codes="50" android:keyLabel="2"/>
+        <Key android:codes="51" android:keyLabel="3"/>
+        <Key android:codes="-5" android:keyLabel="⌫"
+             android:isRepeatable="true" android:keyEdgeFlags="right"/>
+    </Row>
+
+    <Row>
+        <Key android:codes="52" android:keyLabel="4" android:keyEdgeFlags="left"/>
+        <Key android:codes="53" android:keyLabel="5"/>
+        <Key android:codes="54" android:keyLabel="6"/>
+        <Key android:codes="-2" android:keyLabel="ABC" android:keyEdgeFlags="right"/>
+    </Row>
+
+    <Row>
+        <Key android:codes="55" android:keyLabel="7" android:keyEdgeFlags="left"/>
+        <Key android:codes="56" android:keyLabel="8"/>
+        <Key android:codes="57" android:keyLabel="9"/>
+        <!-- No label: TurtleKeyboardView paints the circular enter face + ↵ glyph. -->
+        <Key android:codes="-4" android:keyEdgeFlags="right"/>
+    </Row>
+
+    <Row android:rowEdgeFlags="bottom">
+        <Key android:codes="42" android:keyLabel="*" android:keyEdgeFlags="left"/>
+        <Key android:codes="48" android:keyLabel="0"/>
+        <Key android:codes="35" android:keyLabel="#"/>
+    </Row>
+</Keyboard>

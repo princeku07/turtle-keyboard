@@ -1,12 +1,18 @@
 package com.prince.turtlekeyboard.ui;
 
 import android.content.Intent;
-import android.graphics.BitmapFactory;
+import android.graphics.Outline;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
+import android.util.TypedValue;
+import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewOutlineProvider;
 import android.widget.BaseAdapter;
+import android.widget.FrameLayout;
 import android.widget.GridView;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -15,13 +21,20 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.FileProvider;
 
 import com.prince.turtlekeyboard.ai.ImageHistory;
+import com.prince.turtlekeyboard.ime.view.ThumbnailLoader;
 
+import java.io.File;
 import java.util.List;
 
 /**
- * Grid of past {@code /cap} and {@code /edit} outputs. Tapping a tile opens a
- * system share sheet so the user can drop it into any app. Empty state shows
- * a hint instead of a blank screen.
+ * Grid of past {@code /cap}, {@code /edit}, {@code /style}, {@code /sticker},
+ * {@code /gif} and {@code /gift} outputs. Tapping a tile opens a system share
+ * sheet so the user can drop it into any app. Empty state shows a hint instead
+ * of a blank screen.
+ *
+ * <p>Each tile carries a small bottom-right type tag ({@code GIF} for animated
+ * outputs, {@code IMG} for stills) so the user can tell at a glance what kind
+ * of media each entry is without opening it.
  */
 public class HistoryActivity extends AppCompatActivity {
 
@@ -35,7 +48,7 @@ public class HistoryActivity extends AppCompatActivity {
 
         if (entries.isEmpty()) {
             TextView tv = new TextView(this);
-            tv.setText("Generated images will appear here.\nTry /cap a samurai cat in the keyboard.");
+            tv.setText("Generated images and GIFs land here.\nTry /sticker, /cap, or /gif in the keyboard.");
             tv.setGravity(android.view.Gravity.CENTER);
             int p = dp(24);
             tv.setPadding(p, p, p, p);
@@ -59,11 +72,15 @@ public class HistoryActivity extends AppCompatActivity {
         ImageHistory.Entry e = entries.get(position);
         Uri uri = FileProvider.getUriForFile(this,
                 getPackageName() + ".fileprovider", e.file);
+        // Pick mime by extension — ImageHistory now stores both .png and
+        // .gif under the same command tag, so a fixed image/png would let
+        // share targets refuse / mis-handle animated GIFs.
+        String mime = e.file.getName().endsWith(".gif") ? "image/gif" : "image/png";
         Intent share = new Intent(Intent.ACTION_SEND);
-        share.setType("image/png");
+        share.setType(mime);
         share.putExtra(Intent.EXTRA_STREAM, uri);
         share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        startActivity(Intent.createChooser(share, "Share image"));
+        startActivity(Intent.createChooser(share, "Share"));
     }
 
     private int dp(int v) {
@@ -77,21 +94,65 @@ public class HistoryActivity extends AppCompatActivity {
 
         @Override
         public View getView(int position, View convertView, ViewGroup parent) {
-            ImageView iv;
-            if (convertView instanceof ImageView) {
-                iv = (ImageView) convertView;
+            HistoryTile tile;
+            if (convertView instanceof HistoryTile) {
+                tile = (HistoryTile) convertView;
             } else {
-                iv = new ImageView(HistoryActivity.this);
-                iv.setLayoutParams(new GridView.LayoutParams(
+                tile = new HistoryTile(HistoryActivity.this);
+                tile.setLayoutParams(new GridView.LayoutParams(
                         GridView.LayoutParams.MATCH_PARENT, dp(112)));
-                iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
             }
-            // Sub-sample on decode — 100 thumbnails at full PNG res would OOM.
-            BitmapFactory.Options opts = new BitmapFactory.Options();
-            opts.inSampleSize = 2;
-            iv.setImageBitmap(BitmapFactory.decodeFile(
-                    entries.get(position).file.getAbsolutePath(), opts));
-            return iv;
+            tile.bind(entries.get(position).file);
+            return tile;
+        }
+    }
+
+    /** Single history cell — rounded thumbnail with a {@code GIF}/{@code IMG}
+     *  badge at the bottom-right corner. Uses the shared {@link ThumbnailLoader}
+     *  so this screen no longer decodes 100 PNGs on the main thread the way
+     *  the original sync {@code BitmapFactory.decodeFile} did. */
+    private class HistoryTile extends FrameLayout {
+        private final ImageView image;
+        private final TextView badge;
+
+        HistoryTile(android.content.Context ctx) {
+            super(ctx);
+            final int radius = dp(8);
+            setOutlineProvider(new ViewOutlineProvider() {
+                @Override public void getOutline(View view, Outline outline) {
+                    outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), radius);
+                }
+            });
+            setClipToOutline(true);
+
+            image = new ImageView(ctx);
+            image.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            addView(image, new LayoutParams(LayoutParams.MATCH_PARENT,
+                    LayoutParams.MATCH_PARENT));
+
+            badge = new TextView(ctx);
+            badge.setTextColor(0xFFFFFFFF);
+            badge.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f);
+            badge.setTypeface(badge.getTypeface(), Typeface.BOLD);
+            badge.setLetterSpacing(0.08f);
+            badge.setIncludeFontPadding(false);
+            badge.setPadding(dp(6), dp(2), dp(6), dp(2));
+            GradientDrawable pill = new GradientDrawable();
+            pill.setShape(GradientDrawable.RECTANGLE);
+            pill.setColor(0xCC000000);
+            pill.setCornerRadius(dp(10));
+            badge.setBackground(pill);
+            LayoutParams blp = new LayoutParams(LayoutParams.WRAP_CONTENT,
+                    LayoutParams.WRAP_CONTENT);
+            blp.gravity = Gravity.BOTTOM | Gravity.END;
+            blp.rightMargin = dp(6);
+            blp.bottomMargin = dp(6);
+            addView(badge, blp);
+        }
+
+        void bind(File file) {
+            ThumbnailLoader.load(file, dp(112), image);
+            badge.setText(file.getName().endsWith(".gif") ? "GIF" : "IMG");
         }
     }
 }

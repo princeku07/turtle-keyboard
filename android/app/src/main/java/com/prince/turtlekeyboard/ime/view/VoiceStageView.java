@@ -134,8 +134,10 @@ public class VoiceStageView extends FrameLayout {
 
         // Cancel any leftover animation and snap fully hidden, so the open
         // sweep always starts from a clean slate even if a previous close
-        // was interrupted.
+        // was interrupted (including a mid-flight alpha fade).
         if (revealAnim != null) revealAnim.cancel();
+        animate().cancel();
+        setAlpha(1f);
         revealProgress = 0f;
         glow.setRevealProgress(0f);
 
@@ -152,8 +154,14 @@ public class VoiceStageView extends FrameLayout {
             setVisibility(GONE);
             return;
         }
+        // Fade the whole view out in parallel with the sweep. The GL layer
+        // clears to a 0.6-alpha dim every frame, so without this the keyboard
+        // tint would still be present at revealProgress = 2 and snap off the
+        // instant we flip to GONE.
+        animate().alpha(0f).setDuration(REVEAL_CLOSE_MS).start();
         animateRevealTo(2f, REVEAL_CLOSE_MS, 0L, () -> {
             setVisibility(GONE);
+            setAlpha(1f);
             // Reset so the next open starts cleanly from the right side.
             revealProgress = 0f;
             glow.setRevealProgress(0f);
@@ -410,7 +418,12 @@ public class VoiceStageView extends FrameLayout {
                 "                     * (1.0 - smoothstep(front - 0.06,\n" +
                 "                                         front + 0.06, sweepDist));\n" +
                 "\n" +
-                "    // ---- Bowl arc: sharp violet bottom edge, softer blue body up the curve.\n" +
+                "    // ---- Bowl arc: sharp cyan rim accent at d ≈ radius, masked to\n" +
+                "    // the bottom half. This IS the defined arc silhouette — the\n" +
+                "    // dense pooled smoke at the bowl's curved bottom rim. Kept as\n" +
+                "    // an explicit ring shape (not derived from smoke noise) so\n" +
+                "    // the arc reads sharp and continuous, not gappy where the fbm\n" +
+                "    // happens to be quiet.\n" +
                 "    float thickness = 0.20;\n" +
                 "    float ringDist = (d - radius) / thickness;\n" +
                 "    float falloffScale = mix(1.2, 3.5, step(0.0, ringDist));\n" +
@@ -441,9 +454,7 @@ public class VoiceStageView extends FrameLayout {
                 "    // brighter peaks survive (less overall volume), but keep the\n" +
                 "    // pow-exponent under 1 so the surviving peaks still bloom into\n" +
                 "    // soft mid-tone halos — that's what gives the wisps the glow look\n" +
-                "    // rather than sharply-bordered streaks. Combined with the lavender\n" +
-                "    // colour and the 2.4 amplitude downstream, the bright peaks read\n" +
-                "    // as luminous against the keyboard underneath.\n" +
+                "    // rather than sharply-bordered streaks.\n" +
                 "    float wispsRaw = fbm(wispUv1) * 0.55 + fbm(wispUv2) * 0.45;\n" +
                 "    float wisps = smoothstep(0.36, 0.78, wispsRaw);\n" +
                 "    wisps = pow(wisps, 0.85);\n" +
@@ -451,11 +462,9 @@ public class VoiceStageView extends FrameLayout {
                 "    float insideMask = smoothstep(radius + 0.02, radius - 0.30, d);\n" +
                 "    float wispVerticalFade = smoothstep(0.35, -0.32, p.y);\n" +
                 "\n" +
-                "    // Smoke + halo gate: angle-agnostic, ramps IN during the second\n" +
-                "    // half of the open and ramps OUT during the first 70% of the\n" +
-                "    // close. The bowl rim leads, then smoke/halo fill in; on close,\n" +
-                "    // smoke/halo fade out first so the sweep ends as a clean rim\n" +
-                "    // wiping off rather than a smoke trail being cut.\n" +
+                "    // Smoke + halo gate: ramps IN during the second half of the\n" +
+                "    // open and ramps OUT during the first 70% of the close. The\n" +
+                "    // bowl rim leads (revealMask), then smoke/halo fill in.\n" +
                 "    float revealGate = smoothstep(0.3, 1.0, u_revealProgress)\n" +
                 "                     * (1.0 - smoothstep(1.0, 1.7, u_revealProgress));\n" +
                 "    float wispGlow = wisps * insideMask * wispVerticalFade\n" +
@@ -464,17 +473,22 @@ public class VoiceStageView extends FrameLayout {
                 "    // ---- Soft outer halo, gated by the same ramp.\n" +
                 "    float halo = exp(-d * 6.0) * 0.10 * revealGate;\n" +
                 "\n" +
-                "    // ---- Blue inner halo: softer ring just inside the violet bottom edge.\n" +
+                "    // ---- Inner halo: softer ring just inside the cyan rim accent.\n" +
                 "    float blueR = radius - 0.035;\n" +
                 "    float blueRingDist = (d - blueR) / 0.05;\n" +
                 "    float blueInnerRing = exp(-blueRingDist * blueRingDist);\n" +
                 "    float blueInnerMask = smoothstep(-0.05, -0.95, sin(ang));\n" +
                 "    float blueInnerGlow = blueInnerRing * blueInnerMask * 0.55 * revealMask;\n" +
                 "\n" +
-                "    // ---- Per-component coloring.\n" +
-                "    vec3 violetEdge = vec3(0.55, 0.28, 1.00);\n" +
-                "    vec3 blueBody   = vec3(0.18, 0.22, 1.00);\n" +
-                "    vec3 lavender   = vec3(0.62, 0.68, 1.00);\n" +
+                "    // ---- Per-component coloring (aurora theme — matches\n" +
+                "    //      GeneratingLoaderView's wave palette).\n" +
+                "    //\n" +
+                "    //      violetEdge → bright cyan rim accent (bowl bottom edge)\n" +
+                "    //      blueBody   → cool teal-blue body / inner halo / halo\n" +
+                "    //      lavender   → bright mint-cyan smoke wisps\n" +
+                "    vec3 violetEdge = vec3(0.30, 0.87, 1.00);\n" +
+                "    vec3 blueBody   = vec3(0.18, 0.55, 0.93);\n" +
+                "    vec3 lavender   = vec3(0.55, 0.95, 0.85);\n" +
                 "\n" +
                 "    vec3 colorBowl = mix(blueBody, violetEdge, bottomness);\n" +
                 "\n" +

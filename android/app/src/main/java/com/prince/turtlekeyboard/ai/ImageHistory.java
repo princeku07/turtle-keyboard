@@ -13,10 +13,17 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Append-only on-disk log of {@code /cap} and {@code /edit} outputs. Each entry is
- * a {@code <ts>.png} in {@code filesDir/history/} with a sidecar {@code <ts>.txt}
- * holding {@code command\nprompt}. Sidecar files keep the format readable from a
- * shell and avoid bringing in a JSON dependency just for two fields.
+ * Append-only on-disk log of generated media. Each entry is a
+ * {@code <ts>.<ext>} in {@code filesDir/history/} with a sidecar
+ * {@code <ts>.txt} holding {@code command\nprompt}. Sidecar files keep the
+ * format readable from a shell and avoid bringing in a JSON dependency just
+ * for two fields.
+ *
+ * <p>Extensions tracked today: {@code .png} for still images ({@code /cap},
+ * {@code /edit}, {@code /style}, {@code /sticker}, plus the {@code /gif}
+ * sprite-sheet debug artifact) and {@code .gif} for animated outputs
+ * ({@code /gif}, {@code /gift}). The list call returns all of them in one
+ * pass, newest first — surfaces filter by command or extension as needed.
  *
  * <p>Capped at {@link #MAX_ENTRIES} — older entries are pruned on every record
  * so the directory can't grow unbounded.
@@ -42,16 +49,24 @@ public class ImageHistory {
         return d;
     }
 
-    /** Copies {@code img} into the history directory under a fresh timestamp and
-     *  writes the sidecar. Best-effort — IO failures are logged and swallowed so
-     *  history persistence never blocks the user-visible result. */
-    public static void record(Context ctx, File img, String command, String prompt) {
-        if (img == null || !img.exists()) return;
+    /** Recognised source/target extensions. Files that don't match are
+     *  ignored by {@link #list} and {@link #prune} so unrelated junk
+     *  dropped into {@code filesDir/history/} can't corrupt the listing. */
+    private static final String[] TRACKED_EXTS = { ".png", ".gif" };
+
+    /** Copies {@code src} into the history directory under a fresh timestamp,
+     *  preserving the source extension (so {@code foo.gif} lands as
+     *  {@code <ts>.gif} and stays animatable). Writes the sidecar with the
+     *  command + prompt. Best-effort — IO failures are logged and swallowed
+     *  so history persistence never blocks the user-visible result. */
+    public static void record(Context ctx, File src, String command, String prompt) {
+        if (src == null || !src.exists()) return;
         try {
             File dir = historyDir(ctx);
             long ts = System.currentTimeMillis();
-            File copy = new File(dir, ts + ".png");
-            try (FileInputStream in = new FileInputStream(img);
+            String ext = extensionOf(src.getName(), ".png");
+            File copy = new File(dir, ts + ext);
+            try (FileInputStream in = new FileInputStream(src);
                  FileOutputStream out = new FileOutputStream(copy)) {
                 byte[] buf = new byte[8192];
                 int n;
@@ -69,14 +84,21 @@ public class ImageHistory {
         }
     }
 
-    /** Newest entries first. Empty when the directory is missing or unreadable. */
+    /** Newest entries first. Returns every tracked-extension file in one pass;
+     *  callers filter by {@link Entry#command} or by the file's extension
+     *  (e.g. the GIF tab keeps only {@code .gif}, the test screen keeps only
+     *  {@code .png} sprite sheets). Empty when the directory is missing or
+     *  unreadable. Performs disk I/O — call from a background thread. */
     public static List<Entry> list(Context ctx) {
         File dir = historyDir(ctx);
-        File[] files = dir.listFiles((d, name) -> name.endsWith(".png"));
+        File[] files = dir.listFiles((d, name) -> hasTrackedExt(name));
         if (files == null) return Collections.emptyList();
         List<Entry> entries = new ArrayList<>(files.length);
-        for (File png : files) {
-            String base = png.getName().replace(".png", "");
+        for (File f : files) {
+            String name = f.getName();
+            int dot = name.lastIndexOf('.');
+            if (dot <= 0) continue;
+            String base = name.substring(0, dot);
             long ts;
             try { ts = Long.parseLong(base); } catch (NumberFormatException e) { continue; }
             File meta = new File(dir, ts + ".txt");
@@ -102,23 +124,45 @@ public class ImageHistory {
                     }
                 } catch (Exception ignored) { /* keep empty fields */ }
             }
-            entries.add(new Entry(ts, command, prompt, png));
+            entries.add(new Entry(ts, command, prompt, f));
         }
         Collections.sort(entries, (a, b) -> Long.compare(b.ts, a.ts));
         return entries;
     }
 
     private static void prune(File dir) {
-        File[] pngs = dir.listFiles((d, name) -> name.endsWith(".png"));
-        if (pngs == null || pngs.length <= MAX_ENTRIES) return;
-        Arrays.sort(pngs, (a, b) -> a.getName().compareTo(b.getName()));
-        int toDelete = pngs.length - MAX_ENTRIES;
+        File[] media = dir.listFiles((d, name) -> hasTrackedExt(name));
+        if (media == null || media.length <= MAX_ENTRIES) return;
+        // Sort by name = sort by timestamp (filenames are <ts>.<ext>), so the
+        // lexicographic sort puts oldest first. Don't trust extension order.
+        Arrays.sort(media, (a, b) -> a.getName().compareTo(b.getName()));
+        int toDelete = media.length - MAX_ENTRIES;
         for (int i = 0; i < toDelete; i++) {
-            String base = pngs[i].getName().replace(".png", "");
+            String name = media[i].getName();
+            int dot = name.lastIndexOf('.');
+            if (dot > 0) {
+                //noinspection ResultOfMethodCallIgnored
+                new File(dir, name.substring(0, dot) + ".txt").delete();
+            }
             //noinspection ResultOfMethodCallIgnored
-            new File(dir, base + ".txt").delete();
-            //noinspection ResultOfMethodCallIgnored
-            pngs[i].delete();
+            media[i].delete();
         }
+    }
+
+    private static boolean hasTrackedExt(String name) {
+        for (String e : TRACKED_EXTS) {
+            if (name.endsWith(e)) return true;
+        }
+        return false;
+    }
+
+    private static String extensionOf(String name, String fallback) {
+        int dot = name.lastIndexOf('.');
+        if (dot < 0 || dot == name.length() - 1) return fallback;
+        String ext = name.substring(dot).toLowerCase();
+        for (String tracked : TRACKED_EXTS) {
+            if (tracked.equals(ext)) return tracked;
+        }
+        return fallback;
     }
 }

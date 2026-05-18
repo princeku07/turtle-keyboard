@@ -9,6 +9,11 @@ constraintlayout = "2.2.1"
 playServicesAuth = "21.2.0"
 zxingCore = "3.5.3"
 browser = "1.8.0"
+emoji2 = "1.5.0"
+transition = "1.4.1"
+googleServices = "4.4.2"
+firebaseBom = "33.7.0"
+revenuecat = "8.10.0"
 
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -20,8 +25,17 @@ constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayo
 play-services-auth = { group = "com.google.android.gms", name = "play-services-auth", version.ref = "playServicesAuth" }
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxingCore" }
 browser = { group = "androidx.browser", name = "browser", version.ref = "browser" }
+emoji2 = { group = "androidx.emoji2", name = "emoji2", version.ref = "emoji2" }
+emoji2-views-helper = { group = "androidx.emoji2", name = "emoji2-views-helper", version.ref = "emoji2" }
+transition = { group = "androidx.transition", name = "transition", version.ref = "transition" }
+firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
+firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore" }
+firebase-auth = { group = "com.google.firebase", name = "firebase-auth" }
+firebase-database = { group = "com.google.firebase", name = "firebase-database" }
+revenuecat-purchases = { group = "com.revenuecat.purchases", name = "purchases", version.ref = "revenuecat" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
+google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
 

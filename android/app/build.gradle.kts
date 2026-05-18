@@ -2,6 +2,7 @@ import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.google.services)
 }
 
 // Read secrets from local.properties (gitignored) so API keys never live in
@@ -14,6 +15,10 @@ val localProperties = Properties().apply {
 }
 val geminiApiKey: String = localProperties.getProperty("GEMINI_API_KEY") ?: run {
     logger.warn("GEMINI_API_KEY not set in local.properties — Gemini calls will fail at runtime")
+    ""
+}
+val revenuecatSdkKey: String = localProperties.getProperty("REVENUECAT_SDK_KEY") ?: run {
+    logger.warn("REVENUECAT_SDK_KEY not set in local.properties — RevenueCat init will fail at runtime")
     ""
 }
 
@@ -31,6 +36,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
+        buildConfigField("String", "REVENUECAT_SDK_KEY", "\"$revenuecatSdkKey\"")
     }
 
     buildTypes {
@@ -73,6 +79,22 @@ android.sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("generated/sh
 tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }
     .configureEach { dependsOn(copySharedPrompts) }
 
+// Copy the built WebView games (../../games/dist/<name>/index.html) into the
+// APK's merged assets so WebGameSheetView can load them at
+// file:///android_asset/games/<name>/index.html. The games/ workspace must be
+// built first (`cd games && pnpm build`) — Gradle does NOT invoke pnpm itself
+// to keep the Android build hermetic. If games/dist is empty or missing the
+// Copy task is a no-op and the APK builds without games.
+val copyGamesHtml = tasks.register<Copy>("copyGamesHtml") {
+    from(rootProject.file("../games/dist")) {
+        include("*/index.html")
+    }
+    into(layout.buildDirectory.dir("generated/gamesAssets/games"))
+}
+android.sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("generated/gamesAssets"))
+tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }
+    .configureEach { dependsOn(copyGamesHtml) }
+
 configurations.all {
     resolutionStrategy {
         force("org.jetbrains.kotlin:kotlin-stdlib:1.8.10")
@@ -89,6 +111,14 @@ dependencies {
     implementation(project(":web"))
     implementation(project(":ai"))
     implementation(libs.appcompat)
+    implementation(libs.emoji2)
+    implementation(libs.emoji2.views.helper)
+    implementation(libs.transition)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.firestore)
+    implementation(libs.firebase.auth)
+    implementation(libs.firebase.database)
+    implementation(libs.revenuecat.purchases)
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)

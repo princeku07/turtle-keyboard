@@ -94,9 +94,12 @@ public class LmStudioAiClient implements AiClient {
     @Override
     public void execute(SlashCommand cmd, Callback callback) {
         String name = cmd.name == null ? "" : cmd.name.toLowerCase();
+        // /sticker used to live here but has moved to StickerIntegration, which
+        // pipes it through the two-pass difference-matte for transparency. Don't
+        // re-add a branch for /sticker here — the integration owns it now.
         if (!name.equals("ask") && !name.equals("org") && !name.equals("cap")
                 && !name.equals("edit") && !name.equals("style")
-                && !name.equals("sticker") && !name.equals("us")
+                && !name.equals("us")
                 && !name.equals(RAW_COMPLETION)) {
             delegate.execute(cmd, callback);
             return;
@@ -107,7 +110,6 @@ public class LmStudioAiClient implements AiClient {
                     : name.equals("cap") ? "Describe the image…"
                     : name.equals("edit") ? "Describe the edit…"
                     : name.equals("style") ? "Pick a style (ghibli, anime, pixar…)"
-                    : name.equals("sticker") ? "Describe the sticker…"
                     : name.equals("us") ? "Try /us as astronauts"
                     : name.equals(RAW_COMPLETION) ? "Empty prompt"
                     : "Ask what?";
@@ -127,18 +129,8 @@ public class LmStudioAiClient implements AiClient {
             });
             return;
         }
-        if (name.equals("sticker")) {
-            io.execute(() -> {
-                try {
-                    byte[] png = callGeminiImage(prompt, systemPromptFor("sticker"));
-                    main.post(() -> saveImageBytes(png, callback, 0f, "sticker", prompt));
-                } catch (Exception e) {
-                    Log.w(TAG, "sticker failed", e);
-                    main.post(() -> callback.onResult(AiResult.error("Gemini unreachable")));
-                }
-            });
-            return;
-        }
+        // /sticker handled by StickerIntegration via the two-pass matte. No
+        // branch here.
         if (name.equals("edit")) {
             io.execute(() -> {
                 // Picker is launched proactively when the user enters /edit prompt mode,
@@ -589,6 +581,20 @@ public class LmStudioAiClient implements AiClient {
      *  or read failure) leave the staged image cleared; the next {@code /edit} dispatch
      *  will then fall back to the clipboard or surface "Pick an image first". Also
      *  fires the {@link OnImageStagedListener} so the IME can refresh its UI. */
+    /** Read-and-clear accessor used by integrations on the new SPI path
+     *  ({@code GifIntegration}, future image-input integrations) to consume whatever
+     *  the pre-launched picker staged. Mirrors how the in-class {@code /edit} branch
+     *  reads {@code stagedEditImage.getAndSet(null)} but returns the SPI-typed
+     *  {@link com.prince.kbd.core.IntegrationContext.PickedImage} so callers don't
+     *  depend on the private {@code ClipImage} representation. Returns null when no
+     *  image has been picked since the last consume. */
+    @Nullable
+    public static com.prince.kbd.core.IntegrationContext.PickedImage consumeStagedEditImage() {
+        ClipImage src = stagedEditImage.getAndSet(null);
+        if (src == null) return null;
+        return new com.prince.kbd.core.IntegrationContext.PickedImage(src.bytes, src.mime);
+    }
+
     public static void stageEditImage(byte[] bytes, String mime) {
         if (bytes == null) {
             stagedEditImage.set(null);

@@ -80,6 +80,13 @@
             android:name=".ui.HistoryActivity"
             android:exported="false"
             android:label="History"
+            android:parentActivityName=".ui.MainActivity"
+            android:theme="@style/Theme.TurtleKeyboard.Dark" />
+
+        <activity
+            android:name=".ui.SpriteToGifTestActivity"
+            android:exported="false"
+            android:label="Sprite → GIF test"
             android:parentActivityName=".ui.MainActivity" />
 
         <activity
