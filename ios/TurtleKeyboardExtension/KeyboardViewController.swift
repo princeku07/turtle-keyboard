@@ -65,6 +65,16 @@ class KeyboardViewController: UIInputViewController {
 
     private let textChecker = UITextChecker()
 
+    /// Serial background queue for `UITextChecker` work. The checker is
+    /// not thread-safe across concurrent callers, but using one serial
+    /// queue + cancelling stale work items keeps everything ordered.
+    private let suggestionQueue = DispatchQueue(label: "turtle.suggest", qos: .userInitiated)
+
+    /// In-flight suggestion calculation, kept here so we can cancel it
+    /// when a new keystroke arrives mid-pass — that's the debounce that
+    /// makes fast typing feel responsive instead of stuttery.
+    private var suggestionWorkItem: DispatchWorkItem?
+
     // MARK: - Layout
     //
     // keyboardContainer height = commandBarH + rowsH, always fixed.
@@ -479,7 +489,13 @@ class KeyboardViewController: UIInputViewController {
 
     private func buildPreviewOverlay() {
         let overlay = UIView()
-        overlay.backgroundColor = bgColor
+        // Pin to a dark navy background regardless of theme. The variant
+        // pills (white background, brand-green text) and the close ✕
+        // (white text on translucent-white) are designed against a dark
+        // surface — using `bgColor` made the overlay light-gray in the
+        // Light theme, which collapsed the contrast and made the close
+        // button vanish entirely.
+        overlay.backgroundColor = UIColor(red: 0.020, green: 0.031, blue: 0.102, alpha: 1.0)
         overlay.translatesAutoresizingMaskIntoConstraints = false
         keyboardContainer.addSubview(overlay)
         // Preview is a fixed-height chrome slot at the TOP of the keyboard
@@ -608,7 +624,6 @@ class KeyboardViewController: UIInputViewController {
         // measured in points and is identical on left and right.
         cmdPill.textInsets = UIEdgeInsets(top: 0, left: 8, bottom: 0, right: 8)
         cmdPill.font               = .monospacedSystemFont(ofSize: 12, weight: .bold)
-        cmdPill.textColor          = .white
         cmdPill.backgroundColor    = KeyboardPalette.chipBg
         cmdPill.textColor          = KeyboardPalette.barText
         // Capsule — matches the pill height (locked to `cmdMicH` below)
@@ -665,7 +680,7 @@ class KeyboardViewController: UIInputViewController {
         // taps — `handlePromptTap` owns those.
         cmdCaret = UIView()
         cmdCaret.translatesAutoresizingMaskIntoConstraints = false
-        cmdCaret.backgroundColor = .white
+        cmdCaret.backgroundColor = KeyboardPalette.barText
         cmdCaret.layer.cornerRadius = 1
         cmdCaret.isHidden = true
         cmdCaret.isUserInteractionEnabled = false
@@ -740,7 +755,7 @@ class KeyboardViewController: UIInputViewController {
         keyboardContainer.addSubview(bannerContainer)
 
         bannerLabel = UILabel()
-        bannerLabel.textColor     = .white
+        bannerLabel.textColor     = KeyboardPalette.barText
         bannerLabel.font          = .boldSystemFont(ofSize: 13)
         bannerLabel.textAlignment = .center
         bannerLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -1001,8 +1016,15 @@ class KeyboardViewController: UIInputViewController {
         btn.layer.shadowOffset  = CGSize(width: 0, height: 1.5)
         btn.layer.shadowOpacity = 0.45; btn.layer.shadowRadius = 0
         btn.accessibilityLabel  = label
+        // Character fires on touchDown (snappy, matches Apple's keyboard).
+        // touchUpInside / touchUpOutside / touchCancel only reset the
+        // press-scale visual so the key doesn't stay pinched if the
+        // finger lifts off-button or the gesture is cancelled (e.g. a
+        // long-press taking over).
         btn.addTarget(self, action: #selector(keyTouchDown(_:)), for: .touchDown)
         btn.addTarget(self, action: #selector(keyTapped(_:)),    for: .touchUpInside)
+        btn.addTarget(self, action: #selector(keyTapped(_:)),    for: .touchUpOutside)
+        btn.addTarget(self, action: #selector(keyTapped(_:)),    for: .touchCancel)
 
         // Press-and-hold to repeatedly delete (matches native keyboard behaviour)
         if label == "⌫" {
@@ -1064,15 +1086,37 @@ class KeyboardViewController: UIInputViewController {
     }
 
     // MARK: - Key press handling
+    //
+    // Character insertion fires on **touch down** rather than touchUpInside.
+    // iOS's native keyboard does this — it's why a fast tap registers the
+    // moment your finger touches the key, even if the finger drifts
+    // slightly off the button before lifting. The previous touchUpInside
+    // path required the finger to lift *inside* the button bounds, so
+    // sloppy fast typing lost characters silently to touchUpOutside.
+    //
+    // touchUpInside / touchUpOutside / touchCancel now only reset the
+    // press-scale visual; the character has already been committed.
 
     @objc private func keyTouchDown(_ sender: UIButton) {
         haptic.impactOccurred()
         UIView.animate(withDuration: 0.05) { sender.transform = CGAffineTransform(scaleX: 0.93, y: 0.93) }
+        guard let key = sender.accessibilityLabel else { return }
+        processKey(key)
     }
 
     @objc private func keyTapped(_ sender: UIButton) {
+        // Reset the press-scale visual. The character was inserted in
+        // `keyTouchDown` already.
         UIView.animate(withDuration: 0.08) { sender.transform = .identity }
-        guard let key = sender.accessibilityLabel else { return }
+    }
+
+    /// Carries the key's logical action. Routed from `keyTouchDown` so
+    /// the response feels instant; the touchUp handlers below only reset
+    /// the visual press state. Note: a few keys (`↵`, `⌫`, `space`,
+    /// mode-switches, slash) have side effects beyond inserting a glyph
+    /// — those flows are unchanged, just moved earlier in the touch
+    /// lifecycle.
+    private func processKey(_ key: String) {
         let proxy = textDocumentProxy
 
         // Layout/mode keys always work, regardless of slash-buffer state.
@@ -1410,6 +1454,9 @@ class KeyboardViewController: UIInputViewController {
     private func updateWordSuggestions() {
         guard activeCommand == nil, !isGenerating else { return }
 
+        // Read the document context on the main thread — `textDocumentProxy`
+        // is documented as main-thread-only and quietly returns nil from
+        // a background queue.
         let context = (textDocumentProxy.documentContextBeforeInput ?? "") as NSString
         let range = context.range(of: "\\S+$", options: .regularExpression)
 
@@ -1417,6 +1464,10 @@ class KeyboardViewController: UIInputViewController {
             // No word at cursor — empty / freshly cleared field. Offer the
             // suggested-shortcut chips if this field accepts them.
             if suggestionMode == .wordSuggestion { hideCommandBar() }
+            // Cancel any in-flight checker work; we're switching to a
+            // shortcuts surface that doesn't need UITextChecker.
+            suggestionWorkItem?.cancel()
+            suggestionWorkItem = nil
             updateSuggestedShortcuts()
             return
         }
@@ -1428,39 +1479,70 @@ class KeyboardViewController: UIInputViewController {
             // Single character or slash buffer — no UITextChecker payload,
             // but still no useful shortcuts to show either; hide if up.
             if suggestionMode == .suggestedShortcuts { hideCommandBar() }
+            suggestionWorkItem?.cancel()
+            suggestionWorkItem = nil
             return
         }
 
-        let lang = "en"
-        let wordRange = NSRange(location: 0, length: currentWord.utf16.count)
-        let completions = textChecker.completions(forPartialWordRange: wordRange,
-                                                  in: currentWord,
-                                                  language: lang) ?? []
-        var picks = Array(completions.prefix(3))
+        // Off-main `UITextChecker` work with debounce. UITextChecker
+        // synchronously walks its dictionary and can spend 10–50 ms on a
+        // short word — running that on the main thread on every
+        // keystroke was the source of the "characters don't register
+        // when I type fast" bug. The debounce coalesces a burst of
+        // keystrokes into a single tail-end check.
+        suggestionWorkItem?.cancel()
+        let token = DispatchWorkItem { [weak self] in
+            guard let self = self else { return }
+            let lang = "en"
+            let wordRange = NSRange(location: 0, length: currentWord.utf16.count)
+            let completions = self.textChecker.completions(
+                forPartialWordRange: wordRange,
+                in: currentWord,
+                language: lang
+            ) ?? []
+            var picks = Array(completions.prefix(3))
 
-        // If typed token is a misspelling, also surface guesses
-        if picks.count < 3 {
-            let misspelled = textChecker.rangeOfMisspelledWord(in: currentWord,
-                                                               range: wordRange,
-                                                               startingAt: 0,
-                                                               wrap: false,
-                                                               language: lang)
-            if misspelled.location != NSNotFound {
-                let guesses = textChecker.guesses(forWordRange: misspelled,
-                                                  in: currentWord,
-                                                  language: lang) ?? []
-                for g in guesses where !picks.contains(g) {
-                    picks.append(g)
-                    if picks.count == 3 { break }
+            // Misspelling guesses fill the remainder when the typed
+            // token isn't a known prefix.
+            if picks.count < 3 {
+                let misspelled = self.textChecker.rangeOfMisspelledWord(
+                    in: currentWord,
+                    range: wordRange,
+                    startingAt: 0,
+                    wrap: false,
+                    language: lang
+                )
+                if misspelled.location != NSNotFound {
+                    let guesses = self.textChecker.guesses(
+                        forWordRange: misspelled,
+                        in: currentWord,
+                        language: lang
+                    ) ?? []
+                    for g in guesses where !picks.contains(g) {
+                        picks.append(g)
+                        if picks.count == 3 { break }
+                    }
+                }
+            }
+
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                // Bail if the keyboard moved on to a different state
+                // while we were computing (active command bar mode,
+                // generating, etc.).
+                guard self.activeCommand == nil, !self.isGenerating else { return }
+                if picks.isEmpty {
+                    if self.suggestionMode == .wordSuggestion { self.hideCommandBar() }
+                } else {
+                    self.showWordSuggestions(picks)
                 }
             }
         }
-
-        if picks.isEmpty {
-            if suggestionMode == .wordSuggestion { hideCommandBar() }
-        } else {
-            showWordSuggestions(picks)
-        }
+        suggestionWorkItem = token
+        // 80 ms is short enough that the user perceives the suggestion
+        // as "instant after I stop", but long enough that a burst of
+        // 5–8 keystrokes coalesces into a single check.
+        suggestionQueue.asyncAfter(deadline: .now() + .milliseconds(80), execute: token)
     }
 
     // MARK: - Suggested shortcuts (per-field templates)
@@ -2346,7 +2428,7 @@ class KeyboardViewController: UIInputViewController {
         cmdPresetStrip.isHidden = true
         cmdPromptLabel.isHidden = false
         cmdPromptLabel.text = value
-        cmdPromptLabel.textColor = UIColor.white.withAlphaComponent(0.90)
+        cmdPromptLabel.textColor = KeyboardPalette.barText.withAlphaComponent(0.90)
         // Keep `slashBuffer` in sync so `handleSlashBufferKey` continues
         // to insert / backspace at the same prompt the label shows.
         // Without this, the label says "anime" but `slashBuffer` is

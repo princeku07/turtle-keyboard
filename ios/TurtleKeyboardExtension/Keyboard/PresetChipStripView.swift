@@ -89,8 +89,10 @@ final class PresetChipStripView: UIView {
         let btn = ChipButton(value: chip.value)
         btn.setTitle(chip.label, for: .normal)
         btn.titleLabel?.font = .systemFont(ofSize: 12, weight: .medium)
-        btn.setTitleColor(.white, for: .normal)
-        btn.backgroundColor = UIColor.white.withAlphaComponent(0.16)
+        // Theme-aware — light theme uses dark glyph on light chip;
+        // dark / turtle themes use white glyph on translucent chip.
+        btn.setTitleColor(KeyboardPalette.chipText, for: .normal)
+        btn.backgroundColor = KeyboardPalette.chipBg
         btn.layer.cornerRadius = 13
         btn.contentEdgeInsets = UIEdgeInsets(top: 0, left: 10, bottom: 0, right: 10)
         btn.heightAnchor.constraint(equalToConstant: 26).isActive = true

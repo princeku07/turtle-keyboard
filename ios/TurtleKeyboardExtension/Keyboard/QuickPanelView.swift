@@ -39,12 +39,13 @@ final class QuickPanelView: UIView {
         let header = UILabel()
         header.text = "Pick a command"
         header.font = .systemFont(ofSize: 12, weight: .semibold)
-        header.textColor = UIColor.white.withAlphaComponent(0.7)
+        // Theme-aware — light theme uses dark ink, dark/turtle use white.
+        header.textColor = KeyboardPalette.keyText.withAlphaComponent(0.7)
         header.translatesAutoresizingMaskIntoConstraints = false
 
         let dismiss = UIButton(type: .system)
         dismiss.setImage(UIImage(systemName: "xmark"), for: .normal)
-        dismiss.tintColor = UIColor.white.withAlphaComponent(0.7)
+        dismiss.tintColor = KeyboardPalette.keyText.withAlphaComponent(0.7)
         dismiss.addTarget(self, action: #selector(dismissTapped), for: .touchUpInside)
         dismiss.translatesAutoresizingMaskIntoConstraints = false
 
@@ -124,7 +125,11 @@ final class QuickPanelView: UIView {
         let name = UILabel()
         name.text = "/\(cmd.rawValue)"
         name.font = .monospacedSystemFont(ofSize: 11, weight: .medium)
-        name.textColor = .white
+        // Tile background is `KeyboardPalette.keyNormal` (white in the
+        // Light theme), so a hardcoded white label is invisible there.
+        // `keyText` is the matching glyph colour — dark ink on light
+        // tiles, white on dark tiles.
+        name.textColor = KeyboardPalette.keyText
         name.textAlignment = .center
 
         let stack = UIStackView(arrangedSubviews: [emoji, name])
