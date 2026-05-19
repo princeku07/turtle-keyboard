@@ -1,4 +1,5 @@
 import Foundation
+import ImageIO
 #if os(iOS)
 import UIKit
 
@@ -134,16 +135,21 @@ final class HistoryPanelView: UIView {
         tile.layer.masksToBounds = true
         tile.translatesAutoresizingMaskIntoConstraints = false
 
-        // Thumbnail. Decode synchronously — these are small PNGs from
-        // /cap or /org and we want the grid to be snappy when /history
-        // opens. If decoding fails we just show the command emoji.
+        // Thumbnail. **Critical**: decode via `CGImageSourceCreateThumbnailAtIndex`
+        // rather than `UIImage(data:)`. A keyboard extension has a ~50 MB
+        // memory ceiling; a 1024-px `/cap` PNG decodes to ~4 MB of raw
+        // pixel data, and a grid of 16+ of those blows past the ceiling
+        // and gets the extension killed by iOS (which presents to the
+        // user as "the keyboard crashed" or "the keyboard hot-swapped").
+        // The thumbnail path streams the PNG into a 144-pt thumbnail
+        // (2× retina for a 72-pt tile) and never materialises the full
+        // frame in RAM.
         let imageView = UIImageView()
         imageView.contentMode = .scaleAspectFill
         imageView.clipsToBounds = true
         imageView.translatesAutoresizingMaskIntoConstraints = false
-        if let data = try? Data(contentsOf: entry.pngURL),
-           let img = UIImage(data: data) {
-            imageView.image = img
+        if let thumb = Self.thumbnail(at: entry.pngURL, maxPixel: 288) {
+            imageView.image = thumb
         } else {
             let fallback = UILabel()
             fallback.text = SlashCommand(rawValue: entry.command)?.emoji ?? "🖼️"
@@ -184,5 +190,29 @@ final class HistoryPanelView: UIView {
     }
 
     @objc private func dismissTapped() { onDismiss?() }
+
+    /// Memory-safe thumbnail decode for `/history` tiles. Reads the PNG
+    /// from disk via `CGImageSource`, asks ImageIO for a `maxPixel`-px
+    /// thumbnail, and never decompresses the full-resolution frame into
+    /// RAM. Same technique the photo picker uses to avoid blowing the
+    /// keyboard extension's ~50 MB memory ceiling.
+    private static func thumbnail(at url: URL, maxPixel: CGFloat) -> UIImage? {
+        let opts: [CFString: Any] = [
+            kCGImageSourceShouldCache: false,
+        ]
+        guard let src = CGImageSourceCreateWithURL(url as CFURL, opts as CFDictionary) else {
+            return nil
+        }
+        let thumbOpts: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: false,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixel,
+        ]
+        guard let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, thumbOpts as CFDictionary) else {
+            return nil
+        }
+        return UIImage(cgImage: cg)
+    }
 }
 #endif

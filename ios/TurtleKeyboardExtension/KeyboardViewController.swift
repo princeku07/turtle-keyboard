@@ -2083,6 +2083,17 @@ class KeyboardViewController: UIInputViewController {
             isGenerating = false
             hideGeneratingWave()
             hideCommandBar()
+            // `/history` is keyboard-local but has no integration handler
+            // (its UI is the in-keyboard image grid). Same panel the
+            // Quick Panel tap path lands on — and same async-defer
+            // fix-up so we never tear down the command bar / mount the
+            // panel during the Send button's touch dispatch.
+            if cmd == .history {
+                DispatchQueue.main.async { [weak self] in
+                    self?.showHistoryPanel()
+                }
+                return
+            }
             if let spec = integrationRegistry.command(named: cmd.rawValue) {
                 spec.handler(prompt, integrationContext)
             }
@@ -2750,28 +2761,42 @@ extension KeyboardViewController: PHPickerViewControllerDelegate {
 extension KeyboardViewController: QuickPanelDelegate {
 
     func quickPanelDidSelect(_ command: SlashCommand) {
-        dismissQuickPanel()
-        // /history is keyboard-local with its own panel — no IntegrationKit
-        // wiring, no AI round-trip. Mount it directly so it shares the
-        // overlay slot the Quick Panel just vacated.
-        if command == .history {
-            showHistoryPanel()
-            return
-        }
-        if command.needsPrompt {
-            // Open the command bar pre-loaded with the command and an
-            // empty prompt; the user types (or dictates) the body and
-            // taps Send. Reusing the slash buffer keeps the existing
-            // detection / dispatch path intact.
-            slashBuffer = "/\(command.rawValue) "
-            updateCommandDetection()
-        } else {
-            // No prompt needed — fire immediately. activeCommand is set
-            // synchronously by updateCommandDetection so sendCommand
-            // picks it up.
-            slashBuffer = "/\(command.rawValue)"
-            updateCommandDetection()
-            sendCommand()
+        // Defer the panel teardown + next-state mount to the next runloop
+        // tick. We're currently inside the QuickPanel tile's UIAction
+        // handler — synchronously removing the QuickPanel from its
+        // superview here means UIKit is still mid-dispatch on that
+        // tile's touch event when the control deallocates. For most
+        // commands the survivor state lands in `commandBar` (a different
+        // view), so the timing happens to survive; for `/history` we
+        // *immediately* mount a fresh view into the same host slot the
+        // QuickPanel was just torn out of, which crashes. The async hop
+        // lets UIKit finish the touch dispatch first, then we tear down
+        // and remount cleanly.
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.dismissQuickPanel()
+            // /history is keyboard-local with its own panel — no
+            // IntegrationKit wiring, no AI round-trip. Mount it directly
+            // so it shares the overlay slot the Quick Panel just vacated.
+            if command == .history {
+                self.showHistoryPanel()
+                return
+            }
+            if command.needsPrompt {
+                // Open the command bar pre-loaded with the command and
+                // an empty prompt; the user types (or dictates) the
+                // body and taps Send. Reusing the slash buffer keeps
+                // the existing detection / dispatch path intact.
+                self.slashBuffer = "/\(command.rawValue) "
+                self.updateCommandDetection()
+            } else {
+                // No prompt needed — fire immediately. `activeCommand`
+                // is set synchronously by updateCommandDetection so
+                // sendCommand picks it up.
+                self.slashBuffer = "/\(command.rawValue)"
+                self.updateCommandDetection()
+                self.sendCommand()
+            }
         }
     }
 
