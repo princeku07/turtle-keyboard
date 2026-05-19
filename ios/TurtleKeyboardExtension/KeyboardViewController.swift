@@ -301,7 +301,7 @@ class KeyboardViewController: UIInputViewController {
                 guard let self = self else { return }
                 if self.suggestionMode == .suggestedShortcuts
                     || self.suggestionMode == .wordSuggestion {
-                    self.updateWordSuggestions()
+                    self.refreshSuggestions()
                 }
             }
         }
@@ -384,15 +384,15 @@ class KeyboardViewController: UIInputViewController {
         voiceController.consumePendingTranscript()
         // Re-hydrate any in-progress slash draft the user left behind when
         // they switched apps (e.g. `/ca`, `/cap a samurai cat`). Must run
-        // before updateWordSuggestions — when the draft restores, the
+        // before refreshSuggestions — when the draft restores, the
         // command bar takes over the suggestion slot.
         restoreDraftStateIfFresh()
         // Auto-capitalize the first character on empty fields / after
         // sentence-end punctuation — matches the iOS default behaviour.
         autoEngageShiftIfNeeded()
-        // Surface suggested-shortcut chips as soon as the keyboard mounts
-        // on an empty field. Subsequent text changes refresh via textDidChange.
-        updateWordSuggestions()
+        // Populate the chip strip on mount. Subsequent text changes
+        // refresh via textDidChange + the in-line `processKey` calls.
+        refreshSuggestions()
     }
 
     /// Auto-shift-once when the cursor is at a position where the next
@@ -435,11 +435,10 @@ class KeyboardViewController: UIInputViewController {
 
     override func textDidChange(_ textInput: UITextInput?) {
         super.textDidChange(textInput)
-        // If user cleared the field while the shortcuts strip was up, keep
-        // it. If they typed past the empty state, word suggestions / hide
-        // logic in updateWordSuggestions handle it.
+        // Single dispatch path for the chip strip. `refreshSuggestions`
+        // re-derives the right chips from the live proxy state.
         guard activeCommand == nil, !isGenerating else { return }
-        updateWordSuggestions()
+        refreshSuggestions()
     }
 
     // MARK: - Image preview overlay
@@ -1771,166 +1770,149 @@ class KeyboardViewController: UIInputViewController {
             return
         }
 
-        // No active slash command. For ordinary letter / backspace keys
-        // the proxy was just mutated, so iOS will fire `textDidChange`
-        // immediately after this method returns — that path owns word
-        // suggestions / shortcut chips. Calling `updateWordSuggestions()`
-        // here too would mean every keystroke hits `documentContextBeforeInput`
-        // (synchronous IPC to the host app) twice. We only refresh
-        // explicitly when transitioning OUT of slash mode (the proxy
-        // didn't change in that case, so textDidChange won't fire).
+        // No active slash command. Always refresh the chip strip —
+        // `refreshSuggestions` is now synchronous and cheap (no
+        // background dispatch), and we want a deterministic update on
+        // every keystroke whether or not `textDidChange` fires.
         let wasInSlashMode = suggestionMode == .slashCommand || activeCommand != nil
         if wasInSlashMode {
             hideCommandBar()
-            updateWordSuggestions()
         }
+        refreshSuggestions()
     }
 
     // MARK: - Word suggestions (in-keyboard autocomplete strip)
 
-    private func updateWordSuggestions() {
+    // Single entry point for the chip strip. Runs synchronously on the
+    // main thread — the new suggestion engine's prefix lookup is fast
+    // enough (~1-2 ms over 82k words) that the prior off-main debounce
+    // added more lag than it saved. Synchronous also means we can't
+    // race a fresh keystroke with a stale background result.
+    //
+    // Fallback chain (each step only runs if the previous is empty):
+    //   1. Engine prefix match on the current word (≥2 chars)
+    //   2. User vocabulary top words (so the strip is NEVER blank while
+    //      the user is mid-word — what made the previous setup look
+    //      "broken")
+    //   3. For an empty field: catalog shortcuts (email/url/search hints)
+    //
+    // UITextChecker typo-correction stays off-main and only fires when
+    // the engine had nothing — its result replaces the fallback chips
+    // if it lands before the user types past the current word.
+    private func refreshSuggestions() {
         guard activeCommand == nil, !isGenerating else { return }
 
-        // Read the document context on the main thread — `textDocumentProxy`
-        // is documented as main-thread-only and quietly returns nil from
-        // a background queue.
         let context = (textDocumentProxy.documentContextBeforeInput ?? "") as NSString
         let range = context.range(of: "\\S+$", options: .regularExpression)
+        let currentWord: String = range.location != NSNotFound
+            ? context.substring(with: range)
+            : ""
 
-        guard range.location != NSNotFound else {
-            // No word at cursor — empty / freshly cleared field. Offer the
-            // suggested-shortcut chips if this field accepts them.
-            if suggestionMode == .wordSuggestion { hideCommandBar() }
-            // Cancel any in-flight checker work; we're switching to a
-            // shortcuts surface that doesn't need UITextChecker.
-            suggestionWorkItem?.cancel()
-            suggestionWorkItem = nil
-            updateSuggestedShortcuts()
-            return
-        }
-        let currentWord = context.substring(with: range)
-
-        // Skip while user is composing a slash command
-        guard !currentWord.hasPrefix("/"), currentWord.count >= 2 else {
-            if suggestionMode == .wordSuggestion { hideCommandBar() }
-            // Single character or slash buffer — no UITextChecker payload,
-            // but still no useful shortcuts to show either; hide if up.
-            if suggestionMode == .suggestedShortcuts { hideCommandBar() }
-            suggestionWorkItem?.cancel()
-            suggestionWorkItem = nil
+        // Slash composition uses its own strip — don't fight it.
+        if currentWord.hasPrefix("/") {
+            hideSuggestionStripIfShown()
             return
         }
 
-        // Off-main suggestion work with debounce. The new engine's
-        // prefix scan over 82k words is ~1-2 ms on device, but we keep
-        // the off-main hop + 80 ms debounce so a burst of keystrokes
-        // coalesces into one update — same shape as before, just with
-        // a faster + better-ranked lookup underneath. UITextChecker
-        // remains as a typo-correction fallback when the engine returns
-        // nothing (user mistyped a prefix that doesn't exist).
+        var picks: [String] = []
+
+        // Step 1 — engine prefix lookup.
+        if currentWord.count >= 2 {
+            picks = suggestionEngine.suggest(prefix: currentWord, max: 3)
+        }
+
+        // Step 2 — user vocabulary fallback (keeps strip alive even
+        // when the dictionary is still loading on cold launch, or when
+        // the user types a novel prefix that has no matches).
+        if picks.isEmpty {
+            picks = suggestionEngine.topUserWords(max: 3)
+        }
+
+        if !picks.isEmpty {
+            showWordSuggestions(picks)
+            // Engine didn't match — kick the off-main typo-correction
+            // path which can replace the fallback chips with proper
+            // misspelling guesses if they land in time.
+            if currentWord.count >= 2,
+               suggestionEngine.suggest(prefix: currentWord, max: 1).isEmpty {
+                scheduleTypoCorrection(for: currentWord)
+            }
+            return
+        }
+
+        // Step 3 — no user vocabulary yet AND no prefix match. For an
+        // empty field surface the catalog shortcuts so brand-new
+        // installs get SOMETHING; for an unmatched mid-word, hide.
+        if currentWord.isEmpty {
+            showCatalogShortcutsIfApplicable()
+        } else {
+            hideSuggestionStripIfShown()
+        }
+    }
+
+    /// Hide the chip strip but only when one of the suggestion modes
+    /// owns it. Avoids fighting a slash-command bar that might also be
+    /// up.
+    private func hideSuggestionStripIfShown() {
+        if suggestionMode == .wordSuggestion || suggestionMode == .suggestedShortcuts {
+            hideCommandBar()
+        }
+        suggestionWorkItem?.cancel()
+        suggestionWorkItem = nil
+    }
+
+    /// Show the field-kind catalog shortcuts (email / URL / search /
+    /// general) if the field allows them. Used as the empty-field
+    /// fallback when the user has no learned vocabulary yet.
+    private func showCatalogShortcutsIfApplicable() {
+        guard let proxy = textDocumentProxy as? (UITextDocumentProxy & UITextInputTraits) else {
+            return
+        }
+        let kind = FieldKind.from(InputContext(proxy: proxy))
+        if kind == .sensitive {
+            hideSuggestionStripIfShown()
+            return
+        }
+        let shortcuts = Array(SuggestedShortcutCatalog.shortcuts(for: kind).prefix(3))
+        if !shortcuts.isEmpty {
+            showSuggestedShortcuts(shortcuts)
+        } else {
+            hideSuggestionStripIfShown()
+        }
+    }
+
+    /// Off-main UITextChecker typo-correction. Cancellation-safe — if
+    /// the user types past the captured `word` before this work
+    /// completes, the main-thread block bails out so stale guesses
+    /// don't overwrite the current strip.
+    private func scheduleTypoCorrection(for word: String) {
         suggestionWorkItem?.cancel()
         let token = DispatchWorkItem { [weak self] in
             guard let self = self else { return }
-            var picks = self.suggestionEngine.suggest(prefix: currentWord, max: 3)
-
-            // Typo-correction fallback: only run UITextChecker if the
-            // engine had nothing for this prefix (rare for common
-            // English words, normal for typos). This is the expensive
-            // path so we keep it gated.
-            if picks.isEmpty {
-                let wordRange = NSRange(location: 0, length: currentWord.utf16.count)
-                let misspelled = self.textChecker.rangeOfMisspelledWord(
-                    in: currentWord, range: wordRange,
-                    startingAt: 0, wrap: false, language: "en")
-                if misspelled.location != NSNotFound {
-                    let guesses = self.textChecker.guesses(
-                        forWordRange: misspelled, in: currentWord,
-                        language: "en") ?? []
-                    picks = Array(guesses.prefix(3))
-                }
-            }
-
-            // Last-resort fallback: surface the user's top frequent
-            // words. This is what keeps the strip alive when the
-            // dictionary is still loading (cold launch) or when the
-            // user typed a totally novel prefix — without it the strip
-            // would just go blank, which is the "empty black strip"
-            // bug. Apple's keyboard does the same thing — its strip
-            // always has SOMETHING in it while you're typing.
-            if picks.isEmpty {
-                picks = self.suggestionEngine.topUserWords(max: 3)
-            }
-
+            let nsRange = NSRange(location: 0, length: word.utf16.count)
+            let misspelled = self.textChecker.rangeOfMisspelledWord(
+                in: word, range: nsRange,
+                startingAt: 0, wrap: false, language: "en")
+            guard misspelled.location != NSNotFound else { return }
+            let guesses = self.textChecker.guesses(
+                forWordRange: misspelled, in: word, language: "en") ?? []
+            let picks = Array(guesses.prefix(3))
+            guard !picks.isEmpty else { return }
             DispatchQueue.main.async { [weak self] in
-                guard let self = self else { return }
-                // Bail if the keyboard moved on to a different state
-                // while we were computing (active command bar mode,
-                // generating, etc.).
-                guard self.activeCommand == nil, !self.isGenerating else { return }
-                if picks.isEmpty {
-                    if self.suggestionMode == .wordSuggestion { self.hideCommandBar() }
-                } else {
-                    self.showWordSuggestions(picks)
-                }
+                guard let self = self,
+                      self.activeCommand == nil, !self.isGenerating else { return }
+                // Stale-result guard — bail if the user has typed past
+                // the word we were computing for.
+                let now = (self.textDocumentProxy.documentContextBeforeInput ?? "") as NSString
+                let nowRange = now.range(of: "\\S+$", options: .regularExpression)
+                let nowWord = nowRange.location != NSNotFound
+                    ? now.substring(with: nowRange) : ""
+                guard nowWord == word else { return }
+                self.showWordSuggestions(picks)
             }
         }
         suggestionWorkItem = token
-        // 80 ms is short enough that the user perceives the suggestion
-        // as "instant after I stop", but long enough that a burst of
-        // 5–8 keystrokes coalesces into a single check.
-        suggestionQueue.asyncAfter(deadline: .now() + .milliseconds(80), execute: token)
-    }
-
-    // MARK: - Suggested shortcuts (per-field templates)
-    //
-    // Port of android/.../SuggestedShortcut. iOS keys the catalog off field
-    // traits (UITextInputTraits) rather than Android's `EditorInfo.packageName`
-    // since extensions can't read the host bundle id.
-
-    private func updateSuggestedShortcuts() {
-        guard activeCommand == nil, !isGenerating, commandBar.isHidden || suggestionMode == .suggestedShortcuts else {
-            return
-        }
-        // Only offer on a freshly empty field.
-        let before = textDocumentProxy.documentContextBeforeInput ?? ""
-        let after  = textDocumentProxy.documentContextAfterInput  ?? ""
-        guard before.isEmpty, after.isEmpty else {
-            if suggestionMode == .suggestedShortcuts { hideCommandBar() }
-            return
-        }
-
-        guard let proxy = textDocumentProxy as? (UITextDocumentProxy & UITextInputTraits) else { return }
-        let kind = FieldKind.from(InputContext(proxy: proxy))
-
-        // Sensitive fields (password, OTP, CVV) still skip everything
-        // — never show the user's typed-word history on those.
-        if kind == .sensitive {
-            if suggestionMode == .suggestedShortcuts { hideCommandBar() }
-            return
-        }
-
-        // Prefer the user's most-frequent typed words over the static
-        // "Standup / Today / Birthday" templates. This is the on-empty
-        // surface — words the user has bumped via `learn(_:)`, sorted
-        // by personal frequency, shown as word-suggestion chips that
-        // insert directly on tap.
-        let topUserWords = suggestionEngine.topUserWords(max: 3)
-        if !topUserWords.isEmpty {
-            showWordSuggestions(topUserWords)
-            return
-        }
-
-        // No personal vocabulary yet (fresh install, just cleared, or
-        // newly opened keyboard). Fall back to the curated catalog so
-        // the user still has SOMETHING actionable to tap on an empty
-        // field. Once they type 3-4 words the user-vocab path takes
-        // over and the catalog never resurfaces here.
-        let shortcuts = Array(SuggestedShortcutCatalog.shortcuts(for: kind).prefix(3))
-        guard !shortcuts.isEmpty else {
-            if suggestionMode == .suggestedShortcuts { hideCommandBar() }
-            return
-        }
-        showSuggestedShortcuts(shortcuts)
+        suggestionQueue.async(execute: token)
     }
 
     private func showSuggestedShortcuts(_ shortcuts: [SuggestedShortcut]) {
@@ -2642,7 +2624,7 @@ class KeyboardViewController: UIInputViewController {
             textDocumentProxy.insertText(shortcut.template)
             // Template may include text or a "/cmd " seed — re-evaluate so
             // word suggestions / shortcut strip update for the new state.
-            updateWordSuggestions()
+            refreshSuggestions()
             return
         }
 
@@ -2656,7 +2638,7 @@ class KeyboardViewController: UIInputViewController {
             suggestionMode = .none
             hideCommandBar()
             // Re-evaluate suggestions after the replacement (cursor advanced)
-            updateWordSuggestions()
+            refreshSuggestions()
         default:
             // /reply suggestion → insert full reply
             textDocumentProxy.insertText(pick)
@@ -3555,13 +3537,18 @@ fileprivate final class SuggestionEngine {
         loading = true
         readyLock.unlock()
 
-        DispatchQueue.global(qos: .utility).async { [weak self] in
+        // .userInitiated so the dictionary lands fast on cold launch
+        // (was .utility, which can starve under a busy main thread).
+        // The keyboard's most important user-facing behaviour after
+        // typing speed is suggestion freshness, so we treat this load
+        // as user-blocking work.
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
             let t0 = CFAbsoluteTimeGetCurrent()
             let words = Self.loadSortedWords()
             self.readyLock.lock()
             self.sortedWords = words
-            self.isReady = true
+            self.isReady = (words != nil)
             self.loading = false
             let cb = self.onReady
             self.readyLock.unlock()

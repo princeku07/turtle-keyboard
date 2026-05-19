@@ -114,7 +114,8 @@ struct KeyboardTheme: Equatable {
         keyTextSpecial: UIColor(red: 0.047, green: 0.047, blue: 0.047, alpha: 1.0),
         keyTextShiftOn: UIColor(red: 0.047, green: 0.047, blue: 0.047, alpha: 1.0),
         accent:    UIColor(red: 0.082, green: 0.502, blue: 0.239, alpha: 1.0),
-        chipBg:    UIColor(white: 0.0, alpha: 0.08),
+        // Bumped from 0.08 — see dark-theme `chipBg` note.
+        chipBg:    UIColor(white: 0.0, alpha: 0.14),
         chipText:  UIColor(red: 0.047, green: 0.047, blue: 0.047, alpha: 1.0),
         barText:   UIColor(red: 0.047, green: 0.047, blue: 0.047, alpha: 1.0)
     )
@@ -155,8 +156,12 @@ struct KeyboardTheme: Equatable {
         keyTextSpecial: UIColor(white: 1.0, alpha: 0.92),
         keyTextShiftOn: UIColor(red: 0.000, green: 0.000, blue: 0.000, alpha: 1.0),
         accent:    UIColor(red: 0.310, green: 0.557, blue: 0.361, alpha: 1.0),
-        chipBg:    UIColor(white: 1.0, alpha: 0.14),
-        chipText:  UIColor(white: 0.96, alpha: 1.0),
+        // chipBg used to be 0.14 alpha which was nearly invisible
+        // against the new transparent-backdrop keyboard. Bumped to
+        // 0.30 so the suggestion chips clearly read as pills the user
+        // can tap, regardless of what host content sits behind them.
+        chipBg:    UIColor(white: 1.0, alpha: 0.30),
+        chipText:  UIColor(white: 1.0, alpha: 0.96),
         barText:   .white
     )
 
