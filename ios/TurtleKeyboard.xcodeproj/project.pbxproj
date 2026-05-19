@@ -542,6 +542,7 @@
 				"$(SRCROOT)/../commands/prompts/sticker.txt",
 				"$(SRCROOT)/../commands/prompts/sticker_photo.txt",
 				"$(SRCROOT)/../commands/prompts/gif.txt",
+				"$(SRCROOT)/../commands/dict/en_unigrams.txt",
 			);
 			name = "Copy shared command prompts";
 			outputPaths = (
@@ -553,10 +554,11 @@
 				"$(BUILT_PRODUCTS_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/sticker.txt",
 				"$(BUILT_PRODUCTS_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/sticker_photo.txt",
 				"$(BUILT_PRODUCTS_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/gif.txt",
+				"$(BUILT_PRODUCTS_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/en_unigrams.txt",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -e\nSRC=\"${SRCROOT}/../commands/prompts\"\nDEST=\"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\"\nmkdir -p \"$DEST\"\nfor f in \"$SRC\"/*.txt; do\n  [ -e \"$f\" ] || continue\n  cp \"$f\" \"$DEST/\"\ndone\n";
+			shellScript = "set -e\nDEST=\"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\"\nmkdir -p \"$DEST\"\nfor f in \"${SRCROOT}/../commands/prompts\"/*.txt; do\n  [ -e \"$f\" ] || continue\n  cp \"$f\" \"$DEST/\"\ndone\n# Suggestion-engine unigram dictionary — same source-of-truth file the\n# Android keyboard reads from its assets folder. Lives at commands/dict/.\nDICT=\"${SRCROOT}/../commands/dict/en_unigrams.txt\"\nif [ -f \"$DICT\" ]; then\n  cp \"$DICT\" \"$DEST/\"\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 

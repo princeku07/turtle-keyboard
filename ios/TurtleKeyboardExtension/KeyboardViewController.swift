@@ -65,9 +65,15 @@ class KeyboardViewController: UIInputViewController {
 
     private let textChecker = UITextChecker()
 
-    /// Serial background queue for `UITextChecker` work. The checker is
-    /// not thread-safe across concurrent callers, but using one serial
-    /// queue + cancelling stale work items keeps everything ordered.
+    /// Frequency-based word suggester. Loads `commands/dict/en_unigrams.txt`
+    /// (shared with the Android keyboard) on a background queue and
+    /// blends it with the per-user vocabulary that grows as the user
+    /// types. Replaces the previous UITextChecker-only path.
+    private let suggestionEngine = SuggestionEngine()
+
+    /// Serial background queue for suggestion work. UITextChecker still
+    /// powers the typo-correction fallback so we keep this queue around
+    /// for that work; the new engine's reads are cheap and run inline.
     private let suggestionQueue = DispatchQueue(label: "turtle.suggest", qos: .userInitiated)
 
     /// In-flight suggestion calculation, kept here so we can cancel it
@@ -93,7 +99,7 @@ class KeyboardViewController: UIInputViewController {
     // iPhone numbers tuned to match the iOS system keyboard (≈291pt total
     // portrait). Previously rowH=54, rowGap=12 made the keys look chunky
     // and the keyboard too tall.
-    private var rowH:        CGFloat { isPad ? 46 : 48 }
+    private var rowH:        CGFloat { isPad ? 44 : 45 }
     private var rowGap:      CGFloat { isPad ? 6  : 7 }
     private var commandBarH: CGFloat { isPad ? 46 : 50 }
     private var keyGap:      CGFloat { isPad ? 8  : 6 }
@@ -285,6 +291,21 @@ class KeyboardViewController: UIInputViewController {
             name: KeyboardThemeManager.preferenceDidChange,
             object: nil
         )
+
+        // Warm up the suggestion engine in the background. When the
+        // 82k-word unigram dictionary finishes loading (~150-300 ms on
+        // device), repaint the chip strip so the user sees suggestions
+        // without having to type a fresh keystroke first.
+        suggestionEngine.onReady = { [weak self] in
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                if self.suggestionMode == .suggestedShortcuts
+                    || self.suggestionMode == .wordSuggestion {
+                    self.updateWordSuggestions()
+                }
+            }
+        }
+        suggestionEngine.loadAsync()
     }
 
     override func traitCollectionDidChange(_ previous: UITraitCollection?) {
@@ -366,9 +387,43 @@ class KeyboardViewController: UIInputViewController {
         // before updateWordSuggestions — when the draft restores, the
         // command bar takes over the suggestion slot.
         restoreDraftStateIfFresh()
+        // Auto-capitalize the first character on empty fields / after
+        // sentence-end punctuation — matches the iOS default behaviour.
+        autoEngageShiftIfNeeded()
         // Surface suggested-shortcut chips as soon as the keyboard mounts
         // on an empty field. Subsequent text changes refresh via textDidChange.
         updateWordSuggestions()
+    }
+
+    /// Auto-shift-once when the cursor is at a position where the next
+    /// character should be capitalized: empty field, start of a new
+    /// line, or right after sentence-end punctuation (`.`, `!`, `?`)
+    /// followed by a space. The existing shift-once → letter handler
+    /// in `processKey` already auto-unshifts after the first letter is
+    /// typed, so the user gets "Hello world" without ever tapping ⇧.
+    private func autoEngageShiftIfNeeded() {
+        guard mode == .qwerty, !isCapsLock else { return }
+        let before = textDocumentProxy.documentContextBeforeInput ?? ""
+        let trimmed = before.trimmingCharacters(in: .whitespaces)
+        let shouldShift: Bool
+        if trimmed.isEmpty || before.isEmpty {
+            // Empty field OR cursor sitting on a fresh new line.
+            shouldShift = true
+        } else if let last = trimmed.last,
+                  (last == "." || last == "!" || last == "?"),
+                  before.hasSuffix(" ") || before.hasSuffix("\n") {
+            // Sentence end — next character starts a new sentence.
+            shouldShift = true
+        } else if before.hasSuffix("\n") {
+            // New line typed — capitalize what follows.
+            shouldShift = true
+        } else {
+            shouldShift = false
+        }
+        if shouldShift != isShiftedOnce {
+            isShiftedOnce = shouldShift
+            updateKeyVisualsForShiftState()
+        }
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -929,6 +984,18 @@ class KeyboardViewController: UIInputViewController {
         if let strip = slashStrip {
             keyboardContainer.bringSubviewToFront(strip)
         }
+        // The command bar / banner share the chrome slot above the keys
+        // and host the suggestion chips. After a rebuild they end up
+        // buried beneath the freshly-added key row containers (since
+        // those land at the top of the stacking order), which is why
+        // chip text could appear cut off / invisible. Lift them back
+        // above the rows here.
+        if let bar = commandBar, !bar.isHidden {
+            keyboardContainer.bringSubviewToFront(bar)
+        }
+        if let banner = bannerContainer, !banner.isHidden {
+            keyboardContainer.bringSubviewToFront(banner)
+        }
         // Newly-added key rows land on top of the stacking order; lift any
         // preserved overlay back above them so the user keeps seeing it.
         if let overlay = previewOverlay, overlay.isHidden == false {
@@ -942,6 +1009,12 @@ class KeyboardViewController: UIInputViewController {
         }
         if let listening = listeningOverlay {
             keyboardContainer.bringSubviewToFront(listening)
+        }
+        // Key popup (the magnified glyph above the pressed key) must
+        // stay on top of everything so it isn't clipped by the freshly
+        // rebuilt key rows when a mode-switch rebuild fires.
+        if let popup = keyPopupView, !popup.isHidden {
+            keyboardContainer.bringSubviewToFront(popup)
         }
     }
 
@@ -990,27 +1063,103 @@ class KeyboardViewController: UIInputViewController {
             xOffset = keyGap
         }
 
+        // When the active theme uses a transparent backdrop (dark mode
+        // matches native iOS — host content shows through), we render
+        // each key as a UIVisualEffectView blur material with a faint
+        // tint instead of a flat opaque color. Themes with an opaque
+        // backdrop (light, turtle) keep their solid keys.
+        let translucentTheme = themeUsesTranslucentKeys()
+
         for (i, key) in keys.enumerated() {
             let btn = makeKey(label: key)
             let w = i < widths.count ? widths[i] : 44
-            btn.frame = CGRect(x: xOffset, y: 0, width: w, height: rowH)
-            // Pin the shadow to the button's rounded rect so CALayer
-            // doesn't have to offscreen-rasterize the layer to compute
-            // shadow alpha on every frame. With ~30 buttons and a
-            // press-scale CATransform animation firing on every tap,
-            // the implicit shadow path was the dominant per-keystroke
-            // GPU/CPU cost — typing fast made every key re-rasterize.
-            btn.layer.shadowPath = CGPath(
-                roundedRect: CGRect(x: 0, y: 0, width: w, height: rowH),
-                cornerWidth: 7, cornerHeight: 7, transform: nil)
-            // Tell the rasterization cache that the shadow doesn't
-            // depend on the layer's bitmap contents either — a flat
-            // backgroundColor + cornerRadius is the entire visual.
-            btn.layer.shouldRasterize = false
+            let frame = CGRect(x: xOffset, y: 0, width: w, height: rowH)
+            btn.frame = frame
+            if translucentTheme {
+                // Mount blur + tint as SIBLINGS of the button behind it
+                // (not as subviews of the button). Putting them inside
+                // the UIButton hierarchy interferes with how UIButton
+                // lays out its managed imageView / titleLabel — which
+                // was the reason special-key icons (⇧, ⌫, ↵, 🌐) were
+                // disappearing in the dark theme. With them as
+                // siblings, the button's icon/text always renders on
+                // top of the blur regardless of UIButton internals.
+                addTranslucentBacking(behind: btn, in: container,
+                                       frame: frame,
+                                       tintColor: btn.backgroundColor ?? KeyboardPalette.keyNormal)
+                btn.backgroundColor = .clear
+                btn.layer.shadowOpacity = 0
+            } else {
+                // Pin the shadow to the button's rounded rect so CALayer
+                // doesn't have to offscreen-rasterize the layer to compute
+                // shadow alpha on every frame. With ~30 buttons and a
+                // press-scale CATransform animation firing on every tap,
+                // the implicit shadow path was the dominant per-keystroke
+                // GPU/CPU cost — typing fast made every key re-rasterize.
+                btn.layer.shadowPath = CGPath(
+                    roundedRect: CGRect(x: 0, y: 0, width: w, height: rowH),
+                    cornerWidth: 7, cornerHeight: 7, transform: nil)
+                // Tell the rasterization cache that the shadow doesn't
+                // depend on the layer's bitmap contents either — a flat
+                // backgroundColor + cornerRadius is the entire visual.
+                btn.layer.shouldRasterize = false
+            }
             container.addSubview(btn)
             xOffset += w + keyGap
         }
         return container
+    }
+
+    /// True if the active theme's keyboard backdrop is translucent —
+    /// in which case we want native-style translucent keys (blur +
+    /// faint tint) so host content shows through the gaps the way
+    /// Apple's keyboard does. Themes with a fully opaque backdrop
+    /// don't gain anything from blur and keep their solid colors.
+    private func themeUsesTranslucentKeys() -> Bool {
+        var alpha: CGFloat = 1
+        KeyboardPalette.bg.getRed(nil, green: nil, blue: nil, alpha: &alpha)
+        // Apple's native dark keyboard backdrop sits around 0.55 alpha.
+        // Anything not nearly-opaque counts as a translucent theme.
+        return alpha < 0.95
+    }
+
+    /// Pick the blur material for the active theme. Glyph color tells
+    /// us whether the theme is light or dark — a light glyph means a
+    /// dark theme (and we want `.systemMaterialDark` so the key reads
+    /// dark with a bright glyph), and vice versa.
+    private func blurMaterialForCurrentTheme() -> UIBlurEffect.Style {
+        var white: CGFloat = 0
+        KeyboardPalette.keyText.getWhite(&white, alpha: nil)
+        return white > 0.5 ? .systemMaterialDark : .systemMaterialLight
+    }
+
+    /// Mount a system blur + theme tint as siblings of `btn` inside
+    /// `container`, positioned at `frame` and stacked BEHIND the
+    /// button (so the button's icon / text stays visible on top).
+    /// Picks the blur material based on the active theme — dark
+    /// themes (white glyphs) use `.systemMaterialDark`, light themes
+    /// (dark glyphs) use `.systemMaterialLight` so the key always
+    /// reads with proper contrast against its glyph.
+    private func addTranslucentBacking(behind btn: UIButton,
+                                       in container: UIView,
+                                       frame: CGRect,
+                                       tintColor: UIColor) {
+        let blur = UIVisualEffectView(effect: UIBlurEffect(style: blurMaterialForCurrentTheme()))
+        blur.frame = frame
+        blur.isUserInteractionEnabled = false
+        blur.layer.cornerRadius = 7
+        blur.layer.masksToBounds = true
+        container.addSubview(blur)
+
+        // Tint overlay inside the blur's contentView so it inherits
+        // the blur's rounded clip. The theme's key color already
+        // carries the right alpha (letter keys at ~18% white, special
+        // keys at ~15% white) so it paints verbatim.
+        let tint = UIView(frame: blur.bounds)
+        tint.backgroundColor = tintColor
+        tint.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        tint.isUserInteractionEnabled = false
+        blur.contentView.addSubview(tint)
     }
 
     private func makeKey(label: String) -> UIButton {
@@ -1295,12 +1444,30 @@ class KeyboardViewController: UIInputViewController {
         }
 
         switch key {
-        case "↵":   proxy.insertText("\n"); hideCommandBar()
-        case "⌫":   handleBackspace(); updateCommandDetection()
+        case "↵":
+            // Return commits the word right before the cursor — feed
+            // it to the suggestion engine so it accrues personal
+            // frequency (same as Android's `learn(...)` call site).
+            learnWordBeforeCursor()
+            proxy.insertText("\n")
+            hideCommandBar()
+            // New line → next char starts a new "sentence". Re-engage
+            // auto-shift so the user doesn't have to tap ⇧ again.
+            autoEngageShiftIfNeeded()
+        case "⌫":
+            handleBackspace()
+            updateCommandDetection()
+            // After deleting, the cursor may now be at a sentence start
+            // (e.g. user cleared the field entirely) — re-engage shift.
+            autoEngageShiftIfNeeded()
         case "space":
+            // Space also commits the word — learn before inserting.
+            learnWordBeforeCursor()
             proxy.insertText(" ")
             handleSpaceDoubleTap()
             updateCommandDetection()
+            // Space after sentence-end punctuation kicks auto-shift on.
+            autoEngageShiftIfNeeded()
         default:
             var text = key
             if mode == .qwerty, key.count == 1, key.first?.isLetter == true {
@@ -1432,6 +1599,22 @@ class KeyboardViewController: UIInputViewController {
             promptCaretIndex = nil
         }
         // else: caret == 0 && prompt non-empty → no-op.
+    }
+
+    /// Extract the word ending at the cursor and feed it to the
+    /// suggestion engine. Called from the space / return key paths —
+    /// those are the two glyphs that "commit" the previous word the
+    /// way Android's IME does it. URLs, slash commands, numbers, and
+    /// emoji are filtered inside `SuggestionEngine.learn(_:)`.
+    private func learnWordBeforeCursor() {
+        // Cheap fast-path bail-out if we're in slash mode — the buffer
+        // owns the text, the host field never saw a partial word here.
+        guard slashBuffer == nil else { return }
+        let context = (textDocumentProxy.documentContextBeforeInput ?? "") as NSString
+        let range = context.range(of: "\\S+$", options: .regularExpression)
+        guard range.location != NSNotFound else { return }
+        let word = context.substring(with: range)
+        suggestionEngine.learn(word)
     }
 
     private func handleBackspace() {
@@ -1638,45 +1821,44 @@ class KeyboardViewController: UIInputViewController {
             return
         }
 
-        // Off-main `UITextChecker` work with debounce. UITextChecker
-        // synchronously walks its dictionary and can spend 10–50 ms on a
-        // short word — running that on the main thread on every
-        // keystroke was the source of the "characters don't register
-        // when I type fast" bug. The debounce coalesces a burst of
-        // keystrokes into a single tail-end check.
+        // Off-main suggestion work with debounce. The new engine's
+        // prefix scan over 82k words is ~1-2 ms on device, but we keep
+        // the off-main hop + 80 ms debounce so a burst of keystrokes
+        // coalesces into one update — same shape as before, just with
+        // a faster + better-ranked lookup underneath. UITextChecker
+        // remains as a typo-correction fallback when the engine returns
+        // nothing (user mistyped a prefix that doesn't exist).
         suggestionWorkItem?.cancel()
         let token = DispatchWorkItem { [weak self] in
             guard let self = self else { return }
-            let lang = "en"
-            let wordRange = NSRange(location: 0, length: currentWord.utf16.count)
-            let completions = self.textChecker.completions(
-                forPartialWordRange: wordRange,
-                in: currentWord,
-                language: lang
-            ) ?? []
-            var picks = Array(completions.prefix(3))
+            var picks = self.suggestionEngine.suggest(prefix: currentWord, max: 3)
 
-            // Misspelling guesses fill the remainder when the typed
-            // token isn't a known prefix.
-            if picks.count < 3 {
+            // Typo-correction fallback: only run UITextChecker if the
+            // engine had nothing for this prefix (rare for common
+            // English words, normal for typos). This is the expensive
+            // path so we keep it gated.
+            if picks.isEmpty {
+                let wordRange = NSRange(location: 0, length: currentWord.utf16.count)
                 let misspelled = self.textChecker.rangeOfMisspelledWord(
-                    in: currentWord,
-                    range: wordRange,
-                    startingAt: 0,
-                    wrap: false,
-                    language: lang
-                )
+                    in: currentWord, range: wordRange,
+                    startingAt: 0, wrap: false, language: "en")
                 if misspelled.location != NSNotFound {
                     let guesses = self.textChecker.guesses(
-                        forWordRange: misspelled,
-                        in: currentWord,
-                        language: lang
-                    ) ?? []
-                    for g in guesses where !picks.contains(g) {
-                        picks.append(g)
-                        if picks.count == 3 { break }
-                    }
+                        forWordRange: misspelled, in: currentWord,
+                        language: "en") ?? []
+                    picks = Array(guesses.prefix(3))
                 }
+            }
+
+            // Last-resort fallback: surface the user's top frequent
+            // words. This is what keeps the strip alive when the
+            // dictionary is still loading (cold launch) or when the
+            // user typed a totally novel prefix — without it the strip
+            // would just go blank, which is the "empty black strip"
+            // bug. Apple's keyboard does the same thing — its strip
+            // always has SOMETHING in it while you're typing.
+            if picks.isEmpty {
+                picks = self.suggestionEngine.topUserWords(max: 3)
             }
 
             DispatchQueue.main.async { [weak self] in
@@ -1719,6 +1901,30 @@ class KeyboardViewController: UIInputViewController {
 
         guard let proxy = textDocumentProxy as? (UITextDocumentProxy & UITextInputTraits) else { return }
         let kind = FieldKind.from(InputContext(proxy: proxy))
+
+        // Sensitive fields (password, OTP, CVV) still skip everything
+        // — never show the user's typed-word history on those.
+        if kind == .sensitive {
+            if suggestionMode == .suggestedShortcuts { hideCommandBar() }
+            return
+        }
+
+        // Prefer the user's most-frequent typed words over the static
+        // "Standup / Today / Birthday" templates. This is the on-empty
+        // surface — words the user has bumped via `learn(_:)`, sorted
+        // by personal frequency, shown as word-suggestion chips that
+        // insert directly on tap.
+        let topUserWords = suggestionEngine.topUserWords(max: 3)
+        if !topUserWords.isEmpty {
+            showWordSuggestions(topUserWords)
+            return
+        }
+
+        // No personal vocabulary yet (fresh install, just cleared, or
+        // newly opened keyboard). Fall back to the curated catalog so
+        // the user still has SOMETHING actionable to tap on an empty
+        // field. Once they type 3-4 words the user-vocab path takes
+        // over and the catalog never resurfaces here.
         let shortcuts = Array(SuggestedShortcutCatalog.shortcuts(for: kind).prefix(3))
         guard !shortcuts.isEmpty else {
             if suggestionMode == .suggestedShortcuts { hideCommandBar() }
@@ -1746,12 +1952,16 @@ class KeyboardViewController: UIInputViewController {
         [cmdPill, cmdPromptLabel, cmdSendButton, cmdMicButton]
             .forEach { $0.isHidden = true }
         cmdSuggestionsStack.isHidden = false
+        commandBar.bringSubviewToFront(cmdSuggestionsStack)
 
-        if commandBar.isHidden {
-            commandBar.alpha = 0
-            commandBar.isHidden = false
+        // Race guard — see `showWordSuggestions` for why this matters.
+        let wasHidden = commandBar.isHidden
+        commandBar.layer.removeAllAnimations()
+        commandBar.isHidden = false
+        commandBar.alpha    = 1
+        keyboardContainer.bringSubviewToFront(commandBar)
+        if wasHidden {
             recomputeKeyboardHeight()
-            UIView.animate(withDuration: 0.15) { self.commandBar.alpha = 1 }
         }
     }
 
@@ -1769,20 +1979,43 @@ class KeyboardViewController: UIInputViewController {
             .forEach { $0.isHidden = true }
         cmdPresetStrip?.isHidden = true
         cmdSuggestionsStack.isHidden = false
+        // Lift the chip stack above any other command-bar subview that
+        // might still be drawing on top of it (the pill / prompt /
+        // send / mic stay in the bar, just `isHidden = true`). Without
+        // this, the chips could be visually buried behind a sibling
+        // and their text wouldn't appear.
+        commandBar.bringSubviewToFront(cmdSuggestionsStack)
         updateCaret()
 
-        if commandBar.isHidden {
-            commandBar.alpha = 0
-            commandBar.isHidden = false
+        // Cancel any in-flight fade-out so a stale `hideCommandBar`
+        // animation can't sneak the bar back to hidden right after we
+        // mount fresh chips. This was the "suggestions sometimes
+        // appear, sometimes don't" race — a hide animation in progress
+        // would set isHidden=true in its completion block AFTER we
+        // already populated and re-shown the chips.
+        let wasHidden = commandBar.isHidden
+        commandBar.layer.removeAllAnimations()
+        commandBar.isHidden = false
+        commandBar.alpha    = 1
+        // Lift the entire bar above the freshly-rebuilt key rows in
+        // case anything yanked it back in the stacking order.
+        keyboardContainer.bringSubviewToFront(commandBar)
+        if wasHidden {
             recomputeKeyboardHeight()
-            UIView.animate(withDuration: 0.15) { self.commandBar.alpha = 1 }
         }
     }
 
     private func replaceCurrentWord(with replacement: String) {
         let context = (textDocumentProxy.documentContextBeforeInput ?? "") as NSString
         let range = context.range(of: "\\S+$", options: .regularExpression)
-        guard range.location != NSNotFound else { return }
+        // Empty field / no word at cursor → tap = plain insert, with
+        // trailing space so the user can keep typing the next word.
+        // This is the empty-field "frequent words" chip path; without
+        // it, tapping a chip on an empty field used to silently no-op.
+        guard range.location != NSNotFound else {
+            textDocumentProxy.insertText(replacement + " ")
+            return
+        }
 
         let currentWord = context.substring(with: range)
         for _ in 0..<currentWord.count { textDocumentProxy.deleteBackward() }
@@ -2093,7 +2326,19 @@ class KeyboardViewController: UIInputViewController {
         pickerSourceCommand = nil
         UIView.animate(withDuration: 0.15, animations: {
             self.commandBar.alpha = 0
-        }, completion: { _ in
+        }, completion: { finished in
+            // Race-safe completion: if a `showWordSuggestions` (or any
+            // other re-show path) ran while we were fading out, it
+            // already reset `suggestionMode` to something other than
+            // `.none`. In that case bail out and restore alpha — the
+            // re-show meant the user is meant to see the bar now.
+            // Without this guard, fast typing alternating between
+            // "no picks" and "some picks" sneaks `isHidden = true`
+            // back on top of the freshly-mounted chips.
+            guard finished, self.suggestionMode == .none else {
+                self.commandBar.alpha = 1
+                return
+            }
             self.commandBar.isHidden = true
             self.commandBar.alpha    = 1
             self.resetCommandBarMode()
@@ -3257,6 +3502,270 @@ private final class PulsingDotsView: UIView {
             anim.repeatCount = .infinity
             anim.beginTime = CACurrentMediaTime() + Double(i) * 0.08
             layer.add(anim, forKey: "pulse")
+        }
+    }
+}
+
+// MARK: - SuggestionEngine
+//
+// iOS port of `android/.../suggest/SuggestionEngine`. Same on-disk
+// dictionary (`commands/dict/en_unigrams.txt`, 82k words sorted by
+// global frequency) plus a private per-user vocabulary store, so the
+// two platforms produce the same prefix completions and a user that
+// types on both ends up with the same personalized weighting.
+//
+// Suggest priority order, mirroring Android:
+//   1. user vocabulary (words the user has typed before, personal freq)
+//   2. dictionary prefix completion (global freq)
+// We deliberately skip Android's third-tier SymSpell edit-distance
+// fallback for now — `UITextChecker.guesses(...)` already covers typo
+// correction on iOS and porting SymSpell would double the bundle size
+// (its prefix-edits dictionary serializes to ~5 MB). If the user types
+// "tge" we still get "the" through UITextChecker; if they type "th"
+// they get "the / that / they / them" through our engine.
+
+fileprivate final class SuggestionEngine {
+
+    private static let dictAsset = "en_unigrams"
+
+    /// Words from the bundled dictionary, sorted by frequency desc.
+    /// Loaded lazily on a background queue; `nil` until ready.
+    private var sortedWords: [String]?
+    private var readyLock = NSLock()
+    private var loading = false
+    private(set) var isReady = false
+
+    /// Per-user vocabulary. Reads / writes are cheap (in-memory cache
+    /// backed by App Group UserDefaults under a single JSON key).
+    let userStore: UserWordStore
+
+    /// Fires once the bundled dictionary becomes available so the
+    /// keyboard can repaint the suggestion strip — without this, the
+    /// strip stays empty after a cold launch until the next keystroke.
+    var onReady: (() -> Void)?
+
+    init() {
+        self.userStore = UserWordStore()
+    }
+
+    /// Idempotent. Returns immediately; load runs on a background QoS.
+    func loadAsync() {
+        readyLock.lock()
+        if isReady || loading { readyLock.unlock(); return }
+        loading = true
+        readyLock.unlock()
+
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self = self else { return }
+            let t0 = CFAbsoluteTimeGetCurrent()
+            let words = Self.loadSortedWords()
+            self.readyLock.lock()
+            self.sortedWords = words
+            self.isReady = true
+            self.loading = false
+            let cb = self.onReady
+            self.readyLock.unlock()
+            let ms = Int((CFAbsoluteTimeGetCurrent() - t0) * 1000)
+            NSLog("TurtleSuggest: dict ready in \(ms)ms (\(words?.count ?? 0) words)")
+            cb?()
+        }
+    }
+
+    /// Top suggestions for `prefix`. Returns lowercase strings — the
+    /// caller restores case to match the active shift state when it
+    /// commits. Capped at `max`. Safe to call before the dictionary is
+    /// loaded; falls back to user vocabulary only in that window.
+    func suggest(prefix: String, max: Int = 3) -> [String] {
+        guard !prefix.isEmpty, max > 0 else { return [] }
+        let q = prefix.lowercased()
+        var out: [String] = []
+        var seen = Set<String>()
+
+        // 1. User vocabulary (personal frequency).
+        for w in userStore.prefixMatches(q, max: max) {
+            if seen.insert(w).inserted {
+                out.append(w)
+                if out.count >= max { return out }
+            }
+        }
+
+        // 2. Bundled dictionary (global frequency).
+        if let dict = readSortedWords(), out.count < max {
+            for w in dict where w.hasPrefix(q) {
+                if seen.insert(w).inserted {
+                    out.append(w)
+                    if out.count >= max { return out }
+                }
+            }
+        }
+
+        return out
+    }
+
+    /// Top `max` words the user has typed before, ordered by personal
+    /// frequency. Used to populate the empty-field chip strip in place
+    /// of the old static "Standup / Today / Birthday" shortcuts.
+    func topUserWords(max: Int = 3) -> [String] {
+        userStore.topWords(max: max)
+    }
+
+    /// Record a committed word (called from `processKey` when a word
+    /// completes with space / punctuation). Filters out tokens that
+    /// aren't pure alpha — URLs, numbers, slash commands, emoji.
+    func learn(_ word: String) {
+        let w = word.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !w.isEmpty, w.count >= 2 else { return }
+        for ch in w.unicodeScalars {
+            // Allow letters + apostrophe + hyphen (Android does the same).
+            if !CharacterSet.letters.contains(ch) && ch != "'" && ch != "-" {
+                return
+            }
+        }
+        userStore.bump(w)
+    }
+
+    private func readSortedWords() -> [String]? {
+        readyLock.lock(); defer { readyLock.unlock() }
+        return sortedWords
+    }
+
+    /// Parse the bundled `<word> <freq>` file once. Returns the words
+    /// sorted by descending frequency so a prefix scan finds common
+    /// hits in the first few hundred entries.
+    private static func loadSortedWords() -> [String]? {
+        // Try Bundle.main first (the extension's own bundle when called
+        // from the appex process). Fall back to Bundle(for:) which
+        // anchors to the bundle containing this class — useful when
+        // some host edge case shifts Bundle.main unexpectedly.
+        var url = Bundle.main.url(forResource: Self.dictAsset, withExtension: "txt")
+        if url == nil {
+            url = Bundle(for: SuggestionEngine.self).url(forResource: Self.dictAsset, withExtension: "txt")
+        }
+        guard let url = url else {
+            NSLog("TurtleSuggest: en_unigrams.txt NOT FOUND in bundle (main=\(Bundle.main.bundlePath))")
+            return nil
+        }
+        guard let data = try? Data(contentsOf: url),
+              let text = String(data: data, encoding: .utf8) else {
+            NSLog("TurtleSuggest: failed to read \(url.path)")
+            return nil
+        }
+        var entries: [(String, Int64)] = []
+        entries.reserveCapacity(82_000)
+        text.enumerateLines { line, _ in
+            guard let sp = line.firstIndex(of: " ") else { return }
+            let word = String(line[..<sp])
+            let freq = Int64(line[line.index(after: sp)...]) ?? 0
+            if !word.isEmpty, freq > 0 {
+                entries.append((word, freq))
+            }
+        }
+        entries.sort { $0.1 > $1.1 }
+        return entries.map { $0.0 }
+    }
+}
+
+// MARK: - UserWordStore
+//
+// iOS port of Android's `UserWordStore`. Persists per-word counts in
+// the App Group UserDefaults under a single JSON-encoded key (cheaper
+// than thousands of individual `set(:forKey:)` writes on every space).
+// Capped at MAX_ENTRIES — eviction drops the lowest-count entries in
+// batches once full.
+
+fileprivate final class UserWordStore {
+
+    private static let storeKey = "TurtleKB.userWordCounts"
+    private static let maxEntries = 2000
+    private static let evictBatch = 200
+
+    private let defaults: UserDefaults
+    private var cache: [String: Int]
+    private let lock = NSLock()
+
+    init() {
+        let store = UserDefaults(suiteName: SplitContract.storageSuiteName) ?? .standard
+        self.defaults = store
+        if let data = store.data(forKey: Self.storeKey),
+           let decoded = try? JSONDecoder().decode([String: Int].self, from: data) {
+            self.cache = decoded
+        } else {
+            self.cache = [:]
+        }
+    }
+
+    /// Bump the count for `word`, persisting back to UserDefaults. The
+    /// disk write coalesces multiple bumps inside the same runloop tick
+    /// via the `pendingFlush` flag so a burst of typed words doesn't
+    /// re-encode the whole JSON blob N times.
+    func bump(_ word: String) {
+        lock.lock()
+        cache[word, default: 0] += 1
+        if cache.count > Self.maxEntries { evictLocked() }
+        scheduleFlushLocked()
+        lock.unlock()
+    }
+
+    /// Words in the store that start with `prefix`, sorted by count
+    /// descending. Case-insensitive (the store is lowercase).
+    func prefixMatches(_ prefix: String, max: Int) -> [String] {
+        guard !prefix.isEmpty, max > 0 else { return [] }
+        lock.lock(); defer { lock.unlock() }
+        let p = prefix.lowercased()
+        var hits: [(String, Int)] = []
+        for (k, v) in cache where k.hasPrefix(p) {
+            hits.append((k, v))
+        }
+        hits.sort { $0.1 > $1.1 }
+        return hits.prefix(max).map { $0.0 }
+    }
+
+    /// Top `max` words by personal frequency, regardless of prefix.
+    /// Powers the empty-field "frequent words" chip strip.
+    func topWords(max: Int) -> [String] {
+        guard max > 0 else { return [] }
+        lock.lock(); defer { lock.unlock() }
+        return cache.sorted { $0.value > $1.value }
+            .prefix(max)
+            .map { $0.key }
+    }
+
+    func clear() {
+        lock.lock()
+        cache.removeAll()
+        defaults.removeObject(forKey: Self.storeKey)
+        lock.unlock()
+    }
+
+    // MARK: - Persistence
+
+    private var pendingFlush = false
+
+    /// Schedule a single JSON re-encode at the end of the runloop so a
+    /// burst of bumps amortises into one write. Must be called under
+    /// `lock`.
+    private func scheduleFlushLocked() {
+        guard !pendingFlush else { return }
+        pendingFlush = true
+        DispatchQueue.global(qos: .background).async { [weak self] in
+            guard let self = self else { return }
+            self.lock.lock()
+            self.pendingFlush = false
+            let snapshot = self.cache
+            self.lock.unlock()
+            if let data = try? JSONEncoder().encode(snapshot) {
+                self.defaults.set(data, forKey: Self.storeKey)
+            }
+        }
+    }
+
+    private func evictLocked() {
+        let target = Self.maxEntries - Self.evictBatch
+        let removeCount = cache.count - target
+        guard removeCount > 0 else { return }
+        let sorted = cache.sorted { $0.value < $1.value }
+        for i in 0..<min(removeCount, sorted.count) {
+            cache.removeValue(forKey: sorted[i].key)
         }
     }
 }
