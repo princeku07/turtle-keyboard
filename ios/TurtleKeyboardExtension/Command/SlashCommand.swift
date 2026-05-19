@@ -99,6 +99,27 @@ enum SlashCommand: String, CaseIterable {
         }
     }
 
+    /// Text shown inside the generating-wave overlay while the AI
+    /// request is in flight. Mirrors Android's per-command loading
+    /// messages in `BuiltinAiCommands`.
+    var loadingMessage: String {
+        switch self {
+        case .cap:           return "Generating image…"
+        case .edit:          return "Editing image…"
+        case .style:         return "Restyling image…"
+        case .sticker:       return "Making sticker…"
+        case .gif:           return "Animating…"
+        case .fix:           return "Fixing text…"
+        case .tone:          return "Adjusting tone…"
+        case .reply:         return "Drafting reply…"
+        case .tl:            return "Translating…"
+        case .search:        return "Searching…"
+        case .ask:           return "Thinking…"
+        case .org:           return "Organizing…"
+        default:             return "Working…"
+        }
+    }
+
     /// Banner shown after a successful execution. Local commands surface
     /// their own progress banners; this is just for AI commands.
     var completionBanner: String {

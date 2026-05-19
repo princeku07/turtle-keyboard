@@ -161,6 +161,11 @@ class KeyboardViewController: UIInputViewController {
     private var heightConstraint:    NSLayoutConstraint!
     private var hideBannerTimer:     Timer?
     private var backspaceTimer:      Timer?
+    /// Aurora-style loading overlay that takes over the command-bar slot
+    /// while an AI request is in flight. Lazily created on first use,
+    /// kept around afterwards so subsequent generations don't pay the
+    /// layer-allocation cost.
+    private var generatingWave:      GeneratingWaveView?
     private var previewOverlay:      UIView?
     private var previewImageView:    UIImageView?
     private var pendingPreviewImage: UIImage?
@@ -1927,8 +1932,11 @@ class KeyboardViewController: UIInputViewController {
         }
 
         isGenerating = true
-        cmdSendButton.isHidden = true
-        cmdSpinner.startAnimating()
+        // Replace the spinner-on-Send-button affordance with an
+        // aurora-style wave overlay that fills the entire command-bar
+        // slot. Mirrors Android's GeneratingLoaderView and reads as a
+        // first-class "AI is working" state.
+        showGeneratingWave(message: cmd.loadingMessage)
 
         // Buffer holds the slash text; nothing was typed into the host field,
         // so there's nothing to delete from the proxy.
@@ -1936,14 +1944,62 @@ class KeyboardViewController: UIInputViewController {
         executeCommand(cmd, prompt: commandPromptText)
     }
 
+    // MARK: - Generating wave overlay
+
+    /// Lazily mount the wave overlay on top of the command bar, hide the
+    /// normal bar internals, and start the aurora animation. The wave is
+    /// pinned to all four edges of `commandBar`, so it scales correctly
+    /// with the bar's dynamic height.
+    private func showGeneratingWave(message: String) {
+        let wave: GeneratingWaveView
+        if let existing = generatingWave {
+            wave = existing
+        } else {
+            wave = GeneratingWaveView()
+            wave.translatesAutoresizingMaskIntoConstraints = false
+            commandBar.addSubview(wave)
+            NSLayoutConstraint.activate([
+                wave.topAnchor.constraint(equalTo: commandBar.topAnchor),
+                wave.bottomAnchor.constraint(equalTo: commandBar.bottomAnchor),
+                wave.leadingAnchor.constraint(equalTo: commandBar.leadingAnchor),
+                wave.trailingAnchor.constraint(equalTo: commandBar.trailingAnchor),
+            ])
+            generatingWave = wave
+        }
+        // Hide every interactive bar control so the wave is the only
+        // thing the user sees in this slot. `hideGeneratingWave` doesn't
+        // reverse this — `hideCommandBar` / `showCommandBar` /
+        // `showImagePreview` already drive the next visible state from
+        // scratch on the success / failure paths.
+        [cmdPill, cmdPromptScrollView, cmdSendButton, cmdMicButton,
+         cmdSpinner, cmdSuggestionsStack, cmdPresetStrip,
+         cmdPromptLabel, cmdCaret]
+            .compactMap { $0 }
+            .forEach { $0.isHidden = true }
+
+        wave.setMessage(message)
+        wave.isHidden = false
+        commandBar.bringSubviewToFront(wave)
+        // Layout pass so `wave.bounds` is non-zero before the animations
+        // read its width.
+        commandBar.layoutIfNeeded()
+        wave.startAnimating()
+    }
+
+    /// Stop and hide the wave overlay. Caller is responsible for
+    /// driving the next bar state (preview / banner / cleared bar).
+    private func hideGeneratingWave() {
+        generatingWave?.stopAnimating()
+        generatingWave?.isHidden = true
+    }
+
     // MARK: - Command execution
 
     private func executeCommand(_ cmd: SlashCommand, prompt: String) {
-        // Local commands handled by integrations — no AI hop, no spinner.
+        // Local commands handled by integrations — no AI hop, no overlay.
         if cmd.isLocal {
             isGenerating = false
-            cmdSpinner.stopAnimating()
-            cmdSendButton.isHidden = false
+            hideGeneratingWave()
             hideCommandBar()
             if let spec = integrationRegistry.command(named: cmd.rawValue) {
                 spec.handler(prompt, integrationContext)
@@ -1965,8 +2021,7 @@ class KeyboardViewController: UIInputViewController {
                     referenceImage: referenceImage
                 )
                 isGenerating = false
-                cmdSpinner.stopAnimating()
-                cmdSendButton.isHidden = false
+                hideGeneratingWave()
 
                 switch result {
                 case .text(let text):
@@ -2019,8 +2074,8 @@ class KeyboardViewController: UIInputViewController {
 
             } catch {
                 isGenerating = false
-                cmdSpinner.stopAnimating()
-                cmdSendButton.isHidden = false
+                hideGeneratingWave()
+                hideCommandBar()
                 showBanner("⚠️ " + (error.localizedDescription))
             }
         }
@@ -2277,9 +2332,14 @@ class KeyboardViewController: UIInputViewController {
         return best
     }
 
-    /// Tap callback from `cmdPresetStrip`. Treats the chip value as the
-    /// user's prompt for the active command and fires immediately —
-    /// mirrors Android's `PresetChipStripView.onTap`.
+    /// Tap callback from `cmdPresetStrip`. Pre-fills the prompt with the
+    /// chip's value and parks the caret at the end so the user can either
+    /// tap **Generate** to fire as-is, or keep typing to refine it.
+    ///
+    /// Auto-firing on chip tap (the previous behaviour) was surprising
+    /// for /cap especially — users would brush a preset by accident and
+    /// burn an image generation. Two-step interaction matches what every
+    /// other suggestion chip in the iOS keyboard already does.
     private func handlePresetTap(_ value: String) {
         guard let cmd = activeCommand else { return }
         commandPromptText = value
@@ -2287,9 +2347,19 @@ class KeyboardViewController: UIInputViewController {
         cmdPromptLabel.isHidden = false
         cmdPromptLabel.text = value
         cmdPromptLabel.textColor = UIColor.white.withAlphaComponent(0.90)
+        // Keep `slashBuffer` in sync so `handleSlashBufferKey` continues
+        // to insert / backspace at the same prompt the label shows.
+        // Without this, the label says "anime" but `slashBuffer` is
+        // still "/cap " — tapping Generate sends an empty prompt.
+        if let split = splitSlashBuffer() {
+            slashBuffer = split.head + value
+        }
+        // Caret to end of the new prompt so the next keystroke appends.
+        promptCaretIndex = value.count
         commandBar.layoutIfNeeded()
         updateCaret()
-        executeCommand(cmd, prompt: value)
+        // No auto-execute — the user has to tap Generate.
+        _ = cmd
     }
 
     // MARK: - Banner
@@ -2923,5 +2993,292 @@ fileprivate final class PaddedLabel: UILabel {
             width: rect.size.width + textInsets.left + textInsets.right,
             height: rect.size.height + textInsets.top + textInsets.bottom
         )
+    }
+}
+
+// MARK: - GeneratingWaveView (Metal aurora)
+//
+// Fragment-shader port of Android's `GeneratingLoaderView`. Single
+// full-screen quad rendered with a Metal pixel shader that does all
+// three wave layers in one pass — the 8-colour aurora palette flows
+// horizontally, three soft sine ribbons glow over a dark navy ground,
+// and overlapping crests brighten via additive blending. Strictly more
+// faithful to the Android look than the Core Animation port: the wave
+// glow is a true smoothstep falloff (no hard edges), the palette
+// crossfades through every neighbouring colour (not just three slim
+// gradients sliding past each other), and the whole surface is one
+// composited image rather than three masked pipes.
+//
+// Runtime compilation of the shader keeps the .xcodeproj edit-free —
+// no .metal file, no PBXFileReference dance.
+
+import MetalKit
+
+fileprivate final class GeneratingWaveView: UIView {
+
+    private let metalView: MTKView
+    private let renderer: AuroraRenderer?
+    private let label = UILabel()
+
+    init() {
+        let device = MTLCreateSystemDefaultDevice()
+        let mtk = MTKView(frame: .zero, device: device)
+        mtk.translatesAutoresizingMaskIntoConstraints = false
+        mtk.isUserInteractionEnabled = false
+        mtk.isOpaque = true
+        mtk.framebufferOnly = true
+        mtk.colorPixelFormat = .bgra8Unorm
+        // Pause until startAnimating; isPaused = true + enableSetNeedsDisplay = false
+        // means no drawable acquisition happens while hidden.
+        mtk.isPaused = true
+        mtk.enableSetNeedsDisplay = false
+        mtk.preferredFramesPerSecond = 60
+        mtk.clearColor = MTLClearColor(red: 0.020, green: 0.031, blue: 0.102, alpha: 1.0)
+        self.metalView = mtk
+        self.renderer = device.flatMap { AuroraRenderer(device: $0) }
+
+        super.init(frame: .zero)
+        backgroundColor = UIColor(red: 0.020, green: 0.031, blue: 0.102, alpha: 1.0)
+        clipsToBounds = true
+        isUserInteractionEnabled = false
+
+        mtk.delegate = renderer
+        addSubview(mtk)
+
+        // Pure white at semibold so the message reads cleanly against
+        // the aurora. The previous muted mint-cyan blended into the
+        // ribbons' colour family and disappeared whenever a crest
+        // passed underneath. A heavier black shadow underneath the text
+        // boosts contrast on the bright wave peaks even further.
+        label.font = .systemFont(ofSize: 15, weight: .semibold)
+        label.textColor = .white
+        label.textAlignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.layer.shadowColor   = UIColor.black.cgColor
+        label.layer.shadowOpacity = 0.95
+        label.layer.shadowRadius  = 6
+        label.layer.shadowOffset  = CGSize(width: 0, height: 1)
+        addSubview(label)
+
+        NSLayoutConstraint.activate([
+            mtk.topAnchor.constraint(equalTo: topAnchor),
+            mtk.bottomAnchor.constraint(equalTo: bottomAnchor),
+            mtk.leadingAnchor.constraint(equalTo: leadingAnchor),
+            mtk.trailingAnchor.constraint(equalTo: trailingAnchor),
+
+            label.centerXAnchor.constraint(equalTo: centerXAnchor),
+            label.centerYAnchor.constraint(equalTo: centerYAnchor),
+        ])
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) not used") }
+
+    func setMessage(_ text: String) {
+        label.text = text
+    }
+
+    func startAnimating() {
+        renderer?.start()
+        metalView.isPaused = false
+        // Breathing on the label so the overlay reads as alive even
+        // when the user's gaze is on the chat field.
+        label.alpha = 0.85
+        UIView.animate(
+            withDuration: 1.2,
+            delay: 0,
+            options: [.repeat, .autoreverse, .allowUserInteraction, .curveEaseInOut],
+            animations: { self.label.alpha = 1.0 },
+            completion: nil
+        )
+    }
+
+    func stopAnimating() {
+        metalView.isPaused = true
+        label.layer.removeAllAnimations()
+    }
+}
+
+// MARK: - AuroraRenderer (Metal renderer for GeneratingWaveView)
+
+fileprivate final class AuroraRenderer: NSObject, MTKViewDelegate {
+
+    private let device: MTLDevice
+    private let commandQueue: MTLCommandQueue
+    private let pipelineState: MTLRenderPipelineState
+    private var startTime: CFTimeInterval = 0
+
+    init?(device: MTLDevice) {
+        guard let queue = device.makeCommandQueue() else { return nil }
+        self.device = device
+        self.commandQueue = queue
+
+        // Runtime-compiled Metal Shading Language source. Two stages:
+        //
+        //   • vertexShader  — full-screen triangle pair from a 6-element
+        //                     in-shader vertex array, no vertex buffer
+        //                     needed. UV is computed in screen-relative
+        //                     coords so the fragment shader sees y=0 at
+        //                     the top and y=1 at the bottom of the bar.
+        //
+        //   • fragmentShader — composites three sine ribbons over a
+        //                     dark navy background. Each ribbon has:
+        //                       1. A soft smoothstep falloff around its
+        //                          sine path (`thickness` half-width).
+        //                       2. A colour sampled from the 8-stop
+        //                          aurora palette at a flowing x offset
+        //                          (palette cycles per `flowSpeed`).
+        //                     Ribbons combine with `1 - (1-acc) * (1-c)`
+        //                     (screen-blend) so crests where ribbons
+        //                     overlap lift toward pearl-white without
+        //                     ever clipping.
+        let src = """
+        #include <metal_stdlib>
+        using namespace metal;
+
+        struct VOut {
+            float4 position [[position]];
+            float2 uv;
+        };
+
+        vertex VOut vertexShader(uint vid [[vertex_id]]) {
+            // Two-triangle quad covering NDC.
+            float2 pos[6] = {
+                float2(-1, -1), float2( 1, -1), float2(-1,  1),
+                float2( 1, -1), float2( 1,  1), float2(-1,  1),
+            };
+            VOut o;
+            o.position = float4(pos[vid], 0, 1);
+            // Flip y so uv = (0,0) is top-left, (1,1) is bottom-right.
+            o.uv = float2((pos[vid].x + 1.0) * 0.5,
+                          (1.0 - pos[vid].y) * 0.5);
+            return o;
+        }
+
+        constant float3 PALETTE[8] = {
+            float3(0.063, 0.114, 0.333),  // deep blue   #101D55
+            float3(0.118, 0.314, 0.506),  // blue mid    #1E5081
+            float3(0.165, 0.482, 0.569),  // cyan        #2A7B91
+            float3(0.416, 0.612, 0.549),  // peak        #6A9C8C
+            float3(0.180, 0.514, 0.384),  // mint        #2E8362
+            float3(0.071, 0.408, 0.353),  // teal        #12685A
+            float3(0.118, 0.314, 0.506),  // blue mid (wrap)
+            float3(0.063, 0.114, 0.333),  // deep blue (seamless)
+        };
+
+        // Crossfade through the 7-segment palette at normalized x in [0,1).
+        float3 samplePalette(float x) {
+            x = fract(x);
+            float s = x * 7.0;
+            int idx = int(floor(s));
+            float t = s - float(idx);
+            // Smoothstep gives a softer transition than linear mix at the
+            // segment boundaries — important because the eye picks up the
+            // crease in a linear gradient.
+            t = smoothstep(0.0, 1.0, t);
+            return mix(PALETTE[idx], PALETTE[idx + 1], t);
+        }
+
+        struct Wave {
+            float yCenter;
+            float amp;
+            float freq;
+            float waveSpeed;
+            float flowSpeed;
+            float phase;
+            float thickness;
+        };
+
+        fragment float4 fragmentShader(VOut in [[stage_in]],
+                                       constant float &time [[buffer(0)]]) {
+            float2 uv = in.uv;
+            float t = time;
+            float twoPi = 6.28318530718;
+
+            // Three waves. Same constants as android's `WAVES[]` array
+            // but `thickness` is expressed in normalized fraction of bar
+            // height (not pt) — the smoothstep below uses it as a
+            // half-width on uv.y, so it scales with the bar.
+            Wave waves[3] = {
+                { 0.42, 0.12, 1.2, 0.50, 0.16, 0.00, 0.22 },
+                { 0.50, 0.16, 1.0, 0.45, 0.13, 0.30, 0.30 },
+                { 0.58, 0.10, 1.5, 0.60, 0.20, 0.55, 0.18 },
+            };
+
+            // Dark navy bg (matches Android's BG #05081A).
+            float3 result = float3(0.020, 0.031, 0.102);
+
+            for (int i = 0; i < 3; ++i) {
+                Wave w = waves[i];
+                float sinePhase = w.phase * twoPi + t * w.waveSpeed;
+                float waveY = w.yCenter + w.amp * sin(uv.x * w.freq * twoPi + sinePhase);
+                float dist = abs(uv.y - waveY);
+                // Soft falloff — fully bright at the ribbon's center,
+                // fading to 0 at `thickness` half-width away.
+                float intensity = smoothstep(w.thickness, 0.0, dist);
+                if (intensity <= 0.001) continue;
+
+                // Colour flows along x at the ribbon's flowSpeed.
+                float flowX = uv.x + t * w.flowSpeed + w.phase;
+                float3 c = samplePalette(flowX);
+
+                // Boost peak colour so the centre of each ribbon reads
+                // brighter than the falloff — gives the ribbons real
+                // luminance instead of looking like flat-coloured tubes.
+                c = c * (0.55 + 0.85 * intensity);
+
+                // Screen-blend over the accumulating result. Crests
+                // where waves overlap brighten toward pearl-white.
+                result = 1.0 - (1.0 - result) * (1.0 - c * intensity);
+            }
+
+            return float4(result, 1.0);
+        }
+        """
+
+        guard let library = try? device.makeLibrary(source: src, options: nil) else {
+            return nil
+        }
+        guard let vertexFn = library.makeFunction(name: "vertexShader"),
+              let fragmentFn = library.makeFunction(name: "fragmentShader") else {
+            return nil
+        }
+
+        let desc = MTLRenderPipelineDescriptor()
+        desc.vertexFunction = vertexFn
+        desc.fragmentFunction = fragmentFn
+        desc.colorAttachments[0].pixelFormat = .bgra8Unorm
+        guard let pipeline = try? device.makeRenderPipelineState(descriptor: desc) else {
+            return nil
+        }
+        self.pipelineState = pipeline
+        super.init()
+    }
+
+    func start() {
+        startTime = CACurrentMediaTime()
+    }
+
+    // MARK: MTKViewDelegate
+
+    func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
+        // No-op — the shader is resolution-independent (works in
+        // normalized uv space) so we don't need to rebuild anything on
+        // resize.
+    }
+
+    func draw(in view: MTKView) {
+        guard let drawable = view.currentDrawable,
+              let descriptor = view.currentRenderPassDescriptor,
+              let buffer = commandQueue.makeCommandBuffer(),
+              let encoder = buffer.makeRenderCommandEncoder(descriptor: descriptor) else {
+            return
+        }
+        var t = Float(CACurrentMediaTime() - startTime)
+        encoder.setRenderPipelineState(pipelineState)
+        encoder.setFragmentBytes(&t, length: MemoryLayout<Float>.size, index: 0)
+        encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
+        encoder.endEncoding()
+        buffer.present(drawable)
+        buffer.commit()
     }
 }
