@@ -93,8 +93,8 @@ class KeyboardViewController: UIInputViewController {
     // iPhone numbers tuned to match the iOS system keyboard (≈291pt total
     // portrait). Previously rowH=54, rowGap=12 made the keys look chunky
     // and the keyboard too tall.
-    private var rowH:        CGFloat { isPad ? 42 : 44 }
-    private var rowGap:      CGFloat { isPad ? 6  : 8 }
+    private var rowH:        CGFloat { isPad ? 46 : 48 }
+    private var rowGap:      CGFloat { isPad ? 6  : 7 }
     private var commandBarH: CGFloat { isPad ? 46 : 50 }
     private var keyGap:      CGFloat { isPad ? 8  : 6 }
     private var bottomPad:   CGFloat { isPad ? 4  : 6 }
@@ -199,6 +199,32 @@ class KeyboardViewController: UIInputViewController {
     private lazy var personalizationStore: SplitStore =
         UserDefaultsSplitStore(suiteName: SplitContract.storageSuiteName)
 
+    // Cached personalization flags. Reading these from the App Group
+    // UserDefaults on every keystroke was a measurable hot-path cost
+    // (`handleSpaceDoubleTap`, `showCommandBar`, `showDraftCommandBar`
+    // all hit the store). The user can only flip these from the host
+    // app, so we refresh the cache when the keyboard mounts on a field.
+    private var cachedVoiceEnabled: Bool = true
+    private var cachedQuickPanelEnabled: Bool = true
+
+    private func refreshPersonalizationCache() {
+        cachedVoiceEnabled = personalizationStore.int(
+            forKey: PersonalizationKeys.voiceEnabled, fallback: 1) != 0
+        cachedQuickPanelEnabled = personalizationStore.int(
+            forKey: PersonalizationKeys.quickPanelEnabled, fallback: 1) != 0
+    }
+
+    // MARK: - Key press popup
+    //
+    // Apple's keyboard pops a larger version of the glyph above the
+    // pressed key so the user can confirm what they hit even though
+    // their finger is covering the key itself. We mirror that with a
+    // single recycled `UIView` (reusing it avoids per-keystroke
+    // allocations on the hot typing path).
+
+    private var keyPopupView: UIView?
+    private var keyPopupLabel: UILabel?
+
     private lazy var integrationRegistry = IntegrationRegistry([
         SplitIntegration(),
         NotionIntegration(),
@@ -232,6 +258,7 @@ class KeyboardViewController: UIInputViewController {
         super.viewDidLoad()
         haptic.prepare()
         view.backgroundColor = .clear
+        refreshPersonalizationCache()
         resolveAndCacheTheme()
         setupContainers()
         buildKeyboard()
@@ -326,6 +353,9 @@ class KeyboardViewController: UIInputViewController {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        // Personalization toggles may have changed in the host app between
+        // mounts. Re-cache so per-keystroke checks read in-memory.
+        refreshPersonalizationCache()
         // If the user just returned from the Turtle host app after dictating,
         // a transcript is sitting in the App Group waiting to be inserted.
         // The Darwin notification handles the live case; this catches the
@@ -696,10 +726,8 @@ class KeyboardViewController: UIInputViewController {
         // 🎙 mic — toggles voice dictation into the prompt area. Hidden
         // entirely when the user has switched off "Voice mic key" on the
         // Personalization screen.
-        let voiceEnabled = personalizationStore.int(
-            forKey: PersonalizationKeys.voiceEnabled, fallback: 1) != 0
         cmdMicButton = UIButton(type: .system)
-        cmdMicButton.isHidden = !voiceEnabled
+        cmdMicButton.isHidden = !cachedVoiceEnabled
         cmdMicButton.setImage(
             UIImage(systemName: "mic.fill",
                     withConfiguration: UIImage.SymbolConfiguration(pointSize: 15, weight: .medium)),
@@ -886,7 +914,8 @@ class KeyboardViewController: UIInputViewController {
                    && $0 !== previewOverlay
                    && $0 !== integrationPanelHost
                    && $0 !== quickPanelView
-                   && $0 !== listeningOverlay }
+                   && $0 !== listeningOverlay
+                   && $0 !== keyPopupView }
             .forEach { $0.removeFromSuperview() }
 
         let rows = currentRows()
@@ -918,7 +947,10 @@ class KeyboardViewController: UIInputViewController {
 
     private func buildRow(keys: [String], rowIndex: Int, totalRows: Int, y: CGFloat) -> UIView {
         let w         = kbWidth
-        let container = UIView(frame: CGRect(x: 0, y: y, width: w, height: rowH))
+        // KeyRowView extends hit-testing into the keyGap dead zones so a
+        // tap that lands between two visible keys still registers on the
+        // nearest one — same way Apple's iOS keyboard treats the gap.
+        let container = KeyRowView(frame: CGRect(x: 0, y: y, width: w, height: rowH))
         let isBottom   = rowIndex == totalRows - 1
         let isModifier = rowIndex == totalRows - 2
         let isMiddle   = keys.count == 9 && !isBottom && !isModifier
@@ -960,9 +992,23 @@ class KeyboardViewController: UIInputViewController {
 
         for (i, key) in keys.enumerated() {
             let btn = makeKey(label: key)
-            btn.frame = CGRect(x: xOffset, y: 0, width: i < widths.count ? widths[i] : 44, height: rowH)
+            let w = i < widths.count ? widths[i] : 44
+            btn.frame = CGRect(x: xOffset, y: 0, width: w, height: rowH)
+            // Pin the shadow to the button's rounded rect so CALayer
+            // doesn't have to offscreen-rasterize the layer to compute
+            // shadow alpha on every frame. With ~30 buttons and a
+            // press-scale CATransform animation firing on every tap,
+            // the implicit shadow path was the dominant per-keystroke
+            // GPU/CPU cost — typing fast made every key re-rasterize.
+            btn.layer.shadowPath = CGPath(
+                roundedRect: CGRect(x: 0, y: 0, width: w, height: rowH),
+                cornerWidth: 7, cornerHeight: 7, transform: nil)
+            // Tell the rasterization cache that the shadow doesn't
+            // depend on the layer's bitmap contents either — a flat
+            // backgroundColor + cornerRadius is the entire visual.
+            btn.layer.shouldRasterize = false
             container.addSubview(btn)
-            xOffset += (i < widths.count ? widths[i] : 44) + keyGap
+            xOffset += w + keyGap
         }
         return container
     }
@@ -987,7 +1033,11 @@ class KeyboardViewController: UIInputViewController {
         case "⇧" where isShiftActive:
             btn.setImage(UIImage(systemName: isCapsLock ? "capslock.fill" : "shift.fill",
                                  withConfiguration: c15), for: .normal)
-            btn.tintColor = specialText; btn.backgroundColor = keyShiftOn
+            // When shift latches, Apple's iOS keyboard flips the icon
+            // to a contrasting tone — black icon on the white-ish key
+            // in dark mode. `keyTextShiftOn` is the theme's pick for
+            // that contrast.
+            btn.tintColor = KeyboardPalette.keyTextShiftOn; btn.backgroundColor = keyShiftOn
         case "⇧":
             btn.setImage(UIImage(systemName: "shift", withConfiguration: c15), for: .normal)
             btn.tintColor = specialText; btn.backgroundColor = keySpecial
@@ -1006,15 +1056,24 @@ class KeyboardViewController: UIInputViewController {
             btn.backgroundColor = keySpecial
         default:
             btn.setTitle(displayTitle(for: label), for: .normal)
-            btn.titleLabel?.font = .systemFont(ofSize: 22, weight: .light)
+            // Apple's iOS keyboard uses regular-weight letters at ~23pt.
+            // The previous `.light` weight made glyphs feel spindly and
+            // hard to read at a glance — bumping to `.regular` gives them
+            // the same visual presence as the native keyboard.
+            btn.titleLabel?.font = .systemFont(ofSize: 23, weight: .regular)
             btn.setTitleColor(normalText, for: .normal)
             btn.backgroundColor = keyNormal
         }
 
-        btn.layer.cornerRadius  = 8; btn.layer.masksToBounds = false
+        btn.layer.cornerRadius  = 7; btn.layer.masksToBounds = false
+        // Apple's iOS keys have a barely-there 1pt bottom shadow with
+        // ~20% opacity — just enough to give the key a sense of being a
+        // raised tile. Our previous 0.45 opacity at 1.5pt was way too
+        // heavy: in dark mode it added a visible black fringe under
+        // every key that Apple's keyboard doesn't have.
         btn.layer.shadowColor   = UIColor.black.cgColor
-        btn.layer.shadowOffset  = CGSize(width: 0, height: 1.5)
-        btn.layer.shadowOpacity = 0.45; btn.layer.shadowRadius = 0
+        btn.layer.shadowOffset  = CGSize(width: 0, height: 1.0)
+        btn.layer.shadowOpacity = 0.20; btn.layer.shadowRadius = 0
         btn.accessibilityLabel  = label
         // Character fires on touchDown (snappy, matches Apple's keyboard).
         // touchUpInside / touchUpOutside / touchCancel only reset the
@@ -1098,16 +1157,97 @@ class KeyboardViewController: UIInputViewController {
     // press-scale visual; the character has already been committed.
 
     @objc private func keyTouchDown(_ sender: UIButton) {
+        // Commit the keystroke FIRST — that's what the user is waiting
+        // for. The haptic and press-scale animation run after, so the
+        // character is in the host field by the time the visual press
+        // feedback even starts. Subjective responsiveness wins.
+        guard let key = sender.accessibilityLabel else { return }
+        // Snapshot the visible glyph BEFORE processKey runs — shift-once
+        // letters get reset to lowercase by `updateKeyVisualsForShiftState`
+        // inside processKey, but the popup should still show the glyph
+        // the user actually typed.
+        let displayChar = sender.title(for: .normal) ?? key
+        processKey(key)
+        showKeyPopup(for: sender, label: key, displayChar: displayChar)
         haptic.impactOccurred()
         UIView.animate(withDuration: 0.05) { sender.transform = CGAffineTransform(scaleX: 0.93, y: 0.93) }
-        guard let key = sender.accessibilityLabel else { return }
-        processKey(key)
     }
 
     @objc private func keyTapped(_ sender: UIButton) {
         // Reset the press-scale visual. The character was inserted in
         // `keyTouchDown` already.
+        hideKeyPopup()
         UIView.animate(withDuration: 0.08) { sender.transform = .identity }
+    }
+
+    /// Lazily build the recycled popup view + label. Cheap to call on
+    /// every keystroke; only the first call actually constructs.
+    private func ensureKeyPopupView() {
+        guard keyPopupView == nil else { return }
+        let popup = UIView()
+        popup.layer.cornerRadius = 8
+        popup.layer.shadowColor = UIColor.black.cgColor
+        popup.layer.shadowOpacity = 0.30
+        popup.layer.shadowOffset = CGSize(width: 0, height: 2)
+        popup.layer.shadowRadius = 4
+        popup.isUserInteractionEnabled = false
+        popup.isHidden = true
+
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 34, weight: .regular)
+        label.textAlignment = .center
+        label.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        popup.addSubview(label)
+
+        keyboardContainer.addSubview(popup)
+        keyPopupView = popup
+        keyPopupLabel = label
+    }
+
+    /// Show the magnified-glyph popup above `btn`. Hidden for modifier
+    /// / mode-switch keys — Apple's keyboard doesn't pop those either.
+    private func showKeyPopup(for btn: UIButton, label: String, displayChar: String) {
+        // Glyph keys only — modifiers, mode switches, space, return
+        // all skip the popup the same way the native keyboard does.
+        let nonPop: Set<String> = ["🌐", "⇧", "⌫", "?123", "ABC", "=\\<", "↵", "space"]
+        if nonPop.contains(label) {
+            hideKeyPopup()
+            return
+        }
+        ensureKeyPopupView()
+        guard let popup = keyPopupView,
+              let labelView = keyPopupLabel,
+              let row = btn.superview else { return }
+
+        let keyFrame = row.convert(btn.frame, to: keyboardContainer)
+        // Popup is wider + taller than the key so the magnified glyph
+        // clears the finger. Clamped to the keyboard bounds so popups
+        // near the screen edge don't get pushed off-screen.
+        let popupW = max(keyFrame.width * 1.5, 44)
+        let popupH = keyFrame.height * 1.7
+        var popupX = keyFrame.midX - popupW / 2
+        let kbW = keyboardContainer.bounds.width
+        popupX = max(2, min(popupX, kbW - 2 - popupW))
+        let popupY = keyFrame.minY - popupH - 2
+
+        popup.frame = CGRect(x: popupX, y: popupY, width: popupW, height: popupH)
+        popup.backgroundColor = KeyboardPalette.keyNormal
+        // Pin shadow path so the layer doesn't offscreen-rasterize on
+        // every show — same fix we apply to the keys themselves.
+        popup.layer.shadowPath = CGPath(
+            roundedRect: popup.bounds,
+            cornerWidth: 8, cornerHeight: 8, transform: nil)
+
+        labelView.frame = popup.bounds
+        labelView.text = displayChar
+        labelView.textColor = KeyboardPalette.keyText
+
+        keyboardContainer.bringSubviewToFront(popup)
+        popup.isHidden = false
+    }
+
+    private func hideKeyPopup() {
+        keyPopupView?.isHidden = true
     }
 
     /// Carries the key's logical action. Routed from `keyTouchDown` so
@@ -1169,7 +1309,9 @@ class KeyboardViewController: UIInputViewController {
                     isShiftedOnce = false
                     proxy.insertText(text)
                     updateCommandDetection()
-                    rebuildKeyboard(); return
+                    // Just shift state changed — in-place refresh, not
+                    // a full keyboard rebuild.
+                    updateKeyVisualsForShiftState(); return
                 }
             }
             proxy.insertText(text)
@@ -1236,7 +1378,8 @@ class KeyboardViewController: UIInputViewController {
             if isQwertyLetter, isShiftedOnce, !isCapsLock {
                 isShiftedOnce = false
                 updateCommandDetection()
-                rebuildKeyboard()
+                // Shift state only — refresh in place, no full rebuild.
+                updateKeyVisualsForShiftState()
                 return
             }
             updateCommandDetection()
@@ -1309,15 +1452,16 @@ class KeyboardViewController: UIInputViewController {
         } else {
             isCapsLock = false; isShiftedOnce = !isShiftedOnce; lastShiftTap = now
         }
-        rebuildKeyboard()
+        // Shift only toggles glyph case + the shift button's image —
+        // no row count or key layout change. Update in-place instead
+        // of tearing down every UIButton.
+        updateKeyVisualsForShiftState()
     }
 
     private func handleSpaceDoubleTap() {
         // Respect the Personalization toggle: when off, double-space falls
         // through to whatever the host expects (just two spaces).
-        guard personalizationStore.int(
-            forKey: PersonalizationKeys.quickPanelEnabled, fallback: 1) != 0
-        else { return }
+        guard cachedQuickPanelEnabled else { return }
         let now = Date().timeIntervalSinceReferenceDate
         if now - lastSpaceTap < doubleTapInterval {
             // Undo the second space — the user meant "open Quick Panel",
@@ -1444,9 +1588,19 @@ class KeyboardViewController: UIInputViewController {
             return
         }
 
-        // No active slash command — fall back to word suggestions
-        if activeCommand != nil { hideCommandBar() }
-        updateWordSuggestions()
+        // No active slash command. For ordinary letter / backspace keys
+        // the proxy was just mutated, so iOS will fire `textDidChange`
+        // immediately after this method returns — that path owns word
+        // suggestions / shortcut chips. Calling `updateWordSuggestions()`
+        // here too would mean every keystroke hits `documentContextBeforeInput`
+        // (synchronous IPC to the host app) twice. We only refresh
+        // explicitly when transitioning OUT of slash mode (the proxy
+        // didn't change in that case, so textDidChange won't fire).
+        let wasInSlashMode = suggestionMode == .slashCommand || activeCommand != nil
+        if wasInSlashMode {
+            hideCommandBar()
+            updateWordSuggestions()
+        }
     }
 
     // MARK: - Word suggestions (in-keyboard autocomplete strip)
@@ -1672,10 +1826,8 @@ class KeyboardViewController: UIInputViewController {
         // Coming from word-suggestion mode? Restore normal controls first.
         // Mic only un-hides when the user has voice enabled in
         // Personalization — keep that gate honoured here.
-        let voiceEnabled = personalizationStore.int(
-            forKey: PersonalizationKeys.voiceEnabled, fallback: 1) != 0
         [cmdPill, cmdPromptLabel, cmdSendButton].forEach { $0.isHidden = false }
-        cmdMicButton.isHidden = !voiceEnabled
+        cmdMicButton.isHidden = !cachedVoiceEnabled
         cmdSuggestionsStack.isHidden = true
 
         // Padding now lives in `PaddedLabel.textInsets` (set at setup
@@ -1728,7 +1880,11 @@ class KeyboardViewController: UIInputViewController {
             recomputeKeyboardHeight()
             UIView.animate(withDuration: 0.18) { self.commandBar.alpha = 1 }
         }
-        commandBar.layoutIfNeeded()
+        // No `commandBar.layoutIfNeeded()` here — forcing a synchronous
+        // Auto Layout pass on every keystroke in slash mode is wasted
+        // work. The caret's width-measure (`updateCaretPosition`) doesn't
+        // need the bar's frame to be flushed, and `scrollCaretIntoView`
+        // already flushes the inner scroll view itself when needed.
         updateCaret()
     }
 
@@ -1748,12 +1904,10 @@ class KeyboardViewController: UIInputViewController {
         // approach produced. The prompt label is hidden in draft mode
         // (and so is the caret, via `updateCaret`'s label-visibility
         // gate) — the pill IS the visual indicator.
-        let voiceEnabled = personalizationStore.int(
-            forKey: PersonalizationKeys.voiceEnabled, fallback: 1) != 0
         cmdPill.isHidden = false
         cmdPromptLabel.isHidden = true
         cmdSendButton.isHidden = false
-        cmdMicButton.isHidden = !voiceEnabled
+        cmdMicButton.isHidden = !cachedVoiceEnabled
         cmdPresetStrip?.isHidden = true
         cmdSpinner.stopAnimating()
         cmdSuggestionsStack.isHidden = true
@@ -1830,7 +1984,7 @@ class KeyboardViewController: UIInputViewController {
             recomputeKeyboardHeight()
             UIView.animate(withDuration: 0.15) { self.commandBar.alpha = 1 }
         }
-        commandBar.layoutIfNeeded()
+        // No synchronous layoutIfNeeded — see showCommandBar comment.
         updateCaret()
     }
 
@@ -2488,6 +2642,47 @@ class KeyboardViewController: UIInputViewController {
         // heightConstraint and preferredContentSize are never changed
     }
 
+    /// In-place update for shift state changes. Walks the existing key
+    /// buttons and refreshes the shift button's image / background plus
+    /// every QWERTY letter's title — far cheaper than tearing down all
+    /// ~30 buttons (with their shadows, gestures, target/actions) and
+    /// rebuilding them, which is what `rebuildKeyboard()` does. Use
+    /// this anywhere only the shift flag changed; full mode switches
+    /// still go through `rebuildKeyboard()`.
+    private func updateKeyVisualsForShiftState() {
+        let shifted = isCapsLock || isShiftedOnce
+        let c15 = UIImage.SymbolConfiguration(pointSize: 15, weight: .medium)
+        let specialText = KeyboardPalette.keyTextSpecial
+
+        for row in keyboardContainer.subviews {
+            if row === commandBar || row === bannerContainer
+                || row === slashStrip || row === previewOverlay
+                || row === integrationPanelHost || row === quickPanelView
+                || row === listeningOverlay || row === keyPopupView {
+                continue
+            }
+            for case let btn as UIButton in row.subviews {
+                guard let label = btn.accessibilityLabel else { continue }
+                if label == "⇧" {
+                    if shifted {
+                        btn.setImage(UIImage(systemName: isCapsLock ? "capslock.fill" : "shift.fill",
+                                             withConfiguration: c15), for: .normal)
+                        btn.tintColor = KeyboardPalette.keyTextShiftOn
+                        btn.backgroundColor = keyShiftOn
+                    } else {
+                        btn.setImage(UIImage(systemName: "shift", withConfiguration: c15), for: .normal)
+                        btn.tintColor = specialText
+                        btn.backgroundColor = keySpecial
+                    }
+                } else if mode == .qwerty,
+                          label.count == 1,
+                          label.first?.isLetter == true {
+                    btn.setTitle(displayTitle(for: label), for: .normal)
+                }
+            }
+        }
+    }
+
     // MARK: - Helpers
     //
     // Wrappers around Keyboard/KeyRows.swift so the call sites don't
@@ -3063,6 +3258,40 @@ private final class PulsingDotsView: UIView {
             anim.beginTime = CACurrentMediaTime() + Double(i) * 0.08
             layer.add(anim, forKey: "pulse")
         }
+    }
+}
+
+// MARK: - KeyRowView
+
+/// Row container that extends hit-testing into the visual gap between
+/// keys. Apple's native keyboard treats those gaps as part of the
+/// nearer key's tappable area — a finger that lands a couple of points
+/// to the side of a glyph still registers as a tap on that key. The
+/// previous plain `UIView` row left the gap as a dead zone, which is
+/// what made fast typing feel like characters got "swallowed."
+fileprivate final class KeyRowView: UIView {
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        // Outside the row entirely → not ours.
+        guard bounds.contains(point) else { return nil }
+        // Normal hit test first — if the point lands directly on a key
+        // button, return it unchanged so things like long-press
+        // gesture recognizers attached to the button still fire.
+        if let view = super.hitTest(point, with: event), view !== self {
+            return view
+        }
+        // Point is inside the row but landed in the inter-key gap.
+        // Forward it to the button whose horizontal midpoint is
+        // closest — that's the key the user was aiming for.
+        var nearest: UIView?
+        var bestDist: CGFloat = .greatestFiniteMagnitude
+        for sub in subviews where sub is UIButton {
+            let dist = abs(sub.frame.midX - point.x)
+            if dist < bestDist {
+                bestDist = dist
+                nearest = sub
+            }
+        }
+        return nearest
     }
 }
 

@@ -25,6 +25,7 @@ enum KeyboardPalette {
     static var bannerBg:  UIColor { current.bannerBg }
     static var keyText:   UIColor { current.keyText }
     static var keyTextSpecial: UIColor { current.keyTextSpecial }
+    static var keyTextShiftOn: UIColor { current.keyTextShiftOn }
     static var accent:    UIColor { current.accent }
     static var chipBg:    UIColor { current.chipBg }
     static var chipText:  UIColor { current.chipText }
