@@ -1,0 +1,18 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["AHV2R8U5DW.com.turtlekeyboard"],
+        "components": [
+          {
+            "/": "/.well-known/*",
+            "exclude": true
+          },
+          {
+            "/": "/*"
+          }
+        ]
+      }
+    ]
+  }
+}
