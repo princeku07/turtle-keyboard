@@ -230,6 +230,12 @@ class KeyboardViewController: UIInputViewController {
 
     private var keyPopupView: UIView?
     private var keyPopupLabel: UILabel?
+    /// Safety timer that auto-hides the popup if `keyTapped` doesn't
+    /// fire on touch-up (which can happen when the `UIVisualEffectView`
+    /// sibling backing or row-level gap routing interferes with the
+    /// UIControl touch-tracking path). Cancelled when `keyTapped`
+    /// fires normally — so most key presses never wait for it.
+    private var keyPopupAutoHide: DispatchWorkItem?
 
     private lazy var integrationRegistry = IntegrationRegistry([
         SplitIntegration(),
@@ -1317,6 +1323,12 @@ class KeyboardViewController: UIInputViewController {
         let displayChar = sender.title(for: .normal) ?? key
         processKey(key)
         showKeyPopup(for: sender, label: key, displayChar: displayChar)
+        // Safety net: even if `keyTapped` never fires (rare, but
+        // happens when the visual-effect backing or gap-route hit
+        // testing interferes with UIControl's touch tracking), the
+        // popup must not be left visible. 0.45s matches Apple — feels
+        // instant for taps, allows hold-to-see for a beat.
+        scheduleKeyPopupAutoHide()
         haptic.impactOccurred()
         UIView.animate(withDuration: 0.05) { sender.transform = CGAffineTransform(scaleX: 0.93, y: 0.93) }
     }
@@ -1326,6 +1338,15 @@ class KeyboardViewController: UIInputViewController {
         // `keyTouchDown` already.
         hideKeyPopup()
         UIView.animate(withDuration: 0.08) { sender.transform = .identity }
+    }
+
+    private func scheduleKeyPopupAutoHide() {
+        keyPopupAutoHide?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            self?.hideKeyPopup()
+        }
+        keyPopupAutoHide = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45, execute: work)
     }
 
     /// Lazily build the recycled popup view + label. Cheap to call on
@@ -1395,6 +1416,8 @@ class KeyboardViewController: UIInputViewController {
     }
 
     private func hideKeyPopup() {
+        keyPopupAutoHide?.cancel()
+        keyPopupAutoHide = nil
         keyPopupView?.isHidden = true
     }
 
