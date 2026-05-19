@@ -3857,7 +3857,11 @@ fileprivate final class GeneratingWaveView: UIView {
         let mtk = MTKView(frame: .zero, device: device)
         mtk.translatesAutoresizingMaskIntoConstraints = false
         mtk.isUserInteractionEnabled = false
-        mtk.isOpaque = true
+        // Non-opaque + clearColor with alpha 0 lets the drawable
+        // composite over whatever sits behind the wave view. The
+        // fragment shader writes premultiplied alpha so areas
+        // outside the wave ribbons read as fully transparent.
+        mtk.isOpaque = false
         mtk.framebufferOnly = true
         mtk.colorPixelFormat = .bgra8Unorm
         // Pause until startAnimating; isPaused = true + enableSetNeedsDisplay = false
@@ -3865,12 +3869,12 @@ fileprivate final class GeneratingWaveView: UIView {
         mtk.isPaused = true
         mtk.enableSetNeedsDisplay = false
         mtk.preferredFramesPerSecond = 60
-        mtk.clearColor = MTLClearColor(red: 0.020, green: 0.031, blue: 0.102, alpha: 1.0)
+        mtk.clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
         self.metalView = mtk
         self.renderer = device.flatMap { AuroraRenderer(device: $0) }
 
         super.init(frame: .zero)
-        backgroundColor = UIColor(red: 0.020, green: 0.031, blue: 0.102, alpha: 1.0)
+        backgroundColor = .clear
         clipsToBounds = true
         isUserInteractionEnabled = false
 
@@ -4036,8 +4040,13 @@ fileprivate final class AuroraRenderer: NSObject, MTKViewDelegate {
                 { 0.58, 0.10, 1.5, 0.60, 0.20, 0.55, 0.18 },
             };
 
-            // Dark navy bg (matches Android's BG #05081A).
-            float3 result = float3(0.020, 0.031, 0.102);
+            // Start fully transparent — only the wave ribbons paint
+            // any visible pixels. The previous dark-navy `result` fill
+            // forced the whole bar to render as an opaque tile; now
+            // pixels outside every ribbon stay clear and host content
+            // shows through.
+            float3 result = float3(0.0, 0.0, 0.0);
+            float alpha   = 0.0;
 
             for (int i = 0; i < 3; ++i) {
                 Wave w = waves[i];
@@ -4061,9 +4070,16 @@ fileprivate final class AuroraRenderer: NSObject, MTKViewDelegate {
                 // Screen-blend over the accumulating result. Crests
                 // where waves overlap brighten toward pearl-white.
                 result = 1.0 - (1.0 - result) * (1.0 - c * intensity);
+                // Accumulate alpha the same way so overlapping ribbons
+                // build a more solid fill while isolated pixels stay
+                // partially transparent (smooth edges).
+                alpha = 1.0 - (1.0 - alpha) * (1.0 - intensity);
             }
 
-            return float4(result, 1.0);
+            // Metal's CAMetalLayer expects premultiplied alpha by
+            // default — multiply the RGB by alpha so the drawable
+            // composites correctly when the MTKView is non-opaque.
+            return float4(result * alpha, alpha);
         }
         """
 
