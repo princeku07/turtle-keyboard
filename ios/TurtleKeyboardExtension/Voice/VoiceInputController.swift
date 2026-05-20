@@ -151,34 +151,41 @@ final class VoiceInputController {
             return
         }
 
-        // Host is dead (force-quit, never opened this session, cleared by
-        // iOS). Don't try to launch it programmatically — iOS denies that
-        // for keyboard extensions anyway. Show a toast asking the user to
-        // open Turtle. The rendezvous flag we set above means the host
-        // will pick up where we left off as soon as it foregrounds.
+        // Host is dead (force-quit, never opened this session, or cleared
+        // by iOS). Foreground it programmatically — `extensionContext.open`
+        // to our own container app is permitted from a Full-Access
+        // keyboard, and `micTapped` already gated on `hasFullAccess`. The
+        // user lands on the swipe-back coachmark and dictation continues
+        // from there. Only if iOS refuses the open do we fall back to a
+        // banner asking the user to launch Turtle manually.
         promptUserToOpenHost(sink: sink)
     }
 
     private func promptUserToOpenHost(sink: Sink) {
-        // Tear down the listening state — recording isn't happening yet.
-        // We'll arm a new listening session when the user re-taps mic
-        // after opening Turtle (host will then be alive in background).
+        // Tear down listening state — recording can't start until the host
+        // is foregrounded and the user has swiped back. The voice.requested
+        // rendezvous flag stays in the App Group, so the coachmark fires on
+        // the host's next foreground regardless of how it got there.
         stopPollTimer()
         isListening = false
         let host = hostInputVC
         activeSink = nil
         hostInputVC = nil
-        DispatchQueue.main.async {
-            sink.onListeningStopped()
-            sink.onInfo("Opening Turtle app to enable voice…")
+        DispatchQueue.main.async { sink.onListeningStopped() }
+
+        // Foreground the host. On success the host app appears with the
+        // swipe-back coachmark — the keyboard is no longer visible, so no
+        // banner from this side is needed. Only on failure do we surface
+        // a single-line prompt with the next step.
+        guard let host = host else {
+            DispatchQueue.main.async { sink.onInfo("Open Turtle to enable voice") }
+            return
         }
-        // Try to launch Turtle directly. iOS 18+ keyboard extensions
-        // usually have this denied, but when it works the host pops up
-        // with the coachmark and the user just has to swipe back. When
-        // it fails the toast above stays on screen so the user can open
-        // Turtle by hand.
-        if let host = host {
-            openHostApp(from: host) { _ in /* completion-only logging */ }
+        openHostApp(from: host) { success in
+            guard !success else { return }
+            DispatchQueue.main.async {
+                sink.onInfo("Open Turtle to enable voice")
+            }
         }
     }
 
@@ -305,15 +312,19 @@ final class VoiceInputController {
 
     private func openHostApp(from host: UIInputViewController,
                              completion: @escaping (Bool) -> Void) {
-        // Two prerequisites that were missing earlier and caused this to
-        // silently fail:
-        //   1. `LSApplicationQueriesSchemes` in the extension's Info.plist
-        //      must list `turtlekeyboard`. Without it iOS denies the open
-        //      regardless of Full Access.
-        //   2. Use the typed `extensionContext.open(_:completionHandler:)`
-        //      — it's the only API Apple actually honours from a keyboard
-        //      extension. The `openURL:` selector-walk works on older iOS
-        //      and is kept here as a fallback.
+        // Two open paths, tried in order:
+        //   1. `extensionContext.open(_:)` — the only Apple-blessed API,
+        //      works on iOS ≤ 17 and sometimes on 18. Requires Full Access
+        //      (already gated in `KeyboardViewController.micTapped`) and
+        //      `LSApplicationQueriesSchemes` listing `turtlekeyboard`
+        //      (set in the extension's Info.plist).
+        //   2. Runtime `+[UIApplication sharedApplication]` →
+        //      `openURL:options:completionHandler:` — the *modern* open
+        //      method called via an IMP cast. The deprecated single-arg
+        //      `openURL:` is a no-op on iOS 18, so we bypass it entirely.
+        //      Wispr Flow and similar dictation keyboards rely on this
+        //      runtime path; it is what makes the cold-start launch work
+        //      on current iOS.
         let url = Self.launchURL
 
         if let ctx = host.extensionContext {
@@ -322,57 +333,44 @@ final class VoiceInputController {
                     DispatchQueue.main.async { completion(true) }
                     return
                 }
-                // System refused. Try the responder-chain walk before
-                // giving up — some older iOS keyboards still allow it.
                 DispatchQueue.main.async {
-                    self?.openViaResponderChain(from: host, url: url,
-                                                completion: completion)
+                    self?.openViaSharedApplication(url: url, completion: completion)
                 }
             }
             return
         }
-        openViaResponderChain(from: host, url: url, completion: completion)
+        openViaSharedApplication(url: url, completion: completion)
     }
 
-    private func openViaResponderChain(from host: UIInputViewController,
-                                       url: URL,
-                                       completion: @escaping (Bool) -> Void) {
-        let openSel = NSSelectorFromString("openURL:")
-
-        // 1) Responder-chain walk. On iOS versions where UIApplication is
-        //    reachable from a UIInputViewController this is the cleanest
-        //    way to call `openURL:`. The cast is `as? UIApplication` because
-        //    the class IS available in extensions — only `.shared` is not.
-        let starts: [UIResponder?] = [
-            host.viewIfLoaded?.window,
-            host.viewIfLoaded,
-            host,
-        ]
-        for start in starts {
-            var responder: UIResponder? = start
-            while let r = responder {
-                if let app = r as? UIApplication, app.responds(to: openSel) {
-                    let result = app.perform(openSel, with: url)
-                    completion(result != nil)
-                    return
-                }
-                responder = r.next
-            }
+    private func openViaSharedApplication(url: URL,
+                                          completion: @escaping (Bool) -> Void) {
+        // `UIApplication.shared` is unavailable to extensions at compile
+        // time, but the class and its `+sharedApplication` class method
+        // both exist at runtime — fetch the instance dynamically.
+        let sharedSel = NSSelectorFromString("sharedApplication")
+        guard let appClass = NSClassFromString("UIApplication") as? NSObject.Type,
+              appClass.responds(to: sharedSel),
+              let unmanaged = appClass.perform(sharedSel),
+              let app = unmanaged.takeUnretainedValue() as? NSObject
+        else {
+            completion(false)
+            return
         }
 
-        // 2) Runtime `+[UIApplication sharedApplication]` lookup. Apple's
-        //    static analyser flags this pattern in extensions, but it's the
-        //    path that actually delivers the open on iOS 18+ where neither
-        //    `extensionContext.open` nor the responder chain works. Wispr
-        //    Flow and other dictation keyboards rely on this.
-        let sharedSel = NSSelectorFromString("sharedApplication")
-        if let appClass = NSClassFromString("UIApplication") as? NSObject.Type,
-           appClass.responds(to: sharedSel),
-           let unmanaged = appClass.perform(sharedSel),
-           let app = unmanaged.takeUnretainedValue() as? NSObject,
-           app.responds(to: openSel) {
-            _ = app.perform(openSel, with: url)
-            completion(true)
+        // Reach `open(_:options:completionHandler:)` by its IMP and call
+        // it via a C function pointer. `perform(_:with:)` only supports
+        // one argument so the modern signature can't go through it.
+        let modernSel = NSSelectorFromString("openURL:options:completionHandler:")
+        if app.responds(to: modernSel),
+           let method = class_getInstanceMethod(type(of: app), modernSel) {
+            typealias OpenFn = @convention(c) (
+                AnyObject, Selector, URL, NSDictionary, ((Bool) -> Void)?
+            ) -> Void
+            let openFn = unsafeBitCast(method_getImplementation(method),
+                                       to: OpenFn.self)
+            openFn(app, modernSel, url, NSDictionary()) { ok in
+                DispatchQueue.main.async { completion(ok) }
+            }
             return
         }
 
