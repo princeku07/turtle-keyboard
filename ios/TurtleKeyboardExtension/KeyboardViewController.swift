@@ -3408,7 +3408,7 @@ private final class ListeningOverlayView: UIView {
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        backgroundColor = .clear
+        backgroundColor = UIColor.black.withAlphaComponent(0.45)
         // The overlay no longer carries ✕ / ✓ buttons — silence detection
         // auto-dismisses it. Letting touches fall through means the
         // keyboard underneath stays interactive (mic key still toggles).
@@ -3418,16 +3418,10 @@ private final class ListeningOverlayView: UIView {
     required init?(coder: NSCoder) { fatalError() }
 
     func updateTranscript(_ text: String) {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty {
-            captionLabel.text = "✦ LISTENING…"
-            captionLabel.font = .systemFont(ofSize: 17, weight: .semibold)
-            captionLabel.numberOfLines = 1
-        } else {
-            captionLabel.text = trimmed
-            captionLabel.font = .systemFont(ofSize: 18, weight: .regular)
-            captionLabel.numberOfLines = 3
-        }
+        // Caption is intentionally static — the transcript is typed into
+        // the prompt / host text field (see `onPartial` in the controller),
+        // not echoed in the overlay. Keep this entry point so callers don't
+        // need to change, but no-op the visual update.
     }
 
     private func layout() {
@@ -3439,7 +3433,8 @@ private final class ListeningOverlayView: UIView {
         addSubview(aurora)
 
         // Centered caption with a soft black shadow so it stays
-        // readable as the aurora ribbons pass behind it.
+        // readable as the aurora ribbons pass behind it. Text is
+        // hardcoded — transcript goes into the text field, not here.
         captionLabel.text = "✦ LISTENING…"
         captionLabel.font = .systemFont(ofSize: 17, weight: .semibold)
         captionLabel.textColor = .white
