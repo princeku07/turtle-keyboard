@@ -237,6 +237,17 @@ class KeyboardViewController: UIInputViewController {
     /// fires normally — so most key presses never wait for it.
     private var keyPopupAutoHide: DispatchWorkItem?
 
+    /// Silence-detect auto-stop for voice dictation. Reset every time
+    /// a partial transcript arrives; if the timer fires (no partials
+    /// for `voiceSilenceTimeout` seconds) we request the host to stop
+    /// recording — the same effect the old ✓ button had.
+    private var voiceSilenceTimer: Timer?
+    /// 1.8s matches the silence-stop threshold Siri uses on iOS.
+    /// Short enough that the listening UI dismisses promptly when
+    /// the user finishes speaking; long enough to tolerate brief
+    /// pauses mid-utterance.
+    private static let voiceSilenceTimeout: TimeInterval = 1.8
+
     private lazy var integrationRegistry = IntegrationRegistry([
         SplitIntegration(),
         NotionIntegration(),
@@ -3266,9 +3277,14 @@ extension KeyboardViewController: VoiceInputController.Sink {
     func onListeningStarted() {
         setMicListeningUI(true)
         showListeningOverlay()
+        // Arm the silence watchdog. If no partials arrive within the
+        // window the host gets stopped automatically — the user never
+        // needs to press a ✓ button.
+        armVoiceSilenceTimer()
     }
 
     func onListeningStopped() {
+        cancelVoiceSilenceTimer()
         setMicListeningUI(false)
         hideListeningOverlay()
     }
@@ -3276,9 +3292,12 @@ extension KeyboardViewController: VoiceInputController.Sink {
     func onPartial(_ text: String) {
         listeningOverlay?.updateTranscript(text)
         appendDictation(text)
+        // User is still speaking — push the silence countdown back.
+        armVoiceSilenceTimer()
     }
 
     func onFinal(_ text: String) {
+        cancelVoiceSilenceTimer()
         // Two destinations:
         //   • If the user invoked voice from inside a slash-command flow
         //     (`/ask hello`) the existing path stuffs the transcript into
@@ -3297,8 +3316,28 @@ extension KeyboardViewController: VoiceInputController.Sink {
     }
 
     func onError(_ userVisibleMessage: String) {
+        cancelVoiceSilenceTimer()
         voicePromptPrefix = nil
         showBanner("⚠️ \(userVisibleMessage)")
+    }
+
+    /// (Re-)arm the silence watchdog. Called on listening-start and on
+    /// every partial — so a continuously talking user never trips it.
+    /// When it fires, request the host to commit the current hypothesis,
+    /// which dismisses the overlay via `onFinal` / `onListeningStopped`.
+    private func armVoiceSilenceTimer() {
+        voiceSilenceTimer?.invalidate()
+        voiceSilenceTimer = Timer.scheduledTimer(
+            withTimeInterval: Self.voiceSilenceTimeout,
+            repeats: false
+        ) { [weak self] _ in
+            self?.voiceController.requestStop()
+        }
+    }
+
+    private func cancelVoiceSilenceTimer() {
+        voiceSilenceTimer?.invalidate()
+        voiceSilenceTimer = nil
     }
 
     func onInfo(_ userVisibleMessage: String) {
@@ -3330,8 +3369,10 @@ extension KeyboardViewController: VoiceInputController.Sink {
         guard listeningOverlay == nil else { return }
         let overlay = ListeningOverlayView()
         overlay.translatesAutoresizingMaskIntoConstraints = false
-        overlay.onConfirm = { [weak self] in self?.voiceController.requestStop() }
-        overlay.onCancel  = { [weak self] in self?.voiceController.cancel() }
+        // No confirm/cancel hooks — the overlay auto-dismisses via the
+        // silence timer below. Tapping the mic key again still works
+        // because the overlay has `isUserInteractionEnabled = false`
+        // so touches fall through to the keys.
         keyboardContainer.addSubview(overlay)
         NSLayoutConstraint.activate([
             overlay.topAnchor.constraint(equalTo: keyboardContainer.topAnchor),
@@ -3350,27 +3391,28 @@ extension KeyboardViewController: VoiceInputController.Sink {
 }
 
 // MARK: - ListeningOverlayView
+//
+// Android-style listening surface: a transparent backdrop layered OVER
+// the keyboard (keys remain visible through it), with a Metal-shaded
+// cyan aurora glow pulsing from the centre and a `✦ LISTENING…` label.
+// Replaces the previous Wispr-style full-black overlay with dots.
+//
+// X (cancel) / ✓ (confirm) buttons stay in the corners but rendered
+// over the aurora so the user can still bail out or commit the
+// transcript explicitly.
 
-/// Mirrors Wispr Flow's in-keyboard listening surface (image 18): black
-/// background, a pulsing dot pattern + "Listening / iPad Microphone"
-/// caption, and X / ✓ buttons in the corners. Live transcripts replace
-/// the caption when the recognizer reports partials.
 private final class ListeningOverlayView: UIView {
 
-    var onConfirm: (() -> Void)?
-    var onCancel:  (() -> Void)?
-
-    private let transcriptLabel = UILabel()
-    private let captionStack    = UIStackView()
-    private let dotsView        = PulsingDotsView()
-    private let listeningLabel  = UILabel()
-    private let micLabel        = UILabel()
-    private let cancelButton    = UIButton(type: .system)
-    private let confirmButton   = UIButton(type: .system)
+    private let aurora       = ListeningAuroraView()
+    private let captionLabel = UILabel()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        backgroundColor = .black
+        backgroundColor = .clear
+        // The overlay no longer carries ✕ / ✓ buttons — silence detection
+        // auto-dismisses it. Letting touches fall through means the
+        // keyboard underneath stays interactive (mic key still toggles).
+        isUserInteractionEnabled = false
         layout()
     }
     required init?(coder: NSCoder) { fatalError() }
@@ -3378,136 +3420,403 @@ private final class ListeningOverlayView: UIView {
     func updateTranscript(_ text: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty {
-            transcriptLabel.text = ""
-            transcriptLabel.isHidden = true
-            captionStack.isHidden = false
+            captionLabel.text = "✦ LISTENING…"
+            captionLabel.font = .systemFont(ofSize: 17, weight: .semibold)
+            captionLabel.numberOfLines = 1
         } else {
-            transcriptLabel.text = trimmed
-            transcriptLabel.isHidden = false
-            captionStack.isHidden = true
+            captionLabel.text = trimmed
+            captionLabel.font = .systemFont(ofSize: 18, weight: .regular)
+            captionLabel.numberOfLines = 3
         }
     }
 
     private func layout() {
-        // ✕ — cancel
-        cancelButton.setImage(UIImage(systemName: "xmark"), for: .normal)
-        cancelButton.tintColor = .white
-        cancelButton.backgroundColor = UIColor.white.withAlphaComponent(0.14)
-        cancelButton.layer.cornerRadius = 22
-        cancelButton.addTarget(self, action: #selector(cancelPressed), for: .touchUpInside)
+        // Aurora glow — fills the overlay, draws nothing where the
+        // bowl / wisps aren't active so the host keys read through
+        // the transparent parts.
+        aurora.translatesAutoresizingMaskIntoConstraints = false
+        aurora.isUserInteractionEnabled = false
+        addSubview(aurora)
 
-        // ✓ — confirm
-        confirmButton.setImage(UIImage(systemName: "checkmark"), for: .normal)
-        confirmButton.tintColor = .black
-        confirmButton.backgroundColor = .white
-        confirmButton.layer.cornerRadius = 26
-        confirmButton.addTarget(self, action: #selector(confirmPressed), for: .touchUpInside)
-
-        // Caption shown when there's no transcript yet.
-        listeningLabel.text = "Listening"
-        listeningLabel.textColor = .white
-        listeningLabel.font = .systemFont(ofSize: 18, weight: .medium)
-        listeningLabel.textAlignment = .center
-
-        micLabel.text = "iPad Microphone"
-        micLabel.textColor = UIColor.white.withAlphaComponent(0.55)
-        micLabel.font = .systemFont(ofSize: 14)
-        micLabel.textAlignment = .center
-
-        captionStack.axis = .vertical
-        captionStack.alignment = .center
-        captionStack.spacing = 4
-        captionStack.addArrangedSubview(listeningLabel)
-        captionStack.addArrangedSubview(micLabel)
-
-        // Live transcript, hidden until first partial.
-        transcriptLabel.textColor = .white
-        transcriptLabel.font = .systemFont(ofSize: 20, weight: .regular)
-        transcriptLabel.numberOfLines = 3
-        transcriptLabel.textAlignment = .center
-        transcriptLabel.isHidden = true
-
-        [cancelButton, confirmButton, dotsView, captionStack, transcriptLabel]
-            .forEach {
-                $0.translatesAutoresizingMaskIntoConstraints = false
-                addSubview($0)
-            }
+        // Centered caption with a soft black shadow so it stays
+        // readable as the aurora ribbons pass behind it.
+        captionLabel.text = "✦ LISTENING…"
+        captionLabel.font = .systemFont(ofSize: 17, weight: .semibold)
+        captionLabel.textColor = .white
+        captionLabel.textAlignment = .center
+        captionLabel.numberOfLines = 1
+        captionLabel.translatesAutoresizingMaskIntoConstraints = false
+        captionLabel.layer.shadowColor   = UIColor.black.cgColor
+        captionLabel.layer.shadowOpacity = 0.55
+        captionLabel.layer.shadowRadius  = 6
+        captionLabel.layer.shadowOffset  = .zero
+        addSubview(captionLabel)
 
         NSLayoutConstraint.activate([
-            // ✕ top-left (matches Wispr image 18 top-left position).
-            cancelButton.topAnchor.constraint(equalTo: topAnchor, constant: 14),
-            cancelButton.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 18),
-            cancelButton.widthAnchor.constraint(equalToConstant: 44),
-            cancelButton.heightAnchor.constraint(equalToConstant: 44),
+            aurora.topAnchor.constraint(equalTo: topAnchor),
+            aurora.bottomAnchor.constraint(equalTo: bottomAnchor),
+            aurora.leadingAnchor.constraint(equalTo: leadingAnchor),
+            aurora.trailingAnchor.constraint(equalTo: trailingAnchor),
 
-            // ✓ top-right.
-            confirmButton.topAnchor.constraint(equalTo: topAnchor, constant: 10),
-            confirmButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -18),
-            confirmButton.widthAnchor.constraint(equalToConstant: 52),
-            confirmButton.heightAnchor.constraint(equalToConstant: 52),
-
-            // Dots + caption stacked vertically in the centre.
-            dotsView.centerXAnchor.constraint(equalTo: centerXAnchor),
-            dotsView.centerYAnchor.constraint(equalTo: centerYAnchor, constant: -12),
-            dotsView.widthAnchor.constraint(equalToConstant: 140),
-            dotsView.heightAnchor.constraint(equalToConstant: 12),
-
-            captionStack.topAnchor.constraint(equalTo: dotsView.bottomAnchor, constant: 18),
-            captionStack.centerXAnchor.constraint(equalTo: centerXAnchor),
-
-            transcriptLabel.topAnchor.constraint(equalTo: dotsView.bottomAnchor, constant: 18),
-            transcriptLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 32),
-            transcriptLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -32),
+            captionLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
+            captionLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
+            captionLabel.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: 24),
+            captionLabel.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -24),
         ])
 
-        dotsView.startAnimating()
+        aurora.start()
     }
-
-    @objc private func confirmPressed() { onConfirm?() }
-    @objc private func cancelPressed()  { onCancel?() }
 }
 
-/// Eight white dots pulsing in sequence — purely decorative.
-private final class PulsingDotsView: UIView {
-    private let dotCount = 8
-    private var dotLayers: [CALayer] = []
+// MARK: - ListeningAuroraView (Metal hemisphere bowl + smoke wisps)
+//
+// Direct port of android/.../VoiceStageView's OpenGL ES 2.0 shader:
+// a cyan bowl-arc rim with smoke wisps rising from its interior,
+// dimmed reflection below a mirror line, and an arc-reveal sweep
+// that runs right → bottom → left on open and continues right → left
+// on close. Rendered to a transparent drawable so the keyboard keys
+// remain visible behind the bowl.
 
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        for _ in 0..<dotCount {
-            let layer = CALayer()
-            layer.backgroundColor = UIColor.white.cgColor
-            self.layer.addSublayer(layer)
-            dotLayers.append(layer)
-        }
+private final class ListeningAuroraView: UIView {
+
+    private let metalView: MTKView
+    private let renderer: ListeningAuroraRenderer?
+
+    init() {
+        let device = MTLCreateSystemDefaultDevice()
+        let mtk = MTKView(frame: .zero, device: device)
+        mtk.translatesAutoresizingMaskIntoConstraints = false
+        mtk.isUserInteractionEnabled = false
+        mtk.isOpaque = false
+        mtk.framebufferOnly = true
+        mtk.colorPixelFormat = .bgra8Unorm
+        mtk.preferredFramesPerSecond = 60
+        mtk.clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
+        mtk.isPaused = true
+        mtk.enableSetNeedsDisplay = false
+        self.metalView = mtk
+        self.renderer = device.flatMap { ListeningAuroraRenderer(device: $0) }
+
+        super.init(frame: .zero)
+        backgroundColor = .clear
+        clipsToBounds = true
+        isUserInteractionEnabled = false
+
+        mtk.delegate = renderer
+        addSubview(mtk)
+        NSLayoutConstraint.activate([
+            mtk.topAnchor.constraint(equalTo: topAnchor),
+            mtk.bottomAnchor.constraint(equalTo: bottomAnchor),
+            mtk.leadingAnchor.constraint(equalTo: leadingAnchor),
+            mtk.trailingAnchor.constraint(equalTo: trailingAnchor),
+        ])
     }
+
     required init?(coder: NSCoder) { fatalError() }
 
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        let size: CGFloat = 6
-        let totalW = bounds.width
-        let gap = (totalW - CGFloat(dotCount) * size) / CGFloat(dotCount - 1)
-        var x: CGFloat = 0
-        let y = (bounds.height - size) / 2
-        for layer in dotLayers {
-            layer.frame = CGRect(x: x, y: y, width: size, height: size)
-            layer.cornerRadius = size / 2
-            x += size + gap
-        }
+    func start() {
+        renderer?.openSweep()
+        metalView.isPaused = false
     }
 
-    func startAnimating() {
-        for (i, layer) in dotLayers.enumerated() {
-            let anim = CABasicAnimation(keyPath: "opacity")
-            anim.fromValue = 0.3
-            anim.toValue = 1.0
-            anim.duration = 0.6
-            anim.autoreverses = true
-            anim.repeatCount = .infinity
-            anim.beginTime = CACurrentMediaTime() + Double(i) * 0.08
-            layer.add(anim, forKey: "pulse")
+    func stop() {
+        metalView.isPaused = true
+    }
+}
+
+private final class ListeningAuroraRenderer: NSObject, MTKViewDelegate {
+
+    // Shader inputs packed into a single struct passed via setFragmentBytes.
+    // Mirrors the Android `u_time / u_resolution / u_loudness / u_revealProgress`
+    // uniform layout.
+    private struct Uniforms {
+        var time: Float
+        var reveal: Float
+        var loudness: Float
+        var _pad: Float = 0
+        var resolution: SIMD2<Float>
+    }
+
+    private let device: MTLDevice
+    private let commandQueue: MTLCommandQueue
+    private let pipelineState: MTLRenderPipelineState
+
+    // Open/close sweep timing (matches Android exactly).
+    private static let openDelay: CFTimeInterval = 0.12
+    private static let openDuration: CFTimeInterval = 0.65
+
+    private var openStart: CFTimeInterval = 0
+    private var animStart: CFTimeInterval = 0
+
+    init?(device: MTLDevice) {
+        guard let queue = device.makeCommandQueue() else { return nil }
+        self.device = device
+        self.commandQueue = queue
+
+        // Port of `android/.../VoiceStageView.RenderThread.FRAG_SRC` to MSL.
+        // The bowl geometry, smoke wisps, halos, palette, and reflection
+        // dimming are line-for-line equivalent; only language-specific
+        // differences (precision qualifiers, gl_FragColor → return,
+        // varying → [[stage_in]]) change between the two.
+        let src = """
+        #include <metal_stdlib>
+        using namespace metal;
+
+        struct VOut {
+            float4 position [[position]];
+            float2 uv;
+        };
+
+        struct Uniforms {
+            float time;
+            float reveal;
+            float loudness;
+            float _pad;
+            float2 resolution;
+        };
+
+        vertex VOut vertexShader(uint vid [[vertex_id]]) {
+            float2 pos[6] = {
+                float2(-1, -1), float2( 1, -1), float2(-1,  1),
+                float2( 1, -1), float2( 1,  1), float2(-1,  1),
+            };
+            VOut o;
+            o.position = float4(pos[vid], 0, 1);
+            // Match GLSL convention: a_position * 0.5 + 0.5.
+            o.uv = pos[vid] * 0.5 + 0.5;
+            return o;
         }
+
+        float hash(float2 p) {
+            return fract(sin(dot(p, float2(127.1, 311.7))) * 43758.5453);
+        }
+
+        float noise(float2 p) {
+            float2 i = floor(p);
+            float2 f = fract(p);
+            f = f * f * (3.0 - 2.0 * f);
+            float a = hash(i);
+            float b = hash(i + float2(1.0, 0.0));
+            float c = hash(i + float2(0.0, 1.0));
+            float d = hash(i + float2(1.0, 1.0));
+            return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+        }
+
+        float fbm(float2 p) {
+            float v = 0.0;
+            float a = 0.5;
+            for (int i = 0; i < 6; i++) {
+                v += a * noise(p);
+                p *= 2.0;
+                a *= 0.5;
+            }
+            return v;
+        }
+
+        fragment float4 fragmentShader(VOut in [[stage_in]],
+                                       constant Uniforms &u [[buffer(0)]]) {
+            float2 v_uv = in.uv;
+            float u_time = u.time;
+            float u_revealProgress = u.reveal;
+            float2 u_resolution = u.resolution;
+
+            // Normalize so uv.y in [-0.5, 0.5]; uv.x widens with aspect.
+            // GLSL has y up; Metal's o.uv was set to match GL, so no flip.
+            float2 frag = v_uv * u_resolution;
+            float2 uv = (frag - 0.5 * u_resolution) / u_resolution.y;
+
+            // Mirror sits a bit below center; small dark gap before reflection.
+            float mirrorY = -0.08;
+            bool isReflection = uv.y < mirrorY;
+            float2 p = uv;
+            if (isReflection) {
+                p.y = 2.0 * mirrorY - p.y;
+            }
+
+            // Place the bowl so its bottom arc lands just above the mirror.
+            p.y -= 0.32;
+
+            // Bowl horizontal half-width = 0.35 * aspect (arc spans 70% of
+            // keyboard width). xStretch is derived from radius + aspect so
+            // radius alone controls vertical extent.
+            float aspect = u_resolution.x / u_resolution.y;
+            float radius = 0.35;
+            float xStretch = radius / (0.35 * aspect);
+            float2 ep = p * float2(xStretch, 1.0);
+            float d = length(ep);
+            float ang = atan2(ep.y, ep.x);
+
+            // ---- Arc reveal: single brush stroke right → bottom → left
+            //   sweepDist:  0 at right, 0.5 at bowl floor, 1 at left.
+            //   progress:   0 → 1 = open sweep, 1 → 2 = close sweep.
+            float sweepDist = clamp(-ang / 3.1416, 0.0, 1.0);
+            float front = min(u_revealProgress,         1.0) * 1.2 - 0.1;
+            float back  = max(u_revealProgress - 1.0, 0.0) * 1.2 - 0.1;
+            float revealMask = smoothstep(back  - 0.06, back  + 0.06, sweepDist)
+                             * (1.0 - smoothstep(front - 0.06,
+                                                 front + 0.06, sweepDist));
+
+            // ---- Bowl arc: sharp cyan rim accent at d ≈ radius, masked
+            // to the bottom half.
+            float thickness = 0.20;
+            float ringDist = (d - radius) / thickness;
+            float falloffScale = mix(1.2, 3.5, step(0.0, ringDist));
+            float ring = exp(-pow(ringDist * falloffScale, 2.0));
+
+            float bottomness = pow(clamp(-sin(ang), 0.0, 1.0), 1.5);
+            float bowlMask = smoothstep(0.10, -0.95, sin(ang));
+            float bowl = ring * (bowlMask * 0.35 + bottomness * 0.70) * revealMask;
+
+            // ---- Wisps rising from the bottom, blown right with wind shear.
+            float shear = (p.y + 0.32) * 2.0;
+
+            float2 warp = float2(
+                fbm(p * 3.5 + float2(0.0, u_time * 0.25)) - 0.5,
+                fbm(p * 3.5 + float2(5.7, u_time * 0.25)) - 0.5
+            ) * 0.10;
+            float2 pw = p + warp;
+
+            float2 wispUv1 = pw * float2(8.0, 2.8);
+            wispUv1.y -= u_time * 0.65;
+            wispUv1.x -= u_time * 0.22 + shear;
+
+            float2 wispUv2 = pw * float2(13.0, 4.5) + float2(13.7, 4.2);
+            wispUv2.y -= u_time * 0.95;
+            wispUv2.x -= u_time * 0.38 + shear * 1.5;
+
+            // Smoke shape — keep peaks bloomy, suppress quiet noise body.
+            float wispsRaw = fbm(wispUv1) * 0.55 + fbm(wispUv2) * 0.45;
+            float wisps = smoothstep(0.36, 0.78, wispsRaw);
+            wisps = pow(wisps, 0.85);
+
+            float insideMask = smoothstep(radius + 0.02, radius - 0.30, d);
+            float wispVerticalFade = smoothstep(0.35, -0.32, p.y);
+
+            // Smoke + halo gate: ramps in during second half of open,
+            // ramps out during first 70% of close.
+            float revealGate = smoothstep(0.3, 1.0, u_revealProgress)
+                             * (1.0 - smoothstep(1.0, 1.7, u_revealProgress));
+            float wispGlow = wisps * insideMask * wispVerticalFade
+                           * 2.4 * revealGate;
+
+            // ---- Soft outer halo, gated by the same ramp.
+            float halo = exp(-d * 6.0) * 0.10 * revealGate;
+
+            // ---- Inner halo: softer ring just inside the cyan rim accent.
+            float blueR = radius - 0.035;
+            float blueRingDist = (d - blueR) / 0.05;
+            float blueInnerRing = exp(-blueRingDist * blueRingDist);
+            float blueInnerMask = smoothstep(-0.05, -0.95, sin(ang));
+            float blueInnerGlow = blueInnerRing * blueInnerMask * 0.55 * revealMask;
+
+            // ---- Aurora palette (matches GeneratingLoaderView's wave palette):
+            //   violetEdge → bright cyan rim accent (bowl bottom edge)
+            //   blueBody   → cool teal-blue body / inner halo / halo
+            //   lavender   → bright mint-cyan smoke wisps
+            float3 violetEdge = float3(0.30, 0.87, 1.00);
+            float3 blueBody   = float3(0.18, 0.55, 0.93);
+            float3 lavender   = float3(0.55, 0.95, 0.85);
+
+            float3 colorBowl = mix(blueBody, violetEdge, bottomness);
+
+            float3 color = colorBowl * bowl
+                         + blueBody  * blueInnerGlow
+                         + lavender  * wispGlow
+                         + blueBody  * halo * 1.2;
+
+            color = min(color, float3(1.0));
+
+            // Reflection — smooth fade away from the mirror.
+            if (isReflection) {
+                float boundary = smoothstep(mirrorY - 0.08, mirrorY, uv.y);
+                float fade     = smoothstep(-0.50, -0.15, uv.y);
+                color *= mix(0.40, 1.0, boundary) * fade;
+            }
+
+            // Premultiplied alpha — alpha tracks the brightest channel so
+            // the rim + smoke composite cleanly over the keyboard.
+            float alpha = clamp(max(max(color.r, color.g), color.b), 0.0, 1.0);
+            return float4(color * alpha, alpha);
+        }
+        """
+
+        guard let library = try? device.makeLibrary(source: src, options: nil) else {
+            return nil
+        }
+        guard let vertexFn = library.makeFunction(name: "vertexShader"),
+              let fragmentFn = library.makeFunction(name: "fragmentShader") else {
+            return nil
+        }
+
+        let desc = MTLRenderPipelineDescriptor()
+        desc.vertexFunction = vertexFn
+        desc.fragmentFunction = fragmentFn
+        desc.colorAttachments[0].pixelFormat = .bgra8Unorm
+        // Premultiplied alpha — shader returns (rgb * alpha, alpha) so we
+        // pair (source = .one, destination = .oneMinusSourceAlpha) to
+        // composite cleanly over whatever's behind the keyboard.
+        desc.colorAttachments[0].isBlendingEnabled = true
+        desc.colorAttachments[0].rgbBlendOperation = .add
+        desc.colorAttachments[0].alphaBlendOperation = .add
+        desc.colorAttachments[0].sourceRGBBlendFactor = .one
+        desc.colorAttachments[0].sourceAlphaBlendFactor = .one
+        desc.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
+        desc.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
+
+        guard let pipeline = try? device.makeRenderPipelineState(descriptor: desc) else {
+            return nil
+        }
+        self.pipelineState = pipeline
+        super.init()
+    }
+
+    /// Begin the open sweep (revealProgress 0 → 1 over ~650ms after a
+    /// 120ms delay). Resets the animation clock.
+    func openSweep() {
+        openStart = CACurrentMediaTime()
+        animStart = openStart
+    }
+
+    /// Smoothstep ease in/out — equivalent to Android's
+    /// AccelerateDecelerateInterpolator on a 0..1 range.
+    private static func easeInOut(_ t: CFTimeInterval) -> CFTimeInterval {
+        let clamped = max(0, min(1, t))
+        return clamped * clamped * (3 - 2 * clamped)
+    }
+
+    /// Current revealProgress in [0, 1], driven by the wall clock from
+    /// `openSweep()`. We only do the open sweep here — the overlay
+    /// disappears with the parent view's removal, no close animation.
+    private func computeReveal() -> Float {
+        let elapsed = CACurrentMediaTime() - openStart - Self.openDelay
+        if elapsed <= 0 { return 0 }
+        let t = elapsed / Self.openDuration
+        let eased = Self.easeInOut(t)
+        return Float(eased)
+    }
+
+    func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
+
+    func draw(in view: MTKView) {
+        guard let drawable = view.currentDrawable,
+              let descriptor = view.currentRenderPassDescriptor,
+              let buffer = commandQueue.makeCommandBuffer(),
+              let encoder = buffer.makeRenderCommandEncoder(descriptor: descriptor) else {
+            return
+        }
+        let size = view.drawableSize
+        var uniforms = Uniforms(
+            time: Float(CACurrentMediaTime() - animStart),
+            reveal: computeReveal(),
+            loudness: 0,
+            resolution: SIMD2<Float>(Float(size.width), Float(size.height))
+        )
+        encoder.setRenderPipelineState(pipelineState)
+        encoder.setFragmentBytes(&uniforms, length: MemoryLayout<Uniforms>.size, index: 0)
+        encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
+        encoder.endEncoding()
+        buffer.present(drawable)
+        buffer.commit()
     }
 }
 
