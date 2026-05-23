@@ -14,6 +14,13 @@ final class QuickPanelView: UIView {
     /// Notified when the user picks a command (or dismisses the panel).
     weak var onSelect: QuickPanelDelegate?
 
+    /// Opaque scrim that fills the entire panel. The light + dark themes
+    /// set `KeyboardPalette.bg = .clear` (floating-glass keyboard look),
+    /// so without this view the Quick Panel was visually transparent and
+    /// — worse — taps fell through to the key rows mounted underneath
+    /// the integration-panel host. The blur material guarantees an
+    /// opaque, theme-adapting backdrop that always intercepts touches.
+    private let backdrop = UIVisualEffectView(effect: UIBlurEffect(style: .systemChromeMaterial))
     private let scroll = UIScrollView()
     private let grid = UIStackView()
 
@@ -33,8 +40,22 @@ final class QuickPanelView: UIView {
     }
 
     private func configure() {
-        backgroundColor = KeyboardPalette.bg
+        backgroundColor = .clear
+        isUserInteractionEnabled = true
         translatesAutoresizingMaskIntoConstraints = false
+
+        // Mount the opaque backdrop first so every other subview sits on
+        // top of it. Without this, taps fall through to the keys behind
+        // the panel on themes whose `bg` is `.clear` (light/dark).
+        backdrop.translatesAutoresizingMaskIntoConstraints = false
+        backdrop.isUserInteractionEnabled = true
+        addSubview(backdrop)
+        NSLayoutConstraint.activate([
+            backdrop.topAnchor.constraint(equalTo: topAnchor),
+            backdrop.leadingAnchor.constraint(equalTo: leadingAnchor),
+            backdrop.trailingAnchor.constraint(equalTo: trailingAnchor),
+            backdrop.bottomAnchor.constraint(equalTo: bottomAnchor),
+        ])
 
         let header = UILabel()
         header.text = "Pick a command"
