@@ -495,6 +495,14 @@ public class TurtleAiClient implements AiClient {
     // ClipImage, ReferenceImage, and the staging slots live on StagingPipeline now —
     // see com.prince.turtlekeyboard.ai.StagingPipeline (held by TurtleApp).
 
+    /** Width/height of {@code bytes} without decoding the pixels. Used by {@link #readClipboardImage}. */
+    private static int[] decodeBounds(byte[] bytes) {
+        android.graphics.BitmapFactory.Options opts = new android.graphics.BitmapFactory.Options();
+        opts.inJustDecodeBounds = true;
+        android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.length, opts);
+        return new int[]{opts.outWidth, opts.outHeight};
+    }
+
     /** First image-typed item on the primary clip, or null. */
     private ClipImage readClipboardImage() {
         ClipboardManager cm = (ClipboardManager)

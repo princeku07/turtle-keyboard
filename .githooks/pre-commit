@@ -1,9 +1,9 @@
 #!/bin/sh
 # Auto-pipeline the design system on staged changes:
-#   V1.tokens.json staged → re-import to tokens.json, then regenerate
-#   tokens.json staged    → regenerate platform artifacts
-# Either path adds the regenerated outputs to the same commit so the JSON,
-# tokens.json, and platform artifacts stay in lockstep.
+#   Value.tokens*.json staged → re-merge to token.json, then regenerate
+#   token.json staged         → regenerate platform artifacts
+# Either path adds the regenerated outputs to the same commit so the Figma
+# exports, token.json, and platform artifacts stay in lockstep.
 #
 # Install once per clone: `git config core.hooksPath .githooks`
 
@@ -11,12 +11,12 @@ set -e
 
 staged=$(git diff --cached --name-only)
 
-v1_staged=0
-tokens_staged=0
-echo "$staged" | grep -q "^design-system/V1\.tokens\.json$" && v1_staged=1
-echo "$staged" | grep -q "^design-system/tokens\.json$"    && tokens_staged=1
+value_staged=0
+token_staged=0
+echo "$staged" | grep -qE "^design-system/Value\.tokens.*\.json$" && value_staged=1
+echo "$staged" | grep -q  "^design-system/token\.json$"            && token_staged=1
 
-if [ "$v1_staged" = "0" ] && [ "$tokens_staged" = "0" ]; then
+if [ "$value_staged" = "0" ] && [ "$token_staged" = "0" ]; then
   exit 0
 fi
 
@@ -26,10 +26,10 @@ if ! command -v node >/dev/null 2>&1; then
   exit 1
 fi
 
-if [ "$v1_staged" = "1" ]; then
-  echo "[pre-commit] V1.tokens.json changed — importing Figma palette into tokens.json..."
-  node design-system/import-figma.mjs
-  git add design-system/tokens.json
+if [ "$value_staged" = "1" ]; then
+  echo "[pre-commit] Value.tokens*.json changed — merging Figma exports into token.json..."
+  node design-system/merge-figma.mjs
+  git add design-system/token.json
 fi
 
 echo "[pre-commit] regenerating design system..."

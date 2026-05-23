@@ -1,0 +1,4809 @@
+{
+  "funnel display": {
+    "Heading 1 - 36": {
+      "font-family": {
+        "$type": "string",
+        "$value": "Funnel Display",
+        "$description": "Font family from text style: funnel display/Heading 1 - 36",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:545",
+          "com.figma.scopes": [
+            "FONT_FAMILY"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-font-family-funnel-display-heading-1-36)"
+          },
+          "com.figma.type": "string"
+        }
+      },
+      "font-style": {
+        "$type": "string",
+        "$value": "Bold",
+        "$description": "Font style from text style: funnel display/Heading 1 - 36",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:546",
+          "com.figma.scopes": [
+            "FONT_STYLE"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-font-style-funnel-display-heading-1-36)"
+          },
+          "com.figma.type": "string"
+        }
+      },
+      "font-size": {
+        "$type": "number",
+        "$value": 36,
+        "$description": "Font size in px from text style: funnel display/Heading 1 - 36",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:547",
+          "com.figma.scopes": [
+            "FONT_SIZE"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-font-size-funnel-display-heading-1-36)"
+          }
+        }
+      },
+      "line-height": {
+        "$type": "number",
+        "$value": 42,
+        "$description": "Line height (PIXELS) from text style: funnel display/Heading 1 - 36",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:548",
+          "com.figma.scopes": [
+            "LINE_HEIGHT"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-line-height-funnel-display-heading-1-36)"
+          }
+        }
+      },
+      "letter-spacing": {
+        "$type": "number",
+        "$value": -5,
+        "$description": "Letter spacing (PERCENT) from text style: funnel display/Heading 1 - 36",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:549",
+          "com.figma.scopes": [
+            "LETTER_SPACING"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-letter-spacing-funnel-display-heading-1-36)"
+          }
+        }
+      },
+      "paragraph-spacing": {
+        "$type": "number",
+        "$value": 0,
+        "$description": "Paragraph spacing from text style: funnel display/Heading 1 - 36",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:550",
+          "com.figma.scopes": [
+            "PARAGRAPH_SPACING"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-paragraph-spacing-funnel-display-heading-1-36)"
+          }
+        }
+      },
+      "paragraph-indent": {
+        "$type": "number",
+        "$value": 0,
+        "$description": "Paragraph indent from text style: funnel display/Heading 1 - 36",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:551",
+          "com.figma.scopes": [
+            "PARAGRAPH_INDENT"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-paragraph-indent-funnel-display-heading-1-36)"
+          }
+        }
+      }
+    },
+    "Heading 2 - 30": {
+      "font-family": {
+        "$type": "string",
+        "$value": "Funnel Display",
+        "$description": "Font family from text style: funnel display/Heading 2 - 30",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:552",
+          "com.figma.scopes": [
+            "FONT_FAMILY"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-font-family-funnel-display-heading-2-30)"
+          },
+          "com.figma.type": "string"
+        }
+      },
+      "font-style": {
+        "$type": "string",
+        "$value": "Bold",
+        "$description": "Font style from text style: funnel display/Heading 2 - 30",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:553",
+          "com.figma.scopes": [
+            "FONT_STYLE"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-font-style-funnel-display-heading-2-30)"
+          },
+          "com.figma.type": "string"
+        }
+      },
+      "font-size": {
+        "$type": "number",
+        "$value": 30,
+        "$description": "Font size in px from text style: funnel display/Heading 2 - 30",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:554",
+          "com.figma.scopes": [
+            "FONT_SIZE"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-font-size-funnel-display-heading-2-30)"
+          }
+        }
+      },
+      "line-height": {
+        "$type": "number",
+        "$value": 34,
+        "$description": "Line height (PIXELS) from text style: funnel display/Heading 2 - 30",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:555",
+          "com.figma.scopes": [
+            "LINE_HEIGHT"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-line-height-funnel-display-heading-2-30)"
+          }
+        }
+      },
+      "letter-spacing": {
+        "$type": "number",
+        "$value": -3,
+        "$description": "Letter spacing (PERCENT) from text style: funnel display/Heading 2 - 30",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:556",
+          "com.figma.scopes": [
+            "LETTER_SPACING"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-letter-spacing-funnel-display-heading-2-30)"
+          }
+        }
+      },
+      "paragraph-spacing": {
+        "$type": "number",
+        "$value": 0,
+        "$description": "Paragraph spacing from text style: funnel display/Heading 2 - 30",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:557",
+          "com.figma.scopes": [
+            "PARAGRAPH_SPACING"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-paragraph-spacing-funnel-display-heading-2-30)"
+          }
+        }
+      },
+      "paragraph-indent": {
+        "$type": "number",
+        "$value": 0,
+        "$description": "Paragraph indent from text style: funnel display/Heading 2 - 30",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:558",
+          "com.figma.scopes": [
+            "PARAGRAPH_INDENT"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-paragraph-indent-funnel-display-heading-2-30)"
+          }
+        }
+      }
+    },
+    "Heading 3 - 26": {
+      "font-family": {
+        "$type": "string",
+        "$value": "Funnel Display",
+        "$description": "Font family from text style: funnel display/Heading 3 - 26",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:559",
+          "com.figma.scopes": [
+            "FONT_FAMILY"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-font-family-funnel-display-heading-3-26)"
+          },
+          "com.figma.type": "string"
+        }
+      },
+      "font-style": {
+        "$type": "string",
+        "$value": "Bold",
+        "$description": "Font style from text style: funnel display/Heading 3 - 26",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:560",
+          "com.figma.scopes": [
+            "FONT_STYLE"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-font-style-funnel-display-heading-3-26)"
+          },
+          "com.figma.type": "string"
+        }
+      },
+      "font-size": {
+        "$type": "number",
+        "$value": 26,
+        "$description": "Font size in px from text style: funnel display/Heading 3 - 26",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:561",
+          "com.figma.scopes": [
+            "FONT_SIZE"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-font-size-funnel-display-heading-3-26)"
+          }
+        }
+      },
+      "line-height": {
+        "$type": "number",
+        "$value": 29,
+        "$description": "Line height (PIXELS) from text style: funnel display/Heading 3 - 26",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:562",
+          "com.figma.scopes": [
+            "LINE_HEIGHT"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-line-height-funnel-display-heading-3-26)"
+          }
+        }
+      },
+      "letter-spacing": {
+        "$type": "number",
+        "$value": -3,
+        "$description": "Letter spacing (PERCENT) from text style: funnel display/Heading 3 - 26",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:563",
+          "com.figma.scopes": [
+            "LETTER_SPACING"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-letter-spacing-funnel-display-heading-3-26)"
+          }
+        }
+      },
+      "paragraph-spacing": {
+        "$type": "number",
+        "$value": 0,
+        "$description": "Paragraph spacing from text style: funnel display/Heading 3 - 26",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:564",
+          "com.figma.scopes": [
+            "PARAGRAPH_SPACING"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-paragraph-spacing-funnel-display-heading-3-26)"
+          }
+        }
+      },
+      "paragraph-indent": {
+        "$type": "number",
+        "$value": 0,
+        "$description": "Paragraph indent from text style: funnel display/Heading 3 - 26",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:565",
+          "com.figma.scopes": [
+            "PARAGRAPH_INDENT"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-paragraph-indent-funnel-display-heading-3-26)"
+          }
+        }
+      }
+    },
+    "Title 1 - 22": {
+      "font-family": {
+        "$type": "string",
+        "$value": "Funnel Display",
+        "$description": "Font family from text style: funnel display/Title 1 - 22",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:566",
+          "com.figma.scopes": [
+            "FONT_FAMILY"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-font-family-funnel-display-title-1-22)"
+          },
+          "com.figma.type": "string"
+        }
+      },
+      "font-style": {
+        "$type": "string",
+        "$value": "Bold",
+        "$description": "Font style from text style: funnel display/Title 1 - 22",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:567",
+          "com.figma.scopes": [
+            "FONT_STYLE"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-font-style-funnel-display-title-1-22)"
+          },
+          "com.figma.type": "string"
+        }
+      },
+      "font-size": {
+        "$type": "number",
+        "$value": 22,
+        "$description": "Font size in px from text style: funnel display/Title 1 - 22",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:568",
+          "com.figma.scopes": [
+            "FONT_SIZE"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-font-size-funnel-display-title-1-22)"
+          }
+        }
+      },
+      "line-height": {
+        "$type": "number",
+        "$value": 25,
+        "$description": "Line height (PIXELS) from text style: funnel display/Title 1 - 22",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:569",
+          "com.figma.scopes": [
+            "LINE_HEIGHT"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-line-height-funnel-display-title-1-22)"
+          }
+        }
+      },
+      "letter-spacing": {
+        "$type": "number",
+        "$value": -4,
+        "$description": "Letter spacing (PERCENT) from text style: funnel display/Title 1 - 22",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:570",
+          "com.figma.scopes": [
+            "LETTER_SPACING"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-letter-spacing-funnel-display-title-1-22)"
+          }
+        }
+      },
+      "paragraph-spacing": {
+        "$type": "number",
+        "$value": 0,
+        "$description": "Paragraph spacing from text style: funnel display/Title 1 - 22",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:571",
+          "com.figma.scopes": [
+            "PARAGRAPH_SPACING"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-paragraph-spacing-funnel-display-title-1-22)"
+          }
+        }
+      },
+      "paragraph-indent": {
+        "$type": "number",
+        "$value": 0,
+        "$description": "Paragraph indent from text style: funnel display/Title 1 - 22",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:572",
+          "com.figma.scopes": [
+            "PARAGRAPH_INDENT"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-paragraph-indent-funnel-display-title-1-22)"
+          }
+        }
+      }
+    },
+    "Title 2 - 18": {
+      "font-family": {
+        "$type": "string",
+        "$value": "Funnel Display",
+        "$description": "Font family from text style: funnel display/Title 2 - 18",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:573",
+          "com.figma.scopes": [
+            "FONT_FAMILY"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-font-family-funnel-display-title-2-18)"
+          },
+          "com.figma.type": "string"
+        }
+      },
+      "font-style": {
+        "$type": "string",
+        "$value": "Bold",
+        "$description": "Font style from text style: funnel display/Title 2 - 18",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:574",
+          "com.figma.scopes": [
+            "FONT_STYLE"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-font-style-funnel-display-title-2-18)"
+          },
+          "com.figma.type": "string"
+        }
+      },
+      "font-size": {
+        "$type": "number",
+        "$value": 18,
+        "$description": "Font size in px from text style: funnel display/Title 2 - 18",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:575",
+          "com.figma.scopes": [
+            "FONT_SIZE"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-font-size-funnel-display-title-2-18)"
+          }
+        }
+      },
+      "line-height": {
+        "$type": "number",
+        "$value": 20,
+        "$description": "Line height (PIXELS) from text style: funnel display/Title 2 - 18",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:576",
+          "com.figma.scopes": [
+            "LINE_HEIGHT"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-line-height-funnel-display-title-2-18)"
+          }
+        }
+      },
+      "letter-spacing": {
+        "$type": "number",
+        "$value": -3,
+        "$description": "Letter spacing (PERCENT) from text style: funnel display/Title 2 - 18",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:577",
+          "com.figma.scopes": [
+            "LETTER_SPACING"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-letter-spacing-funnel-display-title-2-18)"
+          }
+        }
+      },
+      "paragraph-spacing": {
+        "$type": "number",
+        "$value": 0,
+        "$description": "Paragraph spacing from text style: funnel display/Title 2 - 18",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:578",
+          "com.figma.scopes": [
+            "PARAGRAPH_SPACING"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-paragraph-spacing-funnel-display-title-2-18)"
+          }
+        }
+      },
+      "paragraph-indent": {
+        "$type": "number",
+        "$value": 0,
+        "$description": "Paragraph indent from text style: funnel display/Title 2 - 18",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:579",
+          "com.figma.scopes": [
+            "PARAGRAPH_INDENT"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-paragraph-indent-funnel-display-title-2-18)"
+          }
+        }
+      }
+    },
+    "Title 2 - 14": {
+      "font-family": {
+        "$type": "string",
+        "$value": "Funnel Display",
+        "$description": "Font family from text style: funnel display/Title 2 - 14",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:580",
+          "com.figma.scopes": [
+            "FONT_FAMILY"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-font-family-funnel-display-title-2-14)"
+          },
+          "com.figma.type": "string"
+        }
+      },
+      "font-style": {
+        "$type": "string",
+        "$value": "Bold",
+        "$description": "Font style from text style: funnel display/Title 2 - 14",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:581",
+          "com.figma.scopes": [
+            "FONT_STYLE"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-font-style-funnel-display-title-2-14)"
+          },
+          "com.figma.type": "string"
+        }
+      },
+      "font-size": {
+        "$type": "number",
+        "$value": 14,
+        "$description": "Font size in px from text style: funnel display/Title 2 - 14",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:582",
+          "com.figma.scopes": [
+            "FONT_SIZE"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-font-size-funnel-display-title-2-14)"
+          }
+        }
+      },
+      "line-height": {
+        "$type": "number",
+        "$value": 16,
+        "$description": "Line height (PIXELS) from text style: funnel display/Title 2 - 14",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:583",
+          "com.figma.scopes": [
+            "LINE_HEIGHT"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-line-height-funnel-display-title-2-14)"
+          }
+        }
+      },
+      "letter-spacing": {
+        "$type": "number",
+        "$value": -2,
+        "$description": "Letter spacing (PERCENT) from text style: funnel display/Title 2 - 14",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:584",
+          "com.figma.scopes": [
+            "LETTER_SPACING"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-letter-spacing-funnel-display-title-2-14)"
+          }
+        }
+      },
+      "paragraph-spacing": {
+        "$type": "number",
+        "$value": 0,
+        "$description": "Paragraph spacing from text style: funnel display/Title 2 - 14",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:585",
+          "com.figma.scopes": [
+            "PARAGRAPH_SPACING"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-paragraph-spacing-funnel-display-title-2-14)"
+          }
+        }
+      },
+      "paragraph-indent": {
+        "$type": "number",
+        "$value": 0,
+        "$description": "Paragraph indent from text style: funnel display/Title 2 - 14",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:586",
+          "com.figma.scopes": [
+            "PARAGRAPH_INDENT"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-paragraph-indent-funnel-display-title-2-14)"
+          }
+        }
+      }
+    },
+    "Title 4 - 12": {
+      "font-family": {
+        "$type": "string",
+        "$value": "Funnel Display",
+        "$description": "Font family from text style: funnel display/Title 4 - 12",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:587",
+          "com.figma.scopes": [
+            "FONT_FAMILY"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-font-family-funnel-display-title-4-12)"
+          },
+          "com.figma.type": "string"
+        }
+      },
+      "font-style": {
+        "$type": "string",
+        "$value": "Bold",
+        "$description": "Font style from text style: funnel display/Title 4 - 12",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:588",
+          "com.figma.scopes": [
+            "FONT_STYLE"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-font-style-funnel-display-title-4-12)"
+          },
+          "com.figma.type": "string"
+        }
+      },
+      "font-size": {
+        "$type": "number",
+        "$value": 12,
+        "$description": "Font size in px from text style: funnel display/Title 4 - 12",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:589",
+          "com.figma.scopes": [
+            "FONT_SIZE"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-font-size-funnel-display-title-4-12)"
+          }
+        }
+      },
+      "line-height": {
+        "$type": "number",
+        "$value": 14,
+        "$description": "Line height (PIXELS) from text style: funnel display/Title 4 - 12",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:590",
+          "com.figma.scopes": [
+            "LINE_HEIGHT"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-line-height-funnel-display-title-4-12)"
+          }
+        }
+      },
+      "letter-spacing": {
+        "$type": "number",
+        "$value": -2,
+        "$description": "Letter spacing (PERCENT) from text style: funnel display/Title 4 - 12",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:591",
+          "com.figma.scopes": [
+            "LETTER_SPACING"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-letter-spacing-funnel-display-title-4-12)"
+          }
+        }
+      },
+      "paragraph-spacing": {
+        "$type": "number",
+        "$value": 0,
+        "$description": "Paragraph spacing from text style: funnel display/Title 4 - 12",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:592",
+          "com.figma.scopes": [
+            "PARAGRAPH_SPACING"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-paragraph-spacing-funnel-display-title-4-12)"
+          }
+        }
+      },
+      "paragraph-indent": {
+        "$type": "number",
+        "$value": 0,
+        "$description": "Paragraph indent from text style: funnel display/Title 4 - 12",
+        "$extensions": {
+          "com.figma.variableId": "VariableID:17:593",
+          "com.figma.scopes": [
+            "PARAGRAPH_INDENT"
+          ],
+          "com.figma.codeSyntax": {
+            "WEB": "var(--type-paragraph-indent-funnel-display-title-4-12)"
+          }
+        }
+      }
+    }
+  },
+  "DM sans": {
+    "Heading 1 - 36": {
+      "H1 - Bold - 36": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Heading 1 - 36/H1 - Bold - 36",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:594",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-heading-1-36-h1-bold-36)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "Bold",
+          "$description": "Font style from text style: DM sans/Heading 1 - 36/H1 - Bold - 36",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:595",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-heading-1-36-h1-bold-36)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 36,
+          "$description": "Font size in px from text style: DM sans/Heading 1 - 36/H1 - Bold - 36",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:596",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-heading-1-36-h1-bold-36)"
+            }
+          }
+        },
+        "line-height": {
+          "$type": "number",
+          "$value": 45,
+          "$description": "Line height (PIXELS) from text style: DM sans/Heading 1 - 36/H1 - Bold - 36",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:597",
+            "com.figma.scopes": [
+              "LINE_HEIGHT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-line-height-dm-sans-heading-1-36-h1-bold-36)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": -1,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Heading 1 - 36/H1 - Bold - 36",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:598",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-heading-1-36-h1-bold-36)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Heading 1 - 36/H1 - Bold - 36",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:599",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-heading-1-36-h1-bold-36)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Heading 1 - 36/H1 - Bold - 36",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:600",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-heading-1-36-h1-bold-36)"
+            }
+          }
+        }
+      },
+      "H1 - Semibold - 36": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Heading 1 - 36/H1 - Semibold - 36",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:601",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-heading-1-36-h1-semibold-36)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "SemiBold",
+          "$description": "Font style from text style: DM sans/Heading 1 - 36/H1 - Semibold - 36",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:602",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-heading-1-36-h1-semibold-36)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 36,
+          "$description": "Font size in px from text style: DM sans/Heading 1 - 36/H1 - Semibold - 36",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:603",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-heading-1-36-h1-semibold-36)"
+            }
+          }
+        },
+        "line-height": {
+          "$type": "number",
+          "$value": 45,
+          "$description": "Line height (PIXELS) from text style: DM sans/Heading 1 - 36/H1 - Semibold - 36",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:604",
+            "com.figma.scopes": [
+              "LINE_HEIGHT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-line-height-dm-sans-heading-1-36-h1-semibold-36)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": -1,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Heading 1 - 36/H1 - Semibold - 36",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:605",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-heading-1-36-h1-semibold-36)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Heading 1 - 36/H1 - Semibold - 36",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:606",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-heading-1-36-h1-semibold-36)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Heading 1 - 36/H1 - Semibold - 36",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:607",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-heading-1-36-h1-semibold-36)"
+            }
+          }
+        }
+      },
+      "H1 -Medium - 36": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Heading 1 - 36/H1 -Medium - 36",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:608",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-heading-1-36-h1-medium-36)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "Medium",
+          "$description": "Font style from text style: DM sans/Heading 1 - 36/H1 -Medium - 36",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:609",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-heading-1-36-h1-medium-36)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 36,
+          "$description": "Font size in px from text style: DM sans/Heading 1 - 36/H1 -Medium - 36",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:610",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-heading-1-36-h1-medium-36)"
+            }
+          }
+        },
+        "line-height": {
+          "$type": "number",
+          "$value": 45,
+          "$description": "Line height (PIXELS) from text style: DM sans/Heading 1 - 36/H1 -Medium - 36",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:611",
+            "com.figma.scopes": [
+              "LINE_HEIGHT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-line-height-dm-sans-heading-1-36-h1-medium-36)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": -1,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Heading 1 - 36/H1 -Medium - 36",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:612",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-heading-1-36-h1-medium-36)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Heading 1 - 36/H1 -Medium - 36",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:613",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-heading-1-36-h1-medium-36)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Heading 1 - 36/H1 -Medium - 36",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:614",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-heading-1-36-h1-medium-36)"
+            }
+          }
+        }
+      },
+      "H1 -Regular - 36": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Heading 1 - 36/H1 -Regular - 36",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:615",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-heading-1-36-h1-regular-36)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "Regular",
+          "$description": "Font style from text style: DM sans/Heading 1 - 36/H1 -Regular - 36",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:616",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-heading-1-36-h1-regular-36)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 36,
+          "$description": "Font size in px from text style: DM sans/Heading 1 - 36/H1 -Regular - 36",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:617",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-heading-1-36-h1-regular-36)"
+            }
+          }
+        },
+        "line-height": {
+          "$type": "number",
+          "$value": 45,
+          "$description": "Line height (PIXELS) from text style: DM sans/Heading 1 - 36/H1 -Regular - 36",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:618",
+            "com.figma.scopes": [
+              "LINE_HEIGHT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-line-height-dm-sans-heading-1-36-h1-regular-36)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": -1,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Heading 1 - 36/H1 -Regular - 36",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:619",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-heading-1-36-h1-regular-36)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Heading 1 - 36/H1 -Regular - 36",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:620",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-heading-1-36-h1-regular-36)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Heading 1 - 36/H1 -Regular - 36",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:621",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-heading-1-36-h1-regular-36)"
+            }
+          }
+        }
+      }
+    },
+    "Heading 2 - 32": {
+      "Heading 2 - Bold - 32": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Heading 2 - 32/Heading 2 - Bold - 32",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:622",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-heading-2-32-heading-2-bold-32)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "Bold",
+          "$description": "Font style from text style: DM sans/Heading 2 - 32/Heading 2 - Bold - 32",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:623",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-heading-2-32-heading-2-bold-32)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 32,
+          "$description": "Font size in px from text style: DM sans/Heading 2 - 32/Heading 2 - Bold - 32",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:624",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-heading-2-32-heading-2-bold-32)"
+            }
+          }
+        },
+        "line-height": {
+          "$type": "number",
+          "$value": 45,
+          "$description": "Line height (PIXELS) from text style: DM sans/Heading 2 - 32/Heading 2 - Bold - 32",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:625",
+            "com.figma.scopes": [
+              "LINE_HEIGHT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-line-height-dm-sans-heading-2-32-heading-2-bold-32)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": -1,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Heading 2 - 32/Heading 2 - Bold - 32",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:626",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-heading-2-32-heading-2-bold-32)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Heading 2 - 32/Heading 2 - Bold - 32",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:627",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-heading-2-32-heading-2-bold-32)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Heading 2 - 32/Heading 2 - Bold - 32",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:628",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-heading-2-32-heading-2-bold-32)"
+            }
+          }
+        }
+      },
+      "Heading 2 - Medium - 32": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Heading 2 - 32/Heading 2 - Medium - 32",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:629",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-heading-2-32-heading-2-medium-32)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "SemiBold",
+          "$description": "Font style from text style: DM sans/Heading 2 - 32/Heading 2 - Medium - 32",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:630",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-heading-2-32-heading-2-medium-32)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 32,
+          "$description": "Font size in px from text style: DM sans/Heading 2 - 32/Heading 2 - Medium - 32",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:631",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-heading-2-32-heading-2-medium-32)"
+            }
+          }
+        },
+        "line-height": {
+          "$type": "number",
+          "$value": 45,
+          "$description": "Line height (PIXELS) from text style: DM sans/Heading 2 - 32/Heading 2 - Medium - 32",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:632",
+            "com.figma.scopes": [
+              "LINE_HEIGHT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-line-height-dm-sans-heading-2-32-heading-2-medium-32)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": -1,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Heading 2 - 32/Heading 2 - Medium - 32",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:633",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-heading-2-32-heading-2-medium-32)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Heading 2 - 32/Heading 2 - Medium - 32",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:634",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-heading-2-32-heading-2-medium-32)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Heading 2 - 32/Heading 2 - Medium - 32",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:635",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-heading-2-32-heading-2-medium-32)"
+            }
+          }
+        },
+        "Medium": {
+          "font-family": {
+            "$type": "string",
+            "$value": "DM Sans",
+            "$description": "Font family from text style: DM sans/Heading 2 - 32/Heading 2 - Medium - 32",
+            "$extensions": {
+              "com.figma.variableId": "VariableID:17:636",
+              "com.figma.scopes": [
+                "FONT_FAMILY"
+              ],
+              "com.figma.codeSyntax": {
+                "WEB": "var(--type-font-family-dm-sans-heading-2-32-heading-2-medium-32-medium)"
+              },
+              "com.figma.type": "string"
+            }
+          },
+          "font-style": {
+            "$type": "string",
+            "$value": "Medium",
+            "$description": "Font style from text style: DM sans/Heading 2 - 32/Heading 2 - Medium - 32",
+            "$extensions": {
+              "com.figma.variableId": "VariableID:17:637",
+              "com.figma.scopes": [
+                "FONT_STYLE"
+              ],
+              "com.figma.codeSyntax": {
+                "WEB": "var(--type-font-style-dm-sans-heading-2-32-heading-2-medium-32-medium)"
+              },
+              "com.figma.type": "string"
+            }
+          },
+          "font-size": {
+            "$type": "number",
+            "$value": 32,
+            "$description": "Font size in px from text style: DM sans/Heading 2 - 32/Heading 2 - Medium - 32",
+            "$extensions": {
+              "com.figma.variableId": "VariableID:17:638",
+              "com.figma.scopes": [
+                "FONT_SIZE"
+              ],
+              "com.figma.codeSyntax": {
+                "WEB": "var(--type-font-size-dm-sans-heading-2-32-heading-2-medium-32-medium)"
+              }
+            }
+          },
+          "line-height": {
+            "$type": "number",
+            "$value": 45,
+            "$description": "Line height (PIXELS) from text style: DM sans/Heading 2 - 32/Heading 2 - Medium - 32",
+            "$extensions": {
+              "com.figma.variableId": "VariableID:17:639",
+              "com.figma.scopes": [
+                "LINE_HEIGHT"
+              ],
+              "com.figma.codeSyntax": {
+                "WEB": "var(--type-line-height-dm-sans-heading-2-32-heading-2-medium-32-medium)"
+              }
+            }
+          },
+          "letter-spacing": {
+            "$type": "number",
+            "$value": -1,
+            "$description": "Letter spacing (PERCENT) from text style: DM sans/Heading 2 - 32/Heading 2 - Medium - 32",
+            "$extensions": {
+              "com.figma.variableId": "VariableID:17:640",
+              "com.figma.scopes": [
+                "LETTER_SPACING"
+              ],
+              "com.figma.codeSyntax": {
+                "WEB": "var(--type-letter-spacing-dm-sans-heading-2-32-heading-2-medium-32-medium)"
+              }
+            }
+          },
+          "paragraph-spacing": {
+            "$type": "number",
+            "$value": 0,
+            "$description": "Paragraph spacing from text style: DM sans/Heading 2 - 32/Heading 2 - Medium - 32",
+            "$extensions": {
+              "com.figma.variableId": "VariableID:17:641",
+              "com.figma.scopes": [
+                "PARAGRAPH_SPACING"
+              ],
+              "com.figma.codeSyntax": {
+                "WEB": "var(--type-paragraph-spacing-dm-sans-heading-2-32-heading-2-medium-32-medium)"
+              }
+            }
+          },
+          "paragraph-indent": {
+            "$type": "number",
+            "$value": 0,
+            "$description": "Paragraph indent from text style: DM sans/Heading 2 - 32/Heading 2 - Medium - 32",
+            "$extensions": {
+              "com.figma.variableId": "VariableID:17:642",
+              "com.figma.scopes": [
+                "PARAGRAPH_INDENT"
+              ],
+              "com.figma.codeSyntax": {
+                "WEB": "var(--type-paragraph-indent-dm-sans-heading-2-32-heading-2-medium-32-medium)"
+              }
+            }
+          }
+        },
+        "Regular": {
+          "font-family": {
+            "$type": "string",
+            "$value": "DM Sans",
+            "$description": "Font family from text style: DM sans/Heading 2 - 32/Heading 2 - Medium - 32",
+            "$extensions": {
+              "com.figma.variableId": "VariableID:17:643",
+              "com.figma.scopes": [
+                "FONT_FAMILY"
+              ],
+              "com.figma.codeSyntax": {
+                "WEB": "var(--type-font-family-dm-sans-heading-2-32-heading-2-medium-32-regular)"
+              },
+              "com.figma.type": "string"
+            }
+          },
+          "font-style": {
+            "$type": "string",
+            "$value": "Regular",
+            "$description": "Font style from text style: DM sans/Heading 2 - 32/Heading 2 - Medium - 32",
+            "$extensions": {
+              "com.figma.variableId": "VariableID:17:644",
+              "com.figma.scopes": [
+                "FONT_STYLE"
+              ],
+              "com.figma.codeSyntax": {
+                "WEB": "var(--type-font-style-dm-sans-heading-2-32-heading-2-medium-32-regular)"
+              },
+              "com.figma.type": "string"
+            }
+          },
+          "font-size": {
+            "$type": "number",
+            "$value": 32,
+            "$description": "Font size in px from text style: DM sans/Heading 2 - 32/Heading 2 - Medium - 32",
+            "$extensions": {
+              "com.figma.variableId": "VariableID:17:645",
+              "com.figma.scopes": [
+                "FONT_SIZE"
+              ],
+              "com.figma.codeSyntax": {
+                "WEB": "var(--type-font-size-dm-sans-heading-2-32-heading-2-medium-32-regular)"
+              }
+            }
+          },
+          "line-height": {
+            "$type": "number",
+            "$value": 45,
+            "$description": "Line height (PIXELS) from text style: DM sans/Heading 2 - 32/Heading 2 - Medium - 32",
+            "$extensions": {
+              "com.figma.variableId": "VariableID:17:646",
+              "com.figma.scopes": [
+                "LINE_HEIGHT"
+              ],
+              "com.figma.codeSyntax": {
+                "WEB": "var(--type-line-height-dm-sans-heading-2-32-heading-2-medium-32-regular)"
+              }
+            }
+          },
+          "letter-spacing": {
+            "$type": "number",
+            "$value": -1,
+            "$description": "Letter spacing (PERCENT) from text style: DM sans/Heading 2 - 32/Heading 2 - Medium - 32",
+            "$extensions": {
+              "com.figma.variableId": "VariableID:17:647",
+              "com.figma.scopes": [
+                "LETTER_SPACING"
+              ],
+              "com.figma.codeSyntax": {
+                "WEB": "var(--type-letter-spacing-dm-sans-heading-2-32-heading-2-medium-32-regular)"
+              }
+            }
+          },
+          "paragraph-spacing": {
+            "$type": "number",
+            "$value": 0,
+            "$description": "Paragraph spacing from text style: DM sans/Heading 2 - 32/Heading 2 - Medium - 32",
+            "$extensions": {
+              "com.figma.variableId": "VariableID:17:648",
+              "com.figma.scopes": [
+                "PARAGRAPH_SPACING"
+              ],
+              "com.figma.codeSyntax": {
+                "WEB": "var(--type-paragraph-spacing-dm-sans-heading-2-32-heading-2-medium-32-regular)"
+              }
+            }
+          },
+          "paragraph-indent": {
+            "$type": "number",
+            "$value": 0,
+            "$description": "Paragraph indent from text style: DM sans/Heading 2 - 32/Heading 2 - Medium - 32",
+            "$extensions": {
+              "com.figma.variableId": "VariableID:17:649",
+              "com.figma.scopes": [
+                "PARAGRAPH_INDENT"
+              ],
+              "com.figma.codeSyntax": {
+                "WEB": "var(--type-paragraph-indent-dm-sans-heading-2-32-heading-2-medium-32-regular)"
+              }
+            }
+          }
+        }
+      }
+    },
+    "Heading 3- 28": {
+      "Heading 3 - Bold - 28": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Heading 3- 28/Heading 3 - Bold - 28",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:650",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-heading-3-28-heading-3-bold-28)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "Bold",
+          "$description": "Font style from text style: DM sans/Heading 3- 28/Heading 3 - Bold - 28",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:651",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-heading-3-28-heading-3-bold-28)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 28,
+          "$description": "Font size in px from text style: DM sans/Heading 3- 28/Heading 3 - Bold - 28",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:652",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-heading-3-28-heading-3-bold-28)"
+            }
+          }
+        },
+        "line-height": {
+          "$type": "number",
+          "$value": 30,
+          "$description": "Line height (PIXELS) from text style: DM sans/Heading 3- 28/Heading 3 - Bold - 28",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:653",
+            "com.figma.scopes": [
+              "LINE_HEIGHT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-line-height-dm-sans-heading-3-28-heading-3-bold-28)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": -3,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Heading 3- 28/Heading 3 - Bold - 28",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:654",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-heading-3-28-heading-3-bold-28)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Heading 3- 28/Heading 3 - Bold - 28",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:655",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-heading-3-28-heading-3-bold-28)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Heading 3- 28/Heading 3 - Bold - 28",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:656",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-heading-3-28-heading-3-bold-28)"
+            }
+          }
+        }
+      },
+      "Heading 3 - Semibold - 28": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Heading 3- 28/Heading 3 - Semibold - 28",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:657",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-heading-3-28-heading-3-semibold-28)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "SemiBold",
+          "$description": "Font style from text style: DM sans/Heading 3- 28/Heading 3 - Semibold - 28",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:658",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-heading-3-28-heading-3-semibold-28)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 28,
+          "$description": "Font size in px from text style: DM sans/Heading 3- 28/Heading 3 - Semibold - 28",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:659",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-heading-3-28-heading-3-semibold-28)"
+            }
+          }
+        },
+        "line-height": {
+          "$type": "number",
+          "$value": 30,
+          "$description": "Line height (PIXELS) from text style: DM sans/Heading 3- 28/Heading 3 - Semibold - 28",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:660",
+            "com.figma.scopes": [
+              "LINE_HEIGHT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-line-height-dm-sans-heading-3-28-heading-3-semibold-28)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": -3,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Heading 3- 28/Heading 3 - Semibold - 28",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:661",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-heading-3-28-heading-3-semibold-28)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Heading 3- 28/Heading 3 - Semibold - 28",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:662",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-heading-3-28-heading-3-semibold-28)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Heading 3- 28/Heading 3 - Semibold - 28",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:663",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-heading-3-28-heading-3-semibold-28)"
+            }
+          }
+        }
+      },
+      "Heading 3 - Medium - 28": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Heading 3- 28/Heading 3 - Medium - 28",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:664",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-heading-3-28-heading-3-medium-28)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "Medium",
+          "$description": "Font style from text style: DM sans/Heading 3- 28/Heading 3 - Medium - 28",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:665",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-heading-3-28-heading-3-medium-28)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 28,
+          "$description": "Font size in px from text style: DM sans/Heading 3- 28/Heading 3 - Medium - 28",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:666",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-heading-3-28-heading-3-medium-28)"
+            }
+          }
+        },
+        "line-height": {
+          "$type": "number",
+          "$value": 30,
+          "$description": "Line height (PIXELS) from text style: DM sans/Heading 3- 28/Heading 3 - Medium - 28",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:667",
+            "com.figma.scopes": [
+              "LINE_HEIGHT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-line-height-dm-sans-heading-3-28-heading-3-medium-28)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": -3,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Heading 3- 28/Heading 3 - Medium - 28",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:668",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-heading-3-28-heading-3-medium-28)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Heading 3- 28/Heading 3 - Medium - 28",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:669",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-heading-3-28-heading-3-medium-28)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Heading 3- 28/Heading 3 - Medium - 28",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:670",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-heading-3-28-heading-3-medium-28)"
+            }
+          }
+        }
+      },
+      "Heading 3 - Regular - 28": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Heading 3- 28/Heading 3 - Regular - 28",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:671",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-heading-3-28-heading-3-regular-28)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "Regular",
+          "$description": "Font style from text style: DM sans/Heading 3- 28/Heading 3 - Regular - 28",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:672",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-heading-3-28-heading-3-regular-28)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 28,
+          "$description": "Font size in px from text style: DM sans/Heading 3- 28/Heading 3 - Regular - 28",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:673",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-heading-3-28-heading-3-regular-28)"
+            }
+          }
+        },
+        "line-height": {
+          "$type": "number",
+          "$value": 30,
+          "$description": "Line height (PIXELS) from text style: DM sans/Heading 3- 28/Heading 3 - Regular - 28",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:674",
+            "com.figma.scopes": [
+              "LINE_HEIGHT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-line-height-dm-sans-heading-3-28-heading-3-regular-28)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": -3,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Heading 3- 28/Heading 3 - Regular - 28",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:675",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-heading-3-28-heading-3-regular-28)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Heading 3- 28/Heading 3 - Regular - 28",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:676",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-heading-3-28-heading-3-regular-28)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Heading 3- 28/Heading 3 - Regular - 28",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:677",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-heading-3-28-heading-3-regular-28)"
+            }
+          }
+        }
+      }
+    },
+    "Title 1 - 28": {
+      "Title 1 - Bold - 26": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Title 1 - 28/Title 1 - Bold - 26",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:678",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-title-1-28-title-1-bold-26)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "Bold",
+          "$description": "Font style from text style: DM sans/Title 1 - 28/Title 1 - Bold - 26",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:679",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-title-1-28-title-1-bold-26)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 26,
+          "$description": "Font size in px from text style: DM sans/Title 1 - 28/Title 1 - Bold - 26",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:680",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-title-1-28-title-1-bold-26)"
+            }
+          }
+        },
+        "line-height": {
+          "$type": "number",
+          "$value": 34,
+          "$description": "Line height (PIXELS) from text style: DM sans/Title 1 - 28/Title 1 - Bold - 26",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:681",
+            "com.figma.scopes": [
+              "LINE_HEIGHT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-line-height-dm-sans-title-1-28-title-1-bold-26)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": -3,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Title 1 - 28/Title 1 - Bold - 26",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:682",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-title-1-28-title-1-bold-26)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Title 1 - 28/Title 1 - Bold - 26",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:683",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-title-1-28-title-1-bold-26)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Title 1 - 28/Title 1 - Bold - 26",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:684",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-title-1-28-title-1-bold-26)"
+            }
+          }
+        }
+      },
+      "Title 1 - Semibold - 26": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Title 1 - 28/Title 1 - Semibold - 26",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:685",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-title-1-28-title-1-semibold-26)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "SemiBold",
+          "$description": "Font style from text style: DM sans/Title 1 - 28/Title 1 - Semibold - 26",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:686",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-title-1-28-title-1-semibold-26)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 26,
+          "$description": "Font size in px from text style: DM sans/Title 1 - 28/Title 1 - Semibold - 26",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:687",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-title-1-28-title-1-semibold-26)"
+            }
+          }
+        },
+        "line-height": {
+          "$type": "number",
+          "$value": 34,
+          "$description": "Line height (PIXELS) from text style: DM sans/Title 1 - 28/Title 1 - Semibold - 26",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:688",
+            "com.figma.scopes": [
+              "LINE_HEIGHT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-line-height-dm-sans-title-1-28-title-1-semibold-26)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": -1,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Title 1 - 28/Title 1 - Semibold - 26",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:689",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-title-1-28-title-1-semibold-26)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Title 1 - 28/Title 1 - Semibold - 26",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:690",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-title-1-28-title-1-semibold-26)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Title 1 - 28/Title 1 - Semibold - 26",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:691",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-title-1-28-title-1-semibold-26)"
+            }
+          }
+        }
+      },
+      "Title 1 - Medium - 26": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Title 1 - 28/Title 1 - Medium - 26",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:692",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-title-1-28-title-1-medium-26)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "Medium",
+          "$description": "Font style from text style: DM sans/Title 1 - 28/Title 1 - Medium - 26",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:693",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-title-1-28-title-1-medium-26)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 26,
+          "$description": "Font size in px from text style: DM sans/Title 1 - 28/Title 1 - Medium - 26",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:694",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-title-1-28-title-1-medium-26)"
+            }
+          }
+        },
+        "line-height": {
+          "$type": "number",
+          "$value": 34,
+          "$description": "Line height (PIXELS) from text style: DM sans/Title 1 - 28/Title 1 - Medium - 26",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:695",
+            "com.figma.scopes": [
+              "LINE_HEIGHT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-line-height-dm-sans-title-1-28-title-1-medium-26)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": -1,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Title 1 - 28/Title 1 - Medium - 26",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:696",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-title-1-28-title-1-medium-26)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Title 1 - 28/Title 1 - Medium - 26",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:697",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-title-1-28-title-1-medium-26)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Title 1 - 28/Title 1 - Medium - 26",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:698",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-title-1-28-title-1-medium-26)"
+            }
+          }
+        }
+      },
+      "Title 1 - Regular - 26": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Title 1 - 28/Title 1 - Regular - 26",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:699",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-title-1-28-title-1-regular-26)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "Regular",
+          "$description": "Font style from text style: DM sans/Title 1 - 28/Title 1 - Regular - 26",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:700",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-title-1-28-title-1-regular-26)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 26,
+          "$description": "Font size in px from text style: DM sans/Title 1 - 28/Title 1 - Regular - 26",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:701",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-title-1-28-title-1-regular-26)"
+            }
+          }
+        },
+        "line-height": {
+          "$type": "number",
+          "$value": 34,
+          "$description": "Line height (PIXELS) from text style: DM sans/Title 1 - 28/Title 1 - Regular - 26",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:702",
+            "com.figma.scopes": [
+              "LINE_HEIGHT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-line-height-dm-sans-title-1-28-title-1-regular-26)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": -1,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Title 1 - 28/Title 1 - Regular - 26",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:703",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-title-1-28-title-1-regular-26)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Title 1 - 28/Title 1 - Regular - 26",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:704",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-title-1-28-title-1-regular-26)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Title 1 - 28/Title 1 - Regular - 26",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:705",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-title-1-28-title-1-regular-26)"
+            }
+          }
+        }
+      }
+    },
+    "Title 2 - 24": {
+      "Title 2 - Bold - 24": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Title 2 - 24/Title 2 - Bold - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:706",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-title-2-24-title-2-bold-24)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "Bold",
+          "$description": "Font style from text style: DM sans/Title 2 - 24/Title 2 - Bold - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:707",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-title-2-24-title-2-bold-24)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 24,
+          "$description": "Font size in px from text style: DM sans/Title 2 - 24/Title 2 - Bold - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:708",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-title-2-24-title-2-bold-24)"
+            }
+          }
+        },
+        "line-height": {
+          "$type": "number",
+          "$value": 34,
+          "$description": "Line height (PIXELS) from text style: DM sans/Title 2 - 24/Title 2 - Bold - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:709",
+            "com.figma.scopes": [
+              "LINE_HEIGHT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-line-height-dm-sans-title-2-24-title-2-bold-24)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": -6,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Title 2 - 24/Title 2 - Bold - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:710",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-title-2-24-title-2-bold-24)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Title 2 - 24/Title 2 - Bold - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:711",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-title-2-24-title-2-bold-24)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Title 2 - 24/Title 2 - Bold - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:712",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-title-2-24-title-2-bold-24)"
+            }
+          }
+        }
+      },
+      "Title 2 - Semibold - 24": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Title 2 - 24/Title 2 - Semibold - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:713",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-title-2-24-title-2-semibold-24)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "SemiBold",
+          "$description": "Font style from text style: DM sans/Title 2 - 24/Title 2 - Semibold - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:714",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-title-2-24-title-2-semibold-24)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 24,
+          "$description": "Font size in px from text style: DM sans/Title 2 - 24/Title 2 - Semibold - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:715",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-title-2-24-title-2-semibold-24)"
+            }
+          }
+        },
+        "line-height": {
+          "$type": "number",
+          "$value": 34,
+          "$description": "Line height (PIXELS) from text style: DM sans/Title 2 - 24/Title 2 - Semibold - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:716",
+            "com.figma.scopes": [
+              "LINE_HEIGHT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-line-height-dm-sans-title-2-24-title-2-semibold-24)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": -6,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Title 2 - 24/Title 2 - Semibold - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:717",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-title-2-24-title-2-semibold-24)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Title 2 - 24/Title 2 - Semibold - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:718",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-title-2-24-title-2-semibold-24)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Title 2 - 24/Title 2 - Semibold - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:719",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-title-2-24-title-2-semibold-24)"
+            }
+          }
+        }
+      },
+      "Title 2 - Medium - 24": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Title 2 - 24/Title 2 - Medium - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:720",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-title-2-24-title-2-medium-24)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "Medium",
+          "$description": "Font style from text style: DM sans/Title 2 - 24/Title 2 - Medium - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:721",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-title-2-24-title-2-medium-24)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 24,
+          "$description": "Font size in px from text style: DM sans/Title 2 - 24/Title 2 - Medium - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:722",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-title-2-24-title-2-medium-24)"
+            }
+          }
+        },
+        "line-height": {
+          "$type": "number",
+          "$value": 34,
+          "$description": "Line height (PIXELS) from text style: DM sans/Title 2 - 24/Title 2 - Medium - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:723",
+            "com.figma.scopes": [
+              "LINE_HEIGHT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-line-height-dm-sans-title-2-24-title-2-medium-24)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": -6,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Title 2 - 24/Title 2 - Medium - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:724",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-title-2-24-title-2-medium-24)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Title 2 - 24/Title 2 - Medium - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:725",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-title-2-24-title-2-medium-24)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Title 2 - 24/Title 2 - Medium - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:726",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-title-2-24-title-2-medium-24)"
+            }
+          }
+        }
+      },
+      "Title 2 - Regular - 24": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Title 2 - 24/Title 2 - Regular - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:727",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-title-2-24-title-2-regular-24)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "Regular",
+          "$description": "Font style from text style: DM sans/Title 2 - 24/Title 2 - Regular - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:728",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-title-2-24-title-2-regular-24)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 24,
+          "$description": "Font size in px from text style: DM sans/Title 2 - 24/Title 2 - Regular - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:729",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-title-2-24-title-2-regular-24)"
+            }
+          }
+        },
+        "line-height": {
+          "$type": "number",
+          "$value": 34,
+          "$description": "Line height (PIXELS) from text style: DM sans/Title 2 - 24/Title 2 - Regular - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:730",
+            "com.figma.scopes": [
+              "LINE_HEIGHT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-line-height-dm-sans-title-2-24-title-2-regular-24)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": -6,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Title 2 - 24/Title 2 - Regular - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:731",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-title-2-24-title-2-regular-24)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Title 2 - 24/Title 2 - Regular - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:732",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-title-2-24-title-2-regular-24)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Title 2 - 24/Title 2 - Regular - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:733",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-title-2-24-title-2-regular-24)"
+            }
+          }
+        }
+      }
+    },
+    "Title 3 - 22": {
+      "Title 3 - Bold - 22": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Title 3 - 22/Title 3 - Bold - 22",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:734",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-title-3-22-title-3-bold-22)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "Bold",
+          "$description": "Font style from text style: DM sans/Title 3 - 22/Title 3 - Bold - 22",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:735",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-title-3-22-title-3-bold-22)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 22,
+          "$description": "Font size in px from text style: DM sans/Title 3 - 22/Title 3 - Bold - 22",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:736",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-title-3-22-title-3-bold-22)"
+            }
+          }
+        },
+        "line-height": {
+          "$type": "number",
+          "$value": 32,
+          "$description": "Line height (PIXELS) from text style: DM sans/Title 3 - 22/Title 3 - Bold - 22",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:737",
+            "com.figma.scopes": [
+              "LINE_HEIGHT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-line-height-dm-sans-title-3-22-title-3-bold-22)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": -4,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Title 3 - 22/Title 3 - Bold - 22",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:738",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-title-3-22-title-3-bold-22)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Title 3 - 22/Title 3 - Bold - 22",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:739",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-title-3-22-title-3-bold-22)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Title 3 - 22/Title 3 - Bold - 22",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:740",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-title-3-22-title-3-bold-22)"
+            }
+          }
+        }
+      },
+      "Title 3 - Semibold - 24": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Title 3 - 22/Title 3  - Semibold - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:741",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-title-3-22-title-3-semibold-24)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "SemiBold",
+          "$description": "Font style from text style: DM sans/Title 3 - 22/Title 3  - Semibold - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:742",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-title-3-22-title-3-semibold-24)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 22,
+          "$description": "Font size in px from text style: DM sans/Title 3 - 22/Title 3  - Semibold - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:743",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-title-3-22-title-3-semibold-24)"
+            }
+          }
+        },
+        "line-height": {
+          "$type": "number",
+          "$value": 32,
+          "$description": "Line height (PIXELS) from text style: DM sans/Title 3 - 22/Title 3  - Semibold - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:744",
+            "com.figma.scopes": [
+              "LINE_HEIGHT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-line-height-dm-sans-title-3-22-title-3-semibold-24)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": -4,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Title 3 - 22/Title 3  - Semibold - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:745",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-title-3-22-title-3-semibold-24)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Title 3 - 22/Title 3  - Semibold - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:746",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-title-3-22-title-3-semibold-24)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Title 3 - 22/Title 3  - Semibold - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:747",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-title-3-22-title-3-semibold-24)"
+            }
+          }
+        }
+      },
+      "Title 3 - Medium - 24": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Title 3 - 22/Title 3  - Medium - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:748",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-title-3-22-title-3-medium-24)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "Medium",
+          "$description": "Font style from text style: DM sans/Title 3 - 22/Title 3  - Medium - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:749",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-title-3-22-title-3-medium-24)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 22,
+          "$description": "Font size in px from text style: DM sans/Title 3 - 22/Title 3  - Medium - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:750",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-title-3-22-title-3-medium-24)"
+            }
+          }
+        },
+        "line-height": {
+          "$type": "number",
+          "$value": 32,
+          "$description": "Line height (PIXELS) from text style: DM sans/Title 3 - 22/Title 3  - Medium - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:751",
+            "com.figma.scopes": [
+              "LINE_HEIGHT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-line-height-dm-sans-title-3-22-title-3-medium-24)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": -4,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Title 3 - 22/Title 3  - Medium - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:752",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-title-3-22-title-3-medium-24)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Title 3 - 22/Title 3  - Medium - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:753",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-title-3-22-title-3-medium-24)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Title 3 - 22/Title 3  - Medium - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:754",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-title-3-22-title-3-medium-24)"
+            }
+          }
+        }
+      },
+      "Title 3 - Regular - 24": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Title 3 - 22/Title 3 - Regular - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:755",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-title-3-22-title-3-regular-24)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "Regular",
+          "$description": "Font style from text style: DM sans/Title 3 - 22/Title 3 - Regular - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:756",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-title-3-22-title-3-regular-24)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 22,
+          "$description": "Font size in px from text style: DM sans/Title 3 - 22/Title 3 - Regular - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:757",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-title-3-22-title-3-regular-24)"
+            }
+          }
+        },
+        "line-height": {
+          "$type": "number",
+          "$value": 32,
+          "$description": "Line height (PIXELS) from text style: DM sans/Title 3 - 22/Title 3 - Regular - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:758",
+            "com.figma.scopes": [
+              "LINE_HEIGHT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-line-height-dm-sans-title-3-22-title-3-regular-24)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": -4,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Title 3 - 22/Title 3 - Regular - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:759",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-title-3-22-title-3-regular-24)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Title 3 - 22/Title 3 - Regular - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:760",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-title-3-22-title-3-regular-24)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Title 3 - 22/Title 3 - Regular - 24",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:761",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-title-3-22-title-3-regular-24)"
+            }
+          }
+        }
+      }
+    },
+    "Subtitle 1 - 18": {
+      "Subtitle 1 - Bold - 18": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Subtitle 1  - 18/Subtitle 1 - Bold - 18",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:762",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-subtitle-1-18-subtitle-1-bold-18)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "Bold",
+          "$description": "Font style from text style: DM sans/Subtitle 1  - 18/Subtitle 1 - Bold - 18",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:763",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-subtitle-1-18-subtitle-1-bold-18)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 18,
+          "$description": "Font size in px from text style: DM sans/Subtitle 1  - 18/Subtitle 1 - Bold - 18",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:764",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-subtitle-1-18-subtitle-1-bold-18)"
+            }
+          }
+        },
+        "line-height": {
+          "$type": "number",
+          "$value": 26,
+          "$description": "Line height (PIXELS) from text style: DM sans/Subtitle 1  - 18/Subtitle 1 - Bold - 18",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:765",
+            "com.figma.scopes": [
+              "LINE_HEIGHT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-line-height-dm-sans-subtitle-1-18-subtitle-1-bold-18)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": -4,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Subtitle 1  - 18/Subtitle 1 - Bold - 18",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:766",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-subtitle-1-18-subtitle-1-bold-18)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Subtitle 1  - 18/Subtitle 1 - Bold - 18",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:767",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-subtitle-1-18-subtitle-1-bold-18)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Subtitle 1  - 18/Subtitle 1 - Bold - 18",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:768",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-subtitle-1-18-subtitle-1-bold-18)"
+            }
+          }
+        }
+      },
+      "Subtitle 1 - Semibold - 18": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Subtitle 1  - 18/Subtitle 1  - Semibold - 18",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:769",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-subtitle-1-18-subtitle-1-semibold-18)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "SemiBold",
+          "$description": "Font style from text style: DM sans/Subtitle 1  - 18/Subtitle 1  - Semibold - 18",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:770",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-subtitle-1-18-subtitle-1-semibold-18)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 18,
+          "$description": "Font size in px from text style: DM sans/Subtitle 1  - 18/Subtitle 1  - Semibold - 18",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:771",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-subtitle-1-18-subtitle-1-semibold-18)"
+            }
+          }
+        },
+        "line-height": {
+          "$type": "number",
+          "$value": 26,
+          "$description": "Line height (PIXELS) from text style: DM sans/Subtitle 1  - 18/Subtitle 1  - Semibold - 18",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:772",
+            "com.figma.scopes": [
+              "LINE_HEIGHT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-line-height-dm-sans-subtitle-1-18-subtitle-1-semibold-18)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": -4,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Subtitle 1  - 18/Subtitle 1  - Semibold - 18",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:773",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-subtitle-1-18-subtitle-1-semibold-18)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Subtitle 1  - 18/Subtitle 1  - Semibold - 18",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:774",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-subtitle-1-18-subtitle-1-semibold-18)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Subtitle 1  - 18/Subtitle 1  - Semibold - 18",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:775",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-subtitle-1-18-subtitle-1-semibold-18)"
+            }
+          }
+        }
+      },
+      "Subtitle 1 - Medium - 18": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Subtitle 1  - 18/Subtitle 1  - Medium - 18",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:776",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-subtitle-1-18-subtitle-1-medium-18)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "Medium",
+          "$description": "Font style from text style: DM sans/Subtitle 1  - 18/Subtitle 1  - Medium - 18",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:777",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-subtitle-1-18-subtitle-1-medium-18)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 18,
+          "$description": "Font size in px from text style: DM sans/Subtitle 1  - 18/Subtitle 1  - Medium - 18",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:778",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-subtitle-1-18-subtitle-1-medium-18)"
+            }
+          }
+        },
+        "line-height": {
+          "$type": "number",
+          "$value": 26,
+          "$description": "Line height (PIXELS) from text style: DM sans/Subtitle 1  - 18/Subtitle 1  - Medium - 18",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:779",
+            "com.figma.scopes": [
+              "LINE_HEIGHT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-line-height-dm-sans-subtitle-1-18-subtitle-1-medium-18)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": -4,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Subtitle 1  - 18/Subtitle 1  - Medium - 18",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:780",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-subtitle-1-18-subtitle-1-medium-18)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Subtitle 1  - 18/Subtitle 1  - Medium - 18",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:781",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-subtitle-1-18-subtitle-1-medium-18)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Subtitle 1  - 18/Subtitle 1  - Medium - 18",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:782",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-subtitle-1-18-subtitle-1-medium-18)"
+            }
+          }
+        }
+      },
+      "Subtitle 1 - Regular - 18": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Subtitle 1  - 18/Subtitle 1 - Regular - 18",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:783",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-subtitle-1-18-subtitle-1-regular-18)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "Regular",
+          "$description": "Font style from text style: DM sans/Subtitle 1  - 18/Subtitle 1 - Regular - 18",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:784",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-subtitle-1-18-subtitle-1-regular-18)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 18,
+          "$description": "Font size in px from text style: DM sans/Subtitle 1  - 18/Subtitle 1 - Regular - 18",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:785",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-subtitle-1-18-subtitle-1-regular-18)"
+            }
+          }
+        },
+        "line-height": {
+          "$type": "number",
+          "$value": 26,
+          "$description": "Line height (PIXELS) from text style: DM sans/Subtitle 1  - 18/Subtitle 1 - Regular - 18",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:786",
+            "com.figma.scopes": [
+              "LINE_HEIGHT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-line-height-dm-sans-subtitle-1-18-subtitle-1-regular-18)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": -4,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Subtitle 1  - 18/Subtitle 1 - Regular - 18",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:787",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-subtitle-1-18-subtitle-1-regular-18)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Subtitle 1  - 18/Subtitle 1 - Regular - 18",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:788",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-subtitle-1-18-subtitle-1-regular-18)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Subtitle 1  - 18/Subtitle 1 - Regular - 18",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:789",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-subtitle-1-18-subtitle-1-regular-18)"
+            }
+          }
+        }
+      }
+    },
+    "Subtitle 2 - 16": {
+      "Subtitle 2 - Bold - 16": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Subtitle 2 - 16/Subtitle 2 - Bold - 16",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:790",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-subtitle-2-16-subtitle-2-bold-16)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "Bold",
+          "$description": "Font style from text style: DM sans/Subtitle 2 - 16/Subtitle 2 - Bold - 16",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:791",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-subtitle-2-16-subtitle-2-bold-16)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 16,
+          "$description": "Font size in px from text style: DM sans/Subtitle 2 - 16/Subtitle 2 - Bold - 16",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:792",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-subtitle-2-16-subtitle-2-bold-16)"
+            }
+          }
+        },
+        "line-height": {
+          "$type": "number",
+          "$value": 26,
+          "$description": "Line height (PIXELS) from text style: DM sans/Subtitle 2 - 16/Subtitle 2 - Bold - 16",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:793",
+            "com.figma.scopes": [
+              "LINE_HEIGHT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-line-height-dm-sans-subtitle-2-16-subtitle-2-bold-16)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Subtitle 2 - 16/Subtitle 2 - Bold - 16",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:794",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-subtitle-2-16-subtitle-2-bold-16)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Subtitle 2 - 16/Subtitle 2 - Bold - 16",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:795",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-subtitle-2-16-subtitle-2-bold-16)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Subtitle 2 - 16/Subtitle 2 - Bold - 16",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:796",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-subtitle-2-16-subtitle-2-bold-16)"
+            }
+          }
+        }
+      },
+      "Subtitle 2 - Semibold - 16": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Subtitle 2 - 16/Subtitle 2  - Semibold - 16",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:797",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-subtitle-2-16-subtitle-2-semibold-16)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "SemiBold",
+          "$description": "Font style from text style: DM sans/Subtitle 2 - 16/Subtitle 2  - Semibold - 16",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:798",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-subtitle-2-16-subtitle-2-semibold-16)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 16,
+          "$description": "Font size in px from text style: DM sans/Subtitle 2 - 16/Subtitle 2  - Semibold - 16",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:799",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-subtitle-2-16-subtitle-2-semibold-16)"
+            }
+          }
+        },
+        "line-height": {
+          "$type": "number",
+          "$value": 24,
+          "$description": "Line height (PIXELS) from text style: DM sans/Subtitle 2 - 16/Subtitle 2  - Semibold - 16",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:800",
+            "com.figma.scopes": [
+              "LINE_HEIGHT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-line-height-dm-sans-subtitle-2-16-subtitle-2-semibold-16)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": -4,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Subtitle 2 - 16/Subtitle 2  - Semibold - 16",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:801",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-subtitle-2-16-subtitle-2-semibold-16)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Subtitle 2 - 16/Subtitle 2  - Semibold - 16",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:802",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-subtitle-2-16-subtitle-2-semibold-16)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Subtitle 2 - 16/Subtitle 2  - Semibold - 16",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:803",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-subtitle-2-16-subtitle-2-semibold-16)"
+            }
+          }
+        }
+      },
+      "Subtitle 2 - Medium - 16": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Subtitle 2 - 16/Subtitle 2  - Medium - 16",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:804",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-subtitle-2-16-subtitle-2-medium-16)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "Medium",
+          "$description": "Font style from text style: DM sans/Subtitle 2 - 16/Subtitle 2  - Medium - 16",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:805",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-subtitle-2-16-subtitle-2-medium-16)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 16,
+          "$description": "Font size in px from text style: DM sans/Subtitle 2 - 16/Subtitle 2  - Medium - 16",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:806",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-subtitle-2-16-subtitle-2-medium-16)"
+            }
+          }
+        },
+        "line-height": {
+          "$type": "number",
+          "$value": 24,
+          "$description": "Line height (PIXELS) from text style: DM sans/Subtitle 2 - 16/Subtitle 2  - Medium - 16",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:807",
+            "com.figma.scopes": [
+              "LINE_HEIGHT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-line-height-dm-sans-subtitle-2-16-subtitle-2-medium-16)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Subtitle 2 - 16/Subtitle 2  - Medium - 16",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:808",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-subtitle-2-16-subtitle-2-medium-16)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Subtitle 2 - 16/Subtitle 2  - Medium - 16",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:809",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-subtitle-2-16-subtitle-2-medium-16)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Subtitle 2 - 16/Subtitle 2  - Medium - 16",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:810",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-subtitle-2-16-subtitle-2-medium-16)"
+            }
+          }
+        }
+      },
+      "Subtitle 2 - Regular - 16": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Subtitle 2 - 16/Subtitle 2 - Regular - 16",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:811",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-subtitle-2-16-subtitle-2-regular-16)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "Regular",
+          "$description": "Font style from text style: DM sans/Subtitle 2 - 16/Subtitle 2 - Regular - 16",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:812",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-subtitle-2-16-subtitle-2-regular-16)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 16,
+          "$description": "Font size in px from text style: DM sans/Subtitle 2 - 16/Subtitle 2 - Regular - 16",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:813",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-subtitle-2-16-subtitle-2-regular-16)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Subtitle 2 - 16/Subtitle 2 - Regular - 16",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:814",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-subtitle-2-16-subtitle-2-regular-16)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Subtitle 2 - 16/Subtitle 2 - Regular - 16",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:815",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-subtitle-2-16-subtitle-2-regular-16)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Subtitle 2 - 16/Subtitle 2 - Regular - 16",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:816",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-subtitle-2-16-subtitle-2-regular-16)"
+            }
+          }
+        }
+      }
+    },
+    "Paragraph 1 - 14": {
+      "Paragraph 1 - Bold - 14": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Paragraph 1 - 14/Paragraph 1 - Bold - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:817",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-paragraph-1-14-paragraph-1-bold-14)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "Bold",
+          "$description": "Font style from text style: DM sans/Paragraph 1 - 14/Paragraph 1 - Bold - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:818",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-paragraph-1-14-paragraph-1-bold-14)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 14,
+          "$description": "Font size in px from text style: DM sans/Paragraph 1 - 14/Paragraph 1 - Bold - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:819",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-paragraph-1-14-paragraph-1-bold-14)"
+            }
+          }
+        },
+        "line-height": {
+          "$type": "number",
+          "$value": 22,
+          "$description": "Line height (PIXELS) from text style: DM sans/Paragraph 1 - 14/Paragraph 1 - Bold - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:820",
+            "com.figma.scopes": [
+              "LINE_HEIGHT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-line-height-dm-sans-paragraph-1-14-paragraph-1-bold-14)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": -2,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Paragraph 1 - 14/Paragraph 1 - Bold - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:821",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-paragraph-1-14-paragraph-1-bold-14)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Paragraph 1 - 14/Paragraph 1 - Bold - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:822",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-paragraph-1-14-paragraph-1-bold-14)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Paragraph 1 - 14/Paragraph 1 - Bold - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:823",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-paragraph-1-14-paragraph-1-bold-14)"
+            }
+          }
+        }
+      },
+      "Paragraph 1 - Semibold - 14": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Paragraph 1 - 14/Paragraph 1  - Semibold - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:824",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-paragraph-1-14-paragraph-1-semibold-14)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "SemiBold",
+          "$description": "Font style from text style: DM sans/Paragraph 1 - 14/Paragraph 1  - Semibold - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:825",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-paragraph-1-14-paragraph-1-semibold-14)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 14,
+          "$description": "Font size in px from text style: DM sans/Paragraph 1 - 14/Paragraph 1  - Semibold - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:826",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-paragraph-1-14-paragraph-1-semibold-14)"
+            }
+          }
+        },
+        "line-height": {
+          "$type": "number",
+          "$value": 22,
+          "$description": "Line height (PIXELS) from text style: DM sans/Paragraph 1 - 14/Paragraph 1  - Semibold - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:827",
+            "com.figma.scopes": [
+              "LINE_HEIGHT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-line-height-dm-sans-paragraph-1-14-paragraph-1-semibold-14)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": -2,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Paragraph 1 - 14/Paragraph 1  - Semibold - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:828",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-paragraph-1-14-paragraph-1-semibold-14)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Paragraph 1 - 14/Paragraph 1  - Semibold - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:829",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-paragraph-1-14-paragraph-1-semibold-14)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Paragraph 1 - 14/Paragraph 1  - Semibold - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:830",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-paragraph-1-14-paragraph-1-semibold-14)"
+            }
+          }
+        }
+      },
+      "Paragraph 1 - Medium - 14": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Paragraph 1 - 14/Paragraph 1  - Medium - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:831",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-paragraph-1-14-paragraph-1-medium-14)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "Medium",
+          "$description": "Font style from text style: DM sans/Paragraph 1 - 14/Paragraph 1  - Medium - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:832",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-paragraph-1-14-paragraph-1-medium-14)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 14,
+          "$description": "Font size in px from text style: DM sans/Paragraph 1 - 14/Paragraph 1  - Medium - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:833",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-paragraph-1-14-paragraph-1-medium-14)"
+            }
+          }
+        },
+        "line-height": {
+          "$type": "number",
+          "$value": 22,
+          "$description": "Line height (PIXELS) from text style: DM sans/Paragraph 1 - 14/Paragraph 1  - Medium - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:834",
+            "com.figma.scopes": [
+              "LINE_HEIGHT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-line-height-dm-sans-paragraph-1-14-paragraph-1-medium-14)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": -2,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Paragraph 1 - 14/Paragraph 1  - Medium - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:835",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-paragraph-1-14-paragraph-1-medium-14)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Paragraph 1 - 14/Paragraph 1  - Medium - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:836",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-paragraph-1-14-paragraph-1-medium-14)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Paragraph 1 - 14/Paragraph 1  - Medium - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:837",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-paragraph-1-14-paragraph-1-medium-14)"
+            }
+          }
+        }
+      },
+      "Paragraph 1 - Regular - 14": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Paragraph 1 - 14/Paragraph 1 - Regular - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:838",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-paragraph-1-14-paragraph-1-regular-14)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "Regular",
+          "$description": "Font style from text style: DM sans/Paragraph 1 - 14/Paragraph 1 - Regular - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:839",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-paragraph-1-14-paragraph-1-regular-14)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 14,
+          "$description": "Font size in px from text style: DM sans/Paragraph 1 - 14/Paragraph 1 - Regular - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:840",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-paragraph-1-14-paragraph-1-regular-14)"
+            }
+          }
+        },
+        "line-height": {
+          "$type": "number",
+          "$value": 22,
+          "$description": "Line height (PIXELS) from text style: DM sans/Paragraph 1 - 14/Paragraph 1 - Regular - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:841",
+            "com.figma.scopes": [
+              "LINE_HEIGHT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-line-height-dm-sans-paragraph-1-14-paragraph-1-regular-14)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": -2,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Paragraph 1 - 14/Paragraph 1 - Regular - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:842",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-paragraph-1-14-paragraph-1-regular-14)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Paragraph 1 - 14/Paragraph 1 - Regular - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:843",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-paragraph-1-14-paragraph-1-regular-14)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Paragraph 1 - 14/Paragraph 1 - Regular - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:844",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-paragraph-1-14-paragraph-1-regular-14)"
+            }
+          }
+        }
+      }
+    },
+    "Paragraph 2 - 12": {
+      "Paragraph 2 - Bold - 12": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Paragraph 2  - 12/Paragraph 2 - Bold - 12",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:845",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-paragraph-2-12-paragraph-2-bold-12)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "Bold",
+          "$description": "Font style from text style: DM sans/Paragraph 2  - 12/Paragraph 2 - Bold - 12",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:846",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-paragraph-2-12-paragraph-2-bold-12)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 12,
+          "$description": "Font size in px from text style: DM sans/Paragraph 2  - 12/Paragraph 2 - Bold - 12",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:847",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-paragraph-2-12-paragraph-2-bold-12)"
+            }
+          }
+        },
+        "line-height": {
+          "$type": "number",
+          "$value": 18,
+          "$description": "Line height (PIXELS) from text style: DM sans/Paragraph 2  - 12/Paragraph 2 - Bold - 12",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:848",
+            "com.figma.scopes": [
+              "LINE_HEIGHT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-line-height-dm-sans-paragraph-2-12-paragraph-2-bold-12)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Paragraph 2  - 12/Paragraph 2 - Bold - 12",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:849",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-paragraph-2-12-paragraph-2-bold-12)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Paragraph 2  - 12/Paragraph 2 - Bold - 12",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:850",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-paragraph-2-12-paragraph-2-bold-12)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Paragraph 2  - 12/Paragraph 2 - Bold - 12",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:851",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-paragraph-2-12-paragraph-2-bold-12)"
+            }
+          }
+        }
+      },
+      "Paragraph 2 - Semibold - 14": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Paragraph 2  - 12/Paragraph 2   - Semibold - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:852",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-paragraph-2-12-paragraph-2-semibold-14)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "SemiBold",
+          "$description": "Font style from text style: DM sans/Paragraph 2  - 12/Paragraph 2   - Semibold - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:853",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-paragraph-2-12-paragraph-2-semibold-14)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 12,
+          "$description": "Font size in px from text style: DM sans/Paragraph 2  - 12/Paragraph 2   - Semibold - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:854",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-paragraph-2-12-paragraph-2-semibold-14)"
+            }
+          }
+        },
+        "line-height": {
+          "$type": "number",
+          "$value": 18,
+          "$description": "Line height (PIXELS) from text style: DM sans/Paragraph 2  - 12/Paragraph 2   - Semibold - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:855",
+            "com.figma.scopes": [
+              "LINE_HEIGHT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-line-height-dm-sans-paragraph-2-12-paragraph-2-semibold-14)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Paragraph 2  - 12/Paragraph 2   - Semibold - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:856",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-paragraph-2-12-paragraph-2-semibold-14)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Paragraph 2  - 12/Paragraph 2   - Semibold - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:857",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-paragraph-2-12-paragraph-2-semibold-14)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Paragraph 2  - 12/Paragraph 2   - Semibold - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:858",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-paragraph-2-12-paragraph-2-semibold-14)"
+            }
+          }
+        }
+      },
+      "Paragraph 2 - Medium - 14": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Paragraph 2  - 12/Paragraph 2   - Medium - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:859",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-paragraph-2-12-paragraph-2-medium-14)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "Medium",
+          "$description": "Font style from text style: DM sans/Paragraph 2  - 12/Paragraph 2   - Medium - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:860",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-paragraph-2-12-paragraph-2-medium-14)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 12,
+          "$description": "Font size in px from text style: DM sans/Paragraph 2  - 12/Paragraph 2   - Medium - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:861",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-paragraph-2-12-paragraph-2-medium-14)"
+            }
+          }
+        },
+        "line-height": {
+          "$type": "number",
+          "$value": 18,
+          "$description": "Line height (PIXELS) from text style: DM sans/Paragraph 2  - 12/Paragraph 2   - Medium - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:862",
+            "com.figma.scopes": [
+              "LINE_HEIGHT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-line-height-dm-sans-paragraph-2-12-paragraph-2-medium-14)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Paragraph 2  - 12/Paragraph 2   - Medium - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:863",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-paragraph-2-12-paragraph-2-medium-14)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Paragraph 2  - 12/Paragraph 2   - Medium - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:864",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-paragraph-2-12-paragraph-2-medium-14)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Paragraph 2  - 12/Paragraph 2   - Medium - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:865",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-paragraph-2-12-paragraph-2-medium-14)"
+            }
+          }
+        }
+      },
+      "Paragraph 2 - Regular - 14": {
+        "font-family": {
+          "$type": "string",
+          "$value": "DM Sans",
+          "$description": "Font family from text style: DM sans/Paragraph 2  - 12/Paragraph 2  - Regular - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:866",
+            "com.figma.scopes": [
+              "FONT_FAMILY"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-family-dm-sans-paragraph-2-12-paragraph-2-regular-14)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-style": {
+          "$type": "string",
+          "$value": "Regular",
+          "$description": "Font style from text style: DM sans/Paragraph 2  - 12/Paragraph 2  - Regular - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:867",
+            "com.figma.scopes": [
+              "FONT_STYLE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-style-dm-sans-paragraph-2-12-paragraph-2-regular-14)"
+            },
+            "com.figma.type": "string"
+          }
+        },
+        "font-size": {
+          "$type": "number",
+          "$value": 12,
+          "$description": "Font size in px from text style: DM sans/Paragraph 2  - 12/Paragraph 2  - Regular - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:868",
+            "com.figma.scopes": [
+              "FONT_SIZE"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-font-size-dm-sans-paragraph-2-12-paragraph-2-regular-14)"
+            }
+          }
+        },
+        "line-height": {
+          "$type": "number",
+          "$value": 18,
+          "$description": "Line height (PIXELS) from text style: DM sans/Paragraph 2  - 12/Paragraph 2  - Regular - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:869",
+            "com.figma.scopes": [
+              "LINE_HEIGHT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-line-height-dm-sans-paragraph-2-12-paragraph-2-regular-14)"
+            }
+          }
+        },
+        "letter-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Letter spacing (PERCENT) from text style: DM sans/Paragraph 2  - 12/Paragraph 2  - Regular - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:870",
+            "com.figma.scopes": [
+              "LETTER_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-letter-spacing-dm-sans-paragraph-2-12-paragraph-2-regular-14)"
+            }
+          }
+        },
+        "paragraph-spacing": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph spacing from text style: DM sans/Paragraph 2  - 12/Paragraph 2  - Regular - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:871",
+            "com.figma.scopes": [
+              "PARAGRAPH_SPACING"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-spacing-dm-sans-paragraph-2-12-paragraph-2-regular-14)"
+            }
+          }
+        },
+        "paragraph-indent": {
+          "$type": "number",
+          "$value": 0,
+          "$description": "Paragraph indent from text style: DM sans/Paragraph 2  - 12/Paragraph 2  - Regular - 14",
+          "$extensions": {
+            "com.figma.variableId": "VariableID:17:872",
+            "com.figma.scopes": [
+              "PARAGRAPH_INDENT"
+            ],
+            "com.figma.codeSyntax": {
+              "WEB": "var(--type-paragraph-indent-dm-sans-paragraph-2-12-paragraph-2-regular-14)"
+            }
+          }
+        }
+      }
+    }
+  },
+  "$extensions": {
+    "com.figma.modeName": "Value"
+  }
+}

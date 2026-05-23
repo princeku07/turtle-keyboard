@@ -66,8 +66,9 @@ android {
     }
 
     testOptions {
-        // Robolectric needs merged resources/assets on the JVM test classpath.
-        unitTests.isIncludeAndroidResources = true
+        // No isIncludeAndroidResources — none of the unit tests reference app
+        // resources; enabling it pulls AAPT into the test classpath path and
+        // has caused link failures with our resource set.
         unitTests.isReturnDefaultValues = true
     }
 }

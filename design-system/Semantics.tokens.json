@@ -1,0 +1,36 @@
+{
+  "brand": {
+    "green":      { "$type": "color", "$value": "#008658", "$description": "Legacy semantic — Android: @color/brand_green. Map to Main Brand in Figma when ready." },
+    "green-deep": { "$type": "color", "$value": "#0E5C2C", "$description": "Legacy semantic — Android: @color/brand_green_deep." },
+    "dot-gold":   { "$type": "color", "$value": "#D9CBA0", "$description": "Legacy semantic — Android: @color/brand_dot_gold." }
+  },
+  "onboard": {
+    "bg":           { "$type": "color", "$value": "#F1F5E8", "$description": "Onboarding screen background." },
+    "hero-top":     { "$type": "color", "$value": "#DDE7F4", "$description": "Onboarding hero gradient — top stop." },
+    "hero-mid":     { "$type": "color", "$value": "#F3EAF6", "$description": "Onboarding hero gradient — mid stop." },
+    "hero-bottom":  { "$type": "color", "$value": "#E8F0E2", "$description": "Onboarding hero gradient — bottom stop." },
+    "title":        { "$type": "color", "$value": "#0C0C0C", "$description": "Onboarding title text." },
+    "subtitle":     { "$type": "color", "$value": "#6B6B6B", "$description": "Onboarding subtitle text." },
+    "cta-bg":       { "$type": "color", "$value": "#0C0C0C", "$description": "Onboarding CTA button background." },
+    "cta-text":     { "$type": "color", "$value": "#FFFFFF", "$description": "Onboarding CTA button text." },
+    "dot-active":   { "$type": "color", "$value": "#0C0C0C", "$description": "Onboarding pager dot — active." },
+    "dot-inactive": { "$type": "color", "$value": "#CDD3C2", "$description": "Onboarding pager dot — inactive." }
+  },
+  "text": {
+    "display": {
+      "$type": "typography",
+      "$value": { "fontFamily": "system", "fontWeight": 900, "fontSize": "28px", "lineHeight": 1.1, "letterSpacing": "0" },
+      "$description": "Android: TextAppearance.Token.Display. Map to a Figma text style when ready."
+    },
+    "body": {
+      "$type": "typography",
+      "$value": { "fontFamily": "system", "fontWeight": 400, "fontSize": "15px", "lineHeight": 1.4, "letterSpacing": "0" },
+      "$description": "Android: TextAppearance.Token.Body."
+    },
+    "button": {
+      "$type": "typography",
+      "$value": { "fontFamily": "system", "fontWeight": 500, "fontSize": "16px", "lineHeight": 1.0, "letterSpacing": "0.02em" },
+      "$description": "Android: TextAppearance.Token.Button."
+    }
+  }
+}

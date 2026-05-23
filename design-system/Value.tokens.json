@@ -1,0 +1,117 @@
+{
+  "2": {
+    "$type": "number",
+    "$value": 2,
+    "$description": "Radius token: 2px",
+    "$extensions": {
+      "com.figma.variableId": "VariableID:17:880",
+      "com.figma.scopes": [
+        "CORNER_RADIUS"
+      ],
+      "com.figma.codeSyntax": {
+        "WEB": "var(--radius-2)"
+      }
+    }
+  },
+  "6": {
+    "$type": "number",
+    "$value": 6,
+    "$description": "Radius token: 6px",
+    "$extensions": {
+      "com.figma.variableId": "VariableID:17:879",
+      "com.figma.scopes": [
+        "CORNER_RADIUS"
+      ],
+      "com.figma.codeSyntax": {
+        "WEB": "var(--radius-6)"
+      }
+    }
+  },
+  "10": {
+    "$type": "number",
+    "$value": 10,
+    "$description": "Radius token: 10px",
+    "$extensions": {
+      "com.figma.variableId": "VariableID:17:878",
+      "com.figma.scopes": [
+        "CORNER_RADIUS"
+      ],
+      "com.figma.codeSyntax": {
+        "WEB": "var(--radius-10)"
+      }
+    }
+  },
+  "14": {
+    "$type": "number",
+    "$value": 14,
+    "$description": "Radius token: 14px",
+    "$extensions": {
+      "com.figma.variableId": "VariableID:17:877",
+      "com.figma.scopes": [
+        "CORNER_RADIUS"
+      ],
+      "com.figma.codeSyntax": {
+        "WEB": "var(--radius-14)"
+      }
+    }
+  },
+  "18": {
+    "$type": "number",
+    "$value": 18,
+    "$description": "Radius token: 18px",
+    "$extensions": {
+      "com.figma.variableId": "VariableID:17:876",
+      "com.figma.scopes": [
+        "CORNER_RADIUS"
+      ],
+      "com.figma.codeSyntax": {
+        "WEB": "var(--radius-18)"
+      }
+    }
+  },
+  "22": {
+    "$type": "number",
+    "$value": 22,
+    "$description": "Radius token: 22px",
+    "$extensions": {
+      "com.figma.variableId": "VariableID:17:875",
+      "com.figma.scopes": [
+        "CORNER_RADIUS"
+      ],
+      "com.figma.codeSyntax": {
+        "WEB": "var(--radius-22)"
+      }
+    }
+  },
+  "26": {
+    "$type": "number",
+    "$value": 26,
+    "$description": "Radius token: 26px",
+    "$extensions": {
+      "com.figma.variableId": "VariableID:17:874",
+      "com.figma.scopes": [
+        "CORNER_RADIUS"
+      ],
+      "com.figma.codeSyntax": {
+        "WEB": "var(--radius-26)"
+      }
+    }
+  },
+  "30": {
+    "$type": "number",
+    "$value": 30,
+    "$description": "Radius token: 30px",
+    "$extensions": {
+      "com.figma.variableId": "VariableID:17:873",
+      "com.figma.scopes": [
+        "CORNER_RADIUS"
+      ],
+      "com.figma.codeSyntax": {
+        "WEB": "var(--radius-30)"
+      }
+    }
+  },
+  "$extensions": {
+    "com.figma.modeName": "Value"
+  }
+}
