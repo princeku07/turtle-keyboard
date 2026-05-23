@@ -31,6 +31,8 @@ final class SplitDetailViewController: UIViewController {
     private let cloudActionButton = UIButton(type: .system)
     private let inviteButton = UIButton(type: .system)
     private let syncButton = UIButton(type: .system)
+    private let clearMineButton = UIButton(type: .system)
+    private let clearAllButton = UIButton(type: .system)
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -141,9 +143,33 @@ final class SplitDetailViewController: UIViewController {
         meta.font = .systemFont(ofSize: 13)
         meta.textColor = UIColor(red: 0.80, green: 0.91, blue: 0.78, alpha: 1.0)
 
-        let stack = UIStackView(arrangedSubviews: [amount, meta])
+        let copyBtn = UIButton(type: .system)
+        styleSecondaryButton(copyBtn, title: "Copy")
+        copyBtn.addAction(UIAction { [weak self] _ in
+            guard let self = self else { return }
+            UIPasteboard.general.string = self.summary(for: entry)
+            self.flashToast("Copied")
+        }, for: .touchUpInside)
+
+        let shareBtn = UIButton(type: .system)
+        styleSecondaryButton(shareBtn, title: "Share")
+        shareBtn.addAction(UIAction { [weak self] _ in
+            guard let self = self else { return }
+            let activity = UIActivityViewController(
+                activityItems: [self.summary(for: entry)],
+                applicationActivities: nil)
+            activity.popoverPresentationController?.sourceView = shareBtn
+            self.present(activity, animated: true)
+        }, for: .touchUpInside)
+
+        let actionRow = UIStackView(arrangedSubviews: [copyBtn, shareBtn, UIView()])
+        actionRow.axis = .horizontal
+        actionRow.spacing = 8
+
+        let stack = UIStackView(arrangedSubviews: [amount, meta, actionRow])
         stack.axis = .vertical
-        stack.spacing = 3
+        stack.spacing = 8
+        stack.setCustomSpacing(3, after: amount)
         stack.translatesAutoresizingMaskIntoConstraints = false
         card.addSubview(stack)
         NSLayoutConstraint.activate([
@@ -153,6 +179,48 @@ final class SplitDetailViewController: UIViewController {
             stack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -12),
         ])
         return card
+    }
+
+    /// Plain-text summary suitable for copy/share. Mirrors Android's
+    /// `SplitActivity.summary` (lines 761-766).
+    private func summary(for entry: SplitHistory.Entry) -> String {
+        let per = entry.people > 0 ? entry.amount / Double(entry.people) : entry.amount
+        let unit = entry.people == 1 ? "person" : "people"
+        return "Splitting ₹\(SplitPanelView.formatAmount(entry.amount)) between "
+            + "\(entry.people) \(unit) — ₹\(SplitPanelView.formatAmount(per)) each."
+    }
+
+    /// Small transient toast for clipboard feedback. Mirrors Android's
+    /// `Toast.makeText(...).show()` style.
+    private func flashToast(_ text: String) {
+        let container = UIView()
+        container.backgroundColor = UIColor.black.withAlphaComponent(0.78)
+        container.layer.cornerRadius = 14
+        container.layer.masksToBounds = true
+        container.alpha = 0
+        container.translatesAutoresizingMaskIntoConstraints = false
+
+        let label = UILabel()
+        label.text = text
+        label.font = .systemFont(ofSize: 13, weight: .semibold)
+        label.textColor = .white
+        label.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(label)
+
+        view.addSubview(container)
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 16),
+            label.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -16),
+            label.topAnchor.constraint(equalTo: container.topAnchor, constant: 8),
+            label.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -8),
+            container.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            container.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -40),
+        ])
+        UIView.animate(withDuration: 0.18, animations: { container.alpha = 1 }) { _ in
+            UIView.animate(withDuration: 0.18, delay: 1.2, options: [],
+                           animations: { container.alpha = 0 },
+                           completion: { _ in container.removeFromSuperview() })
+        }
     }
 
     @objc private func dismissTapped() {
@@ -197,7 +265,19 @@ final class SplitDetailViewController: UIViewController {
         buttonRow.spacing = 8
         buttonRow.distribution = .fillEqually
 
-        let stack = UIStackView(arrangedSubviews: [cloudStatusLabel, buttonRow])
+        // Destructive actions live on their own row so they read as a
+        // separate group from sign-in / sync / invite. Mirrors Android's
+        // `SplitActivity` clearRow (lines 259-296).
+        styleSecondaryButton(clearMineButton, title: "Clear my rows")
+        clearMineButton.addTarget(self, action: #selector(clearMineTapped), for: .touchUpInside)
+        styleSecondaryButton(clearAllButton, title: "Clear all")
+        clearAllButton.addTarget(self, action: #selector(clearAllTapped), for: .touchUpInside)
+        let clearRow = UIStackView(arrangedSubviews: [clearMineButton, clearAllButton])
+        clearRow.axis = .horizontal
+        clearRow.spacing = 8
+        clearRow.distribution = .fillEqually
+
+        let stack = UIStackView(arrangedSubviews: [cloudStatusLabel, buttonRow, clearRow])
         stack.axis = .vertical
         stack.spacing = 10
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -217,8 +297,11 @@ final class SplitDetailViewController: UIViewController {
             cloudActionButton.setTitle("How to set up", for: .normal)
             syncButton.isHidden = true
             inviteButton.isHidden = true
+            clearMineButton.isHidden = true
+            clearAllButton.isHidden = true
             return
         }
+        let hasEntries = !history.all().isEmpty
         if oauth.isSignedIn {
             let email = oauth.accountEmail ?? "signed in"
             let role = sync.isOwner ? " · owner" : (sync.isMembershipOpen ? " · sharing" : "")
@@ -230,12 +313,59 @@ final class SplitDetailViewController: UIViewController {
             // secondary action inside that modal now, so users can re-open
             // the QR after dismissing it without accidentally toggling off.
             inviteButton.setTitle(sync.isMembershipOpen ? "Share QR" : "Invite", for: .normal)
+            clearMineButton.isHidden = !hasEntries
+            clearAllButton.isHidden = !(sync.isOwner && hasEntries)
         } else {
             cloudStatusLabel.text = "Sign in with Google to back up your splits to your own private spreadsheet."
             cloudActionButton.setTitle("Sign in", for: .normal)
             syncButton.isHidden = true
             inviteButton.isHidden = true
+            // Local-only mode: still let the user wipe local rows.
+            clearMineButton.isHidden = !hasEntries
+            clearAllButton.isHidden = true
         }
+    }
+
+    /// Pill styling that matches `syncButton` / `inviteButton`.
+    private func styleSecondaryButton(_ button: UIButton, title: String) {
+        button.setTitle(title, for: .normal)
+        button.setTitleColor(.white, for: .normal)
+        button.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
+        button.backgroundColor = UIColor.white.withAlphaComponent(0.18)
+        button.layer.cornerRadius = 8
+        button.contentEdgeInsets = UIEdgeInsets(top: 8, left: 14, bottom: 8, right: 14)
+    }
+
+    @objc private func clearMineTapped() {
+        let alert = UIAlertController(
+            title: "Clear your rows?",
+            message: "Removes only the splits this device added. Other members' rows stay intact. This can't be undone.",
+            preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Clear", style: .destructive) { [weak self] _ in
+            guard let self = self else { return }
+            self.history.clear()
+            self.sync.pushClear()
+            self.reload()
+            self.refreshCloudUI()
+        })
+        present(alert, animated: true)
+    }
+
+    @objc private func clearAllTapped() {
+        let alert = UIAlertController(
+            title: "Clear everyone's rows?",
+            message: "This wipes the entire shared history for every member. Only the owner can do this. This can't be undone.",
+            preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Clear all", style: .destructive) { [weak self] _ in
+            guard let self = self else { return }
+            self.history.clear()
+            self.sync.pushClearAll()
+            self.reload()
+            self.refreshCloudUI()
+        })
+        present(alert, animated: true)
     }
 
     @objc private func cloudActionTapped() {
