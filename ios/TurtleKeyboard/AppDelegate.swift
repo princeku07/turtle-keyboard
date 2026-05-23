@@ -7,7 +7,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     // App Group rendezvous key the keyboard sets when the user taps mic.
     // Keep in sync with VoiceInputController.kVoiceRequested.
-    private static let voiceAppGroup    = "group.com.turtlekeyboard.split"
+    private static let voiceAppGroup    = "group.com.samarth.turtlekeyboard.split"
     private static let kVoiceRequested  = "voice.requested"
     // Anything older than this is ignored — guards against firing the
     // recorder on unrelated app activations (e.g. the user launched

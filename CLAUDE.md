@@ -58,8 +58,8 @@ Two targets in the Xcode project:
 
 | Target | Bundle ID | Type |
 |---|---|---|
-| `TurtleKeyboard` | `com.prince.turtlekeyboard` | Host app (onboarding) |
-| `TurtleKeyboardExtension` | `com.prince.turtlekeyboard.keyboard` | Keyboard extension |
+| `TurtleKeyboard` | `com.samarth.turtlekeyboard` | Host app (onboarding) |
+| `TurtleKeyboardExtension` | `com.samarth.turtlekeyboard.keyboard` | Keyboard extension |
 
 ### Architecture
 

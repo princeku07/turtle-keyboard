@@ -32,7 +32,7 @@ Same as Android — skip if already done.
 **APIs & Services → Credentials → Create credentials → OAuth client ID**
 
 - Application type: **iOS**
-- Bundle ID: `com.turtlekeyboard` (must match `PRODUCT_BUNDLE_IDENTIFIER` of the
+- Bundle ID: `com.samarth.turtlekeyboard` (must match `PRODUCT_BUNDLE_IDENTIFIER` of the
   TurtleKeyboard host app target — not the keyboard extension)
 - **Save**.
 
@@ -126,7 +126,7 @@ When you're ready to ship to non-test users:
 | Symptom | Likely cause |
 |---|---|
 | "OAuth client ID not set" alert in the app | You skipped step 4 |
-| Web sheet opens then immediately closes with an error | Bundle ID in step 3 doesn't match `com.turtlekeyboard`, OR URL scheme in Info.plist doesn't match `redirectScheme` exactly |
+| Web sheet opens then immediately closes with an error | Bundle ID in step 3 doesn't match `com.samarth.turtlekeyboard`, OR URL scheme in Info.plist doesn't match `redirectScheme` exactly |
 | `HTTP 401: invalid_client` | Client ID typo, or the OAuth client was deleted in Cloud Console |
 | User stuck in consent loop | Account not in test users list and app isn't published |
 | `drive.file` scope greyed out in consent screen | Google Drive API not enabled in step 1 |
@@ -170,7 +170,7 @@ unless you change `redirectScheme` in code.
 
 If `/notion` says "Connect Notion in the Turtle app" even after sign-in, that's the App
 Group caveat — the keyboard extension and host app see different `UserDefaults` until
-the App Group entitlement is wired (`group.com.turtlekeyboard.split`). Add it in
+the App Group entitlement is wired (`group.com.samarth.turtlekeyboard.split`). Add it in
 Xcode → Signing & Capabilities for both targets and the token becomes shared.
 
 ---

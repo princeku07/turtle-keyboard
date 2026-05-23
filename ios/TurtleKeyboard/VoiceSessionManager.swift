@@ -22,7 +22,7 @@ final class VoiceSessionManager {
     static let shared = VoiceSessionManager()
 
     // Keep these strings in sync with VoiceInputController + the recording VC.
-    private static let appGroupID  = "group.com.turtlekeyboard.split"
+    private static let appGroupID  = "group.com.samarth.turtlekeyboard.split"
     private static let kRequested  = "voice.requested"
     private static let kPartial    = "voice.partialTranscript"
     private static let kTranscript = "voice.pendingTranscript"
@@ -34,10 +34,10 @@ final class VoiceSessionManager {
     /// coachmark" slow path.
     private static let kHostAliveAt = "voice.hostAliveAt"
 
-    private static let kFinishedName: CFString = "com.turtlekeyboard.voice.didFinish"   as CFString
-    private static let kPartialName:  CFString = "com.turtlekeyboard.voice.didPartial"  as CFString
-    private static let kControlName:  CFString = "com.turtlekeyboard.voice.control"    as CFString
-    private static let kRequestedName: CFString = "com.turtlekeyboard.voice.requested" as CFString
+    private static let kFinishedName: CFString = "com.samarth.turtlekeyboard.voice.didFinish"   as CFString
+    private static let kPartialName:  CFString = "com.samarth.turtlekeyboard.voice.didPartial"  as CFString
+    private static let kControlName:  CFString = "com.samarth.turtlekeyboard.voice.control"    as CFString
+    private static let kRequestedName: CFString = "com.samarth.turtlekeyboard.voice.requested" as CFString
 
     private let audioEngine = AVAudioEngine()
     private var recognizer: SFSpeechRecognizer?

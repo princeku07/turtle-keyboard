@@ -6,10 +6,10 @@ This directory ships **two targets** that share a single Apple Developer App Gro
 
 | Target | Bundle ID | What it is |
 |---|---|---|
-| `TurtleKeyboard` | `com.turtlekeyboard` | Host app — onboarding, OAuth Connect screens (Notion / Slack / Google), Personalization, image history. |
-| `TurtleKeyboardExtension` | `com.turtlekeyboard.keyboard` | The keyboard itself — a `UIInputViewController` subclass with slash-command routing, multi-provider AI stack, in-keyboard integration panels, voice input. |
+| `TurtleKeyboard` | `com.samarth.turtlekeyboard` | Host app — onboarding, OAuth Connect screens (Notion / Slack / Google), Personalization, image history. |
+| `TurtleKeyboardExtension` | `com.samarth.turtlekeyboard.keyboard` | The keyboard itself — a `UIInputViewController` subclass with slash-command routing, multi-provider AI stack, in-keyboard integration panels, voice input. |
 
-App Group: `group.com.turtlekeyboard.split` — tokens, splits, theme choice, and personalization toggles live in a shared `UserDefaults` suite the host app writes and the extension reads.
+App Group: `group.com.samarth.turtlekeyboard.split` — tokens, splits, theme choice, and personalization toggles live in a shared `UserDefaults` suite the host app writes and the extension reads.
 
 ---
 

@@ -3,7 +3,7 @@ import Security
 
 /// Tiny Keychain wrapper for OAuth tokens. Refresh tokens grant indefinite
 /// access to the user's Sheets/Drive — they belong in Keychain, not
-/// `UserDefaults`. Keys are namespaced under `com.turtlekeyboard.split`.
+/// `UserDefaults`. Keys are namespaced under `com.samarth.turtlekeyboard.split`.
 ///
 /// Synchronous; all reads/writes are sub-millisecond. Items are stored
 /// under a Keychain Access Group so the host app (writer) and the
@@ -12,11 +12,11 @@ import Security
 /// both targets' entitlements (`$(AppIdentifierPrefix)` + this string).
 enum SplitKeychain {
 
-    private static let service = "com.turtlekeyboard.split"
+    private static let service = "com.samarth.turtlekeyboard.split"
 
     /// Group both targets must declare in their entitlements. Xcode prefixes
     /// this with the team identifier at signing time.
-    static let accessGroup = "com.turtlekeyboard.split"
+    static let accessGroup = "com.samarth.turtlekeyboard.split"
 
     private static func baseQuery(forKey key: String) -> [String: Any] {
         [

@@ -48,9 +48,9 @@ final class VoiceInputController {
         func onInfo(_ userVisibleMessage: String)
     }
 
-    // Shared with the host app. Must match `group.com.turtlekeyboard.split`
+    // Shared with the host app. Must match `group.com.samarth.turtlekeyboard.split`
     // declared in both `.entitlements` files.
-    private static let appGroupID = "group.com.turtlekeyboard.split"
+    private static let appGroupID = "group.com.samarth.turtlekeyboard.split"
     private static let kPartial    = "voice.partialTranscript"
     private static let kTranscript = "voice.pendingTranscript"
     private static let kError      = "voice.pendingError"
@@ -73,10 +73,10 @@ final class VoiceInputController {
     /// `partialName`   — host pushed a new partial.
     /// `controlName`   — keyboard signals stop / cancel to the host.
     /// `requestedName` — keyboard tells the host to start recording.
-    private static let finishedName:  CFString = "com.turtlekeyboard.voice.didFinish"  as CFString
-    private static let partialName:   CFString = "com.turtlekeyboard.voice.didPartial" as CFString
-    private static let controlName:   CFString = "com.turtlekeyboard.voice.control"    as CFString
-    private static let requestedName: CFString = "com.turtlekeyboard.voice.requested"  as CFString
+    private static let finishedName:  CFString = "com.samarth.turtlekeyboard.voice.didFinish"  as CFString
+    private static let partialName:   CFString = "com.samarth.turtlekeyboard.voice.didPartial" as CFString
+    private static let controlName:   CFString = "com.samarth.turtlekeyboard.voice.control"    as CFString
+    private static let requestedName: CFString = "com.samarth.turtlekeyboard.voice.requested"  as CFString
     /// Deep link used only when the host has been killed and we have to
     /// cold-launch it. The day-to-day path is the Darwin notification.
     private static let launchURL   = URL(string: "turtlekeyboard://voice")!

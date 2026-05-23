@@ -19,7 +19,7 @@ import UIKit
 
 enum ImageHistory {
 
-    static let appGroupIdentifier = "group.com.turtlekeyboard.split"
+    static let appGroupIdentifier = "group.com.samarth.turtlekeyboard.split"
     static let maxEntries = 100
 
     struct Entry: Equatable {

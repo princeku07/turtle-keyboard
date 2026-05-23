@@ -4,11 +4,11 @@
 <dict>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.com.turtlekeyboard.split</string>
+		<string>group.com.samarth.turtlekeyboard.split</string>
 	</array>
 	<key>keychain-access-groups</key>
 	<array>
-		<string>$(AppIdentifierPrefix)com.turtlekeyboard.split</string>
+		<string>$(AppIdentifierPrefix)com.samarth.turtlekeyboard.split</string>
 	</array>
 </dict>
 </plist>

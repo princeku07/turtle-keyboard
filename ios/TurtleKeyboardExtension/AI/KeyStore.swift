@@ -5,7 +5,7 @@ import Foundation
 // Stores provider API keys.
 //
 // Current: UserDefaults.standard (isolated to extension sandbox).
-// TODO: migrate to Keychain with kSecAttrAccessGroup = "group.com.turtlekeyboard"
+// TODO: migrate to Keychain with kSecAttrAccessGroup = "group.com.samarth.turtlekeyboard"
 //       once App Groups is configured, so the host app can write keys that the
 //       keyboard extension can read.
 
@@ -13,7 +13,7 @@ final class KeyStore {
     static let shared = KeyStore()
     private init() {}
 
-    // TODO: replace with UserDefaults(suiteName: "group.com.turtlekeyboard")
+    // TODO: replace with UserDefaults(suiteName: "group.com.samarth.turtlekeyboard")
     private let defaults: UserDefaults = .standard
 
     subscript(provider: ProviderID) -> String? {

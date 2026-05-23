@@ -9,10 +9,10 @@ Two targets in the Xcode project:
 
 | Target | Bundle ID | Type |
 |---|---|---|
-| `TurtleKeyboard` | `com.turtlekeyboard` | Host app (onboarding + Connect screens + Personalization) |
-| `TurtleKeyboardExtension` | `com.turtlekeyboard.keyboard` | Keyboard extension (`UIInputViewController`) |
+| `TurtleKeyboard` | `com.samarth.turtlekeyboard` | Host app (onboarding + Connect screens + Personalization) |
+| `TurtleKeyboardExtension` | `com.samarth.turtlekeyboard.keyboard` | Keyboard extension (`UIInputViewController`) |
 
-Both targets share the App Group `group.com.turtlekeyboard.split` (see
+Both targets share the App Group `group.com.samarth.turtlekeyboard.split` (see
 `*.entitlements` files at the target root). Tokens, splits, and personalization
 toggles live in the shared `UserDefaults` suite — the extension reads what the
 host app writes.
@@ -179,7 +179,7 @@ Automatic signing may rewrite the App Group entry during a build before the
 group is registered to your team, which trips the "Entitlements file was
 modified during the build" error. Both targets currently ship with
 `CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES` to suppress this. The proper
-fix is to register `group.com.turtlekeyboard.split` on your Apple Developer
+fix is to register `group.com.samarth.turtlekeyboard.split` on your Apple Developer
 account and add the App Groups capability in Xcode → Signing & Capabilities;
 then this flag can be removed.
 
@@ -224,7 +224,7 @@ Single file (~2500 lines). Key sections in order:
 - `RequestsOpenAccess` in the extension `Info.plist` must stay `true` for HTTP requests to LM Studio / fal *and* for `SFSpeechRecognizer` to work. iOS will additionally require the user to flip "Allow Full Access" in Settings.
 - The `192.168.1.10` ATS exception in both `Info.plist` files is required for plaintext HTTP to the LAN LM Studio endpoint. Don't broaden it.
 - `OrgImageRenderer` is synchronous and runs on the main thread — fine because Core Graphics on a 500×500 canvas is sub-millisecond. Do **not** reintroduce a WKWebView path inside the keyboard extension; rAF is paused on detached webviews and the process is too memory-constrained for an in-hierarchy one.
-- App Group ID is `group.com.turtlekeyboard.split` in both `.entitlements` files. The extension and host must agree on this string or the shared `UserDefaults(suiteName:)` reads return defaults and OAuth tokens look "missing" from the keyboard.
+- App Group ID is `group.com.samarth.turtlekeyboard.split` in both `.entitlements` files. The extension and host must agree on this string or the shared `UserDefaults(suiteName:)` reads return defaults and OAuth tokens look "missing" from the keyboard.
 - pbxproj IDs use the `HH` prefix when added by hand. Pick the next free `HHxxxxxxHHxxxxxxHHxxxxxx` triple. The pbxproj sections that need every new file: `PBXBuildFile`, `PBXFileReference`, the relevant `PBXGroup`, and the `Sources` (or `Resources`) build phase of the owning target.
 
 ---

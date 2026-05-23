@@ -7,7 +7,7 @@ import Foundation
 /// migrating Split out of the keyboard later is a build-system change, not
 /// a data-layout change.
 enum SplitContract {
-    static let storageSuiteName = "group.com.turtlekeyboard.split"
+    static let storageSuiteName = "group.com.samarth.turtlekeyboard.split"
     static let minPeople: Int = 1
     static let maxPeople: Int = 99
     static let defaultPeople: Int = 2

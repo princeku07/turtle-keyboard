@@ -20,7 +20,7 @@ import UIKit
 /// the App-Group rendezvous flag is set.
 final class VoiceRecordingViewController: UIViewController {
 
-    private static let appGroupID  = "group.com.turtlekeyboard.split"
+    private static let appGroupID  = "group.com.samarth.turtlekeyboard.split"
     private static let kRequested  = "voice.requested"
 
     private var didTriggerRecording = false

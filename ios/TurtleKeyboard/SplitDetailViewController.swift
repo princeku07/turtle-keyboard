@@ -6,7 +6,7 @@ import UIKit
 /// than the in-keyboard panel can offer.
 ///
 /// Reads `SplitHistory` via the shared `SplitStore`. Until the App Group
-/// entitlement is wired (`group.com.turtlekeyboard.split`), the host app
+/// entitlement is wired (`group.com.samarth.turtlekeyboard.split`), the host app
 /// and keyboard each have their own `UserDefaults.standard` so this screen
 /// will show only entries saved from inside the host app — the keyboard's
 /// saves stay invisible. Adding the App Group capability in both targets
