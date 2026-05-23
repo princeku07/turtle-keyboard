@@ -81,6 +81,21 @@ class KeyboardViewController: UIInputViewController {
     /// makes fast typing feel responsive instead of stuttery.
     private var suggestionWorkItem: DispatchWorkItem?
 
+    /// Hash of the last `documentContextBeforeInput` value we ran
+    /// `refreshSuggestions` against. `processKey` calls us right after
+    /// `insertText` and then UIKit fires `textDidChange` which calls us
+    /// again — without this guard the dictionary scan + chip rebuild
+    /// ran twice per keystroke. Cleared on command-bar state transitions
+    /// so genuine state changes don't get masked.
+    private var lastRefreshedContextHash: Int?
+
+    /// Last chip titles we pushed to the suggestion strip. Skip the
+    /// UIKit churn when the new pick set matches — `UIButton.setTitle`
+    /// invalidates layout regardless of whether the title actually
+    /// changed, so the previous always-update path re-laid out the chips
+    /// on every key.
+    private var lastShownChipTitles: [String]?
+
     // MARK: - Layout
     //
     // keyboardContainer height = commandBarH + rowsH, always fixed.
@@ -236,6 +251,11 @@ class KeyboardViewController: UIInputViewController {
     /// UIControl touch-tracking path). Cancelled when `keyTapped`
     /// fires normally — so most key presses never wait for it.
     private var keyPopupAutoHide: DispatchWorkItem?
+    /// Size the popup `shadowPath` was last rasterised for. Within a
+    /// single keyboard layout the popup geometry is constant per-row, so
+    /// this cache lets the path build once and no-op on every subsequent
+    /// keystroke — `CGPath(roundedRect:)` is not free at typing speed.
+    private var keyPopupCachedShadowSize: CGSize?
 
     /// Silence-detect auto-stop for voice dictation. Reset every time
     /// a partial transcript arrives; if the timer fires (no partials
@@ -1268,10 +1288,9 @@ class KeyboardViewController: UIInputViewController {
             startBackspaceRepeat()
         case .ended, .cancelled, .failed:
             stopBackspaceRepeat()
-            // cancelsTouchesInView=true means touchUpInside won't fire — restore visual
-            if let btn = gesture.view as? UIButton {
-                UIView.animate(withDuration: 0.08) { btn.transform = .identity }
-            }
+            // No transform reset needed — `keyTouchDown` no longer
+            // applies a press-scale, so there's nothing to undo even
+            // when `cancelsTouchesInView=true` swallows `touchUpInside`.
         default: break
         }
     }
@@ -1323,9 +1342,9 @@ class KeyboardViewController: UIInputViewController {
 
     @objc private func keyTouchDown(_ sender: UIButton) {
         // Commit the keystroke FIRST — that's what the user is waiting
-        // for. The haptic and press-scale animation run after, so the
-        // character is in the host field by the time the visual press
-        // feedback even starts. Subjective responsiveness wins.
+        // for. The haptic runs after, so the character is in the host
+        // field by the time any visual feedback starts. Subjective
+        // responsiveness wins.
         guard let key = sender.accessibilityLabel else { return }
         // Snapshot the visible glyph BEFORE processKey runs — shift-once
         // letters get reset to lowercase by `updateKeyVisualsForShiftState`
@@ -1341,14 +1360,17 @@ class KeyboardViewController: UIInputViewController {
         // instant for taps, allows hold-to-see for a beat.
         scheduleKeyPopupAutoHide()
         haptic.impactOccurred()
-        UIView.animate(withDuration: 0.05) { sender.transform = CGAffineTransform(scaleX: 0.93, y: 0.93) }
+        // No press-scale UIView.animate — Apple's keyboard doesn't pinch
+        // keys either; the magnified popup is the visual feedback.
+        // Per-keystroke Core Animation transactions were measurable
+        // overhead at fast typing speeds.
     }
 
     @objc private func keyTapped(_ sender: UIButton) {
-        // Reset the press-scale visual. The character was inserted in
-        // `keyTouchDown` already.
+        // The character was inserted in `keyTouchDown`. Nothing to do on
+        // touch-up except dismissing the popup — there's no press-scale
+        // transform left to reset.
         hideKeyPopup()
-        UIView.animate(withDuration: 0.08) { sender.transform = .identity }
     }
 
     private func scheduleKeyPopupAutoHide() {
@@ -1413,10 +1435,17 @@ class KeyboardViewController: UIInputViewController {
         popup.frame = CGRect(x: popupX, y: popupY, width: popupW, height: popupH)
         popup.backgroundColor = KeyboardPalette.keyNormal
         // Pin shadow path so the layer doesn't offscreen-rasterize on
-        // every show — same fix we apply to the keys themselves.
-        popup.layer.shadowPath = CGPath(
-            roundedRect: popup.bounds,
-            cornerWidth: 8, cornerHeight: 8, transform: nil)
+        // every show — same fix we apply to the keys themselves. The
+        // cached-size guard skips the CGPath alloc when the popup
+        // geometry hasn't changed since the last keystroke, which is
+        // the common case while typing a row of same-width letters.
+        let popupSize = CGSize(width: popupW, height: popupH)
+        if keyPopupCachedShadowSize != popupSize {
+            popup.layer.shadowPath = CGPath(
+                roundedRect: CGRect(origin: .zero, size: popupSize),
+                cornerWidth: 8, cornerHeight: 8, transform: nil)
+            keyPopupCachedShadowSize = popupSize
+        }
 
         labelView.frame = popup.bounds
         labelView.text = displayChar
@@ -1836,7 +1865,16 @@ class KeyboardViewController: UIInputViewController {
     private func refreshSuggestions() {
         guard activeCommand == nil, !isGenerating else { return }
 
-        let context = (textDocumentProxy.documentContextBeforeInput ?? "") as NSString
+        let contextString = textDocumentProxy.documentContextBeforeInput ?? ""
+        // Dedupe: `processKey` calls us right after `insertText`, then
+        // UIKit fires `textDidChange` which calls us again with the same
+        // context. Skipping the second pass cuts the per-keystroke
+        // dictionary scan + UI rebuild in half.
+        let contextHash = contextString.hashValue
+        if contextHash == lastRefreshedContextHash { return }
+        lastRefreshedContextHash = contextHash
+
+        let context = contextString as NSString
         let range = context.range(of: "\\S+$", options: .regularExpression)
         let currentWord: String = range.location != NSNotFound
             ? context.substring(with: range)
@@ -1849,10 +1887,12 @@ class KeyboardViewController: UIInputViewController {
         }
 
         var picks: [String] = []
+        var step1Empty = true
 
         // Step 1 — engine prefix lookup.
         if currentWord.count >= 2 {
             picks = suggestionEngine.suggest(prefix: currentWord, max: 3)
+            step1Empty = picks.isEmpty
         }
 
         // Step 2 — user vocabulary fallback (keeps strip alive even
@@ -1866,9 +1906,10 @@ class KeyboardViewController: UIInputViewController {
             showWordSuggestions(picks)
             // Engine didn't match — kick the off-main typo-correction
             // path which can replace the fallback chips with proper
-            // misspelling guesses if they land in time.
-            if currentWord.count >= 2,
-               suggestionEngine.suggest(prefix: currentWord, max: 1).isEmpty {
+            // misspelling guesses if they land in time. Tracked via the
+            // local `step1Empty` Bool now; the previous code re-ran
+            // `suggest(...)` here to check the same condition.
+            if currentWord.count >= 2, step1Empty {
                 scheduleTypoCorrection(for: currentWord)
             }
             return
@@ -1985,6 +2026,17 @@ class KeyboardViewController: UIInputViewController {
         suggestionMode = .wordSuggestion
         pendingSuggestions = items
 
+        // Skip the chip-strip UIKit churn when the picks are identical to
+        // what's already mounted AND the bar is already visible. `setTitle`
+        // invalidates layout regardless of whether the title actually
+        // changed, so re-stamping identical chips per-keystroke was
+        // meaningful work at fast typing speed.
+        if items == lastShownChipTitles,
+           !commandBar.isHidden,
+           !cmdSuggestionsStack.isHidden {
+            return
+        }
+
         for (i, btn) in cmdSuggestionBtns.enumerated() {
             btn.setTitle(i < items.count ? items[i] : nil, for: .normal)
             btn.isHidden = i >= items.count
@@ -2019,6 +2071,7 @@ class KeyboardViewController: UIInputViewController {
         if wasHidden {
             recomputeKeyboardHeight()
         }
+        lastShownChipTitles = items
     }
 
     private func replaceCurrentWord(with replacement: String) {
@@ -2075,9 +2128,36 @@ class KeyboardViewController: UIInputViewController {
         // Coming from word-suggestion mode? Restore normal controls first.
         // Mic only un-hides when the user has voice enabled in
         // Personalization — keep that gate honoured here.
-        [cmdPill, cmdPromptLabel, cmdSendButton].forEach { $0.isHidden = false }
+        //
+        // `cmdPromptScrollView` is the container the prompt label lives
+        // inside — `showGeneratingWave` hides it (alongside every other
+        // bar control) when the AI is mid-request, and nothing else
+        // restores it. The label's own `isHidden = false` is meaningless
+        // while its scroll-view parent stays hidden, which is why the
+        // second invocation of any slash command after a generation
+        // cycle rendered an empty prompt area.
+        [cmdPill, cmdPromptScrollView, cmdPromptLabel, cmdSendButton]
+            .forEach { $0.isHidden = false }
         cmdMicButton.isHidden = !cachedVoiceEnabled
         cmdSuggestionsStack.isHidden = true
+        // `showWordSuggestions` brings the chip stack to the front of the
+        // command bar (the stack is full-width and would otherwise be
+        // buried by sibling views). When we're now back in slash-prompt
+        // mode the stack is hidden, but its front-of-z-order position
+        // would still let it absorb the prompt area's apparent space
+        // on subsequent invocations — re-front the prompt scroll view
+        // so the label is the topmost subview in its slot.
+        commandBar.bringSubviewToFront(cmdPromptScrollView)
+        // Reset the prompt scroll's horizontal offset to the start
+        // whenever we're entering an empty prompt — the previous
+        // session might have scrolled past 0 while the user typed
+        // a long prompt, and nothing resets contentOffset until the
+        // caret moves enough to trigger scrollCaretIntoView's clamp.
+        // Without this, the placeholder rendered at x=0 stays off the
+        // visible window on re-entry.
+        if commandPromptText.isEmpty {
+            cmdPromptScrollView.contentOffset = .zero
+        }
 
         // Padding now lives in `PaddedLabel.textInsets` (set at setup
         // time), so the text itself carries no whitespace. Left + right
@@ -2334,6 +2414,11 @@ class KeyboardViewController: UIInputViewController {
         caretAnchorWidth = nil
         promptCaretIndex = nil
         slashAutocompleteTopMatch = nil
+        // Force the suggestion + chip caches to repopulate when the bar
+        // comes back — otherwise a context hash that matches what we
+        // last refreshed against would skip the rebuild.
+        lastShownChipTitles = nil
+        lastRefreshedContextHash = nil
         hideSlashStrip()
         // Drop any staged /edit or /style reference — the user backed out
         // before describing the edit/restyle. Re-entering either command
@@ -3837,9 +3922,16 @@ fileprivate final class SuggestionEngine {
 
     private static let dictAsset = "en_unigrams"
 
-    /// Words from the bundled dictionary, sorted by frequency desc.
-    /// Loaded lazily on a background queue; `nil` until ready.
-    private var sortedWords: [String]?
+    /// Bundled dictionary, sorted **alphabetically** so prefix lookup
+    /// is a binary search instead of an O(N) scan. The prior layout
+    /// (sorted by frequency, linear scan) was the dominant per-keystroke
+    /// main-thread cost — common-prefix queries terminated early but a
+    /// 4+ char or uncommon prefix walked all 82k entries on every key.
+    private var alphaWords: [String]?
+    /// Per-word frequency lookup. After locating the prefix slice via
+    /// binary search we rank the matches by frequency so the top
+    /// suggestions still surface first.
+    private var wordFreq: [String: Int64]?
     private var readyLock = NSLock()
     private var loading = false
     private(set) var isReady = false
@@ -3872,15 +3964,16 @@ fileprivate final class SuggestionEngine {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
             let t0 = CFAbsoluteTimeGetCurrent()
-            let words = Self.loadSortedWords()
+            let loaded = Self.loadDictionary()
             self.readyLock.lock()
-            self.sortedWords = words
-            self.isReady = (words != nil)
+            self.alphaWords = loaded?.alpha
+            self.wordFreq = loaded?.freq
+            self.isReady = (loaded != nil)
             self.loading = false
             let cb = self.onReady
             self.readyLock.unlock()
             let ms = Int((CFAbsoluteTimeGetCurrent() - t0) * 1000)
-            NSLog("TurtleSuggest: dict ready in \(ms)ms (\(words?.count ?? 0) words)")
+            NSLog("TurtleSuggest: dict ready in \(ms)ms (\(loaded?.alpha.count ?? 0) words)")
             cb?()
         }
     }
@@ -3889,6 +3982,10 @@ fileprivate final class SuggestionEngine {
     /// caller restores case to match the active shift state when it
     /// commits. Capped at `max`. Safe to call before the dictionary is
     /// loaded; falls back to user vocabulary only in that window.
+    ///
+    /// O(log N + K log K) where K is bounded by `explorationCap` so a
+    /// degenerate query (e.g. 2-char common prefix with thousands of
+    /// hits) doesn't sort all matches just to return the top three.
     func suggest(prefix: String, max: Int = 3) -> [String] {
         guard !prefix.isEmpty, max > 0 else { return [] }
         let q = prefix.lowercased()
@@ -3903,9 +4000,21 @@ fileprivate final class SuggestionEngine {
             }
         }
 
-        // 2. Bundled dictionary (global frequency).
-        if let dict = readSortedWords(), out.count < max {
-            for w in dict where w.hasPrefix(q) {
+        // 2. Bundled dictionary: binary-search the alpha-sorted list to
+        //    locate the prefix slice, rank the matches by frequency,
+        //    then take the top remaining slots.
+        if let (alpha, freq) = readDictionary(), out.count < max {
+            let start = Self.lowerBound(alpha, q)
+            var matches: [(String, Int64)] = []
+            let explorationCap = 200
+            var i = start
+            while i < alpha.count, alpha[i].hasPrefix(q), matches.count < explorationCap {
+                let w = alpha[i]
+                matches.append((w, freq[w] ?? 0))
+                i += 1
+            }
+            matches.sort { $0.1 > $1.1 }
+            for (w, _) in matches {
                 if seen.insert(w).inserted {
                     out.append(w)
                     if out.count >= max { return out }
@@ -3938,15 +4047,28 @@ fileprivate final class SuggestionEngine {
         userStore.bump(w)
     }
 
-    private func readSortedWords() -> [String]? {
+    private func readDictionary() -> (alpha: [String], freq: [String: Int64])? {
         readyLock.lock(); defer { readyLock.unlock() }
-        return sortedWords
+        guard let alpha = alphaWords, let freq = wordFreq else { return nil }
+        return (alpha, freq)
+    }
+
+    /// First index `i` in `array` where `array[i] >= prefix`. Returns
+    /// `array.count` when every element compares less than `prefix`.
+    /// Standard lower-bound binary search.
+    private static func lowerBound(_ array: [String], _ prefix: String) -> Int {
+        var lo = 0, hi = array.count
+        while lo < hi {
+            let mid = (lo + hi) >> 1
+            if array[mid] < prefix { lo = mid + 1 } else { hi = mid }
+        }
+        return lo
     }
 
     /// Parse the bundled `<word> <freq>` file once. Returns the words
-    /// sorted by descending frequency so a prefix scan finds common
-    /// hits in the first few hundred entries.
-    private static func loadSortedWords() -> [String]? {
+    /// sorted alphabetically (for binary-search prefix lookup) paired
+    /// with a frequency dict (for ranking matches once located).
+    private static func loadDictionary() -> (alpha: [String], freq: [String: Int64])? {
         // Try Bundle.main first (the extension's own bundle when called
         // from the appex process). Fall back to Bundle(for:) which
         // anchors to the bundle containing this class — useful when
@@ -3974,8 +4096,14 @@ fileprivate final class SuggestionEngine {
                 entries.append((word, freq))
             }
         }
-        entries.sort { $0.1 > $1.1 }
-        return entries.map { $0.0 }
+        // Sort alphabetically so prefix lookup is a binary search instead
+        // of a linear scan. Frequency comparison is preserved in the
+        // returned `freq` dict so matches can still be ranked.
+        entries.sort { $0.0 < $1.0 }
+        let alpha = entries.map { $0.0 }
+        var freq = [String: Int64](minimumCapacity: entries.count)
+        for (w, f) in entries { freq[w] = f }
+        return (alpha, freq)
     }
 }
 
