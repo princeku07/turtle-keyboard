@@ -259,23 +259,38 @@ final class SplitOAuth: NSObject, SplitFreshTokenProvider {
         }
         store.setString("1", forKey: SplitKeys.signedIn)
 
-        // Best-effort email lookup for the UI label.
+        // Resolve the account email BEFORE signalling success. Android's
+        // GoogleSignInAccount returns the email synchronously at sign-in,
+        // so `SplitCloudSync.ensureSheet` reliably stamps `OWNER_EMAIL`
+        // when creating the spreadsheet. iOS has to make a separate
+        // userinfo HTTP call — if we fired it as fire-and-forget the
+        // caller would race ahead and create the sheet with an empty
+        // owner stamp, leaving `isOwner == false` forever and hiding the
+        // invite/QR button on the splits screen. Waiting one extra round
+        // trip on the auth path is the right tradeoff. If the lookup
+        // fails (network blip, expired token), we still complete with
+        // success — the next ensureSheet will retry the backfill once
+        // an email is known.
         if accountEmail == nil {
-            fetchEmail(accessToken: access)
+            fetchEmail(accessToken: access) {
+                completion(.success(access))
+            }
+        } else {
+            completion(.success(access))
         }
-        completion(.success(access))
     }
 
-    private func fetchEmail(accessToken: String) {
+    private func fetchEmail(accessToken: String, completion: (() -> Void)? = nil) {
         var req = URLRequest(url: Self.userinfoEndpoint)
         req.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         URLSession.shared.dataTask(with: req) { [store] data, _, _ in
+            defer { completion?() }
             guard let data = data,
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let email = json["email"] as? String
             else { return }
             store.setString(email, forKey: SplitKeys.accountEmail)
-            // Owner backfill for legacy installs.
+            // Owner backfill for legacy installs that pre-date OWNER_EMAIL.
             if !store.string(forKey: SplitKeys.sheetId, fallback: "").isEmpty,
                store.string(forKey: SplitKeys.ownerEmail, fallback: "").isEmpty {
                 store.setString(email, forKey: SplitKeys.ownerEmail)
