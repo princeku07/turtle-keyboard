@@ -31,8 +31,20 @@ final class SplitHistoryView: UIView {
     }
 
     private func configure() {
-        backgroundColor = UIColor(red: 0.051, green: 0.247, blue: 0.071, alpha: 1.0)
+        // See SplitPanelView.configure() — blur backdrop, not `bg`, so the
+        // panel stays opaque on the floating-glass themes too.
+        backgroundColor = .clear
         translatesAutoresizingMaskIntoConstraints = false
+
+        let backdrop = UIVisualEffectView(effect: UIBlurEffect(style: .systemChromeMaterial))
+        backdrop.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(backdrop)
+        NSLayoutConstraint.activate([
+            backdrop.topAnchor.constraint(equalTo: topAnchor),
+            backdrop.leadingAnchor.constraint(equalTo: leadingAnchor),
+            backdrop.trailingAnchor.constraint(equalTo: trailingAnchor),
+            backdrop.bottomAnchor.constraint(equalTo: bottomAnchor),
+        ])
 
         let root = UIStackView()
         root.axis = .vertical
@@ -66,7 +78,7 @@ final class SplitHistoryView: UIView {
 
         emptyLabel.text = "No splits yet — tap a payment-app chip and save one."
         emptyLabel.font = .systemFont(ofSize: 13)
-        emptyLabel.textColor = UIColor(red: 0.80, green: 0.91, blue: 0.78, alpha: 1.0)
+        emptyLabel.textColor = KeyboardPalette.keyText.withAlphaComponent(0.7)
         emptyLabel.textAlignment = .center
         emptyLabel.numberOfLines = 0
         emptyLabel.isHidden = true
@@ -82,7 +94,7 @@ final class SplitHistoryView: UIView {
 
         headline.text = "Saved splits"
         headline.font = .systemFont(ofSize: 16, weight: .bold)
-        headline.textColor = .white
+        headline.textColor = KeyboardPalette.keyText
         row.addArrangedSubview(headline)
 
         let spacer = UIView()
@@ -92,7 +104,7 @@ final class SplitHistoryView: UIView {
         let report = UIButton(type: .system)
         report.setTitle("Report ↗", for: .normal)
         report.titleLabel?.font = .systemFont(ofSize: 13)
-        report.setTitleColor(UIColor(red: 0.72, green: 0.88, blue: 0.74, alpha: 1.0), for: .normal)
+        report.setTitleColor(KeyboardPalette.accent, for: .normal)
         report.addTarget(self, action: #selector(reportTapped), for: .touchUpInside)
         row.addArrangedSubview(report)
 
@@ -106,15 +118,15 @@ final class SplitHistoryView: UIView {
         row.spacing = 8
 
         clearButton.setTitle("Clear", for: .normal)
-        clearButton.setTitleColor(.white, for: .normal)
-        clearButton.backgroundColor = UIColor(red: 0.047, green: 0.047, blue: 0.047, alpha: 1.0)
+        clearButton.setTitleColor(KeyboardPalette.keyTextSpecial, for: .normal)
+        clearButton.backgroundColor = KeyboardPalette.keySpecial
         clearButton.layer.cornerRadius = 8
         clearButton.addTarget(self, action: #selector(clearTapped), for: .touchUpInside)
 
         let done = UIButton(type: .system)
         done.setTitle("Done", for: .normal)
         done.setTitleColor(.white, for: .normal)
-        done.backgroundColor = UIColor(red: 0.122, green: 0.435, blue: 0.165, alpha: 1.0)
+        done.backgroundColor = KeyboardPalette.accent
         done.layer.cornerRadius = 8
         done.addTarget(self, action: #selector(dismissTapped), for: .touchUpInside)
 
@@ -149,23 +161,23 @@ final class SplitHistoryView: UIView {
 
     private func buildRow(entry: SplitHistory.Entry, now: Date) -> UIView {
         let card = UIControl()
-        card.backgroundColor = UIColor(red: 0.082, green: 0.502, blue: 0.239, alpha: 1.0)
+        card.backgroundColor = KeyboardPalette.keyNormal
         card.layer.cornerRadius = 8
         card.translatesAutoresizingMaskIntoConstraints = false
         card.addTarget(self, action: #selector(rowTapped(_:)), for: .touchUpInside)
         card.tag = listColumn.arrangedSubviews.count // index into the visible list
 
         let amount = UILabel()
-        amount.text = "₹\(SplitPanelView.formatAmount(entry.amount))"
+        amount.text = "₹\(SplitContract.formatAmount(entry.amount))"
         amount.font = .systemFont(ofSize: 16, weight: .bold)
-        amount.textColor = .white
+        amount.textColor = KeyboardPalette.keyText
 
         let per = entry.people > 0 ? entry.amount / Double(entry.people) : entry.amount
         let when = Self.relativeTime(timestampMs: entry.timestampMs, now: now)
         let meta = UILabel()
-        meta.text = "\(entry.people) \(entry.people == 1 ? "person" : "people") · ₹\(SplitPanelView.formatAmount(per)) each · \(when)"
+        meta.text = "\(entry.people) \(entry.people == 1 ? "person" : "people") · ₹\(SplitContract.formatAmount(per)) each · \(when)"
         meta.font = .systemFont(ofSize: 12)
-        meta.textColor = UIColor(red: 0.80, green: 0.91, blue: 0.78, alpha: 1.0)
+        meta.textColor = KeyboardPalette.keyText.withAlphaComponent(0.7)
         meta.numberOfLines = 1
 
         let stack = UIStackView(arrangedSubviews: [amount, meta])

@@ -158,7 +158,7 @@ final class SplitIntegration: KeyboardIntegration {
         private func summary(entry: SplitHistory.Entry) -> String {
             let per = entry.people > 0 ? entry.amount / Double(entry.people) : entry.amount
             let noun = entry.people == 1 ? "person" : "people"
-            return "Splitting ₹\(SplitPanelView.formatAmount(entry.amount)) between \(entry.people) \(noun) — ₹\(SplitPanelView.formatAmount(per)) each."
+            return "Splitting ₹\(SplitContract.formatAmount(entry.amount)) between \(entry.people) \(noun) — ₹\(SplitContract.formatAmount(per)) each."
         }
     }
 }

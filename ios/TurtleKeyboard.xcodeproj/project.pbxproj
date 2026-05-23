@@ -31,7 +31,6 @@
 		HH000050HH000050HH000050 /* SplitHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000051HH000051HH000051 /* SplitHistoryView.swift */; };
 		HH000060HH000060HH000060 /* SplitDetailViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000061HH000061HH000061 /* SplitDetailViewController.swift */; };
 		HH000062HH000062HH000062 /* SplitTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000045HH000045HH000045 /* SplitTypes.swift */; };
-		HH000063HH000063HH000063 /* SplitPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000049HH000049HH000049 /* SplitPanelView.swift */; };
 		HH000070HH000070HH000070 /* SplitKeychain.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000071HH000071HH000071 /* SplitKeychain.swift */; };
 		HH000072HH000072HH000072 /* SplitOAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000073HH000073HH000073 /* SplitOAuth.swift */; };
 		HH000074HH000074HH000074 /* SplitSheetsClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000075HH000075HH000075 /* SplitSheetsClient.swift */; };
@@ -571,7 +570,6 @@
 				CC000005CC000005CC000005 /* ViewController.swift in Sources */,
 				HH000060HH000060HH000060 /* SplitDetailViewController.swift in Sources */,
 				HH000062HH000062HH000062 /* SplitTypes.swift in Sources */,
-				HH000063HH000063HH000063 /* SplitPanelView.swift in Sources */,
 				HH000070HH000070HH000070 /* SplitKeychain.swift in Sources */,
 				HH000072HH000072HH000072 /* SplitOAuth.swift in Sources */,
 				HH000074HH000074HH000074 /* SplitSheetsClient.swift in Sources */,

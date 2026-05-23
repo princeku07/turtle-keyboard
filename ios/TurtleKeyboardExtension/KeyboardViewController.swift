@@ -220,6 +220,13 @@ class KeyboardViewController: UIInputViewController {
     // us to show via IntegrationContext.showPanel. Sits on top of the key
     // rows but below the command bar / preview overlay.
     private var integrationPanelHost: UIView?
+    /// Opaque blur layer pinned inside `integrationPanelHost` so every
+    /// panel mounted there sits on a solid surface — even when the
+    /// active theme has `KeyboardPalette.bg = .clear` (Light / Dark
+    /// floating-glass themes). Without this, `/history` and any other
+    /// panel that doesn't bring its own backdrop would let the key rows
+    /// behind it show through and stay tappable.
+    private var integrationPanelBackdrop: UIVisualEffectView?
 
     // Quick Panel — opened by double-tapping space (PRD §6.6). Lives in
     // the same overlay slot as integration panels (mutually exclusive).
@@ -1635,6 +1642,20 @@ class KeyboardViewController: UIInputViewController {
             updateCommandDetection()
             return
 
+        case "/" where slashBuffer == "/":
+            // Second `/` typed immediately after entering slash mode — the
+            // user meant a literal "/", not a slash command. Drop the
+            // buffer, hide the command bar, and insert a single `/` into
+            // the host field. From here on `/` types as a normal
+            // character because the start-of-field guard in `processKey`
+            // no longer matches (text is now `/…`).
+            slashBuffer = nil
+            hideCommandBar()
+            textDocumentProxy.insertText("/")
+            autoEngageShiftIfNeeded()
+            updateCommandDetection()
+            return
+
         default:
             var text = key
             let isQwertyLetter = (mode == .qwerty
@@ -1891,6 +1912,28 @@ class KeyboardViewController: UIInputViewController {
                spaceIdx != nil || !cmd.needsPrompt {
                 commandPromptText = prompt
                 showCommandBar(cmd)
+                // Auto-fire no-prompt commands the moment they're fully
+                // typed — `/splits`, `/history`, `/fix`, `/reply`, `/wyr`
+                // don't take a prompt, so making the user tap the green
+                // Send button is just an extra step. Matches Android's
+                // behavior (TurtleInputMethodService.java:673-678) which
+                // fires no-prompt commands on the space/enter terminator.
+                // iOS fires earlier (on exact-name match) because no
+                // current no-prompt command is a prefix of another
+                // command name — auto-fire is unambiguous.
+                //
+                // Dispatched async so the key event finishes processing
+                // and the command bar lays out before sendCommand mutates
+                // state. Guards inside sendCommand (`isGenerating`,
+                // `activeCommand`) make re-entry safe.
+                if !cmd.needsPrompt && spaceIdx == nil {
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self = self,
+                              self.activeCommand == cmd,
+                              !self.isGenerating else { return }
+                        self.sendCommand()
+                    }
+                }
             } else {
                 // Buffer doesn't match a known command yet — show a draft bar
                 // so the user can see what they're typing.
@@ -2526,7 +2569,18 @@ class KeyboardViewController: UIInputViewController {
     /// its prompt state (with `/edit` firing the picker, presets
     /// surfacing for `/tone`, etc.).
     private func handleSlashSuggestionTap(_ name: String) {
-        slashBuffer = "/\(name) "
+        // No-prompt commands (`/history`, `/splits`, `/fix`, `/reply`,
+        // `/wyr`) must skip the trailing space so `updateCommandDetection`
+        // sees an exact-name match and routes through the auto-fire
+        // branch — otherwise the user is stranded on a "ready — tap
+        // Open" bar even though the command has nothing left to ask for.
+        // Prompt-needing commands keep the trailing space so detection
+        // jumps straight into prompt mode.
+        if let cmd = SlashCommand(rawValue: name), !cmd.needsPrompt {
+            slashBuffer = "/\(name)"
+        } else {
+            slashBuffer = "/\(name) "
+        }
         commandPromptText = ""
         updateCommandDetection()
     }
@@ -3200,9 +3254,24 @@ extension KeyboardViewController {
                 host.bottomAnchor.constraint(equalTo: keyboardContainer.bottomAnchor),
             ])
             integrationPanelHost = host
+
+            // Persistent opaque backdrop. Lives at index 0 so every
+            // mounted panel renders on top of it. Survives mount/unmount
+            // cycles — `removeAllPanelSubviews()` filters it out — so we
+            // pay the blur-view setup cost exactly once.
+            let backdrop = UIVisualEffectView(effect: UIBlurEffect(style: .systemChromeMaterial))
+            backdrop.translatesAutoresizingMaskIntoConstraints = false
+            host.addSubview(backdrop)
+            NSLayoutConstraint.activate([
+                backdrop.topAnchor.constraint(equalTo: host.topAnchor),
+                backdrop.leadingAnchor.constraint(equalTo: host.leadingAnchor),
+                backdrop.trailingAnchor.constraint(equalTo: host.trailingAnchor),
+                backdrop.bottomAnchor.constraint(equalTo: host.bottomAnchor),
+            ])
+            integrationPanelBackdrop = backdrop
         }
         guard let host = integrationPanelHost else { return }
-        host.subviews.forEach { $0.removeFromSuperview() }
+        removeAllPanelSubviews()
         panel.translatesAutoresizingMaskIntoConstraints = false
         host.addSubview(panel)
         NSLayoutConstraint.activate([
@@ -3216,8 +3285,17 @@ extension KeyboardViewController {
     }
 
     func unmountIntegrationPanel() {
-        integrationPanelHost?.subviews.forEach { $0.removeFromSuperview() }
+        removeAllPanelSubviews()
         integrationPanelHost?.isHidden = true
+    }
+
+    /// Tears down every mounted panel but keeps the persistent backdrop
+    /// alive — otherwise the next mount would briefly flash through to
+    /// the keys until the new panel laid out.
+    private func removeAllPanelSubviews() {
+        integrationPanelHost?.subviews
+            .filter { $0 !== integrationPanelBackdrop }
+            .forEach { $0.removeFromSuperview() }
     }
 
     func emitBanner(_ text: String) { showBanner(text) }

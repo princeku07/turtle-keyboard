@@ -105,7 +105,7 @@ final class SplitDetailViewController: UIViewController {
     private func reload() {
         let entries = history.all()
         let total = entries.reduce(0.0) { $0 + $1.amount }
-        totalLabel.text = "₹\(SplitPanelView.formatAmount(total))"
+        totalLabel.text = "₹\(SplitContract.formatAmount(total))"
         subtotalLabel.text = "Across \(entries.count) split\(entries.count == 1 ? "" : "s")"
         emptyLabel.isHidden = !entries.isEmpty
 
@@ -127,7 +127,7 @@ final class SplitDetailViewController: UIViewController {
         card.translatesAutoresizingMaskIntoConstraints = false
 
         let amount = UILabel()
-        amount.text = "₹\(SplitPanelView.formatAmount(entry.amount))"
+        amount.text = "₹\(SplitContract.formatAmount(entry.amount))"
         amount.font = .systemFont(ofSize: 18, weight: .bold)
         amount.textColor = .white
 
@@ -138,7 +138,7 @@ final class SplitDetailViewController: UIViewController {
         formatter.timeStyle = .short
 
         let meta = UILabel()
-        meta.text = "\(entry.people) \(entry.people == 1 ? "person" : "people") · ₹\(SplitPanelView.formatAmount(per)) each\n\(formatter.string(from: date))"
+        meta.text = "\(entry.people) \(entry.people == 1 ? "person" : "people") · ₹\(SplitContract.formatAmount(per)) each\n\(formatter.string(from: date))"
         meta.numberOfLines = 0
         meta.font = .systemFont(ofSize: 13)
         meta.textColor = UIColor(red: 0.80, green: 0.91, blue: 0.78, alpha: 1.0)
@@ -186,8 +186,8 @@ final class SplitDetailViewController: UIViewController {
     private func summary(for entry: SplitHistory.Entry) -> String {
         let per = entry.people > 0 ? entry.amount / Double(entry.people) : entry.amount
         let unit = entry.people == 1 ? "person" : "people"
-        return "Splitting ₹\(SplitPanelView.formatAmount(entry.amount)) between "
-            + "\(entry.people) \(unit) — ₹\(SplitPanelView.formatAmount(per)) each."
+        return "Splitting ₹\(SplitContract.formatAmount(entry.amount)) between "
+            + "\(entry.people) \(unit) — ₹\(SplitContract.formatAmount(per)) each."
     }
 
     /// Small transient toast for clipboard feedback. Mirrors Android's

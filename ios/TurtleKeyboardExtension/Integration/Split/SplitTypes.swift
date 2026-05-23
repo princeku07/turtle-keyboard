@@ -11,6 +11,15 @@ enum SplitContract {
     static let minPeople: Int = 1
     static let maxPeople: Int = 99
     static let defaultPeople: Int = 2
+
+    /// Display formatter shared by every Split surface (in-keyboard panel,
+    /// in-keyboard history, host-app detail screen, share/copy summary).
+    /// Lives here so the host target doesn't have to pull in the
+    /// UIKit-laden `SplitPanelView` just to format a currency string.
+    static func formatAmount(_ v: Double) -> String {
+        if v == v.rounded(), v.isFinite { return String(Int64(v)) }
+        return String(format: "%.2f", v)
+    }
 }
 
 // MARK: - SplitKeys

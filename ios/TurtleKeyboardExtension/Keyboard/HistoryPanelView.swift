@@ -34,18 +34,22 @@ final class HistoryPanelView: UIView {
     required init?(coder: NSCoder) { fatalError() }
 
     private func configure() {
-        backgroundColor = KeyboardPalette.bg
+        // Backdrop is the integration-panel host's own blur layer (set up
+        // in `KeyboardViewController.mountIntegrationPanel`), so this view
+        // stays clear — text/glyph colours come from `KeyboardPalette` so
+        // they read correctly on every theme.
+        backgroundColor = .clear
         translatesAutoresizingMaskIntoConstraints = false
 
         let header = UILabel()
         header.text = "Image history"
         header.font = .systemFont(ofSize: 12, weight: .semibold)
-        header.textColor = UIColor.white.withAlphaComponent(0.7)
+        header.textColor = KeyboardPalette.keyText.withAlphaComponent(0.7)
         header.translatesAutoresizingMaskIntoConstraints = false
 
         let dismiss = UIButton(type: .system)
         dismiss.setImage(UIImage(systemName: "xmark"), for: .normal)
-        dismiss.tintColor = UIColor.white.withAlphaComponent(0.7)
+        dismiss.tintColor = KeyboardPalette.keyText.withAlphaComponent(0.7)
         dismiss.addTarget(self, action: #selector(dismissTapped), for: .touchUpInside)
         dismiss.translatesAutoresizingMaskIntoConstraints = false
 
@@ -58,7 +62,7 @@ final class HistoryPanelView: UIView {
 
         emptyLabel.text = "No images yet — run /cap or /org to fill this up."
         emptyLabel.font = .systemFont(ofSize: 13)
-        emptyLabel.textColor = UIColor.white.withAlphaComponent(0.55)
+        emptyLabel.textColor = KeyboardPalette.keyText.withAlphaComponent(0.55)
         emptyLabel.textAlignment = .center
         emptyLabel.numberOfLines = 0
         emptyLabel.isHidden = true

@@ -32,8 +32,22 @@ final class SplitPanelView: UIView {
     }
 
     private func configure() {
-        backgroundColor = UIColor(red: 0.051, green: 0.247, blue: 0.071, alpha: 1.0)
+        // `KeyboardPalette.bg` is `.clear` on light/dark themes (floating
+        // glass), so a plain backgroundColor would let key taps through.
+        // Mirror the Quick Panel fix: opaque blur backdrop that adapts to
+        // the system appearance regardless of theme.
+        backgroundColor = .clear
         translatesAutoresizingMaskIntoConstraints = false
+
+        let backdrop = UIVisualEffectView(effect: UIBlurEffect(style: .systemChromeMaterial))
+        backdrop.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(backdrop)
+        NSLayoutConstraint.activate([
+            backdrop.topAnchor.constraint(equalTo: topAnchor),
+            backdrop.leadingAnchor.constraint(equalTo: leadingAnchor),
+            backdrop.trailingAnchor.constraint(equalTo: trailingAnchor),
+            backdrop.bottomAnchor.constraint(equalTo: bottomAnchor),
+        ])
 
         let stack = UIStackView()
         stack.axis = .vertical
@@ -50,14 +64,14 @@ final class SplitPanelView: UIView {
         ])
 
         headline.font = .systemFont(ofSize: 16, weight: .semibold)
-        headline.textColor = .white
+        headline.textColor = KeyboardPalette.keyText
         headline.textAlignment = .center
         stack.addArrangedSubview(headline)
 
         stack.addArrangedSubview(buildStepper())
 
         perPersonText.font = .systemFont(ofSize: 14)
-        perPersonText.textColor = UIColor(red: 0.80, green: 0.91, blue: 0.78, alpha: 1.0)
+        perPersonText.textColor = KeyboardPalette.keyText.withAlphaComponent(0.7)
         perPersonText.textAlignment = .center
         stack.addArrangedSubview(perPersonText)
 
@@ -74,7 +88,7 @@ final class SplitPanelView: UIView {
         let minus = pillButton(title: "−")
         minus.addTarget(self, action: #selector(decrement), for: .touchUpInside)
         countText.font = .systemFont(ofSize: 18, weight: .semibold)
-        countText.textColor = .white
+        countText.textColor = KeyboardPalette.keyText
         countText.textAlignment = .center
         countText.setContentHuggingPriority(.defaultLow, for: .horizontal)
         let plus = pillButton(title: "+")
@@ -102,8 +116,7 @@ final class SplitPanelView: UIView {
 
         let cancel = pillButton(title: "Cancel")
         cancel.addTarget(self, action: #selector(cancelTapped), for: .touchUpInside)
-        let save = pillButton(title: "Save")
-        save.backgroundColor = UIColor(red: 0.122, green: 0.435, blue: 0.165, alpha: 1.0)
+        let save = pillButton(title: "Save", primary: true)
         save.addTarget(self, action: #selector(saveTapped), for: .touchUpInside)
 
         row.addArrangedSubview(cancel)
@@ -114,12 +127,21 @@ final class SplitPanelView: UIView {
         return row
     }
 
-    private func pillButton(title: String) -> UIButton {
+    /// Pill button — `primary == true` paints the action with the theme
+    /// accent colour, otherwise it uses the `keySpecial` surface that
+    /// matches the keyboard's modifier-key palette. Saves us from baking
+    /// any specific green into the panel.
+    private func pillButton(title: String, primary: Bool = false) -> UIButton {
         let b = UIButton(type: .system)
         b.setTitle(title, for: .normal)
-        b.setTitleColor(.white, for: .normal)
         b.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
-        b.backgroundColor = UIColor(red: 0.082, green: 0.502, blue: 0.239, alpha: 1.0)
+        if primary {
+            b.backgroundColor = KeyboardPalette.accent
+            b.setTitleColor(.white, for: .normal)
+        } else {
+            b.backgroundColor = KeyboardPalette.keySpecial
+            b.setTitleColor(KeyboardPalette.keyTextSpecial, for: .normal)
+        }
         b.layer.cornerRadius = 8
         b.translatesAutoresizingMaskIntoConstraints = false
         return b
@@ -159,15 +181,10 @@ final class SplitPanelView: UIView {
     }
 
     private func refresh() {
-        headline.text = "Split ₹\(Self.formatAmount(amount))"
+        headline.text = "Split ₹\(SplitContract.formatAmount(amount))"
         countText.text = "\(people) \(people == 1 ? "person" : "people")"
         let per = people > 0 ? amount / Double(people) : amount
-        perPersonText.text = "₹\(Self.formatAmount(per)) each"
-    }
-
-    static func formatAmount(_ v: Double) -> String {
-        if v == v.rounded(), v.isFinite { return String(Int64(v)) }
-        return String(format: "%.2f", v)
+        perPersonText.text = "₹\(SplitContract.formatAmount(per)) each"
     }
 }
 #endif
