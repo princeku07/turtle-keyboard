@@ -319,7 +319,14 @@ final class VoiceSessionManager {
         tearDownEngine()
         if let d = UserDefaults(suiteName: Self.appGroupID) {
             let trimmed = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !trimmed.isEmpty { d.set(trimmed, forKey: Self.kTranscript) }
+            // Always write the transcript — even when empty. The keyboard's
+            // `consumePendingTranscript` only tears the listening overlay
+            // down when it observes a payload; if we skip the write on a
+            // silent finalization (e.g. user tapped mic then said nothing
+            // and the silence watchdog requested stop), the overlay would
+            // stay up forever. The sink's `onFinal("")` correctly no-ops
+            // the text insert, so writing the empty string is safe.
+            d.set(trimmed, forKey: Self.kTranscript)
             d.removeObject(forKey: Self.kPartial)
             d.removeObject(forKey: Self.kError)
         }
