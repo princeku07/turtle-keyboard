@@ -1364,13 +1364,15 @@ public class TurtleInputMethodService extends InputMethodService
     }
 
     private boolean isAiAssistPanelVisible() {
-        return aiAssistPanel != null
-                && aiAssistPanel.getParent() != null
-                && aiAssistPanel.getVisibility() == View.VISIBLE;
+        return keyAreaPanel != null
+                && keyAreaPanel.currentChild() == aiAssistPanel
+                && aiAssistPanel != null;
     }
 
-    /** Toggles the AI assist panel. Mounted into {@code panelHost} — same slot/pattern
-     *  as puzzle setup, web games, and integration sheets. */
+    /** Mounts the AI assist panel via {@link com.prince.turtlekeyboard.ime.view.PanelSlot}
+     *  — same slot/pattern as Emoji / Quick / History panels. Browse mode replaces the
+     *  keys (no IME size change at all). Compose mode (user taps the custom prompt
+     *  field) shrinks the panel and re-shows the keys below — same UX as emoji search. */
     private void showAiAssistPanel() {
         if (isAiAssistPanelVisible()) {
             hideAiAssistPanel();
@@ -1380,26 +1382,33 @@ public class TurtleInputMethodService extends InputMethodService
             aiAssistPanel = new com.prince.turtlekeyboard.ime.view.AiAssistPanelView(this);
             aiAssistPanel.setOnInputActiveChangedListener(inputTargetWatcher);
         }
-        android.view.ViewGroup host = root.panelHost();
-        // Kick out any integration view currently occupying the slot.
-        if (host.getChildCount() > 0 && host.getChildAt(0) != aiAssistPanel) {
-            host.removeAllViews();
-        }
-        if (aiAssistPanel.getParent() == null) {
-            host.addView(aiAssistPanel);
-        }
-        host.setVisibility(View.VISIBLE);
-        aiAssistPanel.applyTheme(themes.current());
-        aiAssistPanel.show(this::runAiAssist, this::hideAiAssistPanel);
+        final com.prince.turtlekeyboard.ime.view.AiAssistPanelView panel = aiAssistPanel;
+        final android.inputmethodservice.KeyboardView keys = root.keyboardView();
+        // Lock browse height so re-entering browse from compose restores correctly.
+        int browseHeight = keys.getHeight();
+        panel.setBrowseHeightPx(browseHeight > 0
+                ? browseHeight
+                : android.widget.FrameLayout.LayoutParams.WRAP_CONTENT);
+        panel.applyTheme(themes.current());
+        panel.show(this::runAiAssist, this::hideAiAssistPanel);
+        // AutoTransition inside the panel handles the fade — we just flip visibility.
+        panel.setOnComposeStateListener(new com.prince.turtlekeyboard.ime.view.AiAssistPanelView.OnComposeStateListener() {
+            @Override public void onEnterCompose() {
+                keys.setVisibility(View.VISIBLE);
+            }
+            @Override public void onExitCompose() {
+                keys.setVisibility(View.GONE);
+            }
+        });
+        keyAreaPanel.show(panel);
     }
 
     private void hideAiAssistPanel() {
-        if (aiAssistPanel == null) return;
-        aiAssistPanel.hide(() -> {
-            android.view.ViewGroup host = root.panelHost();
-            host.removeView(aiAssistPanel);
-            if (host.getChildCount() == 0) host.setVisibility(View.GONE);
-        });
+        if (aiAssistPanel != null) {
+            // Synchronous state reset (no animation now that PanelSlot handles teardown).
+            aiAssistPanel.hide();
+        }
+        if (keyAreaPanel != null) keyAreaPanel.hide();
     }
 
     /** Snapshots the field, runs the rewrite (on-device when Nano is ready, else cloud Gemini),

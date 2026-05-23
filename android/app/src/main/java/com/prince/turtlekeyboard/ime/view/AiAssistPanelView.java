@@ -1,7 +1,5 @@
 package com.prince.turtlekeyboard.ime.view;
 
-import android.animation.Animator;
-import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Color;
@@ -13,10 +11,7 @@ import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.animation.AccelerateInterpolator;
-import android.view.animation.Interpolator;
 import android.view.animation.LinearInterpolator;
-import android.view.animation.PathInterpolator;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -45,6 +40,14 @@ public class AiAssistPanelView extends LinearLayout implements InputTarget {
     public interface OnRunListener { void onRun(String systemPrompt); }
     public interface OnCloseListener { void onClose(); }
 
+    /** Mirrors EmojiPanelView's search-state pattern: when the user taps the custom-prompt
+     *  field the panel shrinks to a compose-friendly height and the IME re-shows the keys
+     *  below. Closes restore the full panel and hide keys again. */
+    public interface OnComposeStateListener {
+        void onEnterCompose();
+        void onExitCompose();
+    }
+
     private static final int BG = 0xFF111111;
     private static final int TEXT_PRIMARY = 0xFFF5F5F5;
     private static final int TEXT_SUBTLE = 0x99FFFFFF;
@@ -55,23 +58,21 @@ public class AiAssistPanelView extends LinearLayout implements InputTarget {
     private static final int FIELD_STROKE_ACTIVE = 0xFF15803D;
     private static final int RUN_ACCENT = 0xFF15803D;
 
-    private static final long ENTER_MS = 240L;
-    private static final long EXIT_MS = 200L;
     private static final long CARET_BLINK_PERIOD_MS = 1100L;
-    private static final Interpolator ENTER_EASING =
-            new PathInterpolator(0.05f, 0.7f, 0.1f, 1.0f);
-    private static final Interpolator EXIT_EASING = new AccelerateInterpolator(1.2f);
 
     private LinearLayout chipsRow;
     private TextView fieldView;
     private TextView runButton;
     private GradientDrawable fieldBg;
     @Nullable private ValueAnimator caretBlinker;
-    @Nullable private ValueAnimator heightAnimator;
 
     @Nullable private OnRunListener runListener;
     @Nullable private OnCloseListener closeListener;
     @Nullable private InputTarget.ActiveChangeListener inputModeListener;
+    @Nullable private OnComposeStateListener composeStateListener;
+    /** Set by the IME to the full keyboard-area height; the browse-mode size. */
+    private int browseHeightPx = ViewGroup.LayoutParams.WRAP_CONTENT;
+    private static final int COMPOSE_HEIGHT_DP = 140;
     private boolean inflight;
     private boolean inputActive;
     private final StringBuilder buffer = new StringBuilder();
@@ -253,27 +254,23 @@ public class AiAssistPanelView extends LinearLayout implements InputTarget {
         return d;
     }
 
+    /** Wires callbacks + clears state. View-tree mount and visibility are owned by the
+     *  IME via PanelSlot — this is just state initialization. */
     public void show(@Nullable OnRunListener onRun, @Nullable OnCloseListener onClose) {
         this.runListener = onRun;
         this.closeListener = onClose;
         this.inflight = false;
         this.buffer.setLength(0);
+        setAlpha(1f);
+        chipsRow.setVisibility(VISIBLE);
         exitInputMode();
         renderField();
-        animateIn();
+        if (getVisibility() != VISIBLE) setVisibility(VISIBLE);
     }
 
-    /** Plays the exit animation, then hides. Safe to call when already hidden. */
-    public void hide() { hide(null); }
-
-    /** {@code afterHidden} runs once the exit animation completes and state is reset. */
-    public void hide(@Nullable Runnable afterHidden) {
-        if (getVisibility() != VISIBLE) {
-            resetAfterHide();
-            if (afterHidden != null) afterHidden.run();
-            return;
-        }
-        animateOut(afterHidden);
+    /** Resets state. The IME removes us from the view tree via PanelSlot.hide() separately. */
+    public void hide() {
+        resetAfterHide();
     }
 
     /** Dim chips/run while a rewrite is in flight; ignored taps until cleared. */
@@ -288,6 +285,23 @@ public class AiAssistPanelView extends LinearLayout implements InputTarget {
 
     public void setOnInputActiveChangedListener(@Nullable InputTarget.ActiveChangeListener l) {
         this.inputModeListener = l;
+    }
+
+    public void setOnComposeStateListener(@Nullable OnComposeStateListener l) {
+        this.composeStateListener = l;
+    }
+
+    /** Full keyboard-area height the IME wants us to occupy in browse mode. */
+    public void setBrowseHeightPx(int px) {
+        this.browseHeightPx = px;
+        if (!inputActive) setPanelHeight(px);
+    }
+
+    private void setPanelHeight(int px) {
+        ViewGroup.LayoutParams lp = getLayoutParams();
+        if (lp == null || lp.height == px) return;
+        lp.height = px;
+        setLayoutParams(lp);
     }
 
     @Override
@@ -325,6 +339,9 @@ public class AiAssistPanelView extends LinearLayout implements InputTarget {
                 theme != null ? theme.accent : FIELD_STROKE_ACTIVE);
         startCaretBlink();
         renderField();
+        chipsRow.setVisibility(GONE);
+        setPanelHeight(dp(COMPOSE_HEIGHT_DP));
+        if (composeStateListener != null) composeStateListener.onEnterCompose();
         if (inputModeListener != null) inputModeListener.onActiveChanged(this, true);
     }
 
@@ -337,6 +354,9 @@ public class AiAssistPanelView extends LinearLayout implements InputTarget {
         fieldBg.setStroke(dp(1), FIELD_STROKE);
         stopCaretBlink();
         renderField();
+        chipsRow.setVisibility(VISIBLE);
+        setPanelHeight(browseHeightPx);
+        if (composeStateListener != null) composeStateListener.onExitCompose();
         if (inputModeListener != null) inputModeListener.onActiveChanged(this, false);
     }
 
@@ -381,109 +401,14 @@ public class AiAssistPanelView extends LinearLayout implements InputTarget {
         caretOn = true;
     }
 
-    private void animateIn() {
-        cancelHeightAnimator();
-        animate().cancel();
-        setVisibility(VISIBLE);
-        setAlpha(0f);
-        // Defer one frame so the parent slot has a measured width to constrain our measure().
-        post(this::startEnterAnimation);
-    }
-
-    private void startEnterAnimation() {
-        int parentWidth = getParent() instanceof View
-                ? ((View) getParent()).getWidth() : 0;
-        if (parentWidth <= 0) {
-            parentWidth = getResources().getDisplayMetrics().widthPixels;
-        }
-        measure(
-                View.MeasureSpec.makeMeasureSpec(parentWidth, View.MeasureSpec.EXACTLY),
-                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
-        final int targetHeight = getMeasuredHeight();
-        if (targetHeight <= 0) {
-            setAlpha(1f);
-            return;
-        }
-
-        ViewGroup.LayoutParams lp = getLayoutParams();
-        lp.height = 0;
-        setLayoutParams(lp);
-
-        ValueAnimator h = ValueAnimator.ofInt(0, targetHeight);
-        h.setDuration(ENTER_MS);
-        h.setInterpolator(ENTER_EASING);
-        h.addUpdateListener(a -> applyAnimatedHeight((int) a.getAnimatedValue()));
-        h.addListener(new AnimatorListenerAdapter() {
-            @Override public void onAnimationEnd(Animator a) {
-                // Restore wrap_content so the panel can resize itself if content grows.
-                ViewGroup.LayoutParams lp2 = getLayoutParams();
-                lp2.height = ViewGroup.LayoutParams.WRAP_CONTENT;
-                setLayoutParams(lp2);
-                heightAnimator = null;
-            }
-        });
-        heightAnimator = h;
-        h.start();
-
-        animate().alpha(inflight ? 0.55f : 1f)
-                .setDuration(ENTER_MS)
-                .setInterpolator(ENTER_EASING)
-                .start();
-    }
-
-    private void animateOut(@Nullable Runnable afterHidden) {
-        cancelHeightAnimator();
-        animate().cancel();
-        final int startHeight = getHeight();
-        if (startHeight <= 0) {
-            resetAfterHide();
-            if (afterHidden != null) afterHidden.run();
-            return;
-        }
-
-        ValueAnimator h = ValueAnimator.ofInt(startHeight, 0);
-        h.setDuration(EXIT_MS);
-        h.setInterpolator(EXIT_EASING);
-        h.addUpdateListener(a -> applyAnimatedHeight((int) a.getAnimatedValue()));
-        h.addListener(new AnimatorListenerAdapter() {
-            @Override public void onAnimationEnd(Animator a) {
-                heightAnimator = null;
-                resetAfterHide();
-                if (afterHidden != null) afterHidden.run();
-            }
-        });
-        heightAnimator = h;
-        h.start();
-
-        animate().alpha(0f)
-                .setDuration(EXIT_MS)
-                .setInterpolator(EXIT_EASING)
-                .start();
-    }
-
-    private void applyAnimatedHeight(int h) {
-        ViewGroup.LayoutParams lp = getLayoutParams();
-        if (lp.height != h) {
-            lp.height = h;
-            setLayoutParams(lp);
-        }
-    }
-
-    private void cancelHeightAnimator() {
-        if (heightAnimator != null) {
-            heightAnimator.cancel();
-            heightAnimator = null;
-        }
-    }
-
     private void resetAfterHide() {
-        setVisibility(GONE);
+        // The IME removes us from the view tree via PanelSlot.hide(); this is just state cleanup
+        // so the next show() starts fresh.
         setAlpha(1f);
-        ViewGroup.LayoutParams lp = getLayoutParams();
-        lp.height = ViewGroup.LayoutParams.WRAP_CONTENT;
-        setLayoutParams(lp);
+        chipsRow.setVisibility(VISIBLE);
         this.runListener = null;
         this.closeListener = null;
+        this.composeStateListener = null;
         this.inflight = false;
         exitInputMode();
         buffer.setLength(0);
