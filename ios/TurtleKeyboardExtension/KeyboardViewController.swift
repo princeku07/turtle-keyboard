@@ -174,6 +174,14 @@ class KeyboardViewController: UIInputViewController {
     private var voicePromptPrefix: String?
     private var cmdSuggestionsStack: UIStackView!
     private var cmdSuggestionBtns:   [UIButton] = []
+    /// Thin vertical lines that sit between adjacent suggestion buttons,
+    /// matching the native iOS keyboard's suggestion-bar separators.
+    /// Index `i` is the separator that lives *before* button `i+1`, so
+    /// `cmdSuggestionSeparators[0]` is between button 0 and button 1,
+    /// and `[1]` is between button 1 and button 2. Toggled in lockstep
+    /// with `cmdSuggestionBtns[i+1].isHidden` so a hidden trailing
+    /// button doesn't leave a stray bar dangling.
+    private var cmdSuggestionSeparators: [UIView] = []
     private var cmdPresetStrip:      PresetChipStripView!
     /// 2 pt-wide blinking caret pinned to the right edge of the prompt
     /// label's rendered text. Visible whenever `cmdPromptLabel` is on
@@ -712,7 +720,7 @@ class KeyboardViewController: UIInputViewController {
         //    grew it past `rowsH` (slash strip / banner). Putting the
         //    constraint on `view.heightAnchor` instead makes iOS adjust
         //    the actual keyboard frame.
-        keyboardContainer = UIView()
+        keyboardContainer = KeyboardContainerView()
         keyboardContainer.backgroundColor = bgColor
         keyboardContainer.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(keyboardContainer)
@@ -843,27 +851,49 @@ class KeyboardViewController: UIInputViewController {
         cmdSendButton.translatesAutoresizingMaskIntoConstraints = false
         commandBar.addSubview(cmdSendButton)
 
-        // Suggestion chips — for /reply results (3 tappable options)
+        // Suggestion chips — render like the native iOS keyboard:
+        // plain words on the bar (no pill background), separated by
+        // thin vertical bars. `.fill` distribution + explicit equal-
+        // width constraints between the 3 buttons let the 1pt
+        // separators take their own narrow slot without throwing off
+        // the buttons' alignment.
         cmdSuggestionsStack = UIStackView()
         cmdSuggestionsStack.axis         = .horizontal
-        cmdSuggestionsStack.distribution = .fillEqually
-        cmdSuggestionsStack.spacing      = 6
+        cmdSuggestionsStack.distribution = .fill
+        cmdSuggestionsStack.alignment    = .fill
+        cmdSuggestionsStack.spacing      = 0
         cmdSuggestionsStack.isHidden     = true
         cmdSuggestionsStack.translatesAutoresizingMaskIntoConstraints = false
         commandBar.addSubview(cmdSuggestionsStack)
 
         for i in 0..<3 {
+            if i > 0 {
+                let sep = makeChipSeparator()
+                cmdSuggestionsStack.addArrangedSubview(sep)
+                cmdSuggestionSeparators.append(sep)
+            }
             let btn = UIButton(type: .custom)
             btn.tag = i
-            btn.titleLabel?.font          = .systemFont(ofSize: 12, weight: .medium)
+            // 17pt regular matches what Apple uses on the native
+            // suggestion bar; the previous 12pt medium read as a
+            // chip label rather than a word suggestion.
+            btn.titleLabel?.font          = .systemFont(ofSize: 17)
             btn.titleLabel?.lineBreakMode = .byTruncatingTail
             btn.setTitleColor(KeyboardPalette.barText, for: .normal)
-            btn.backgroundColor           = KeyboardPalette.chipBg
-            btn.layer.cornerRadius        = 18  // capsule on the 36pt stack height
-            btn.contentEdgeInsets         = UIEdgeInsets(top: 0, left: 10, bottom: 0, right: 10)
+            btn.backgroundColor           = .clear
+            btn.layer.cornerRadius        = 0
+            btn.contentEdgeInsets         = .zero
+            btn.translatesAutoresizingMaskIntoConstraints = false
             btn.addTarget(self, action: #selector(suggestionTapped(_:)), for: .touchUpInside)
             cmdSuggestionsStack.addArrangedSubview(btn)
             cmdSuggestionBtns.append(btn)
+            // Equal-width constraint to the first button so the three
+            // word slots are always the same size regardless of label
+            // length. The 1pt separators take their fixed slice and
+            // the rest of the bar splits evenly across the buttons.
+            if i > 0 {
+                btn.widthAnchor.constraint(equalTo: cmdSuggestionBtns[0].widthAnchor).isActive = true
+            }
         }
 
         // ── Banner — overlays the command bar slot ────────────────────────────
@@ -1111,6 +1141,16 @@ class KeyboardViewController: UIInputViewController {
             let w = i < widths.count ? widths[i] : 44
             let frame = CGRect(x: xOffset, y: 0, width: w, height: rowH)
             btn.frame = frame
+            // Expand each button's hit area horizontally by half the
+            // surrounding `keyGap` so adjacent buttons exactly meet at
+            // the gap midpoint. Vertical expansion is intentionally
+            // zero — the button already fills its row's full height,
+            // and any inter-row gap is owned by `KeyboardContainerView`
+            // (which knows how to forward to the closer of two rows).
+            (btn as? FatFingerButton)?.hitInset = UIEdgeInsets(
+                top: 0, left: -keyGap / 2,
+                bottom: 0, right: -keyGap / 2
+            )
             if translucentTheme {
                 // Mount blur + tint as SIBLINGS of the button behind it
                 // (not as subviews of the button). Putting them inside
@@ -1199,7 +1239,11 @@ class KeyboardViewController: UIInputViewController {
     }
 
     private func makeKey(label: String) -> UIButton {
-        let btn           = UIButton(type: .custom)
+        // FatFingerButton expands its `point(inside:)` past the visible
+        // frame by `hitInset` — set per-row in `buildRow` based on the
+        // live `keyGap` / `rowGap` — so taps that land in the gaps
+        // between visible keys still register on the nearest key.
+        let btn           = FatFingerButton(type: .custom)
         let isShiftActive = label == "⇧" && (isCapsLock || isShiftedOnce)
         let c16  = UIImage.SymbolConfiguration(pointSize: 16, weight: .medium)
         let c15  = UIImage.SymbolConfiguration(pointSize: 15, weight: .medium)
@@ -1723,7 +1767,29 @@ class KeyboardViewController: UIInputViewController {
     private func showQuickPanel() {
         // Tear down any active command bar / integration panel first —
         // Quick Panel takes the whole overlay slot.
-        if !commandBar.isHidden { hideCommandBar() }
+        //
+        // `hideCommandBar` fades the bar over 0.15s. Without the
+        // synchronous force-hide below, the suggestion chip strip
+        // (and any other command-bar chrome that was visible) shows
+        // through behind the panel for the duration of that fade,
+        // which reads as "suggestions overlaying the panel" since the
+        // panel itself mounts instantly. Cancelling the in-flight
+        // animation and snapping `isHidden = true` removes that
+        // flash. The completion block from `hideCommandBar` still
+        // fires later with `finished = false` and its guard handles
+        // the no-op exit cleanly.
+        if !commandBar.isHidden {
+            hideCommandBar()
+            commandBar.layer.removeAllAnimations()
+            commandBar.isHidden = true
+            commandBar.alpha = 1
+        }
+        // Also clear the chip-strip-specific state so a fresh refresh
+        // after the panel dismisses doesn't dedupe against stale picks.
+        lastShownChipTitles = nil
+        lastRefreshedContextHash = nil
+        cmdSuggestionsStack.isHidden = true
+        hideSlashStrip()
         unmountIntegrationPanel()
 
         let panel = QuickPanelView(columns: isPad ? 6 : 4)
@@ -1862,8 +1928,20 @@ class KeyboardViewController: UIInputViewController {
     // UITextChecker typo-correction stays off-main and only fires when
     // the engine had nothing — its result replaces the fallback chips
     // if it lands before the user types past the current word.
+    /// True while a Quick Panel / Web / other integration panel is
+    /// mounted. The suggestion strip lives in the command-bar slot at
+    /// the top of the keyboard, and `showWordSuggestions` calls
+    /// `keyboardContainer.bringSubviewToFront(commandBar)` — without
+    /// this guard, an async `textDidChange` firing after the panel
+    /// mounts (e.g. from the `deleteBackward` in double-tap-space)
+    /// would re-front the chip strip above the panel.
+    private var isIntegrationPanelShown: Bool {
+        integrationPanelHost?.isHidden == false
+    }
+
     private func refreshSuggestions() {
         guard activeCommand == nil, !isGenerating else { return }
+        guard !isIntegrationPanelShown else { return }
 
         let contextString = textDocumentProxy.documentContextBeforeInput ?? ""
         // Dedupe: `processKey` calls us right after `insertText`, then
@@ -1895,11 +1973,17 @@ class KeyboardViewController: UIInputViewController {
             step1Empty = picks.isEmpty
         }
 
-        // Step 2 — user vocabulary fallback (keeps strip alive even
-        // when the dictionary is still loading on cold launch, or when
-        // the user types a novel prefix that has no matches).
-        if picks.isEmpty {
-            picks = suggestionEngine.topUserWords(max: 3)
+        // Step 2 — pad to three with top user words. The native iOS
+        // keyboard always renders three suggestion slots; we follow the
+        // same convention so the strip never looks half-empty mid-type.
+        // De-dup so a word that's already in `picks` (because it's
+        // also a top user word) doesn't appear twice.
+        if picks.count < 3 {
+            let supplement = suggestionEngine.topUserWords(max: 3)
+            for word in supplement where !picks.contains(word) {
+                picks.append(word)
+                if picks.count >= 3 { break }
+            }
         }
 
         if !picks.isEmpty {
@@ -1990,7 +2074,42 @@ class KeyboardViewController: UIInputViewController {
         suggestionQueue.async(execute: token)
     }
 
+    /// One thin vertical bar used between suggestion words. Wrapped in
+    /// a 1pt-wide container so the stack's `.fill` alignment doesn't
+    /// stretch the line itself — the visible line stays a fixed 20pt
+    /// tall, centered on the bar.
+    private func makeChipSeparator() -> UIView {
+        let container = UIView()
+        container.translatesAutoresizingMaskIntoConstraints = false
+        container.backgroundColor = .clear
+        container.widthAnchor.constraint(equalToConstant: 1).isActive = true
+
+        let line = UIView()
+        line.translatesAutoresizingMaskIntoConstraints = false
+        line.backgroundColor = KeyboardPalette.barText.withAlphaComponent(0.25)
+        container.addSubview(line)
+        NSLayoutConstraint.activate([
+            line.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+            line.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+            line.widthAnchor.constraint(equalToConstant: 1),
+            line.heightAnchor.constraint(equalToConstant: 20),
+        ])
+        return container
+    }
+
+    /// Sync the separator visibility to its trailing button — a hidden
+    /// trailing button shouldn't leave a stray separator dangling.
+    /// Called after every `setTitle` / `isHidden` flip on the chip
+    /// buttons.
+    private func syncSuggestionSeparators() {
+        for (i, sep) in cmdSuggestionSeparators.enumerated() {
+            let trailingBtn = cmdSuggestionBtns[i + 1]
+            sep.isHidden = trailingBtn.isHidden
+        }
+    }
+
     private func showSuggestedShortcuts(_ shortcuts: [SuggestedShortcut]) {
+        guard !isIntegrationPanelShown else { return }
         suggestionMode   = .suggestedShortcuts
         pendingShortcuts = shortcuts
 
@@ -2004,6 +2123,7 @@ class KeyboardViewController: UIInputViewController {
                 btn.isHidden = true
             }
         }
+        syncSuggestionSeparators()
         // Mic only makes sense while composing a slash-command prompt;
         // hide it in the suggestions strip so it doesn't crowd the chips.
         [cmdPill, cmdPromptLabel, cmdSendButton, cmdMicButton]
@@ -2023,6 +2143,10 @@ class KeyboardViewController: UIInputViewController {
     }
 
     private func showWordSuggestions(_ items: [String]) {
+        // Integration panel is mounted — don't fire the chip strip
+        // even if a stale async path tries to. See
+        // `isIntegrationPanelShown`'s doc-comment for why.
+        guard !isIntegrationPanelShown else { return }
         suggestionMode = .wordSuggestion
         pendingSuggestions = items
 
@@ -2041,6 +2165,7 @@ class KeyboardViewController: UIInputViewController {
             btn.setTitle(i < items.count ? items[i] : nil, for: .normal)
             btn.isHidden = i >= items.count
         }
+        syncSuggestionSeparators()
         // Hide normal command-bar controls (including the mic — it only
         // belongs in slash-command compose mode); show only the chips.
         [cmdPill, cmdPromptLabel, cmdSendButton, cmdMicButton]
@@ -3921,17 +4046,36 @@ private final class ListeningAuroraRenderer: NSObject, MTKViewDelegate {
 fileprivate final class SuggestionEngine {
 
     private static let dictAsset = "en_unigrams"
+    /// Per-bucket cap for the prefix index. 50 covers the vast majority
+    /// of real autocomplete queries — by definition the top-50 most
+    /// frequent words for any 2-char prefix include practically every
+    /// word a user would actually accept as a suggestion. The longer
+    /// the prefix the user types, the more narrowly we filter the
+    /// bucket; the rare words that fall outside the top-50 wouldn't be
+    /// surfaced as the top-3 picks anyway.
+    ///
+    /// Memory budget at K=50: ~500 populated buckets × 50 entries ×
+    /// ~16B (Swift small-string) ≈ 400 KB. Was ~8.5 MB before the
+    /// alpha-list + freq-dict tier was dropped.
+    private static let bucketTopK = 50
 
-    /// Bundled dictionary, sorted **alphabetically** so prefix lookup
-    /// is a binary search instead of an O(N) scan. The prior layout
-    /// (sorted by frequency, linear scan) was the dominant per-keystroke
-    /// main-thread cost — common-prefix queries terminated early but a
-    /// 4+ char or uncommon prefix walked all 82k entries on every key.
-    private var alphaWords: [String]?
-    /// Per-word frequency lookup. After locating the prefix slice via
-    /// binary search we rank the matches by frequency so the top
-    /// suggestions still surface first.
-    private var wordFreq: [String: Int64]?
+    /// 2-char prefix bucket index → top-K words by frequency, descending.
+    /// `prefixIndex["th"] = ["the", "this", "that", "they", ...]`. Built
+    /// once at load time. Lookup is `O(1)` hash for the bucket + `O(K)`
+    /// linear filter against the longer prefix, where K ≤ `bucketTopK`.
+    /// Effectively constant-time per keystroke, *independent* of the
+    /// total dictionary size.
+    ///
+    /// This is the *only* dictionary structure we keep resident. The
+    /// previous design also held an alpha-sorted word list (2.5 MB) and
+    /// a per-word frequency dict (4 MB) to power a binary-search
+    /// fallback, but that path never actually ran in production:
+    /// `refreshSuggestions` gates on `currentWord.count >= 2` so the
+    /// 1-char case it covered never reached `suggest`, and rare/long
+    /// prefixes whose top-K matches fall outside the bucket would
+    /// return empty either way (those words are too rare to surface).
+    /// Dropping the fallback recovers ~6 MB of the 50 MB appex ceiling.
+    private var prefixIndex: [String: [String]]?
     private var readyLock = NSLock()
     private var loading = false
     private(set) var isReady = false
@@ -3964,16 +4108,17 @@ fileprivate final class SuggestionEngine {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
             let t0 = CFAbsoluteTimeGetCurrent()
-            let loaded = Self.loadDictionary()
+            let index = Self.loadPrefixIndex()
             self.readyLock.lock()
-            self.alphaWords = loaded?.alpha
-            self.wordFreq = loaded?.freq
-            self.isReady = (loaded != nil)
+            self.prefixIndex = index
+            self.isReady = (index != nil)
             self.loading = false
             let cb = self.onReady
             self.readyLock.unlock()
             let ms = Int((CFAbsoluteTimeGetCurrent() - t0) * 1000)
-            NSLog("TurtleSuggest: dict ready in \(ms)ms (\(loaded?.alpha.count ?? 0) words)")
+            let bucketCount = index?.count ?? 0
+            let totalEntries = index?.values.reduce(0) { $0 + $1.count } ?? 0
+            NSLog("TurtleSuggest: dict ready in \(ms)ms (\(bucketCount) buckets, \(totalEntries) entries)")
             cb?()
         }
     }
@@ -3983,9 +4128,21 @@ fileprivate final class SuggestionEngine {
     /// commits. Capped at `max`. Safe to call before the dictionary is
     /// loaded; falls back to user vocabulary only in that window.
     ///
-    /// O(log N + K log K) where K is bounded by `explorationCap` so a
-    /// degenerate query (e.g. 2-char common prefix with thousands of
-    /// hits) doesn't sort all matches just to return the top three.
+    /// Lookup path:
+    ///   1. **User vocabulary** — personal frequency, always tried
+    ///      first so words the user actually types win over the
+    ///      bundled dict.
+    ///   2. **Prefix bucket index** — hash the first 2 chars of the
+    ///      query, take the pre-sorted top-K slice for that bucket,
+    ///      iterate while `hasPrefix(query)` until we've collected
+    ///      `max` picks. `O(1)` hash + `O(K)` linear with K ≤ 50.
+    ///
+    /// `refreshSuggestions` already gates on `currentWord.count >= 2`,
+    /// so the 1-char case is never reached here. Queries longer than
+    /// the bucket's top-K can store (rare 5+ char prefixes for
+    /// uncommon words) naturally return empty — those words are too
+    /// rare to outrank the top-3 anyway, and the user-vocab path will
+    /// surface them once the user has typed them a few times.
     func suggest(prefix: String, max: Int = 3) -> [String] {
         guard !prefix.isEmpty, max > 0 else { return [] }
         let q = prefix.lowercased()
@@ -3999,29 +4156,20 @@ fileprivate final class SuggestionEngine {
                 if out.count >= max { return out }
             }
         }
+        guard out.count < max else { return out }
 
-        // 2. Bundled dictionary: binary-search the alpha-sorted list to
-        //    locate the prefix slice, rank the matches by frequency,
-        //    then take the top remaining slots.
-        if let (alpha, freq) = readDictionary(), out.count < max {
-            let start = Self.lowerBound(alpha, q)
-            var matches: [(String, Int64)] = []
-            let explorationCap = 200
-            var i = start
-            while i < alpha.count, alpha[i].hasPrefix(q), matches.count < explorationCap {
-                let w = alpha[i]
-                matches.append((w, freq[w] ?? 0))
-                i += 1
-            }
-            matches.sort { $0.1 > $1.1 }
-            for (w, _) in matches {
-                if seen.insert(w).inserted {
-                    out.append(w)
-                    if out.count >= max { return out }
-                }
+        // 2. Prefix bucket — single hash + short linear filter. The
+        //    bucket is pre-sorted by frequency at load time so the
+        //    iteration order is already the answer order.
+        guard q.count >= 2, let index = readPrefixIndex() else { return out }
+        let bucketKey = String(q.prefix(2))
+        guard let candidates = index[bucketKey] else { return out }
+        for w in candidates {
+            if w.hasPrefix(q), seen.insert(w).inserted {
+                out.append(w)
+                if out.count >= max { return out }
             }
         }
-
         return out
     }
 
@@ -4047,28 +4195,17 @@ fileprivate final class SuggestionEngine {
         userStore.bump(w)
     }
 
-    private func readDictionary() -> (alpha: [String], freq: [String: Int64])? {
+    private func readPrefixIndex() -> [String: [String]]? {
         readyLock.lock(); defer { readyLock.unlock() }
-        guard let alpha = alphaWords, let freq = wordFreq else { return nil }
-        return (alpha, freq)
+        return prefixIndex
     }
 
-    /// First index `i` in `array` where `array[i] >= prefix`. Returns
-    /// `array.count` when every element compares less than `prefix`.
-    /// Standard lower-bound binary search.
-    private static func lowerBound(_ array: [String], _ prefix: String) -> Int {
-        var lo = 0, hi = array.count
-        while lo < hi {
-            let mid = (lo + hi) >> 1
-            if array[mid] < prefix { lo = mid + 1 } else { hi = mid }
-        }
-        return lo
-    }
-
-    /// Parse the bundled `<word> <freq>` file once. Returns the words
-    /// sorted alphabetically (for binary-search prefix lookup) paired
-    /// with a frequency dict (for ranking matches once located).
-    private static func loadDictionary() -> (alpha: [String], freq: [String: Int64])? {
+    /// Parse the bundled `<word> <freq>` file once and build the 2-char
+    /// prefix bucket index: each bucket holds its top-`bucketTopK` words
+    /// sorted by frequency desc. The raw 82k-entry word list and
+    /// frequency dict are dropped after the buckets are built — only
+    /// the trimmed index stays resident.
+    private static func loadPrefixIndex() -> [String: [String]]? {
         // Try Bundle.main first (the extension's own bundle when called
         // from the appex process). Fall back to Bundle(for:) which
         // anchors to the bundle containing this class — useful when
@@ -4086,24 +4223,33 @@ fileprivate final class SuggestionEngine {
             NSLog("TurtleSuggest: failed to read \(url.path)")
             return nil
         }
-        var entries: [(String, Int64)] = []
-        entries.reserveCapacity(82_000)
+        // Stream the file into per-bucket lists in a single pass — we
+        // never materialise the full 82k-entry word list or frequency
+        // dict, which keeps peak load-time memory close to the
+        // steady-state ceiling instead of spiking ~6 MB above it.
+        var rawBuckets: [String: [(String, Int64)]] = [:]
+        rawBuckets.reserveCapacity(676)  // 26 × 26 worst case for lowercase ASCII
         text.enumerateLines { line, _ in
             guard let sp = line.firstIndex(of: " ") else { return }
             let word = String(line[..<sp])
+            guard word.count >= 2 else { return }
             let freq = Int64(line[line.index(after: sp)...]) ?? 0
-            if !word.isEmpty, freq > 0 {
-                entries.append((word, freq))
-            }
+            guard freq > 0 else { return }
+            let key = String(word.prefix(2))
+            rawBuckets[key, default: []].append((word, freq))
         }
-        // Sort alphabetically so prefix lookup is a binary search instead
-        // of a linear scan. Frequency comparison is preserved in the
-        // returned `freq` dict so matches can still be ranked.
-        entries.sort { $0.0 < $1.0 }
-        let alpha = entries.map { $0.0 }
-        var freq = [String: Int64](minimumCapacity: entries.count)
-        for (w, f) in entries { freq[w] = f }
-        return (alpha, freq)
+        // Sort each bucket by frequency desc and trim to top-K. After
+        // this loop the raw bucket arrays (which can hold thousands of
+        // entries for popular prefixes) are released — only the trimmed
+        // K-sized slice survives.
+        var index = [String: [String]](minimumCapacity: rawBuckets.count)
+        for (key, words) in rawBuckets {
+            let ranked = words.sorted { $0.1 > $1.1 }
+                .prefix(bucketTopK)
+                .map { $0.0 }
+            index[key] = Array(ranked)
+        }
+        return index
     }
 }
 
@@ -4220,6 +4366,28 @@ fileprivate final class UserWordStore {
 /// to the side of a glyph still registers as a tap on that key. The
 /// previous plain `UIView` row left the gap as a dead zone, which is
 /// what made fast typing feel like characters got "swallowed."
+// MARK: - FatFingerButton
+//
+// `UIButton` subclass whose hit area extends past its visible frame by
+// `hitInset` (negative insets = expansion). Combined with the row-level
+// nearest-key-by-midX forwarding in `KeyRowView` and the container-level
+// inter-row forwarding in `KeyboardContainerView`, this gives a third
+// layer of forgiveness so any tap that lands within the keyboard's
+// key-grid region is claimed by *some* key. Set up so each button
+// expands by half the surrounding `keyGap` on each horizontal side and
+// half the `rowGap` on each vertical side — adjacent buttons meet at
+// the gap midpoint with no overlap, so the hit-test never has to break
+// a tie between two claimants.
+fileprivate final class FatFingerButton: UIButton {
+    /// Negative inset = expansion. Set per-button in `buildRow` based
+    /// on the live `keyGap` / `rowGap` constants.
+    var hitInset: UIEdgeInsets = .zero
+
+    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+        return bounds.inset(by: hitInset).contains(point)
+    }
+}
+
 fileprivate final class KeyRowView: UIView {
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
         // Outside the row entirely → not ours.
@@ -4243,6 +4411,87 @@ fileprivate final class KeyRowView: UIView {
             }
         }
         return nearest
+    }
+}
+
+// MARK: - KeyboardContainerView
+//
+// Companion to `KeyRowView` that closes the *vertical* fat-finger gap:
+// `KeyRowView` already snaps inter-key touches within a row to the
+// nearest button by horizontal midpoint, but the `rowGap` strips
+// between rows used to land on bare `keyboardContainer` and produce no
+// keypress at all. That dead zone is the dominant reason fast typing
+// felt unresponsive — every other miss got swallowed silently.
+//
+// This subclass forwards any touch that didn't hit a regular subview
+// to the row whose vertical extent is nearest, clamped to a small
+// tolerance so a tap on the chrome above (command bar, slash strip)
+// isn't stolen by the topmost letter row.
+
+fileprivate final class KeyboardContainerView: UIView {
+    /// How far above the top row / below the bottom row a tap can land
+    /// and still snap to a key. Inter-row gaps (the strips between
+    /// rows) are always covered — they're inside the row span by
+    /// definition, so this knob doesn't gate them. What it does control
+    /// is the overflow margin at the very top and bottom edges of the
+    /// key grid: a tap landing this many points above the top letter
+    /// row (or below the bottom row) still snaps to the closest key.
+    ///
+    /// 18pt is roughly half a key height — generous enough that
+    /// sloppy fast typing along the row edges almost never misses,
+    /// while still leaving a clear band between the keys and the
+    /// command bar so chrome taps aren't pulled into the top row.
+    private static let fatFingerTolerance: CGFloat = 18
+
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        // Standard hit test first — overlays (command bar, slash strip,
+        // preview, integration / quick / listening panels) and the
+        // KeyRowView's own horizontal-gap forwarding all run here. Use
+        // whatever it returns unless it bounced back to `self`, which
+        // means nothing claimed the touch.
+        if let view = super.hitTest(point, with: event), view !== self {
+            return view
+        }
+        guard bounds.contains(point) else { return nil }
+        let rows = subviews.compactMap { $0 as? KeyRowView }
+        guard !rows.isEmpty else { return nil }
+
+        // Restrict fat-fingering to the key-grid span (with a small
+        // tolerance above/below). A tap on the command bar slot
+        // above the keys, or on the system home indicator below, is
+        // intentional — don't snap it to a key.
+        let topY    = rows.map { $0.frame.minY }.min()!
+        let bottomY = rows.map { $0.frame.maxY }.max()!
+        guard point.y >= topY    - Self.fatFingerTolerance,
+              point.y <= bottomY + Self.fatFingerTolerance else { return nil }
+
+        // Closest row by vertical edge distance.
+        var nearestRow: KeyRowView?
+        var bestDist: CGFloat = .greatestFiniteMagnitude
+        for row in rows {
+            let dy: CGFloat
+            if point.y < row.frame.minY {
+                dy = row.frame.minY - point.y
+            } else if point.y > row.frame.maxY {
+                dy = point.y - row.frame.maxY
+            } else {
+                dy = 0  // super.hitTest would normally catch this case
+            }
+            if dy < bestDist {
+                bestDist = dy
+                nearestRow = row
+            }
+        }
+        guard let row = nearestRow else { return nil }
+        // Forward to the row's own hitTest with the touch's X but the
+        // row's vertical centre — that hands off to `KeyRowView`'s
+        // existing nearest-key-by-midX logic, so the same button the
+        // user would have hit had they been on the row gets the touch.
+        let rowLocal = CGPoint(
+            x: row.convert(point, from: self).x,
+            y: row.bounds.midY
+        )
+        return row.hitTest(rowLocal, with: event)
     }
 }
 
