@@ -24,12 +24,8 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 /**
- * Full-panel WebView host. Layout matches the rest of the keyboard's panels: a thin
- * header (URL on the left, close button on the right), a 2 dp progress strip while
- * loading, then the WebView filling the remainder.
- *
- * <p>The host IME mounts this with whatever LayoutParams it wants — the panel uses
- * {@code MATCH_PARENT} for both axes internally so it fills whatever box it's placed in.
+ * Full-panel WebView host. Header with URL + close, a progress strip, and the WebView
+ * below filling the remainder.
  */
 public class WebViewPanel extends LinearLayout {
 
@@ -37,7 +33,6 @@ public class WebViewPanel extends LinearLayout {
         void onClose();
     }
 
-    // Match the landing-page palette: ink border, cream surface.
     private static final int CREAM = 0xFFF4EFE4;
     private static final int INK   = 0xFF0C0C0C;
     private static final int MUTED = 0xFF6B6B6B;
@@ -61,7 +56,6 @@ public class WebViewPanel extends LinearLayout {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
 
-        // Header: URL + close.
         LinearLayout header = new LinearLayout(context);
         header.setOrientation(HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
@@ -81,10 +75,7 @@ public class WebViewPanel extends LinearLayout {
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         header.addView(urlLabel, urlLp);
 
-        // "Open in Chrome" hand-off — Custom Tabs share Chrome's profile (cookies, login,
-        // password manager), so a logged-in user lands on the same page already signed
-        // in. We can't get that inside the embedded WebView (per-app cookie jar), so
-        // this is the escape hatch when the user actually needs their browser session.
+        // Custom Tabs hand-off — reuses the user's browser profile (cookies, login).
         TextView openExternalBtn = new TextView(context);
         openExternalBtn.setText("↗");
         openExternalBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f);
@@ -146,8 +137,6 @@ public class WebViewPanel extends LinearLayout {
     private void openInExternalBrowser() {
         if (currentUrl == null || currentUrl.isEmpty()) return;
         try {
-            // Custom Tabs reuses Chrome's profile (cookies, autofill) when Chrome is the
-            // user's default; falls through to whichever browser is set otherwise.
             CustomTabsIntent intent = new CustomTabsIntent.Builder().build();
             intent.intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             intent.launchUrl(getContext(), Uri.parse(currentUrl));

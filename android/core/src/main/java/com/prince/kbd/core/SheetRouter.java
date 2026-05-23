@@ -6,10 +6,8 @@ import java.util.Map;
 
 /**
  * App-scoped registry mapping URL route keys to {@link SheetViewFactory} instances.
- * Populated once at app startup from each {@link KeyboardIntegration#sheetRoutes()}; the
- * {@code BottomSheetActivity} reads it at deep-link time to mount the right sheet.
- *
- * <p>Route keys are case-insensitive — registrars stamp lowercase, lookups do too.
+ * Populated at app startup from each {@link KeyboardIntegration#sheetRoutes()}. Route
+ * keys are case-insensitive (lowercase on register and lookup).
  */
 public interface SheetRouter {
 

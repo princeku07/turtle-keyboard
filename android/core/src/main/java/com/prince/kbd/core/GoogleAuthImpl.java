@@ -26,18 +26,13 @@ import java.util.concurrent.Executors;
 
 /**
  * Play Services-backed implementation of {@link GoogleAuth}. Caches one access token
- * across all modules in the {@code google} namespace store; AuthorizationClient
- * incrementally grants scopes — so a module asking for a scope already granted to another
- * feature gets the token without a second consent dialog.
- *
- * <p>Construct one per Activity, or one for the IME service. Every instance backed by the
+ * across modules in the {@code google} namespace store; every instance backed by the
  * same {@link KeyValueStore} sees the same signed-in state.
  */
 public final class GoogleAuthImpl implements GoogleAuth {
 
     /** Buffer subtracted from token expiry so we refresh before the token actually dies. */
     private static final long REFRESH_SKEW_MS = 60_000L;
-
     private static final String KEY_SIGNED_IN = "signed_in";
     private static final String KEY_ACCOUNT_EMAIL = "account_email";
     private static final String KEY_ACCESS_TOKEN = "access_token";
@@ -57,9 +52,8 @@ public final class GoogleAuthImpl implements GoogleAuth {
 
     /**
      * @param webClientId OAuth 2.0 web client ID from Firebase. Required for
-     *                    {@link #freshIdToken}; pass {@code null} from modules
-     *                    that only need access tokens for Google APIs (split,
-     *                    notion, slack) — those keep working unchanged.
+     *                    {@link #freshIdToken}; pass {@code null} from modules that
+     *                    only need access tokens for Google APIs.
      */
     public GoogleAuthImpl(Context appContext, KeyValueStore store,
                           @Nullable String webClientId) {
@@ -155,10 +149,7 @@ public final class GoogleAuthImpl implements GoogleAuth {
                         BeginSignInRequest.GoogleIdTokenRequestOptions.builder()
                                 .setSupported(true)
                                 .setServerClientId(webClientId)
-                                // First-time + Firebase-bootstrap sign-in: show every Google
-                                // account on the device. Once the user picks once, Play Services
-                                // remembers the grant — One Tap returns silently on subsequent
-                                // calls without needing this flipped to true.
+                                // Show every account on first run; Play Services remembers the grant after.
                                 .setFilterByAuthorizedAccounts(false)
                                 .build())
                 .setAutoSelectEnabled(true)
@@ -183,9 +174,7 @@ public final class GoogleAuthImpl implements GoogleAuth {
                 cb.onError("no id token in result", null);
                 return;
             }
-            // SignInCredential.getId() is the user's email when the credential came
-            // from a Google account — same source of truth as the access-token path
-            // so the shared "google" store stays consistent across both flows.
+            // SignInCredential.getId() is the email for Google-account credentials.
             String email = credential.getId();
             if (email != null && !email.isEmpty()) {
                 store.putString(KEY_SIGNED_IN, "1");
@@ -218,8 +207,7 @@ public final class GoogleAuthImpl implements GoogleAuth {
                 && result.toGoogleSignInAccount().getEmail() != null) {
             store.putString(KEY_ACCOUNT_EMAIL, result.toGoogleSignInAccount().getEmail());
         } else if (store.getString(KEY_ACCOUNT_EMAIL, "").isEmpty()) {
-            // AuthorizationResult won't surface the account when sign-in wasn't part of
-            // this request; fall back to userinfo for the email scope we did grant.
+            // AuthorizationResult omits the account when sign-in wasn't part of the request.
             fetchAndStoreEmail(token);
         }
         cb.onToken(token);

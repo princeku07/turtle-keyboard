@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg_root">
+
+    <include layout="@layout/view_topbar" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="@dimen/screen_margin"
+            android:paddingEnd="@dimen/screen_margin"
+            android:paddingTop="@dimen/space_sm"
+            android:paddingBottom="@dimen/space_4xl">
+
+            <!-- ===== Account ===== -->
+
+            <TextView
+                style="@style/SectionHeader"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Account" />
+
+            <LinearLayout
+                style="@style/Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/account_email"
+                    style="@style/TextBody"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    tools:text="teamandroid@flamapp.com" />
+
+                <TextView
+                    android:id="@+id/account_plan"
+                    style="@style/TextBodyMuted"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_xs"
+                    tools:text="Free plan" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="@dimen/space_lg">
+
+                    <Button
+                        android:id="@+id/btn_upgrade"
+                        style="@style/ButtonPrimary"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Upgrade" />
+
+                    <Button
+                        android:id="@+id/btn_sign_out"
+                        style="@style/ButtonSecondary"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="@dimen/space_sm"
+                        android:text="Sign out" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- ===== Appearance ===== -->
+
+            <TextView
+                style="@style/SectionHeader"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_xl"
+                android:text="Appearance" />
+
+            <LinearLayout
+                style="@style/Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <include layout="@layout/item_settings_row"
+                    android:id="@+id/row_kb_theme" />
+
+                <View android:layout_width="match_parent"
+                    android:layout_height="@dimen/border_hairline"
+                    android:background="@color/border_subtle" />
+
+                <include layout="@layout/item_settings_row"
+                    android:id="@+id/row_app_theme" />
+            </LinearLayout>
+
+            <!-- ===== Typing ===== -->
+
+            <TextView
+                style="@style/SectionHeader"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_xl"
+                android:text="Typing" />
+
+            <LinearLayout
+                style="@style/Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <include layout="@layout/item_settings_row"
+                    android:id="@+id/row_autocorrect" />
+
+                <View android:layout_width="match_parent"
+                    android:layout_height="@dimen/border_hairline"
+                    android:background="@color/border_subtle" />
+
+                <include layout="@layout/item_settings_row"
+                    android:id="@+id/row_gesture" />
+
+                <View android:layout_width="match_parent"
+                    android:layout_height="@dimen/border_hairline"
+                    android:background="@color/border_subtle" />
+
+                <include layout="@layout/item_settings_row"
+                    android:id="@+id/row_sound" />
+
+                <View android:layout_width="match_parent"
+                    android:layout_height="@dimen/border_hairline"
+                    android:background="@color/border_subtle" />
+
+                <include layout="@layout/item_settings_row"
+                    android:id="@+id/row_haptics" />
+            </LinearLayout>
+
+            <!-- ===== Voice ===== -->
+
+            <TextView
+                style="@style/SectionHeader"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_xl"
+                android:text="Voice" />
+
+            <LinearLayout
+                style="@style/Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <include layout="@layout/item_settings_row"
+                    android:id="@+id/row_mic" />
+
+                <View android:layout_width="match_parent"
+                    android:layout_height="@dimen/border_hairline"
+                    android:background="@color/border_subtle" />
+
+                <include layout="@layout/item_settings_row"
+                    android:id="@+id/row_voice_lang" />
+            </LinearLayout>
+
+            <!-- ===== Privacy ===== -->
+
+            <TextView
+                style="@style/SectionHeader"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_xl"
+                android:text="Privacy" />
+
+            <LinearLayout
+                style="@style/Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    style="@style/TextBody"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Turtle never sends text outside of a /command."
+                    android:textStyle="bold" />
+
+                <TextView
+                    style="@style/TextBodyMuted"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_xs"
+                    android:text="Everything you type stays on your device unless you explicitly invoke a slash command. The keyboard is fully open source — verify the code yourself." />
+
+                <Button
+                    android:id="@+id/btn_github"
+                    style="@style/ButtonSecondary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_md"
+                    android:text="View source on GitHub" />
+            </LinearLayout>
+
+            <TextView
+                style="@style/TextCaption"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_2xl"
+                android:gravity="center"
+                android:text="v1.0  ·  Turtle Keyboard"
+                android:textAllCaps="false" />
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

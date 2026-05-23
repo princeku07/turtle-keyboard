@@ -16,24 +16,11 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Creates a {@code games/<id>} Firestore doc for a new puzzle. The image is NOT
- * uploaded by this client — the caller supplies a public URL. Once the user's
- * Google Drive upload path lands ({@link com.prince.turtlekeyboard.integration.drive.DriveFilesClient}
- * already does this for {@code /us}), the integration will upload first, then
- * pass the resulting Drive-share URL here.
+ * Creates a {@code games/<id>} Firestore doc for a new puzzle. The caller supplies a
+ * public image URL; uploads are handled elsewhere.
  *
- * <p>Schema written:
- * <pre>
- *   games/&lt;id&gt;: {
- *     type: "puzzle",
- *     state: { imageUrl, gridSize },
- *     createdByUid,
- *     createdAt
- *   }
- * </pre>
- *
- * <p>Tile drag/drop sync (the dynamic part) lands at {@code puzzleTiles/<id>}
- * in RTDB in a follow-up, when we wire that bridge.
+ * <p>Schema: {@code games/<id> = { type: "puzzle", state: { imageUrl, gridSize },
+ * createdByUid, createdAt }}.
  */
 public final class PuzzleClient {
 

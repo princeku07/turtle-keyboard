@@ -23,13 +23,9 @@ import java.util.concurrent.Executors;
 
 /**
  * Orchestrates cloud sync for {@link SplitHistory} against the user's own Google Sheet.
- * Local SharedPreferences remains the source of truth for the keyboard panel; this class
- * mirrors saves to the cloud and pulls remote rows on demand.
- *
- * <p>All cloud calls are no-ops unless the user is signed in via {@link GoogleAuth} and a
- * sheet has been provisioned by {@link #ensureSheet}. The {@link GoogleAuth} instance is
- * passed in by every caller (rather than constructed here) so the same shared instance —
- * with the cached token in the {@code google} namespace — is reused across modules.
+ * Local store is the source of truth; this class mirrors saves and pulls remote rows
+ * on demand. All cloud calls are no-ops unless the user is signed in and a sheet has
+ * been provisioned.
  */
 public final class SplitCloudSync {
 
@@ -44,9 +40,8 @@ public final class SplitCloudSync {
     private SplitCloudSync() {}
 
     /**
-     * Ensures the user has a "Turtle Splits" spreadsheet in their Drive, creating one if
-     * needed and migrating any pre-existing local rows on first run. Safe to call on
-     * every app launch — short-circuits when already provisioned.
+     * Ensures the user has a "Turtle Splits" spreadsheet, creating one and migrating local
+     * rows on first run. Safe to call on every launch.
      */
     public static void ensureSheet(final Context ctx, final GoogleAuth auth,
                                    final KeyValueStore store,
@@ -55,9 +50,7 @@ public final class SplitCloudSync {
             deliver(cb, false);
             return;
         }
-        // Backfill: pre-invite-feature installs created sheets without stamping OWNER_EMAIL.
-        // Anyone with a SHEET_ID but no OWNER_EMAIL is necessarily the owner — at the time
-        // the sheet was created, the only way to have a sheet was to create it yourself.
+        // Backfill: a SHEET_ID without OWNER_EMAIL means the current user is the owner.
         if (!store.getString(SplitKeys.SHEET_ID, "").isEmpty()
                 && store.getString(SplitKeys.OWNER_EMAIL, "").isEmpty()) {
             String myEmail = auth.accountEmail();
@@ -79,7 +72,6 @@ public final class SplitCloudSync {
                             if (sheetId.isEmpty()) {
                                 sheetId = SplitSheetsClient.createSpreadsheet(token);
                                 store.putString(SplitKeys.SHEET_ID, sheetId);
-                                // The user who creates the sheet owns it.
                                 String email = auth.accountEmail();
                                 if (email != null) {
                                     store.putString(SplitKeys.OWNER_EMAIL, email);
@@ -100,7 +92,7 @@ public final class SplitCloudSync {
         });
     }
 
-    /** Mirrors a save to the user's sheet. Fire-and-forget; local write already happened. */
+    /** Mirrors a save to the user's sheet. Fire-and-forget. */
     public static void pushSave(final Context ctx, final GoogleAuth auth,
                                 final KeyValueStore store,
                                 final double amount, final int people, final long timestampMs) {
@@ -123,16 +115,13 @@ public final class SplitCloudSync {
         });
     }
 
-    /** Mirrors a clear — removes only this device's rows from the sheet. */
+    /** Removes only this device's rows from the sheet. */
     public static void pushClear(final Context ctx, final GoogleAuth auth,
                                  final KeyValueStore store) {
         pushClearInternal(ctx, auth, store, false);
     }
 
-    /**
-     * Owner-only: nukes every data row (across all devices) from the shared sheet.
-     * No-op if the current user isn't the sheet owner.
-     */
+    /** Owner-only: removes every data row from the shared sheet. */
     public static void pushClearAll(final Context ctx, final GoogleAuth auth,
                                     final KeyValueStore store) {
         if (!isOwner(auth, store)) return;
@@ -164,7 +153,7 @@ public final class SplitCloudSync {
         });
     }
 
-    /** True iff the current account is the email stamped at sheet-creation time. */
+    /** True iff the current account matches the email stamped at sheet creation. */
     public static boolean isOwner(GoogleAuth auth, KeyValueStore store) {
         String me = auth.accountEmail();
         if (me == null) me = "";
@@ -201,8 +190,6 @@ public final class SplitCloudSync {
             @Override public void onError() { deliver(cb, false); }
         });
     }
-
-    // -- internals ------------------------------------------------------------
 
     private interface TokenAction {
         void run(String token);
@@ -322,40 +309,16 @@ public final class SplitCloudSync {
         String dedupeKey() { return timestampMs + "|" + amount + "|" + people; }
     }
 
-    // -- single-QR membership flow ------------------------------------------
-
-    /**
-     * Single-QR invite flow.
-     *
-     * <ol>
-     *   <li>Owner taps "Invite" → {@link #openMembership} adds an anyone-with-link
-     *       writer permission and returns a {@code turtlekeyboard://join} deep link.</li>
-     *   <li>Joiner scans with any OS camera → deep link opens
-     *       {@link com.prince.split.ui.JoinSplitActivity} → {@link #joinSharedSheet}
-     *       stamps local pointers and refreshes.</li>
-     *   <li>Owner taps "Stop accepting members" → {@link #closeMembership} revokes the
-     *       anyone-with-link permission. Existing members keep direct grants if any;
-     *       in this minimal v1 they retain access until the owner removes them
-     *       (anyone-with-link removal alone doesn't revoke anyone — Google leaves the
-     *       file accessible to anyone who already opened it via the link).</li>
-     * </ol>
-     *
-     * <p>Same security model as Google Docs' "anyone with link can edit": whoever has
-     * the QR can read/write until the owner stops accepting members. Owner is in control
-     * of the lifecycle.
-     */
     public static final String DEEP_LINK_JOIN = "turtlekeyboard://join";
 
-    /**
-     * Owner-only: enables anyone-with-link writer sharing on the sheet, persists the
-     * Drive permissionId, and returns a deep-link URL the owner can render as a QR.
-     * Fires {@code cb} on the main thread; the URL is delivered via the wider
-     * {@link InviteCallback}.
-     */
     public interface InviteCallback {
         void onReady(@Nullable String deepLink);
     }
 
+    /**
+     * Owner-only: enables anyone-with-link writer sharing and returns a join deep link
+     * that can be rendered as a QR.
+     */
     public static void openMembership(final Context ctx, final GoogleAuth auth,
                                       final KeyValueStore store,
                                       final InviteCallback cb) {
@@ -395,7 +358,6 @@ public final class SplitCloudSync {
         final String sheetId = store.getString(SplitKeys.SHEET_ID, "");
         final String permId = store.getString(SplitKeys.ANYONE_PERMISSION_ID, "");
         if (sheetId.isEmpty() || permId.isEmpty()) {
-            // Already closed — clear any stale state and report success.
             store.putString(SplitKeys.ANYONE_PERMISSION_ID, "");
             deliver(cb, true);
             return;
@@ -418,7 +380,7 @@ public final class SplitCloudSync {
         });
     }
 
-    /** Whether the owner currently has an anyone-with-link share open. */
+    /** True when the owner currently has an anyone-with-link share open. */
     public static boolean isMembershipOpen(KeyValueStore store) {
         return !store.getString(SplitKeys.ANYONE_PERMISSION_ID, "").isEmpty();
     }
@@ -436,8 +398,7 @@ public final class SplitCloudSync {
 
     /**
      * Joiner-side: switches the local store onto {@code sheetId} (owned by
-     * {@code ownerEmail}) and refreshes from the sheet. Owner must have membership open
-     * for the {@code fetchAndMerge} call to succeed.
+     * {@code ownerEmail}) and refreshes from the sheet.
      */
     public static void joinSharedSheet(final Context ctx, final GoogleAuth auth,
                                        final KeyValueStore store,
@@ -445,11 +406,9 @@ public final class SplitCloudSync {
                                        @Nullable final SyncCallback cb) {
         store.putString(SplitKeys.SHEET_ID, sheetId);
         store.putString(SplitKeys.OWNER_EMAIL, ownerEmail == null ? "" : ownerEmail);
-        // Joiner doesn't own this sheet, so no migration of local rows; subsequent saves
-        // are mirrored to the new sheet on append.
+        // Skip local migration: joiner doesn't own this sheet.
         store.putString(SplitKeys.MIGRATED_LOCAL, "1");
-        // Joiner is not the owner of any anyone-with-link share — clear any leftover from
-        // a previous owner role on this install.
+        // Clear any leftover anyone-with-link permission from a previous owner role.
         store.putString(SplitKeys.ANYONE_PERMISSION_ID, "");
         fetchAndMerge(ctx, auth, store, cb);
     }

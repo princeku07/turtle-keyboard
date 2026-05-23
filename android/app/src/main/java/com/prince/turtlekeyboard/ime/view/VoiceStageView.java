@@ -30,52 +30,37 @@ import java.nio.FloatBuffer;
 import com.prince.turtlekeyboard.theme.KeyboardTheme;
 
 /**
- * Voice dictation overlay.
- *
- * <p>Composition (back → front, all children of a {@link FrameLayout}):
- * <ol>
- *   <li>{@link GlowTexture} — a {@link TextureView} that renders an animated
- *       GL gradient. TextureView draws into the window surface like any
- *       regular view, so siblings layered after it compose naturally on
- *       top — no z-order tricks, no texture-baking of text.</li>
- *   <li>"LISTENING…" hint — plain {@link TextView}, centred.</li>
- *   <li>Live transcript — plain {@link TextView}, centred, replaces the hint
- *       as partials arrive.</li>
- * </ol>
- *
- * <p>The stage is non-clickable: key taps pass through to the keyboard
- * underneath. Dismissal is owned by the external Stop button.
- *
- * <p>Open/close use a circular reveal anchored at the mic button's window
- * centre — pass those coordinates to {@link #start(int,int)}.
+ * Voice dictation overlay: an animated GL gradient behind centred LISTENING…
+ * hint and live-transcript text. Non-clickable so key taps fall through; the
+ * external Stop button owns dismissal.
  */
 public class VoiceStageView extends FrameLayout {
 
     public interface Listener {
-        /** External Stop button was pressed — commit the current transcript. */
         void onStop();
     }
 
     private static final int TEXT_PRIMARY = 0xFFFFFFFF;
     private static final int TEXT_SHADOW  = 0xCC000000;
 
-    // Open: the view is overlaid first, then after a short beat the brush
-    // starts sweeping. Both durations are slow enough to read as a deliberate
-    // gesture rather than a snap — the user should *experience* the design.
+    private static final String HINT_DEFAULT = "✦  LISTENING…";
+
     private static final long REVEAL_OPEN_DELAY_MS = 120L;
     private static final long REVEAL_OPEN_MS       = 650L;
     private static final long REVEAL_CLOSE_MS      = 500L;
+
+    private static final long ERROR_LINGER_MS      = 1200L;
 
     private GlowTexture glow;
     private TextView hint;
     private TextView transcript;
     private Listener listener;
 
-    // Current shader-driven reveal value, 0 (hidden) … 1 (fully drawn).
-    // Tracked here so an in-flight animation can be cancelled and restarted
-    // from its current position instead of snapping back to 0 or 1.
+    // 0 = hidden, 1 = fully drawn. Tracked so in-flight reveals can resume from current value.
     private float revealProgress = 0f;
     @Nullable private ValueAnimator revealAnim;
+
+    @Nullable private Runnable errorDismiss;
 
     public VoiceStageView(Context c) { super(c); init(); }
     public VoiceStageView(Context c, @Nullable AttributeSet a) { super(c, a); init(); }
@@ -83,14 +68,12 @@ public class VoiceStageView extends FrameLayout {
     private void init() {
         setVisibility(GONE);
 
-        // ── 1) GL gradient background.
         glow = new GlowTexture(getContext());
         addView(glow, new LayoutParams(LayoutParams.MATCH_PARENT,
                 LayoutParams.MATCH_PARENT));
 
-        // ── 2) Hint — shown until the first partial transcript arrives.
         hint = new TextView(getContext());
-        hint.setText("✦  LISTENING…");
+        hint.setText(HINT_DEFAULT);
         hint.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
         hint.setLetterSpacing(0.22f);
         hint.setTypeface(hint.getTypeface(), Typeface.BOLD);
@@ -102,7 +85,6 @@ public class VoiceStageView extends FrameLayout {
         hLp.gravity = Gravity.CENTER;
         addView(hint, hLp);
 
-        // ── 3) Live transcript — replaces the hint as partials arrive.
         transcript = new TextView(getContext());
         transcript.setText("");
         transcript.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
@@ -123,18 +105,15 @@ public class VoiceStageView extends FrameLayout {
 
     public void setListener(Listener l) { this.listener = l; }
 
-    /** Show the stage. The view is made VISIBLE immediately so the GLView
-     *  is overlaid in place, then after a short delay the brush sweeps the
-     *  arc from right → bottom → left. At revealProgress = 0 the shader
-     *  outputs (0,0,0,0), so the view appearing pre-sweep is invisible. */
+    /** At revealProgress = 0 the shader outputs (0,0,0,0), so showing the view pre-sweep is invisible. */
     public void start(int micWindowX, int micWindowY) {
+        cancelErrorDismiss();
         transcript.setText("");
+        hint.setText(HINT_DEFAULT);
         hint.setVisibility(VISIBLE);
         glow.setLoudness(0f);
 
-        // Cancel any leftover animation and snap fully hidden, so the open
-        // sweep always starts from a clean slate even if a previous close
-        // was interrupted (including a mid-flight alpha fade).
+        // Reset to a clean slate so the sweep restarts even if a prior close was interrupted.
         if (revealAnim != null) revealAnim.cancel();
         animate().cancel();
         setAlpha(1f);
@@ -145,33 +124,23 @@ public class VoiceStageView extends FrameLayout {
         animateRevealTo(1f, REVEAL_OPEN_MS, REVEAL_OPEN_DELAY_MS, null);
     }
 
-    /** Sweep the arc out in the same right → left direction (progress
-     *  1 → 2), then hide the view. The trailing edge advances while the
-     *  leading edge stays at the left, so the arc disappears starting
-     *  from the right — a continuation of the open motion, not a rewind. */
     public void stop() {
+        cancelErrorDismiss();
         if (getVisibility() != VISIBLE) {
             setVisibility(GONE);
             return;
         }
-        // Fade the whole view out in parallel with the sweep. The GL layer
-        // clears to a 0.6-alpha dim every frame, so without this the keyboard
-        // tint would still be present at revealProgress = 2 and snap off the
-        // instant we flip to GONE.
+        // Parallel alpha-out: the GL clear-colour holds a 0.6-alpha dim that would otherwise snap off.
         animate().alpha(0f).setDuration(REVEAL_CLOSE_MS).start();
         animateRevealTo(2f, REVEAL_CLOSE_MS, 0L, () -> {
             setVisibility(GONE);
             setAlpha(1f);
-            // Reset so the next open starts cleanly from the right side.
             revealProgress = 0f;
             glow.setRevealProgress(0f);
             revealAnim = null;
         });
     }
 
-    /** Drive u_revealProgress from its current value to {@code target}.
-     *  Cancels any in-flight reveal so a rapid stop-during-open (or vice
-     *  versa) picks up smoothly from where it was, rather than snapping. */
     private void animateRevealTo(float target, long durationMs,
                                  long startDelayMs,
                                  @Nullable Runnable onEnd) {
@@ -194,8 +163,6 @@ public class VoiceStageView extends FrameLayout {
         a.start();
     }
 
-    /** Latest mic RMS sample. Normalised internally; drives the gradient
-     *  intensity. */
     public void setRms(float dB) {
         float n = (dB + 2f) / 12f;
         if (n < 0f) n = 0f;
@@ -203,10 +170,11 @@ public class VoiceStageView extends FrameLayout {
         glow.setLoudness(n);
     }
 
-    /** Live partial transcript. Empty/null → hint shown; non-empty → text. */
+    /** Null/empty shows the hint; otherwise replaces it with the transcript. */
     public void setTranscript(@Nullable String text) {
         if (text == null || text.isEmpty()) {
             transcript.setText("");
+            hint.setText(HINT_DEFAULT);
             hint.setVisibility(VISIBLE);
         } else {
             transcript.setText(text);
@@ -214,22 +182,32 @@ public class VoiceStageView extends FrameLayout {
         }
     }
 
-    /** Ignored — the gradient design has its own fixed palette. */
-    public void applyTheme(KeyboardTheme theme) { /* no-op */ }
+    /** Shows the error in place of the hint, then auto-closes after a short linger. */
+    public void showError(String message) {
+        if (getVisibility() != VISIBLE) return;
+        cancelErrorDismiss();
+        transcript.setText("");
+        hint.setText(message);
+        hint.setVisibility(VISIBLE);
+        errorDismiss = this::stop;
+        postDelayed(errorDismiss, ERROR_LINGER_MS);
+    }
+
+    private void cancelErrorDismiss() {
+        if (errorDismiss != null) {
+            removeCallbacks(errorDismiss);
+            errorDismiss = null;
+        }
+    }
+
+    /** No-op; the gradient design has its own fixed palette. */
+    public void applyTheme(KeyboardTheme theme) { }
 
     private int dp(int v) {
         return (int) (v * getResources().getDisplayMetrics().density + 0.5f);
     }
 
-    // ──────────────────────────────────────────────────────────────────────
-    // GL gradient layer
-    // ──────────────────────────────────────────────────────────────────────
-
-    /**
-     *  TextureView that owns a {@link RenderThread} for an animated gradient.
-     *  Unlike GLSurfaceView this draws into the window surface, so siblings
-     *  in the FrameLayout compose on top without z-order workarounds.
-     */
+    /** TextureView wrapping a {@link RenderThread}. Draws into the window surface so siblings compose on top naturally. */
     private static class GlowTexture extends TextureView
             implements TextureView.SurfaceTextureListener {
 
@@ -237,18 +215,13 @@ public class VoiceStageView extends FrameLayout {
         private volatile float loudness;
         private volatile float revealProgress;
 
-        // First-frame plumbing: callers (VoiceStageView.start) can queue a
-        // Runnable to run on the main thread *after* the render thread has
-        // swapped its first frame, so the reveal animation doesn't expose a
-        // half-warmed-up GL surface.
+        // First-frame ready flag + listener so callers don't see a half-warmed-up GL surface.
         private volatile boolean firstFrameReady;
         @Nullable private Runnable firstFrameListener;
 
         GlowTexture(Context c) {
             super(c);
-            // Honour the alpha channel — without this, TextureView treats
-            // every pixel as opaque and the gradient won't blend with the
-            // keyboard.
+            // setOpaque(false) is required for the gradient's alpha to blend with the keyboard.
             setOpaque(false);
             setSurfaceTextureListener(this);
         }
@@ -263,8 +236,7 @@ public class VoiceStageView extends FrameLayout {
             if (thread != null) thread.setRevealProgress(n);
         }
 
-        /** Run {@code cb} on the main thread once the GL surface has rendered
-         *  its first frame. If it already has, the callback runs synchronously. */
+        /** Runs {@code cb} immediately if the GL surface has already rendered; otherwise on first frame. */
         void runOnFirstFrame(Runnable cb) {
             if (firstFrameReady) {
                 cb.run();
@@ -273,8 +245,6 @@ public class VoiceStageView extends FrameLayout {
             }
         }
 
-        /** Invoked on the main thread (via View.post from the render thread)
-         *  after the first eglSwapBuffers of the current surface. */
         private void onFirstFrameSwapped() {
             firstFrameReady = true;
             Runnable cb = firstFrameListener;
@@ -304,26 +274,16 @@ public class VoiceStageView extends FrameLayout {
                 try { thread.join(200); } catch (InterruptedException ignored) {}
                 thread = null;
             }
-            // Next surface will start fresh — drop the flag so the next
-            // runOnFirstFrame waits for the new render thread's first frame.
             firstFrameReady = false;
             firstFrameListener = null;
-            return true; // we own the SurfaceTexture; let TextureView release it
+            return true;
         }
 
         @Override
-        public void onSurfaceTextureUpdated(SurfaceTexture s) { /* no-op */ }
+        public void onSurfaceTextureUpdated(SurfaceTexture s) { }
     }
 
-    /**
-     *  Render thread — owns an EGL context bound to the TextureView's
-     *  SurfaceTexture and draws the gradient at ~60 fps.
-     *
-     *  <p>Threading model is straightforward: created by
-     *  {@link GlowTexture#onSurfaceTextureAvailable}, torn down by
-     *  {@link GlowTexture#onSurfaceTextureDestroyed}. Main thread updates
-     *  {@link #loudness} (volatile); render thread reads it each frame.
-     */
+    /** Owns an EGL context bound to the TextureView's SurfaceTexture and draws the gradient at ~60 fps. */
     private static class RenderThread extends Thread {
 
         private static final String TAG = "VoiceGlowRT";
@@ -527,7 +487,6 @@ public class VoiceStageView extends FrameLayout {
                 "    gl_FragColor = vec4(color, alpha);\n" +
                 "}\n";
 
-        // Fullscreen quad (-1..1) drawn as TRIANGLE_STRIP.
         private static final float[] QUAD = {
                 -1f, -1f,
                  1f, -1f,
@@ -641,8 +600,6 @@ public class VoiceStageView extends FrameLayout {
                     .asFloatBuffer();
             vb.put(QUAD).position(0);
 
-            // Clear-colour alpha is set per-frame in drawFrame() so the
-            // backdrop dim ramps in with u_revealProgress.
             GLES20.glDisable(GLES20.GL_DEPTH_TEST);
             // Premultiplied-alpha blend: shader outputs (rgb * alpha, alpha).
             GLES20.glEnable(GLES20.GL_BLEND);
@@ -655,10 +612,6 @@ public class VoiceStageView extends FrameLayout {
             if (w == 0 || h == 0) return;
 
             GLES20.glViewport(0, 0, w, h);
-            // Fully transparent clear — any non-zero clear-alpha lands in the
-            // framebuffer's alpha channel, which suppresses how much keyboard
-            // colour the TextureView composite blends *into* the smoke, so
-            // dim-on-clear ends up reading as a black overlay on the wisps.
             GLES20.glClearColor(0f, 0f, 0f, 0.6f);
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
 
@@ -676,9 +629,7 @@ public class VoiceStageView extends FrameLayout {
 
             EGL14.eglSwapBuffers(display, surface);
 
-            // Signal the main thread on first swap so the parent view can
-            // expose itself (and run the reveal) only after pixels exist —
-            // otherwise the reveal animates over the clear-colour dim.
+            // Notify the main thread once pixels exist so the reveal doesn't animate over the clear-colour dim.
             if (!firstFrameSent) {
                 firstFrameSent = true;
                 firstFrameSignal.run();

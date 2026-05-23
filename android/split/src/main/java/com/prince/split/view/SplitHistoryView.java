@@ -28,29 +28,17 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * In-keyboard saved-splits list. Mirrors the activity flow but stays inside
- * the panel slot so the user never leaves the host app. Each row is
- * tap-to-copy; footer offers Clear/Done.
- *
- * <p>Visual language matches the rest of the keyboard's polished panels
- * (history, emoji, GIFs, split): pure-black surface, white text at two
- * opacities, subtle-white chip secondary buttons, brand-lime primary CTA.
- * List rows are rounded cards with ripple foregrounds for press feedback.
+ * In-keyboard saved-splits list. Each row is tap-to-copy; footer offers Clear / Done.
  */
 public class SplitHistoryView extends LinearLayout {
 
     public interface Listener {
-        /** Copy a summary line for the entry (or wire to share, etc). */
         void onCopy(SplitHistory.Entry entry);
-        /** Wipe the persisted history. */
         void onClear();
-        /** Close the panel. */
         void onDismiss();
-        /** Open the host's deeper detail / reports screen. */
         void onOpenReport();
     }
 
-    // ── Dark-panel color tokens (mirror SplitPanelView) ──────────────
     private static final int BG           = 0xFF000000;
     private static final int TEXT_PRIMARY = 0xFFF5F5F5;
     private static final int TEXT_MUTED   = 0xA0F5F5F5;
@@ -58,17 +46,9 @@ public class SplitHistoryView extends LinearLayout {
     private static final int RIPPLE_WASH  = 0x33FFFFFF;
     private static final int ACCENT_LIME  = 0xFF15803D;
     private static final int PILL_RADIUS_DP = 10;
-    /** Panel-card corner radius. 16 dp matches {@link SplitPanelView} so the
-     *  two split surfaces feel like the same rounded sheet rendered with
-     *  different content. */
     private static final int PANEL_RADIUS_DP = 16;
-    /** Translate-from offset for the slide-up entrance. */
     private static final int SLIDE_OFFSET_DP = 28;
-    /** Space above the rounded card. Matches SplitPanelView so a flow that
-     *  toggles from sheet → history (or vice versa) keeps the same gap. */
     private static final int TOP_GAP_DP = 12;
-    /** Material's "emphasized" easing — shared across all the keyboard's
-     *  rounded-card panels for a unified rise-into-place feel. */
     private static final Interpolator ENTER_EASING =
             new PathInterpolator(0.05f, 0.7f, 0.1f, 1.0f);
 
@@ -83,15 +63,6 @@ public class SplitHistoryView extends LinearLayout {
 
     private void init() {
         setOrientation(VERTICAL);
-        // Outer view is transparent so the keyboard chrome shows through
-        // the TOP_GAP_DP space above the rounded card — matches the
-        // restructure on SplitPanelView / HistoryPanelView / EmojiPanelView.
-
-        // Rounded-card container — all real content (header, scroll list,
-        // empty hint, actions) lives inside this. Card carries the
-        // background, hairline stroke, outline + clipToOutline. Clip-to-
-        // outline also keeps the scrollable row cards from poking past the
-        // curved corners as the user scrolls them through.
         final int radius = dp(PANEL_RADIUS_DP);
         LinearLayout card = new LinearLayout(getContext());
         card.setOrientation(VERTICAL);
@@ -142,7 +113,6 @@ public class SplitHistoryView extends LinearLayout {
         actionsLp.topMargin = dp(12);
         card.addView(buildActions(), actionsLp);
 
-        // Mount the card on the outer view with a top gap.
         LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -212,9 +182,6 @@ public class SplitHistoryView extends LinearLayout {
         }
     }
 
-    /** Rounded card row — subtle-white fill + ripple foreground. Tap copies
-     *  the entry to the host editor via the listener; press feedback comes
-     *  from the ripple, clipped to the card's corner radius. */
     private LinearLayout buildRow(SplitHistory.Entry e, long now) {
         LinearLayout row = new LinearLayout(getContext());
         row.setOrientation(VERTICAL);
@@ -255,8 +222,6 @@ public class SplitHistoryView extends LinearLayout {
 
         return row;
     }
-
-    // -- factories ------------------------------------------------------------
 
     private TextView text(int sp, int color, boolean bold) {
         TextView t = new TextView(getContext());
@@ -308,12 +273,7 @@ public class SplitHistoryView extends LinearLayout {
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
-        // Smooth slide-up + fade-in whenever the parent mounts us. The host
-        // controls our lifecycle by adding/removing the view, so this is the
-        // most reliable place to trigger the entrance — show() itself runs
-        // while the view may not yet have a parent. ViewPropertyAnimator is
-        // GPU-accelerated for translate/alpha so this stays smooth with the
-        // rounded-card outline clip.
+        // show() may run before the view has a parent, so trigger the entrance from here.
         setAlpha(0f);
         setTranslationY(dp(SLIDE_OFFSET_DP));
         animate()
@@ -327,8 +287,6 @@ public class SplitHistoryView extends LinearLayout {
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
-        // Cancel any in-flight entrance so the next attach starts from a
-        // clean state. (Parent removes us instantly; no exit animation.)
         animate().cancel();
         setAlpha(1f);
         setTranslationY(0f);

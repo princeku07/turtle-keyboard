@@ -31,24 +31,8 @@ import java.util.List;
 
 /**
  * Quick Panel — replaces the keyboard's key area with a 2-column grid of
- * slash commands (PRD §6.6). Opened by double-tap-space.
- *
- * <p>A tap on a tile does <b>not</b> dispatch the command and does
- * <b>not</b> write {@code "/<name>"} to the host editor. The panel hands
- * the command name back to the IME, which routes through the same
- * {@link com.prince.turtlekeyboard.command.CommandComposer} the typed-slash
- * flow uses — so picking from the grid is indistinguishable from typing
- * the command. The host app sees nothing until the final result is
- * committed.
- *
- * <p>Visual language matches the keyboard's other rounded-card panels
- * (history, emoji, split): pure-black surface inside a 16 dp-radius card
- * with a 1 dp hairline stroke, sitting under a 12 dp top gap so the chrome
- * behind shows through. Tiles are subtle-white chips with a ripple
- * foreground, plus the brand-lime accent on the dismiss CTA. The whole
- * card slides up + fades in with the same Material-emphasized easing the
- * other panels use, so the keyboard's "panel rising into view" vocabulary
- * stays consistent across surfaces.
+ * slash commands. Opened by double-tap-space. Picking a tile routes through
+ * the same composer as typed slashes, so the host never sees "/&lt;name&gt;".
  */
 public class QuickPanelView extends LinearLayout {
 
@@ -57,14 +41,12 @@ public class QuickPanelView extends LinearLayout {
 
     private static final int COLUMNS = 2;
 
-    // ── Dark-panel color tokens (mirror HistoryPanelView etc.) ──────────
     private static final int BG           = 0xFF000000;
     private static final int TEXT_PRIMARY = 0xFFF5F5F5;
     private static final int TEXT_MUTED   = 0xA0F5F5F5;
     private static final int CHIP_FILL    = 0x14FFFFFF;
     private static final int RIPPLE_WASH  = 0x33FFFFFF;
     private static final int DIVIDER      = 0x22FFFFFF;
-    /** Brand lime — same value as colors.xml#lime. */
     private static final int ACCENT_LIME  = 0xFF15803D;
 
     private static final int PANEL_RADIUS_DP = 16;
@@ -100,10 +82,6 @@ public class QuickPanelView extends LinearLayout {
 
     private void init() {
         setOrientation(VERTICAL);
-        // Outer view stays transparent so the keyboard chrome shows through
-        // the TOP_GAP_DP gap above the rounded card.
-
-        // ── Rounded-card container ───────────────────────────────────────
         cardContainer.setOrientation(VERTICAL);
         final int cardRadius = dp(PANEL_RADIUS_DP);
         GradientDrawable cardBg = new GradientDrawable();
@@ -119,7 +97,6 @@ public class QuickPanelView extends LinearLayout {
         });
         cardContainer.setClipToOutline(true);
 
-        // ── Grid scroller (top of card) ──────────────────────────────────
         scroller.setFillViewport(true);
         scroller.setVerticalScrollBarEnabled(false);
         grid.setColumnCount(COLUMNS);
@@ -132,13 +109,11 @@ public class QuickPanelView extends LinearLayout {
         cardContainer.addView(scroller,
                 new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
 
-        // ── Hairline divider above the dismiss bar ───────────────────────
         divider.setBackgroundColor(DIVIDER);
         cardContainer.addView(divider,
                 new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
                         Math.max(1, dp(1) / 2)));
 
-        // ── Dismiss bar (full-width, single tap target back to keys) ─────
         dismissBar.setText("↓  Keyboard");
         dismissBar.setTextColor(TEXT_PRIMARY);
         dismissBar.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f);
@@ -150,9 +125,6 @@ public class QuickPanelView extends LinearLayout {
         dismissBar.setFocusable(true);
         int barPad = dp(12);
         dismissBar.setPadding(barPad, barPad, barPad, barPad);
-        // Transparent fill, ripple foreground for press feedback. No background
-        // shape — the dismiss bar reads as the card's bottom edge rather than
-        // a separate button.
         dismissBar.setForeground(new RippleDrawable(
                 ColorStateList.valueOf(RIPPLE_WASH), null, solidWhiteMask(0)));
         dismissBar.setOnClickListener(v -> {
@@ -163,7 +135,6 @@ public class QuickPanelView extends LinearLayout {
                 new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        // ── Mount the card with a top gap ────────────────────────────────
         LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f);
         cardLp.topMargin = dp(TOP_GAP_DP);
@@ -251,10 +222,7 @@ public class QuickPanelView extends LinearLayout {
         return g;
     }
 
-    /** Solid-white {@link GradientDrawable} sized as a rounded-corner mask
-     *  for {@link RippleDrawable}. Radius 0 means a square clip (used by the
-     *  dismiss bar, which has no rounded corners of its own — its ripple
-     *  spans the rectangular bar area). */
+    /** Radius 0 returns a square clip (used by the rectangular dismiss bar). */
     private GradientDrawable solidWhiteMask(int radius) {
         GradientDrawable g = new GradientDrawable();
         g.setShape(GradientDrawable.RECTANGLE);
@@ -263,14 +231,10 @@ public class QuickPanelView extends LinearLayout {
         return g;
     }
 
-    /** Kept for API compatibility with the IME's mount path; the panel
-     *  intentionally pins itself to the dark palette declared above so the
-     *  keyboard's light/dark theme can't repaint it underneath. */
+    /** No-op for API symmetry — the panel pins to its own dark palette. */
     @SuppressWarnings("unused")
     public void applyTheme(KeyboardTheme theme) { }
 
-    /** Slide-up + fade-in. Material-emphasized easing matches every other
-     *  rounded-card panel in the keyboard. */
     private void animateIn() {
         animate().cancel();
         setAlpha(0f);
@@ -283,9 +247,6 @@ public class QuickPanelView extends LinearLayout {
                 .start();
     }
 
-    /** Mirror: fade + slide down, then fire {@code onEnd} so the host can
-     *  tear down or dispatch the picked command as a follow-up to the
-     *  visual exit. Reset transform so a re-attach starts clean. */
     private void animateOut(Runnable onEnd) {
         animate().cancel();
         animate()

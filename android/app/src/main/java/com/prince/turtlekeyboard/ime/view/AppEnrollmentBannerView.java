@@ -17,10 +17,9 @@ import androidx.annotation.Nullable;
 import com.prince.turtlekeyboard.theme.KeyboardTheme;
 
 /**
- * Slim banner offered the first time the user types in an unknown app. Layout (left→right):
- * app icon · "Add &lt;App Name&gt;?" · ✓ · ✕. The ✓ enrolls the app for personalization
- * (affinity ranking, future per-app shortcut bundles); ✕ suppresses future prompts for
- * this package. Tapping anywhere on the row except ✕ also enrolls.
+ * Slim banner shown the first time the user types in an unknown app, offering to
+ * enrol it for personalization. Tapping the row or the check accepts; the X suppresses
+ * future prompts for that package.
  */
 public class AppEnrollmentBannerView extends LinearLayout {
 
@@ -102,7 +101,6 @@ public class AppEnrollmentBannerView extends LinearLayout {
         label.setText("Add " + appName + "?");
         View.OnClickListener accepter = v -> { if (listener != null) listener.onAccept(); };
         accept.setOnClickListener(accepter);
-        // Tapping the row body also enrolls — bigger target for the affirmative path.
         setOnClickListener(accepter);
         close.setOnClickListener(v -> { if (listener != null) listener.onDismiss(); });
         setVisibility(VISIBLE);

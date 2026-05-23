@@ -50,22 +50,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Dev-only screen for testing the sprite-sheet → animated GIF pipeline in
- * isolation from the AI. Lets you drop in any PNG, runs it through
- * {@link SpriteSheetSlicer} + {@link GifEncoder#encodeAnimated}, and previews
- * the resulting animated GIF in-app (or hands it off to an external viewer for
- * pre-API-28 devices that can't render {@link AnimatedImageDrawable}).
- *
- * <p>Pipeline mirrors {@code GifIntegration.sliceAndEncode} so a bug fixed here
- * is a bug fixed in /gif. Useful for:
- * <ul>
- *   <li>Verifying {@link GifEncoder#encodeAnimated} produces valid {@code image/gif}
- *       bytes that real viewers accept.</li>
- *   <li>Eyeballing the 5×1 vs 5×2 aspect detection threshold against arbitrary
- *       sheets.</li>
- *   <li>Reproducing matte issues using saved {@code gif_sheet_matte_*.png}
- *       artifacts from {@code ImageHistory}.</li>
- * </ul>
+ * Dev-only screen for testing the sprite-sheet → animated GIF pipeline in isolation
+ * from the AI. Mirrors {@code GifIntegration.sliceAndEncode} so bugs caught here
+ * map directly to /gif.
  */
 public class SpriteToGifTestActivity extends AppCompatActivity {
 
@@ -73,9 +60,7 @@ public class SpriteToGifTestActivity extends AppCompatActivity {
 
     private static final int REQ_PICK_SHEET = 100;
 
-    /** Same threshold and frame-delay numbers as the production pipeline so the
-     *  test reflects what /gif would actually do. See GifIntegration for the
-     *  layout rationale (4×4 preferred, 4×2 fallback, 4×1 last-resort). */
+    /** Production pipeline thresholds and frame-delay values. */
     private static final int COLS = 4;
     private static final double GRID_4X4_MAX_ASPECT  = 1.5;
     private static final double STRIP_4X1_MIN_ASPECT = 3.0;
@@ -100,23 +85,15 @@ public class SpriteToGifTestActivity extends AppCompatActivity {
     private ImageView gifPreview;
     private Button shareBtn;
 
-    /** True while {@link #syncInputsFromState()} is mutating the EditText
-     *  values from code — the TextWatchers swap currentCols/Rows/DelayCs
-     *  back to whatever the user types, but we don't want that re-entry
-     *  during a programmatic refresh on sheet load. */
+    /** True while {@link #syncInputsFromState()} is rewriting EditTexts; blocks watcher re-entry. */
     private boolean suppressInputWatch = false;
 
-    /** Last loaded sheet (from picker or bundled drawable), kept in memory
-     *  between load and generate. */
     @Nullable private Bitmap currentSheet;
 
-    /** Grid + frame-delay config for the current sheet. Set by the load path
-     *  (aspect-detected for picked sheets, hardcoded for bundled). */
     private int currentCols = COLS;
     private int currentRows = 4;
     private int currentDelayCs = FRAME_DELAY_CS_4X4;
 
-    /** Last encoded GIF on disk — used by the share button. */
     @Nullable private File lastGifFile;
 
     @Override
@@ -174,11 +151,7 @@ public class SpriteToGifTestActivity extends AppCompatActivity {
         infoLp.topMargin = dp(4);
         root.addView(sheetInfo, infoLp);
 
-        // ── Manual grid override row ────────────────────────────────────
-        // Replaces the previously-hardcoded 8×4 for the bundled sheet and
-        // makes the picker / history paths editable too. Auto-detect from
-        // aspect still runs on load and seeds these fields; the user is
-        // free to override before generating.
+        // Manual grid override row; auto-detect from aspect still seeds these on load.
         LinearLayout gridRow = new LinearLayout(this);
         gridRow.setOrientation(LinearLayout.HORIZONTAL);
         gridRow.setGravity(Gravity.CENTER_VERTICAL);
@@ -250,9 +223,6 @@ public class SpriteToGifTestActivity extends AppCompatActivity {
         root.addView(firstTileInfo, fullWidth());
 
         firstTilePreview = new ImageView(this);
-        // Pixel art (oneko) and screenshot-style sheets both benefit from
-        // NEAREST scaling rather than the default bilinear — disable it
-        // when we set the drawable so 32×32 cells stay crisp at upscale.
         firstTilePreview.setScaleType(ImageView.ScaleType.FIT_CENTER);
         firstTilePreview.setAdjustViewBounds(true);
         firstTilePreview.setBackgroundColor(0xFFCCCCCC);
@@ -300,8 +270,7 @@ public class SpriteToGifTestActivity extends AppCompatActivity {
         gifPreview = new ImageView(this);
         gifPreview.setScaleType(ImageView.ScaleType.FIT_CENTER);
         gifPreview.setAdjustViewBounds(true);
-        // Checkerboard-ish background so transparent GIFs are visible against
-        // the activity's solid surface. Solid grey is fine for a dev screen.
+        // Grey background so transparent GIFs are visible against the activity surface.
         gifPreview.setBackgroundColor(0xFFCCCCCC);
         LinearLayout.LayoutParams previewLp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(220));
@@ -360,8 +329,6 @@ public class SpriteToGifTestActivity extends AppCompatActivity {
                 ViewGroup.LayoutParams.WRAP_CONTENT);
     }
 
-    /** EditText layout params for the grid-config row — narrow enough that
-     *  three of them fit on a single line under the sheet info. */
     private LinearLayout.LayoutParams numberLp() {
         return new LinearLayout.LayoutParams(dp(56),
                 ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -378,12 +345,7 @@ public class SpriteToGifTestActivity extends AppCompatActivity {
         return e;
     }
 
-    /** Read the three inputs, apply them to the current grid state, and
-     *  refresh the first-tile preview so the user can immediately see
-     *  whether the manual override produces clean cells. Empty / non-numeric
-     *  fields are tolerated — we just hold onto the previous valid value
-     *  for that field so the user can clear and retype without us spamming
-     *  preview redraws with degenerate {@code 0×0} grids. */
+    /** Reads the grid inputs, updates state, and refreshes the first-tile preview. */
     private void applyGridFromInputs() {
         int newCols = parsePositive(colsInput, currentCols);
         int newRows = parsePositive(rowsInput, currentRows);
@@ -396,8 +358,6 @@ public class SpriteToGifTestActivity extends AppCompatActivity {
         currentDelayCs = newDelay;
         if (changed && currentSheet != null && !currentSheet.isRecycled()) {
             updateFirstTilePreview(currentSheet);
-            // Refresh the info line too so the displayed slice config tracks
-            // the manual override.
             double aspect = (double) currentSheet.getWidth() / currentSheet.getHeight();
             sheetInfo.setText(String.format(
                     "%d × %d px · aspect %.2f · %d × %d slice · %d cs/frame",
@@ -406,10 +366,7 @@ public class SpriteToGifTestActivity extends AppCompatActivity {
         }
     }
 
-    /** Push the current grid state into the EditTexts, suppressing the
-     *  TextWatcher round-trip so the act of programmatically setting text
-     *  doesn't re-invoke {@link #applyGridFromInputs()} and clobber the
-     *  values we just chose. */
+    /** Pushes current grid state into EditTexts; suppresses the watcher round-trip. */
     private void syncInputsFromState() {
         suppressInputWatch = true;
         try {
@@ -471,11 +428,7 @@ public class SpriteToGifTestActivity extends AppCompatActivity {
         });
     }
 
-    /** Lists every {@link ImageHistory} entry with command={@code "gif"} — these
-     *  are the debug artifacts /gif writes per invocation (white-bg, black-bg,
-     *  matte, chroma, raw). Lets you load any past sheet straight into the test
-     *  pipeline without re-running the model. Aspect detection then applies
-     *  the same 4×4 / 4×2 / 4×1 logic /gif uses in prod. */
+    /** Lists every {@link ImageHistory} entry with command={@code "gif"} for replay. */
     private void pickFromGifHistory() {
         io.execute(() -> {
             final java.util.List<ImageHistory.Entry> entries = filterGifEntries(
@@ -509,11 +462,7 @@ public class SpriteToGifTestActivity extends AppCompatActivity {
             java.util.List<ImageHistory.Entry> all) {
         java.util.List<ImageHistory.Entry> out = new java.util.ArrayList<>(all.size());
         for (ImageHistory.Entry e : all) {
-            // The /gif pipeline records two artifacts per run with the same
-            // "gif" command: the source sprite-sheet PNG (this screen's
-            // input) and the final encoded .gif (which the slicer can't
-            // re-ingest as a sheet). Filter to PNGs so the picker only
-            // surfaces things this test screen can actually feed back in.
+            // Filter to PNG sheets — the encoded .gif can't be re-ingested as a sheet.
             if ("gif".equals(e.command)
                     && e.file != null
                     && e.file.getName().endsWith(".png")) {
@@ -527,7 +476,7 @@ public class SpriteToGifTestActivity extends AppCompatActivity {
         io.execute(() -> {
             try {
                 BitmapFactory.Options opts = new BitmapFactory.Options();
-                opts.inScaled = false; // history PNGs are already at native resolution
+                opts.inScaled = false;
                 Bitmap bm = BitmapFactory.decodeFile(entry.file.getAbsolutePath(), opts);
                 if (bm == null) throw new Exception("decode failed for " + entry.file);
                 main.post(() -> onSheetLoaded(bm, /*overrideGrid*/ false, "history"));
@@ -538,17 +487,13 @@ public class SpriteToGifTestActivity extends AppCompatActivity {
         });
     }
 
-    /** Bundled oneko sprite sheet ({@code res/drawable/oneko.png}, 256×128 px).
-     *  Eight columns × four rows of 32×32 pixel-art cat frames — pixel-perfect
-     *  division means the slicer can be evaluated without any floor-division
-     *  rounding artifacts. 15cs/frame ⇒ a ~5 s loop across all 32 cells. */
+    /** Bundled oneko sprite sheet (256×128 px, 8×4 grid of 32×32 cells, ~5 s loop). */
     private void loadBundledSheet() {
         io.execute(() -> {
             try {
                 BitmapFactory.Options opts = new BitmapFactory.Options();
-                opts.inScaled = false; // keep native pixel dimensions
-                Bitmap bm = BitmapFactory.decodeResource(getResources(),
-                        R.drawable.oneko, opts);
+                opts.inScaled = false;
+                Bitmap bm = null;
                 if (bm == null) throw new Exception("decodeResource returned null");
                 main.post(() -> onSheetLoaded(bm, /*overrideGrid*/ true, "oneko"));
             } catch (Exception e) {
@@ -558,20 +503,14 @@ public class SpriteToGifTestActivity extends AppCompatActivity {
         });
     }
 
-    /** Single load-callback path used by both the picker and the bundled button.
-     *  {@code overrideGrid=true} preseeds the bundled sheet's known
-     *  8×4 layout; {@code false} runs the aspect-ratio heuristic. Either
-     *  way the user can edit the cols/rows/delay inputs afterward — these
-     *  values just populate the inputs as a starting point. */
+    /** Load callback for picker and bundled paths; {@code overrideGrid} preseeds bundled. */
     private void onSheetLoaded(Bitmap bm, boolean overrideGrid, String source) {
-        // Recycle previous sheet so repeated loads don't pile up bitmap memory.
         if (currentSheet != null && !currentSheet.isRecycled()) currentSheet.recycle();
         currentSheet = bm;
         setPixelPerfectBitmap(sheetThumb, bm);
         double aspect = (double) bm.getWidth() / bm.getHeight();
         if (overrideGrid) {
-            // oneko.png: 256×128 ⇒ 8 cols × 4 rows of 32×32 cells (32 frames).
-            // 15 cs/frame ⇒ ~5 s loop. Pixel-perfect division, no rounding.
+            // oneko.png: 8×4 grid of 32×32 cells; 15 cs/frame → ~5 s loop.
             currentCols = 8;
             currentRows = 4;
             currentDelayCs = 15;
@@ -585,19 +524,12 @@ public class SpriteToGifTestActivity extends AppCompatActivity {
                 "[%s] %d × %d px · aspect %.2f · %d × %d slice · %d cs/frame",
                 source, bm.getWidth(), bm.getHeight(), aspect,
                 currentCols, currentRows, currentDelayCs));
-        // Push the auto-detected values into the EditTexts. Suppression
-        // prevents the watcher from immediately re-applying them and
-        // re-rendering the preview before this load path is done with it.
         syncInputsFromState();
         updateFirstTilePreview(bm);
         generateBtn.setEnabled(true);
     }
 
-    /** Slices just frame 0 from {@code sheet} using the current grid config and
-     *  displays it in the preview ImageView with NEAREST-neighbor scaling so
-     *  pixel-art sheets like oneko stay crisp under upscale. Verifying frame 0
-     *  visually is the fastest way to catch a mis-grided slicer — if this tile
-     *  shows two half-cats fused at a seam, the cols/rows are wrong. */
+    /** Slices frame 0 with the current grid config; seams in the tile mean the grid is wrong. */
     private void updateFirstTilePreview(Bitmap sheet) {
         int cellW = sheet.getWidth()  / currentCols;
         int cellH = sheet.getHeight() / currentRows;
@@ -607,14 +539,13 @@ public class SpriteToGifTestActivity extends AppCompatActivity {
                     + currentRows + " grid (cell would be " + cellW + "×" + cellH + ")");
             return;
         }
-        // Copy out of the source so a later sheet reload (which recycles
-        // currentSheet) can't invalidate the displayed tile.
+        // Copy out of source so a later sheet reload can't invalidate the displayed tile.
         Bitmap raw = Bitmap.createBitmap(sheet, 0, 0, cellW, cellH);
         Bitmap tile = raw.copy(Bitmap.Config.ARGB_8888, false);
         if (raw != tile) raw.recycle();
 
         BitmapDrawable d = new BitmapDrawable(getResources(), tile);
-        d.setFilterBitmap(false); // NEAREST upscale — keeps pixel-art crisp
+        d.setFilterBitmap(false); // NEAREST upscale keeps pixel-art crisp
         d.setAntiAlias(false);
         firstTilePreview.setImageDrawable(d);
         firstTileInfo.setText(String.format(
@@ -632,23 +563,18 @@ public class SpriteToGifTestActivity extends AppCompatActivity {
         gifPreview.setImageDrawable(null);
         shareBtn.setEnabled(false);
 
-        // Snapshot the load-time config so a later sheet reload mid-encode
-        // can't desync rows/cols/delay.
+        // Snapshot config so a later sheet reload mid-encode can't desync rows/cols/delay.
         final int cols = currentCols;
         final int rows = currentRows;
         final int delayCs = currentDelayCs;
         final boolean keyOut = chromaKeyToggle.isChecked();
 
-        // Copy the source bitmap so the (possible) chroma-key can recycle its
-        // input without killing the on-screen thumbnail (which still references
-        // currentSheet).
+        // Copy source so optional chroma-key can recycle its input without killing the thumbnail.
         final Bitmap source = currentSheet.copy(Bitmap.Config.ARGB_8888, false);
 
         io.execute(() -> {
             try {
-                // Deterministic #FFFFFF mask. Opt-in because pixel-art sheets
-                // like oneko have white INSIDE the subject too — masking would
-                // hollow them out. Mirrors what /gif does in production.
+                // Opt-in: pixel-art sheets with internal white would get hollowed out.
                 Bitmap sheet = keyOut
                         ? BackgroundChromaKey.applyForColor(source, 0xFFFFFF, 10)
                         : source;
@@ -698,9 +624,7 @@ public class SpriteToGifTestActivity extends AppCompatActivity {
             try {
                 ImageDecoder.Source src = ImageDecoder.createSource(gifFile);
                 Drawable d = ImageDecoder.decodeDrawable(src);
-                // NEAREST-neighbor upscale so pixel-art GIFs (oneko) render
-                // crisp instead of bilinear-smudged. Drawable honors this on
-                // AnimatedImageDrawable too — pixels stay sharp per frame.
+                // NEAREST upscale keeps pixel-art crisp; honored by AnimatedImageDrawable too.
                 d.setFilterBitmap(false);
                 gifPreview.setImageDrawable(d);
                 if (d instanceof AnimatedImageDrawable) {
@@ -711,18 +635,12 @@ public class SpriteToGifTestActivity extends AppCompatActivity {
                 Log.w(TAG, "ImageDecoder failed; falling back to bitmap preview", e);
             }
         }
-        // Pre-API-28 or decode failure: show the first frame as a static bitmap
-        // so the user at least sees something. Encoded animation can still be
-        // verified via the share button.
+        // Pre-API-28 or decode failure: show the first frame; share button verifies the animation.
         Bitmap first = BitmapFactory.decodeFile(gifFile.getAbsolutePath());
         setPixelPerfectBitmap(gifPreview, first);
     }
 
-    /** Sets {@code bm} on {@code iv} as a {@link BitmapDrawable} with bitmap
-     *  filtering disabled — NEAREST-neighbor upscale. Required for crisp
-     *  rendering of pixel-art and low-res sprite sheets; the default
-     *  ImageView path uses bilinear filtering which smudges sub-pixel
-     *  details into a blur. */
+    /** Sets {@code bm} on {@code iv} as a BitmapDrawable with NEAREST-neighbor filtering. */
     private void setPixelPerfectBitmap(ImageView iv, Bitmap bm) {
         BitmapDrawable d = new BitmapDrawable(getResources(), bm);
         d.setFilterBitmap(false);
@@ -751,9 +669,7 @@ public class SpriteToGifTestActivity extends AppCompatActivity {
         return (int) (v * getResources().getDisplayMetrics().density);
     }
 
-    /** Aspect-ratio → row count. Mirror of {@code GifIntegration.rowsForAspect}
-     *  so the test screen behaves identically to the production pipeline for
-     *  any sheet a user picks from gallery. */
+    /** Aspect-ratio → row count; mirrors {@code GifIntegration.rowsForAspect}. */
     private static int rowsForAspect(double aspect) {
         if (aspect > STRIP_4X1_MIN_ASPECT) return 1;
         if (aspect > GRID_4X4_MAX_ASPECT)  return 2;

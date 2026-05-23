@@ -25,10 +25,9 @@ import com.prince.turtlekeyboard.ime.view.KeyboardRootView;
 import com.prince.turtlekeyboard.input.InputCommitter;
 
 /**
- * Adapts the IME's {@link KeyboardRootView} + {@link InputCommitter} + a root
- * {@link KeyValueStore} into the {@link IntegrationContext} the SDK exposes to
- * integrations. Each {@code store(namespace)} call returns a scoped child of the
- * single root store, so module storage is isolated without spinning up new prefs files.
+ * Adapts the IME's {@link KeyboardRootView}, {@link InputCommitter}, and a root
+ * {@link KeyValueStore} into the {@link IntegrationContext} surface exposed to
+ * integrations.
  */
 public class KeyboardIntegrationContextImpl implements IntegrationContext {
 
@@ -86,10 +85,8 @@ public class KeyboardIntegrationContextImpl implements IntegrationContext {
     @Override public void hideChip() { root.chip().hide(); }
 
     @Override public void showBanner(String text, long autoHideMs) {
-        // Trailing "…" is the shared loading-marker convention (same as
-        // CommandDispatcher.run). Integrations that pass e.g. "Creating poll…"
-        // get the gradient loader panel instead of the transient banner; on
-        // the next non-loading status (or after autoHideMs) we hide it.
+        // Trailing "…" is the shared loading-marker convention — show the gradient
+        // loader instead of the transient banner.
         if (text != null && text.endsWith("…")) {
             root.generatingLoader().show(text);
             root.banner().clear();
@@ -121,8 +118,6 @@ public class KeyboardIntegrationContextImpl implements IntegrationContext {
     @Override public GoogleAuth googleAuth() { return googleAuth; }
 
     @Override public void commitText(CharSequence text) {
-        // A successful commit means whatever was "in flight" has landed — hide
-        // the gradient loader so it doesn't linger past the result.
         root.generatingLoader().hide();
         committer.commitText(text);
     }
@@ -132,8 +127,6 @@ public class KeyboardIntegrationContextImpl implements IntegrationContext {
     @Override public void pickImage(ImagePickCallback cb) { imageBridge.pickImage(cb); }
 
     @Override public void commitImage(Uri uri, String mime) {
-        // Successful image insert means the in-flight work has landed — same as
-        // commitText, drop the gradient loader so it doesn't linger past the result.
         root.generatingLoader().hide();
         imageBridge.commitImage(uri, mime);
     }

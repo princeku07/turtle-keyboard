@@ -7,11 +7,8 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Tiny persistent log of saved splits, kept as newline-delimited
- * {@code amount|people|timestampMs} entries via a caller-supplied {@link KeyValueStore}.
- * Most-recent first, capped at {@link #MAX}.
- *
- * <p>Single-line records keep parsing trivial without pulling in a JSON dependency.
+ * Persistent log of saved splits stored as newline-delimited
+ * {@code amount|people|timestampMs} entries. Most-recent first, capped at {@link #MAX}.
  */
 public class SplitHistory {
 

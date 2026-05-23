@@ -25,32 +25,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Two-step bridge from {@link GoogleAuth}'s Google ID token to a Firebase Auth session,
- * plus the side effects that should fire on every successful sign-in.
- *
- * <p>Side effects per sign-in:
- * <ol>
- *   <li>Upsert {@code users/{uid}} in Firestore — first-time create writes
- *       {@code tier:"free"} + {@code createdAt}; subsequent calls update only the
- *       profile-fields allowlist defined in {@code firestore.rules}.</li>
- *   <li>Bind RevenueCat identity via {@code Purchases.logIn(uid)} so future purchase
- *       receipts map to the Firebase uid (the RevenueCat webhook → Cloud Function will
- *       write entitlements back to the same {@code users/{uid}} doc).</li>
- * </ol>
- *
- * <p>Construction wires GoogleAuth with the Firebase Web Client ID that the
- * {@code google-services} plugin auto-exposes as {@code R.string.default_web_client_id}:
- * <pre>
- *   String webClientId = context.getString(R.string.default_web_client_id);
- *   KeyValueStore store = new SharedPrefsKeyValueStore(context).scoped("google");
- *   GoogleAuth auth = new GoogleAuthImpl(context, store, webClientId);
- *   FirebaseAuthBridge bridge = new FirebaseAuthBridge(context, auth);
- * </pre>
- *
- * <p>Usage from a host {@link Activity}: call {@link #ensureSignedIn} on resume; if it
- * returns a {@link GoogleAuth.PendingUi}, launch the {@link android.content.IntentSender}
- * via {@code ActivityResultLauncher} and feed the result back to
- * {@link #onSignInActivityResult}. The bridge handles every other step.
+ * Bridges {@link GoogleAuth}'s Google ID token to a Firebase Auth session and upserts
+ * the {@code users/{uid}} doc plus RevenueCat identity on every successful sign-in.
  */
 public final class FirebaseAuthBridge {
 
@@ -79,17 +55,14 @@ public final class FirebaseAuthBridge {
     }
 
     /**
-     * Fast-path if Firebase Auth already has a user; otherwise kicks off the
-     * Google-ID-token-then-Firebase-credential flow. Caller must launch any returned
-     * {@link GoogleAuth.PendingUi} and route the result to
-     * {@link #onSignInActivityResult}.
+     * Returns the current Firebase user via callback, or kicks off the Google sign-in
+     * flow. Caller must launch any returned {@link GoogleAuth.PendingUi} and route the
+     * result to {@link #onSignInActivityResult}.
      */
     public void ensureSignedIn(@Nullable Activity activity, @NonNull Callback cb) {
         FirebaseUser existing = firebaseAuth.getCurrentUser();
         if (existing != null) {
-            // Firebase Auth persists across launches via its own session store. We still
-            // re-bind RevenueCat in case the SDK was reset (process death after sign-in
-            // but before logIn settled) — logIn is idempotent.
+            // Re-bind RevenueCat in case the SDK was reset between sign-in and logIn; idempotent.
             bindRevenueCat(existing);
             cb.onSignedIn(existing);
             return;
@@ -104,11 +77,7 @@ public final class FirebaseAuthBridge {
         });
     }
 
-    /**
-     * Completes the flow after the host {@link Activity} returned from the
-     * {@link GoogleAuth.PendingUi} intent. Mirrors GoogleAuth's
-     * {@code onAuthorizationResult} but for the One Tap sign-in intent path.
-     */
+    /** Completes sign-in after the host {@link Activity} returns from the One Tap intent. */
     public void onSignInActivityResult(@Nullable Activity activity, @Nullable Intent data,
                                        @NonNull Callback cb) {
         googleAuth.onSignInResult(activity, data, new GoogleAuth.Callback() {
@@ -121,9 +90,10 @@ public final class FirebaseAuthBridge {
         });
     }
 
-    /** Drops Firebase session + RC identity. Does NOT call
-     *  {@link GoogleAuth#signOut()} — access-token state for Drive/Sheets is a separate
-     *  concern and callers may want one without the other. */
+    /**
+     * Drops Firebase session and RevenueCat identity. Does NOT call
+     * {@link GoogleAuth#signOut()} — Drive/Sheets access-token state is a separate concern.
+     */
     public void signOut() {
         firebaseAuth.signOut();
         if (Purchases.isConfigured()) {
@@ -151,13 +121,9 @@ public final class FirebaseAuthBridge {
     }
 
     /**
-     * Upserts {@code users/{uid}}. Read-then-write so the first call satisfies the
-     * {@code create} rule ({@code tier == 'free'}) and subsequent calls satisfy the
-     * {@code update} rule (allowlisted fields only — never re-sending {@code tier},
-     * which the RevenueCat webhook owns).
-     *
-     * <p>Best-effort: failures are logged, not surfaced. Sign-in itself already
-     * succeeded; a stale profile doc isn't worth blocking the user on.
+     * Upserts {@code users/{uid}}. Read-then-write so the first call writes
+     * {@code tier:"free"} and subsequent calls only update the profile allowlist
+     * (never re-sending {@code tier}, which the RevenueCat webhook owns). Best-effort.
      */
     private void syncUserDoc(FirebaseUser user) {
         DocumentReference ref = firestore.collection(USERS_COLLECTION).document(user.getUid());
@@ -185,14 +151,12 @@ public final class FirebaseAuthBridge {
 
     private void bindRevenueCat(FirebaseUser user) {
         if (!Purchases.isConfigured()) {
-            // TurtleApp left RC unconfigured — REVENUECAT_SDK_KEY missing from
-            // local.properties. Already logged at startup; don't spam here.
+            // REVENUECAT_SDK_KEY missing; startup already logged this.
             return;
         }
         Purchases.getSharedInstance().logIn(user.getUid(), new LogInCallback() {
             @Override public void onReceived(@NonNull CustomerInfo customerInfo, boolean created) {
-                // No-op: entitlements arrive separately via the webhook → users/{uid}.
-                // Client-side CustomerInfo is not the source of truth for tier.
+                // Entitlements arrive via webhook → users/{uid}; CustomerInfo is not the source of truth.
             }
             @Override public void onError(@NonNull PurchasesError error) {
                 Log.w(TAG, "Purchases.logIn failed: " + error.getMessage());

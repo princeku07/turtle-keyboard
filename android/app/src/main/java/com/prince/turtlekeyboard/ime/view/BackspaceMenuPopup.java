@@ -5,6 +5,8 @@ import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.inputmethodservice.Keyboard;
 import android.inputmethodservice.KeyboardView;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
@@ -16,11 +18,12 @@ import android.widget.TextView;
 import com.prince.turtlekeyboard.R;
 
 /**
- * Floating menu shown above the backspace key after a long hold (~600ms). Offers
- * three bulk-delete actions; tapping one fires the callback and dismisses.
- * Outside touches dismiss without firing anything.
+ * Floating bulk-delete menu shown above the backspace key after a long hold.
+ * Dismisses on outside touch or after {@link #AUTO_DISMISS_MS}.
  */
 public class BackspaceMenuPopup {
+
+    private static final long AUTO_DISMISS_MS = 1500L;
 
     public interface ActionListener {
         void onClearAll();
@@ -30,8 +33,14 @@ public class BackspaceMenuPopup {
 
     private final Context context;
     private final PopupWindow window;
+    private final PopupWindow dimWindow;
+    private final View dimView;
     private final LinearLayout content;
     private final int verticalOffsetPx;
+    private final Handler autoDismissHandler = new Handler(Looper.getMainLooper());
+    private final Runnable autoDismissRunnable = new Runnable() {
+        @Override public void run() { dismiss(); }
+    };
     private ActionListener listener;
 
     public BackspaceMenuPopup(Context context) {
@@ -66,6 +75,17 @@ public class BackspaceMenuPopup {
         window.setClippingEnabled(false);
         window.setAnimationStyle(0);
 
+        // Dim layer sized to the IME root in showAbove(); keys underneath still receive touches.
+        dimView = new View(context);
+        dimView.setBackgroundColor(0x4D000000);
+        dimWindow = new PopupWindow(dimView, 0, 0);
+        dimWindow.setBackgroundDrawable(null);
+        dimWindow.setTouchable(false);
+        dimWindow.setFocusable(false);
+        dimWindow.setOutsideTouchable(false);
+        dimWindow.setClippingEnabled(false);
+        dimWindow.setAnimationStyle(0);
+
         verticalOffsetPx = dp(8);
     }
 
@@ -93,11 +113,25 @@ public class BackspaceMenuPopup {
 
         int[] loc = new int[2];
         kv.getLocationInWindow(loc);
-        // Right-align the menu to the key's right edge so the bulk-delete chips read
-        // from left to right ending under the user's finger.
+        // Right-align to the key so chips end under the user's finger.
         int keyRight = loc[0] + kv.getPaddingLeft() + target.x + target.width;
         int x = Math.max(loc[0] + dp(4), keyRight - w);
         int y = loc[1] + kv.getPaddingTop() + target.y - h - verticalOffsetPx;
+
+        View imeRoot = kv.getRootView();
+        if (imeRoot != null) {
+            int[] rootLoc = new int[2];
+            imeRoot.getLocationInWindow(rootLoc);
+            int rw = imeRoot.getWidth();
+            int rh = imeRoot.getHeight();
+            if (dimWindow.isShowing()) {
+                dimWindow.update(rootLoc[0], rootLoc[1], rw, rh);
+            } else {
+                dimWindow.setWidth(rw);
+                dimWindow.setHeight(rh);
+                dimWindow.showAtLocation(kv, Gravity.NO_GRAVITY, rootLoc[0], rootLoc[1]);
+            }
+        }
 
         if (window.isShowing()) {
             window.update(x, y, w, h);
@@ -106,6 +140,8 @@ public class BackspaceMenuPopup {
             window.setHeight(h);
             window.showAtLocation(kv, Gravity.NO_GRAVITY, x, y);
         }
+        autoDismissHandler.removeCallbacks(autoDismissRunnable);
+        autoDismissHandler.postDelayed(autoDismissRunnable, AUTO_DISMISS_MS);
     }
 
     public boolean isShowing() {
@@ -113,7 +149,9 @@ public class BackspaceMenuPopup {
     }
 
     public void dismiss() {
+        autoDismissHandler.removeCallbacks(autoDismissRunnable);
         if (window.isShowing()) window.dismiss();
+        if (dimWindow.isShowing()) dimWindow.dismiss();
     }
 
     private TextView makeButton(String label, final Runnable onTap) {

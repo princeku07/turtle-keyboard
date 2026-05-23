@@ -14,9 +14,8 @@ import android.os.Build;
 import androidx.core.app.NotificationCompat;
 
 /**
- * Surfaces the result of a fire-and-forget {@code /slack} dispatch via a system
- * notification — same pattern as {@code NotionResultNotifier}, kept module-local so
- * each integration owns its own channel + receiver.
+ * Surfaces the result of a {@code /slack} dispatch via a system notification.
+ * Tap opens the message; the "Copy link" action copies the permalink.
  */
 public final class SlackResultNotifier {
 

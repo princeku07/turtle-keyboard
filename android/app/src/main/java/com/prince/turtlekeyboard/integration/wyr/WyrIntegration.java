@@ -12,6 +12,7 @@ import com.prince.kbd.core.IntegrationContext;
 import com.prince.kbd.core.IntegrationSession;
 import com.prince.kbd.core.KeyboardIntegration;
 import com.prince.kbd.core.SheetViewFactory;
+import com.prince.turtlekeyboard.ai.AiErrorMessages;
 import com.prince.turtlekeyboard.integration.web.GamesFirestoreClient;
 import com.prince.turtlekeyboard.integration.web.WebGameSheetView;
 
@@ -25,22 +26,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Would-you-rather integration. Local handler owns the full flow:
- *
- * <ol>
- *   <li>Loads {@code assets/prompts/wyr.txt}.</li>
- *   <li>Calls {@link GeminiService#text} to shape the user's (optional) theme prompt
- *       into dilemma pairs as JSON.</li>
- *   <li>Writes the artifact via {@link GamesFirestoreClient#createGame} with
- *       {@code type:"wyr"} — the actual quiz UI lives in the WebView at
- *       {@code games.turtlekeyboard.com/wyr/} (see {@link WebGameSheetView}).</li>
- *   <li>Commits the returned shareable App Link URL into the host field.</li>
- * </ol>
- *
- * <p>Unlike {@code PollIntegration} (native sheet), the wyr sheet view is generic
- * {@link WebGameSheetView} — every future WebView-based game registers the same factory
- * keyed by its route key. Empty user prompt is allowed; system prompt covers the
- * no-theme case.
+ * {@code /wyr} — generates a would-you-rather game from an optional theme prompt,
+ * persists it via {@link GamesFirestoreClient#createGame}, and commits the share URL.
+ * The quiz UI is the generic {@link WebGameSheetView}.
  */
 public class WyrIntegration implements KeyboardIntegration {
 
@@ -68,15 +56,10 @@ public class WyrIntegration implements KeyboardIntegration {
 
     @Override
     public Map<String, SheetViewFactory> sheetRoutes() {
-        // WebView shell. Reads game type from SheetContext.routeKey() so one factory
-        // serves every WebView game — wyr's UI lives in JS at
-        // games.turtlekeyboard.com/wyr/, not in Java.
         return Collections.singletonMap(ROUTE_KEY, WebGameSheetView::new);
     }
 
     private void handleWyr(String prompt, IntegrationContext ctx) {
-        // /wyr accepts an empty prompt (system prompt covers the no-theme case) but
-        // trims any user input as a theme hint.
         final String themeHint = prompt == null ? "" : prompt.trim();
         final String userPrompt = themeHint.isEmpty()
                 ? "Generate a varied set."
@@ -91,13 +74,13 @@ public class WyrIntegration implements KeyboardIntegration {
         ctx.ai().text(systemPrompt, userPrompt, new GeminiService.TextCallback() {
             @Override public void onText(String text) { onModelText(ctx, text); }
             @Override public void onError(String reason) {
-                ctx.showBanner("Game failed: " + reason, FAIL_BANNER_MS);
+                Log.w(TAG, "wyr ai.text failed: " + reason);
+                ctx.showBanner(AiErrorMessages.userMessage(reason), FAIL_BANNER_MS);
             }
         });
     }
 
-    /** Main thread. Parses Gemini's output and writes the artifact via Firestore.
-     *  Firestore callbacks fire on the main thread by default — no Handler hop. */
+    /** Parses model output and writes the artifact. Runs on the main thread. */
     private void onModelText(IntegrationContext ctx, String rawJson) {
         String stripped = stripCodeFences(rawJson);
         JSONObject parsed;
@@ -113,8 +96,7 @@ public class WyrIntegration implements KeyboardIntegration {
             ctx.showBanner("Couldn't shape that game — try a clearer prompt", FAIL_BANNER_MS);
             return;
         }
-        // Build questions as a List<Map> so Firestore serializes them as document arrays
-        // of nested maps. The JS game reads {a, b} directly off each element.
+        // List<Map> so Firestore serializes as an array of nested maps.
         final List<Map<String, Object>> questions = new ArrayList<>(qsArr.length());
         for (int i = 0; i < qsArr.length(); i++) {
             JSONObject q = qsArr.optJSONObject(i);

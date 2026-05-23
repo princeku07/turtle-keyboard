@@ -24,23 +24,12 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Pluggable Notion integration. Contributes the {@code /notion} slash command (and
- * {@code /note} as a friendly alias). Behavior is fire-and-forget:
- *
- * <ol>
- *   <li>User taps Go on {@code /notion <prompt>}.</li>
- *   <li>Composer closes, banner flashes "Creating Notion page…" for ~1.2s.</li>
- *   <li>Background: LLM structures the prompt → Notion API creates the page.</li>
- *   <li>System notification surfaces the result (tap to open, "Copy link" action).</li>
- * </ol>
- *
- * <p>If the user hasn't completed OAuth + parent picking, the handler shows a banner
- * pointing them to the host app's "Connect Notion" screen and exits without firing.
+ * Notion integration. Contributes {@code /notion} (and {@code /note} alias): structures
+ * the prompt with the LLM, creates a Notion page under the user's chosen parent, and
+ * surfaces the result via system notification.
  */
 public final class NotionIntegration implements KeyboardIntegration {
 
-    /** Apps where a "send to Notion" action feels most natural — drives Quick Panel
-     *  ranking, never gates command availability. */
     private static final Set<String> AFFINITY = new HashSet<>(Arrays.asList(
             "com.Slack",
             "com.whatsapp",
@@ -55,9 +44,7 @@ public final class NotionIntegration implements KeyboardIntegration {
     @Override
     @Nullable
     public IntegrationSession activate(EditorInfo info, IntegrationContext ctx) {
-        // No per-input chip today — Notion is action-driven via slash, not contextual.
-        // Returning null leaves any other integration (e.g. Split) free to claim the
-        // session in its own host apps.
+        // Slash-driven, not contextual — no per-input chip.
         return null;
     }
 
@@ -87,8 +74,6 @@ public final class NotionIntegration implements KeyboardIntegration {
             return;
         }
 
-        // Fire-and-forget. UI thread sees only the brief banner; the LLM + API work
-        // runs off the IME thread, and the result lands as a system notification.
         ctx.showBanner("📓 Creating Notion page…", 1200L);
 
         final Context appContext = ctx.appContext();
@@ -115,7 +100,7 @@ public final class NotionIntegration implements KeyboardIntegration {
     }
 
     private static String canonicalUrl(String pageId) {
-        // Notion's web URL has the dashes stripped from the id.
+        // Notion web URLs use the dash-stripped id.
         if (pageId == null) return "https://www.notion.so";
         return "https://www.notion.so/" + pageId.replace("-", "");
     }

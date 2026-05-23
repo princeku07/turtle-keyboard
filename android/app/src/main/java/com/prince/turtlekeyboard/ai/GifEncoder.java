@@ -13,33 +13,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Minimal GIF89a encoder. The keyboard needs this so the "GIF" share option produces
- * real {@code image/gif} bytes. Android's {@code Bitmap.compress} doesn't include GIF,
- * and pulling a library in for one feature isn't worth the weight.
- *
- * <p>Two entry points:
- * <ul>
- *   <li>{@link #encode(Bitmap, OutputStream)} — single-frame, opaque. Used by the
- *       "Save as GIF" share path.</li>
- *   <li>{@link #encodeAnimated(List, int, int, OutputStream)} — multi-frame, with
- *       per-frame transparency. Used by {@code /gif} to assemble the sprite sheet
- *       from Nano Banana into a looping animation.</li>
- * </ul>
- *
- * <p>Algorithm:
- * <ul>
- *   <li>Quantize to ≤256 colors by first-fit (most images we render have a small
- *       palette anyway). When the palette fills, every additional color maps to its
- *       nearest existing entry.</li>
- *   <li>For the animated variant, the palette is built once across all frames (one
- *       global color table) so frame-to-frame palette flicker is impossible.</li>
- *   <li>Standard GIF89a structure: header, logical screen descriptor, GCT, optional
- *       NETSCAPE2.0 loop extension, one or more frames (GCE + image descriptor + LZW),
- *       trailer.</li>
- * </ul>
- *
- * <p>LZW compression code adapted from Jef Poskanzer's public-domain Acme GifEncoder
- * (which itself derives from the Unix {@code compress} utility).
+ * Minimal GIF89a encoder. Single-frame {@link #encode} for opaque output;
+ * {@link #encodeAnimated} for multi-frame animations with per-frame transparency
+ * and a single global color table. LZW code adapted from Jef Poskanzer's
+ * public-domain Acme GifEncoder.
  */
 public final class GifEncoder {
 
@@ -75,18 +52,15 @@ public final class GifEncoder {
             indexed[i] = (byte) idx;
         }
 
-        // ── GIF89a header ───────────────────────────────────────────────
         out.write(new byte[]{'G', 'I', 'F', '8', '9', 'a'});
 
         // Logical screen descriptor
         writeShort(out, w);
         writeShort(out, h);
-        // Packed: GCT=1, color_res=7, sort=0, GCT size=7 (=> 256 entries)
-        out.write(0xF7);
-        out.write(0); // background color index
-        out.write(0); // pixel aspect ratio
+        out.write(0xF7); // GCT=1, color_res=7, sort=0, GCT size=7 (256 entries)
+        out.write(0);
+        out.write(0);
 
-        // Global color table — always 256 entries (pad with zeros)
         for (int i = 0; i < 256; i++) {
             int p = i < paletteSize ? palette[i] : 0;
             out.write((p >> 16) & 0xff);
@@ -94,40 +68,29 @@ public final class GifEncoder {
             out.write(p & 0xff);
         }
 
-        // Image descriptor
         out.write(0x2C);
-        writeShort(out, 0); // left
-        writeShort(out, 0); // top
+        writeShort(out, 0);
+        writeShort(out, 0);
         writeShort(out, w);
         writeShort(out, h);
-        out.write(0); // no LCT, no interlace
+        out.write(0);
 
-        // LZW image data
-        out.write(8); // initial LZW code size
+        out.write(8);
         new LzwEncoder(indexed, 8).encode(out);
-        out.write(0); // block terminator
+        out.write(0);
 
-        // Trailer
         out.write(0x3B);
         out.flush();
     }
 
     /**
-     * Encodes {@code frames} into a single looping animated GIF. All frames must share
-     * the same dimensions; the first frame's size is used as the canvas size.
+     * Encodes frames into a looping animated GIF. All frames must share dimensions.
+     * Pixels with alpha &lt; 128 become transparent; disposal method 2 prevents
+     * frame-N pixels bleeding through frame-N+1 transparent regions.
      *
-     * <p>Transparency: pixels with alpha &lt; 128 in any frame are encoded as the
-     * GIF's transparent index. Disposal method 2 (restore-to-background) is set on
-     * every frame, so a transparent region in frame N+1 does not retain pixels from
-     * frame N.
-     *
-     * @param frames         the frames in display order. Must be non-empty, all the
-     *                       same width and height, all non-recycled.
-     * @param frameDelayCs   delay between frames in centiseconds (1/100 s). For 10 fps
-     *                       pass 10.
-     * @param loopCount      0 = loop forever (the common case for /gif); 1..65535 =
-     *                       loop that many additional times after the first play.
-     * @param out            the destination stream.
+     * @param frames        frames in display order; non-empty, matching dimensions
+     * @param frameDelayCs  per-frame delay in centiseconds (1/100 s)
+     * @param loopCount     0 = loop forever; otherwise 1..65535 additional plays
      */
     public static void encodeAnimated(List<Bitmap> frames, int frameDelayCs,
                                       int loopCount, OutputStream out) throws IOException {
@@ -142,18 +105,9 @@ public final class GifEncoder {
             }
         }
 
-        // ── Two-pass palette construction ───────────────────────────────────
-        // Pass 1: histogram of every opaque pixel's 5-bit-binned RGB across all
-        //   frames. Binning to 5 bits/channel (32 levels) collapses anti-aliased
-        //   near-white variants (FE/FF/FD/FC ...) into a single bucket so they
-        //   don't each claim a palette slot.
-        // Pass 2: pick the top-255 most-frequent binned RGBs as the palette.
-        //   This is why we're two-pass: first-fit was claiming slots in scan
-        //   order, so a row of near-white bg pixels would exhaust the palette
-        //   before any subject pixel was seen, and subject pixels would then
-        //   nearest-match onto white — collapsing the GIF to silhouette/B&W.
-        // Pass 3: re-iterate pixels and emit indices into the chosen palette.
-        // Index 0 is reserved as the transparent placeholder regardless.
+        // Two-pass: 5-bit-binned histogram across all frames, take top-255 as the
+        // palette (slot 0 reserved for transparent), then index every pixel. First-fit
+        // would let bg pixels exhaust the palette before any subject pixel was seen.
         int frameCount = frames.size();
         int[][] frameArgb = new int[frameCount][w * h];
         HashMap<Integer, Integer> histogram = new HashMap<>();
@@ -169,12 +123,10 @@ public final class GifEncoder {
             }
         }
 
-        // Top-255 by frequency. Sort the entry list once; for typical sheets
-        // (≤32K unique binned RGBs) this is well under 10 ms.
         List<Map.Entry<Integer, Integer>> ranked = new ArrayList<>(histogram.entrySet());
         Collections.sort(ranked, new Comparator<Map.Entry<Integer, Integer>>() {
             @Override public int compare(Map.Entry<Integer, Integer> a, Map.Entry<Integer, Integer> b) {
-                return Integer.compare(b.getValue(), a.getValue()); // desc
+                return Integer.compare(b.getValue(), a.getValue());
             }
         });
 
@@ -185,8 +137,6 @@ public final class GifEncoder {
             palette[paletteSize++] = ranked.get(i).getKey();
         }
 
-        // Map every distinct binned RGB → palette index once, then reuse.
-        // Top-255 colors get exact-match slots; everything else nearest-matches.
         HashMap<Integer, Integer> rgbToIdx = new HashMap<>(paletteSize * 2);
         for (int i = 1; i < paletteSize; i++) {
             rgbToIdx.put(palette[i], i);
@@ -239,12 +189,9 @@ public final class GifEncoder {
                     "frame %d/%d alpha=[%d..%d] op=%d tr=%d mean=(%d,%d,%d) firstChromatic=(%d,%d,%d) exact=%d near=%d",
                     f, frameCount, minA, maxA, opaquePixels, transparentPixels,
                     meanR, meanG, meanB, sampleR, sampleG, sampleB, exactHits, nearestMisses));
-            frameArgb[f] = null; // release per-frame buffer once indexed
+            frameArgb[f] = null;
         }
 
-        // Sample the first 8 non-placeholder palette entries (now sorted by
-        // global frequency desc, so palette[1] is the dominant color of the
-        // sheet — typically the white background).
         StringBuilder palSample = new StringBuilder("palette[1..");
         int dumpEnd = Math.min(paletteSize, 9);
         palSample.append(dumpEnd - 1).append("]=");
@@ -254,18 +201,13 @@ public final class GifEncoder {
         Log.d(TAG, palSample.toString() + " (total " + paletteSize
                 + ", uniqueBins=" + histogram.size() + ")");
 
-        // ── GIF89a header + LSD ─────────────────────────────────────────────
         out.write(new byte[]{'G', 'I', 'F', '8', '9', 'a'});
         writeShort(out, w);
         writeShort(out, h);
-        out.write(0xF7);   // GCT=1, color_res=7, sort=0, GCT size=7 (=> 256 entries)
-        out.write(0);      // background color index — index 0 (transparent)
-        out.write(0);      // pixel aspect ratio
+        out.write(0xF7);
+        out.write(0);
+        out.write(0);
 
-        // Global color table — 256 entries, slot 0 = (0,0,0) placeholder. The
-        // transparent flag in each frame's GCE is what actually makes index 0
-        // render as transparent; the RGB value at slot 0 only shows in viewers
-        // that ignore the transparent flag and fall back to the background color.
         for (int i = 0; i < 256; i++) {
             int p = i < paletteSize ? palette[i] : 0;
             out.write((p >> 16) & 0xff);
@@ -273,52 +215,44 @@ public final class GifEncoder {
             out.write(p & 0xff);
         }
 
-        // ── NETSCAPE2.0 application extension (looping) ─────────────────────
-        // Standard incantation viewers use to enable infinite-loop playback.
-        out.write(0x21);   // extension introducer
-        out.write(0xFF);   // application extension label
-        out.write(0x0B);   // block size (11)
+        // NETSCAPE2.0 application extension enables infinite-loop playback.
+        out.write(0x21);
+        out.write(0xFF);
+        out.write(0x0B);
         out.write(new byte[]{'N', 'E', 'T', 'S', 'C', 'A', 'P', 'E', '2', '.', '0'});
-        out.write(0x03);   // sub-block size
-        out.write(0x01);   // sub-block id
+        out.write(0x03);
+        out.write(0x01);
         writeShort(out, loopCount & 0xFFFF);
-        out.write(0x00);   // block terminator
+        out.write(0x00);
 
-        // ── Per-frame blocks ────────────────────────────────────────────────
         for (int f = 0; f < frameCount; f++) {
-            // Graphic Control Extension: transparency on, disposal=2 (restore
-            // background), delay = frameDelayCs centiseconds.
-            //   packed byte layout: reserved(3) | disposal(3) | userInput(1) | transparency(1)
-            //   disposal=2, userInput=0, transparency=1 → 0b00001001 = 0x09
+            // GCE: disposal=2, transparency=1 → 0x09
             out.write(0x21);
             out.write(0xF9);
-            out.write(0x04);   // block size
+            out.write(0x04);
             out.write(0x09);
             writeShort(out, frameDelayCs);
-            out.write(0x00);   // transparent color index
-            out.write(0x00);   // block terminator
+            out.write(0x00);
+            out.write(0x00);
 
-            // Image Descriptor — full-canvas frame, no local color table.
             out.write(0x2C);
-            writeShort(out, 0); // left
-            writeShort(out, 0); // top
+            writeShort(out, 0);
+            writeShort(out, 0);
             writeShort(out, w);
             writeShort(out, h);
-            out.write(0x00);   // packed: no LCT, no interlace, no sort
+            out.write(0x00);
 
-            // LZW image data
-            out.write(8);      // initial LZW code size
+            out.write(8);
             new LzwEncoder(indexedFrames[f], 8).encode(out);
-            out.write(0x00);   // block terminator
+            out.write(0x00);
         }
 
-        out.write(0x3B);       // trailer
+        out.write(0x3B);
         out.flush();
     }
 
-    /** Nearest-match in palette[from..size). The original single-frame {@link #encode}
-     *  scans from index 0; the animated path needs to skip the transparent placeholder
-     *  at slot 0 so opaque pixels never collapse onto the transparent index. */
+    /** Nearest-match in palette[from..size). The animated path passes from=1 to skip
+     *  the transparent placeholder so opaque pixels never collapse onto it. */
     private static int nearestIndex(int[] palette, int size, int rgb, int from) {
         int r = (rgb >> 16) & 0xff, g = (rgb >> 8) & 0xff, b = rgb & 0xff;
         int best = from, bestDist = Integer.MAX_VALUE;
@@ -352,8 +286,7 @@ public final class GifEncoder {
         o.write((v >> 8) & 0xff);
     }
 
-    // ── LZW (GIF variant) ───────────────────────────────────────────────
-    // Adapted from Jef Poskanzer's Acme GifEncoder (public domain).
+    // LZW (GIF variant) — adapted from Jef Poskanzer's Acme GifEncoder (public domain).
     private static final class LzwEncoder {
         private static final int EOF = -1;
         private static final int BITS = 12;

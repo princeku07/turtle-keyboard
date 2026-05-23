@@ -6,13 +6,9 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * OAuth scopes Split needs from Google. Spreadsheets for the Sheets-backed split book,
- * drive.file so the OWNER can call drive.permissions.create on sheets they created,
- * userinfo.email so we can show "signed in as &lt;email&gt;" and identify owner vs joiner.
- *
- * <p>Constants live in their own file so callers don't pull in the rest of {@code split/}
- * just to reference scope strings. Used at every {@link com.prince.kbd.core.GoogleAuth}
- * call from {@link SplitCloudSync} and the Split host activities.
+ * OAuth scopes the Split module requests from Google: Sheets for the split book,
+ * drive.file for owner-side permission management, and userinfo.email to identify
+ * owner vs joiner.
  */
 public final class SplitOAuthScopes {
 

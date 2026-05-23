@@ -12,23 +12,16 @@ import com.google.zxing.common.BitMatrix;
 import java.util.EnumMap;
 import java.util.Map;
 
-/**
- * Tiny wrapper over ZXing core for rendering QR codes to {@link Bitmap}s. Avoids the
- * heavier {@code zxing-android-embedded} library since we only need rendering, not
- * scanning (the OS camera handles that).
- */
+/** Wrapper over ZXing core for rendering QR codes to {@link Bitmap}s. */
 final class QrRenderer {
 
     private QrRenderer() {}
 
-    /**
-     * Renders {@code text} as a square QR bitmap of {@code size} px on each side.
-     * Returns {@code null} if encoding fails (extremely rare for short URLs).
-     */
+    /** Renders {@code text} as a square QR bitmap. Returns {@code null} on encode failure. */
     static Bitmap render(String text, int size) {
         try {
             Map<EncodeHintType, Object> hints = new EnumMap<>(EncodeHintType.class);
-            hints.put(EncodeHintType.MARGIN, 1); // small quiet zone
+            hints.put(EncodeHintType.MARGIN, 1);
             hints.put(EncodeHintType.CHARACTER_SET, "UTF-8");
             BitMatrix matrix = new MultiFormatWriter().encode(text, BarcodeFormat.QR_CODE, size, size, hints);
             int w = matrix.getWidth();

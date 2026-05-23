@@ -18,14 +18,8 @@ import androidx.annotation.Nullable;
 import com.prince.turtlekeyboard.theme.KeyboardTheme;
 
 /**
- * Banner-row replacement shown while voice dictation is active.
- *
- * <p>Left: a row of vertical bars whose heights track {@link #setRms(float)} (RMS
- * in dB from {@code SpeechRecognizer}). When no audio is arriving yet, the bars
- * idle in a slow sine wave so the user knows the mic is live.
- *
- * <p>Right: a {@link TextView} that shows the in-flight transcript (or
- * "Listening…" before the recognizer has emitted any partial result).
+ * Banner-row shown while voice dictation is active: an RMS-driven bar wave on
+ * the left and the in-flight transcript on the right.
  */
 public class VoiceListeningView extends LinearLayout {
 
@@ -57,25 +51,22 @@ public class VoiceListeningView extends LinearLayout {
         addView(label, lp);
     }
 
-    /** Show the row and start the idle animation. */
     public void start() {
         label.setText("Listening…");
         setVisibility(VISIBLE);
         bars.start();
     }
 
-    /** Hide the row and stop animating. */
     public void stop() {
         bars.stop();
         setVisibility(GONE);
     }
 
-    /** Update transcript line. Empty/null reverts to "Listening…". */
+    /** Null/empty reverts to "Listening…". */
     public void setTranscript(@Nullable String text) {
         label.setText(text == null || text.isEmpty() ? "Listening…" : text);
     }
 
-    /** Drive bars with the recognizer's latest RMS in dB. */
     public void setRms(float dB) { bars.setRms(dB); }
 
     public void applyTheme(KeyboardTheme theme) {
@@ -88,16 +79,13 @@ public class VoiceListeningView extends LinearLayout {
         return (int) (v * getResources().getDisplayMetrics().density + 0.5f);
     }
 
-    /** Inner view that paints the bars. Driven by a single {@link ValueAnimator}
-     *  ticking the wall clock; bar heights are derived from the latest RMS plus
-     *  a per-bar phase offset so the row reads as a wave. */
     private static class BarsView extends View {
 
         private static final int BAR_COUNT = 5;
-        private static final long TICK_MS = 16L;     // ~60 fps
-        private static final float MIN_FRAC = 0.18f; // bar height never collapses fully
+        private static final long TICK_MS = 16L;
+        private static final float MIN_FRAC = 0.18f;
         private static final float MAX_FRAC = 1.00f;
-        private static final float IDLE_AMP = 0.22f; // amplitude of idle sine wave
+        private static final float IDLE_AMP = 0.22f;
 
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final RectF rect = new RectF();
@@ -105,7 +93,6 @@ public class VoiceListeningView extends LinearLayout {
         private long startedAt;
         private int color = 0xFF15803D;
 
-        // Smoothed loudness in 0..1; eased toward latest RMS sample.
         private float loudness = 0f;
 
         BarsView(Context c) { super(c); }
@@ -121,7 +108,7 @@ public class VoiceListeningView extends LinearLayout {
             ticker.setRepeatCount(ValueAnimator.INFINITE);
             ticker.setInterpolator(new LinearInterpolator());
             ticker.addUpdateListener(a -> {
-                // Ease loudness back toward 0 so bars settle when speech pauses.
+                // Decay loudness so bars settle when speech pauses.
                 loudness *= 0.92f;
                 invalidate();
             });
@@ -134,15 +121,12 @@ public class VoiceListeningView extends LinearLayout {
             invalidate();
         }
 
-        /** RMS dB values from SpeechRecognizer are roughly -2..10 in practice.
-         *  Map that range to 0..1 and ease toward it so bars feel springy
-         *  rather than jittery. */
+        // SpeechRecognizer RMS is roughly -2..10 dB in practice.
         void setRms(float dB) {
             float normalized = (dB + 2f) / 12f;
             if (normalized < 0f) normalized = 0f;
             if (normalized > 1f) normalized = 1f;
-            // Take the max so a louder sample lifts immediately; the per-tick
-            // decay in the animator handles the fall-off.
+            // Max-on-rise + decay-on-tick gives a springy attack with smooth fall-off.
             if (normalized > loudness) loudness = normalized;
         }
 
@@ -162,10 +146,8 @@ public class VoiceListeningView extends LinearLayout {
             float t = (System.currentTimeMillis() - startedAt) / 1000f;
 
             for (int i = 0; i < BAR_COUNT; i++) {
-                // Per-bar sine offset gives the row a traveling-wave shape.
                 float phase = i * 0.9f;
                 float idle = IDLE_AMP * (0.5f + 0.5f * (float) Math.sin(t * 5.0 + phase));
-                // Blend idle wave (when quiet) with louder spikes (when speaking).
                 float frac = MIN_FRAC + (MAX_FRAC - MIN_FRAC)
                         * Math.min(1f, idle + loudness * (0.6f + 0.4f * (float) Math.sin(t * 9.0 + phase)));
                 float bh = h * frac;

@@ -12,6 +12,7 @@ import com.prince.kbd.core.IntegrationContext;
 import com.prince.kbd.core.IntegrationSession;
 import com.prince.kbd.core.KeyboardIntegration;
 import com.prince.kbd.core.SheetViewFactory;
+import com.prince.turtlekeyboard.ai.AiErrorMessages;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -22,28 +23,17 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Poll integration — owns the full {@code /poll} flow end-to-end. The local handler:
- *
- * <ol>
- *   <li>Loads {@code assets/prompts/poll.txt} via {@link AssetPrompts}.</li>
- *   <li>Calls {@link GeminiService#text} to shape the user's terse prompt into a
- *       {@code {question, options}} JSON object.</li>
- *   <li>Parses + validates, then writes the poll doc via
- *       {@link RealtimePollClient#createPoll}.</li>
- *   <li>Commits the returned shareable HTTPS App Link URL into the host field.</li>
- * </ol>
- *
- * <p>No round trip through {@code LmStudioAiClient}. New AI features should follow this
- * shape: own your prompt, own your dispatch, call {@code ctx.ai()} directly.
+ * {@code /poll} — shape a terse user prompt into a {@code {question, options}} object
+ * via Gemini, write the poll doc via {@link RealtimePollClient#createPoll}, then commit
+ * the shareable App Link URL into the host editor.
  */
 public class PollIntegration implements KeyboardIntegration {
 
     private static final String TAG = "PollIntegration";
 
-    /** URL route key — matches {@code https://www.turtlekeyboard.com/poll/<id>}. */
     public static final String ROUTE_KEY = "poll";
 
-    private static final long BUSY_BANNER_MS = 30_000L; // long enough to last through gen + Firestore write
+    private static final long BUSY_BANNER_MS = 30_000L;
     private static final long FAIL_BANNER_MS = 2_500L;
     private static final long EMPTY_BANNER_MS = 2_200L;
 
@@ -77,9 +67,6 @@ public class PollIntegration implements KeyboardIntegration {
         }
         String systemPrompt = AssetPrompts.load(ctx.appContext(), "poll");
         if (systemPrompt.isEmpty()) {
-            // Build-time copy of commands/prompts/poll.txt → assets/prompts/poll.txt
-            // didn't happen. Clean rebuild fixes it; surface so it doesn't look like a
-            // model error.
             ctx.showBanner("Poll prompt missing — clean rebuild needed", FAIL_BANNER_MS);
             return;
         }
@@ -87,13 +74,12 @@ public class PollIntegration implements KeyboardIntegration {
         ctx.ai().text(systemPrompt, trimmed, new GeminiService.TextCallback() {
             @Override public void onText(String text) { onModelText(ctx, text); }
             @Override public void onError(String reason) {
-                ctx.showBanner("Poll failed: " + reason, FAIL_BANNER_MS);
+                Log.w(TAG, "poll ai.text failed: " + reason);
+                ctx.showBanner(AiErrorMessages.userMessage(reason), FAIL_BANNER_MS);
             }
         });
     }
 
-    /** Main thread. Parses Gemini's output, dispatches the Firestore write. Firestore
-     *  callbacks fire on the main thread by default, so no Handler hop on either side. */
     private void onModelText(IntegrationContext ctx, String rawJson) {
         String stripped = stripCodeFences(rawJson);
         JSONObject parsed;
@@ -130,9 +116,6 @@ public class PollIntegration implements KeyboardIntegration {
         });
     }
 
-    /** Maps {@link RealtimePollClient} error codes to user-facing banner copy. The
-     *  {@code not_signed_in} path is the most likely first-time failure — the IME can't
-     *  host the One Tap UI itself, so we bounce the user toward MainActivity. */
     private static String bannerForError(String code) {
         switch (code) {
             case "not_signed_in":
@@ -148,7 +131,7 @@ public class PollIntegration implements KeyboardIntegration {
         }
     }
 
-    /** Even when told not to, models occasionally wrap JSON in ```json … ```. */
+    /** Models occasionally wrap JSON in ```json … ``` despite the prompt. */
     private static String stripCodeFences(String s) {
         if (s == null) return "";
         String t = s.trim();

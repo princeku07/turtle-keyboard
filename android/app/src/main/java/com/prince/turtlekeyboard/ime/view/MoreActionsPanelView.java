@@ -30,34 +30,15 @@ import androidx.annotation.Nullable;
 import com.prince.turtlekeyboard.theme.KeyboardTheme;
 
 /**
- * Replaces the keyboard area with a Gboard-style "more options" panel: a
- * top icon row anchored to a green back button, a header, and a grid of
- * action tiles. The IME mounts this view in {@code quickPanelHost} when
- * the user taps the leading hamburger button on the suggestion strip.
- *
- * <p>Visual language matches the keyboard's other rounded-card panels
- * (history, emoji, split, generating loader): pure-black inner card with
- * a 16 dp corner radius and 1 dp hairline stroke, sitting under a 12 dp
- * top gap so the chrome behind shows through. Tiles are subtle-white
- * chips with a ripple foreground; the whole card slides up + fades in
- * with the same Material-emphasized easing.
- *
- * <p><b>Trimmed action set.</b> The original layout had eight tiles, four
- * of which duplicated the four circles in the top quick-shortcut row
- * (Quick Panel, History, Settings, Voice). The Emoji tile additionally
- * duplicated the leading 😀 button on the suggestion strip and Voice
- * tile duplicates the top-row mic. Two of those duplicates are removed
- * here (Voice + Emoji) so the grid surfaces actions that aren't already
- * one tap away on another surface; the remaining "duplicated" tiles
- * (Slash, History, Settings) stay because losing them would leave the
- * grid uncomfortably sparse and they're the most-tapped actions.
+ * Replaces the keyboard area with a Gboard-style "more options" panel: a top
+ * icon row anchored to a green back button, a header, and a grid of action
+ * tiles. Mounted by the IME in the quick-panel host when the user taps the
+ * leading hamburger on the suggestion strip.
  */
 public class MoreActionsPanelView extends LinearLayout {
 
     public interface Callbacks {
-        /** User dismissed the panel via the back button. IME should hide it. */
         void onClose();
-        /** User tapped a tile or top-row glyph. The action ID identifies which one. */
         void onAction(int actionId);
     }
 
@@ -70,14 +51,11 @@ public class MoreActionsPanelView extends LinearLayout {
     public static final int ACTION_EMOJI       = 7;
     public static final int ACTION_UNDO        = 8;
 
-    // ── Dark-panel color tokens (mirror HistoryPanelView etc.) ──────────
     private static final int BG           = 0xFF000000;
     private static final int TEXT_PRIMARY = 0xFFF5F5F5;
     private static final int TEXT_MUTED   = 0xA0F5F5F5;
     private static final int CHIP_FILL    = 0x14FFFFFF;
     private static final int RIPPLE_WASH  = 0x33FFFFFF;
-    /** Brand lime — same as colors.xml#lime. Used by the back-button fill
-     *  so the dismiss CTA reads as part of Turtle's brand voice. */
     private static final int ACCENT_LIME  = 0xFF15803D;
 
     private static final int PANEL_RADIUS_DP = 16;
@@ -105,7 +83,6 @@ public class MoreActionsPanelView extends LinearLayout {
         super(c, a);
         setOrientation(VERTICAL);
 
-        // ── Inner rounded card — same chrome as the other panels ──
         cardContainer = new LinearLayout(c);
         cardContainer.setOrientation(VERTICAL);
         final int cardRadius = dp(PANEL_RADIUS_DP);
@@ -122,7 +99,6 @@ public class MoreActionsPanelView extends LinearLayout {
         });
         cardContainer.setClipToOutline(true);
 
-        // ── Top bar: back button + 4 small inline icon shortcuts ──
         LinearLayout topRow = new LinearLayout(c);
         topRow.setOrientation(HORIZONTAL);
         topRow.setGravity(Gravity.CENTER_VERTICAL);
@@ -149,7 +125,6 @@ public class MoreActionsPanelView extends LinearLayout {
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        // ── Header ──
         header = new TextView(c);
         header.setText("More options");
         header.setTextColor(TEXT_MUTED);
@@ -163,7 +138,6 @@ public class MoreActionsPanelView extends LinearLayout {
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        // ── Tile grid in a scroller (taller panels stay reachable) ──
         ScrollView scroll = new ScrollView(c);
         scroll.setVerticalScrollBarEnabled(false);
         scroll.setFillViewport(true);
@@ -183,7 +157,6 @@ public class MoreActionsPanelView extends LinearLayout {
             animateOut(() -> { if (callbacks != null) callbacks.onClose(); });
         });
 
-        // Mount card on the outer view with a top gap.
         LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f);
         cardLp.topMargin = dp(TOP_GAP_DP);
@@ -194,8 +167,6 @@ public class MoreActionsPanelView extends LinearLayout {
     public void show(Callbacks callbacks) {
         this.callbacks = callbacks;
         grid.removeAllViews();
-        // Trimmed tile set: Voice (duplicates the top-row mic) and Emoji
-        // (duplicates the suggestion strip's 😀 button) were removed.
         addTile("🎨", "Theme",     ACTION_THEME);
         addTile("⚡",  "Slash",     ACTION_QUICK_PANEL);
         addTile("🗂",  "History",   ACTION_HISTORY);
@@ -205,8 +176,7 @@ public class MoreActionsPanelView extends LinearLayout {
         animateIn();
     }
 
-    /** Kept for API compatibility with the IME's mount path; the panel
-     *  pins itself to the dark palette declared above. */
+    /** No-op for API symmetry — the panel pins to its own dark palette. */
     @SuppressWarnings("unused")
     public void applyTheme(KeyboardTheme theme) { }
 
@@ -236,8 +206,6 @@ public class MoreActionsPanelView extends LinearLayout {
         tile.setLayoutParams(lp);
         grid.addView(tile);
     }
-
-    // ── Animation ────────────────────────────────────────────────────
 
     private void animateIn() {
         animate().cancel();
@@ -279,9 +247,6 @@ public class MoreActionsPanelView extends LinearLayout {
                 getResources().getDisplayMetrics());
     }
 
-    /** Green circular back button — mirrors the Enter circle on the keys
-     *  and keeps the brand-lime accent in this panel even though the rest
-     *  of the chrome is neutral dark. */
     private static class CircleBackButton extends FrameLayout {
         private final Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint arrowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -297,8 +262,6 @@ public class MoreActionsPanelView extends LinearLayout {
             arrowPaint.setStrokeCap(Paint.Cap.ROUND);
             arrowPaint.setStrokeJoin(Paint.Join.ROUND);
             arrowPaint.setColor(Color.WHITE);
-            // Ripple over the lime fill, clipped to the circle outline so
-            // press feedback stays inside the button's visible shape.
             setOutlineProvider(new ViewOutlineProvider() {
                 @Override public void getOutline(View view, Outline outline) {
                     int side = Math.min(view.getWidth(), view.getHeight());
@@ -322,7 +285,6 @@ public class MoreActionsPanelView extends LinearLayout {
             c.drawCircle(cx, cy, r, fillPaint);
             arrowPaint.setStrokeWidth(dp(2.2f));
             float arm = r * 0.45f;
-            // ← arrow: stem and two arrowhead legs.
             c.drawLine(cx - arm, cy, cx + arm, cy, arrowPaint);
             c.drawLine(cx - arm, cy, cx - arm * 0.3f, cy - arm * 0.55f, arrowPaint);
             c.drawLine(cx - arm, cy, cx - arm * 0.3f, cy + arm * 0.55f, arrowPaint);
@@ -334,7 +296,6 @@ public class MoreActionsPanelView extends LinearLayout {
         }
     }
 
-    /** Small circular icon button shown in the top row next to back. */
     private static class GlyphIcon extends FrameLayout {
         static final int GLYPH_QUICK_PANEL = 0;
         static final int GLYPH_HISTORY = 1;
@@ -442,9 +403,6 @@ public class MoreActionsPanelView extends LinearLayout {
         }
     }
 
-    /** A grid tile: rounded-rect chip background with a single emoji glyph
-     *  + label below. Subtle-white chip fill on the panel's black surface,
-     *  ripple foreground for press feedback. */
     private static class Tile extends LinearLayout {
         Tile(Context c, String emoji, String label) {
             super(c);

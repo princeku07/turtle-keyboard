@@ -20,14 +20,9 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Native Canvas renderer for the same component vocabulary that
- * {@link AttachedHtmlRenderer} renders via WebView. Takes a JSON document
- * shaped like {@code {"blocks":[ {"type":"heading","text":"..."}, ... ]}} and
- * returns a 500×500 ARGB_8888 bitmap. Synchronous, no WebView, no Chromium
- * cold-start, no IME-process restrictions.
- *
- * <p>Steady-state cost is dominated by {@link StaticLayout} construction
- * (text shaping). Typical content renders in 5–25 ms.
+ * Native Canvas renderer mirroring {@link AttachedHtmlRenderer}'s component vocabulary.
+ * Takes a JSON document {@code {"blocks":[ {"type":"heading","text":"..."}, ... ]}}
+ * and returns a 500x500 ARGB_8888 bitmap. Synchronous, no WebView.
  */
 public final class NativeCardRenderer {
 
@@ -37,7 +32,7 @@ public final class NativeCardRenderer {
     private static final int PADDING = 20;
     private static final int BLOCK_GAP = 10;
 
-    // Design system colors — mirror cream/ink/lime/pink/blue/orange from CSS.
+    // Design system colors — mirror the CSS palette.
     private static final int COLOR_BG       = 0xFFF4EFE4;
     private static final int COLOR_INK      = 0xFF0C0C0C;
     private static final int COLOR_LIME     = 0xFF15803D;
@@ -63,7 +58,6 @@ public final class NativeCardRenderer {
 
         int contentWidth = SIZE - PADDING * 2;
 
-        // Measure pass: each Block knows its own height for the given width.
         List<Block> measured = new ArrayList<>(blocks.length());
         int totalH = 0;
         for (int i = 0; i < blocks.length(); i++) {
@@ -76,9 +70,7 @@ public final class NativeCardRenderer {
             totalH += blk.height;
         }
 
-        // Vertical-center the stack if it fits; otherwise top-anchor and let
-        // the bottom clip — matches the flex/justify-content behavior of the
-        // HTML version. Always leaves PADDING on top and bottom when possible.
+        // Vertical-center the stack if it fits; otherwise top-anchor and clip the bottom.
         int avail = SIZE - PADDING * 2;
         int y = PADDING;
         if (totalH < avail) y = (SIZE - totalH) / 2;
@@ -93,8 +85,7 @@ public final class NativeCardRenderer {
         return bmp;
     }
 
-    // --- Paints (re-created per render: cheap, keeps the renderer thread-safe) ---
-
+    // Paints re-created per render so the renderer stays thread-safe.
     private static TextPaint textPaint(int sizePx, int color, boolean bold) {
         TextPaint p = new TextPaint(Paint.ANTI_ALIAS_FLAG);
         p.setColor(color);
@@ -142,8 +133,6 @@ public final class NativeCardRenderer {
         }
     }
 
-    // --- Block dispatch ---
-
     private static Block buildBlock(JSONObject json, int width) {
         String type = json.optString("type", "").toLowerCase(Locale.ROOT);
         switch (type) {
@@ -169,8 +158,6 @@ public final class NativeCardRenderer {
         abstract void draw(Canvas c, int x, int y);
     }
 
-    // --- Heading ----------------------------------------------------------
-
     private static class HeadingBlock extends Block {
         final StaticLayout layout;
         HeadingBlock(JSONObject json, int w) {
@@ -186,8 +173,6 @@ public final class NativeCardRenderer {
         }
     }
 
-    // --- Paragraph --------------------------------------------------------
-
     private static class ParagraphBlock extends Block {
         final StaticLayout layout;
         ParagraphBlock(JSONObject json, int w) {
@@ -200,8 +185,6 @@ public final class NativeCardRenderer {
             c.save(); c.translate(x, y); layout.draw(c); c.restore();
         }
     }
-
-    // --- List (ul / ol) ---------------------------------------------------
 
     private static class ListBlock extends Block {
         static final int INDENT = 22;
@@ -238,8 +221,6 @@ public final class NativeCardRenderer {
         }
     }
 
-    // --- Checklist --------------------------------------------------------
-
     private static class ChecklistBlock extends Block {
         static final int INDENT = 28;
         static final int ITEM_GAP = 4;
@@ -271,8 +252,6 @@ public final class NativeCardRenderer {
         }
     }
 
-    // --- Callout ----------------------------------------------------------
-
     private static class CalloutBlock extends Block {
         static final int PAD_X = 14;
         static final int PAD_Y = 12;
@@ -297,8 +276,6 @@ public final class NativeCardRenderer {
             c.restore();
         }
     }
-
-    // --- Badge ------------------------------------------------------------
 
     private static class BadgeBlock extends Block {
         static final int PAD_X = 8;
@@ -329,8 +306,6 @@ public final class NativeCardRenderer {
         }
     }
 
-    // --- Stat -------------------------------------------------------------
-
     private static class StatBlock extends Block {
         final StaticLayout num;
         final StaticLayout label;
@@ -352,8 +327,6 @@ public final class NativeCardRenderer {
         }
     }
 
-    // --- Key/Value (dl) ---------------------------------------------------
-
     private static class KvBlock extends Block {
         static final int COL_GAP = 14;
         static final int ROW_GAP = 6;
@@ -367,7 +340,7 @@ public final class NativeCardRenderer {
             JSONArray rows = json.optJSONArray("rows");
             int n = rows == null ? 0 : rows.length();
 
-            // Compute key column width = widest key, capped at 50% of total.
+            // Key column = widest key, capped at 50% of total.
             float widest = 0;
             String[] kTexts = new String[n];
             String[] vTexts = new String[n];
@@ -402,8 +375,6 @@ public final class NativeCardRenderer {
         }
     }
 
-    // --- Table ------------------------------------------------------------
-
     private static class TableBlock extends Block {
         static final int CELL_PAD_X = 10;
         static final int CELL_PAD_Y = 8;
@@ -419,7 +390,7 @@ public final class NativeCardRenderer {
         final int footerRowH;
 
         TableBlock(JSONObject json, int w) {
-            this.width = w - SHADOW;  // leave room for offset shadow
+            this.width = w - SHADOW;
             JSONArray hArr = json.optJSONArray("headers");
             JSONArray rArr = json.optJSONArray("rows");
             JSONArray fArr = json.optJSONArray("footer");
@@ -443,7 +414,6 @@ public final class NativeCardRenderer {
             this.footer = fArr == null ? null : new String[cols];
             if (footer != null) for (int i = 0; i < cols; i++) footer[i] = fArr.optString(i, "");
 
-            // Equal column widths.
             this.colW = new int[cols];
             int each = cols == 0 ? 0 : width / cols;
             for (int i = 0; i < cols; i++) colW[i] = each;
@@ -478,16 +448,13 @@ public final class NativeCardRenderer {
             int cols = colW.length;
             int tableW = 0; for (int w : colW) tableW += w;
 
-            // Drop shadow
             c.drawRect(new RectF(x + SHADOW, y + SHADOW,
                                  x + SHADOW + tableW, y + SHADOW + headerRowH + sumBody() + footerRowH),
                        fill(COLOR_INK));
 
             int cy = y;
-            // Header row
             drawRow(c, x, cy, headers, headerRowH, COLOR_LIME, COLOR_WHITE, true);
             cy += headerRowH;
-            // Body rows (zebra stripe even)
             for (int r = 0; r < body.length; r++) {
                 int bg = (r % 2 == 1) ? COLOR_CREAM2 : COLOR_WHITE;
                 drawRow(c, x, cy, body[r], bodyRowH[r], bg, COLOR_INK, false);
@@ -516,8 +483,6 @@ public final class NativeCardRenderer {
             }
         }
     }
-
-    // --- Grid (cards) -----------------------------------------------------
 
     private static class GridBlock extends Block {
         static final int GAP = 8;
@@ -577,7 +542,6 @@ public final class NativeCardRenderer {
                 rowMax = Math.max(rowMax, cards.get(i).cardH);
                 curRow++;
                 if (curRow == cols || i == cards.size() - 1) {
-                    // Draw the row from rowStart..i with uniform height = rowMax.
                     for (int j = rowStart; j <= i; j++) {
                         int col = j - rowStart;
                         int cx = x + col * (cardW + GAP);
@@ -592,7 +556,6 @@ public final class NativeCardRenderer {
         }
 
         private void drawCard(Canvas c, int x, int y, int w, int h, Card card) {
-            // Hard offset shadow
             c.drawRect(new RectF(x + SHADOW, y + SHADOW, x + SHADOW + w, y + SHADOW + h), fill(COLOR_INK));
             RectF box = new RectF(x, y, x + w, y + h);
             c.drawRect(box, fill(COLOR_WHITE));

@@ -19,6 +19,7 @@ public class KeyboardRootView extends LinearLayout {
     private SuggestionStripView strip;
     private CommandPanelView panel;
     private PresetChipStripView presetStrip;
+    private StylePreviewStripView stylePreviewStrip;
     private BannerView banner;
     private VoiceListeningView voiceListening;
     private VoiceStageView voiceStage;
@@ -42,6 +43,7 @@ public class KeyboardRootView extends LinearLayout {
         strip = findViewById(R.id.suggestion_strip);
         panel = findViewById(R.id.command_panel);
         presetStrip = findViewById(R.id.preset_strip);
+        stylePreviewStrip = findViewById(R.id.style_preview_strip);
         banner = findViewById(R.id.banner);
         voiceListening = findViewById(R.id.voice_listening);
         voiceStage = findViewById(R.id.voice_stage);
@@ -60,6 +62,7 @@ public class KeyboardRootView extends LinearLayout {
     public SuggestionStripView strip() { return strip; }
     public CommandPanelView panel() { return panel; }
     public PresetChipStripView presetStrip() { return presetStrip; }
+    public StylePreviewStripView stylePreviewStrip() { return stylePreviewStrip; }
     public BannerView banner() { return banner; }
     public VoiceListeningView voiceListening() { return voiceListening; }
     public VoiceStageView voiceStage() { return voiceStage; }
@@ -68,11 +71,9 @@ public class KeyboardRootView extends LinearLayout {
     public AppEnrollmentBannerView enrollmentBanner() { return enrollmentBanner; }
     public CommandSuggestionStripView cmdSuggestions() { return cmdSuggestions; }
     public HostAppBadgeView hostAppBadge() { return hostAppBadge; }
-    /** Generic slot integrations attach panel views to. Visibility flips when content
-     *  is added/removed by callers. */
+    /** Generic slot integrations attach panel views to. */
     public ViewGroup panelHost() { return panelHost; }
-    /** Slot the Quick Panel mounts into. Sized to match the keyboard area when shown,
-     *  so the keys are replaced (not overlaid) by the command grid. */
+    /** Slot the Quick Panel mounts into; sized to replace the keyboard area when shown. */
     public ViewGroup quickPanelHost() { return quickPanelHost; }
     public ShimmerView shimmer() { return shimmer; }
     public GeneratingLoaderView generatingLoader() { return generatingLoader; }
@@ -81,12 +82,12 @@ public class KeyboardRootView extends LinearLayout {
     public void applyTheme(KeyboardTheme theme) {
         setBackgroundColor(theme.background);
         if (strip != null) strip.applyTheme(theme);
-        // Banner colours are fixed by the dark gradient design (set in XML);
-        // theme tokens here would pull it back to white. Intentionally skipped.
+        // Banner intentionally skipped — its colours are fixed in XML.
         if (voiceListening != null) voiceListening.applyTheme(theme);
         if (voiceStage != null) voiceStage.applyTheme(theme);
         if (panel != null) panel.applyTheme(theme);
         if (presetStrip != null) presetStrip.applyTheme(theme);
+        if (stylePreviewStrip != null) stylePreviewStrip.applyTheme(theme);
         if (enrollmentBanner != null) enrollmentBanner.applyTheme(theme);
         if (cmdSuggestions != null) cmdSuggestions.applyTheme(theme);
         if (preview != null) preview.applyTheme(theme);

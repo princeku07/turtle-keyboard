@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Onboarding primary CTA — black pill, matches the mockups. Separate from the
+     dark-theme ButtonPrimary so the two surfaces can diverge later. -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="#33FFFFFF">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/onboard_cta_bg" />
+            <corners android:radius="32dp" />
+        </shape>
+    </item>
+</ripple>

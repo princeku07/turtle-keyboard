@@ -7,15 +7,9 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Hand-curated keyword catalog backing the emoji panel's search field. Each
- * entry maps an emoji glyph to a small set of search terms — base name plus a
- * few common synonyms (e.g. "happy", "smile", "grin" for 😀). Coverage favours
- * the emojis users actually search for; less-common glyphs in
- * {@link EmojiData} are intentionally unindexed and still reachable by
- * category browsing.
- *
- * <p>Ranking: exact-keyword matches first, then prefix matches, then substring
- * matches, preserving insertion order within each tier.
+ * Hand-curated keyword catalog backing the emoji panel's search. Each glyph maps to
+ * a small set of search terms; ranking is exact > prefix > substring, preserving
+ * insertion order within each tier.
  */
 public final class EmojiSearchIndex {
 
@@ -673,9 +667,7 @@ public final class EmojiSearchIndex {
 
     private EmojiSearchIndex() { }
 
-    /** Returns emojis matching {@code query}, ranked exact > prefix > substring
-     *  on any of the entry's keywords. Returns an empty list for blank queries
-     *  so callers can decide what to show in that state. */
+    /** Returns emojis matching {@code query}, ranked exact > prefix > substring. Empty for blank input. */
     public static List<String> search(String query) {
         if (query == null) return new ArrayList<>();
         String q = query.toLowerCase(Locale.ROOT).trim();

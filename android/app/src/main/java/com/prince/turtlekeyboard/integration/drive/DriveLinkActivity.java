@@ -48,34 +48,15 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Host-app screen for linking Google Drive to enable /us. Standalone — does NOT require
- * Split (or any other module) to be set up first. Requests only the {@code drive.file}
- * scope; Split's sheets / email scopes are never bundled into the consent dialog from
- * this entry point.
- *
- * <p>Stages:
- * <ol>
- *   <li>Not linked → "Connect with Google" button triggers {@code drive.file} consent.</li>
- *   <li>Linked → reference-photo picker (multi-select up to
- *       {@link DriveKeys#MAX_REFERENCE_PHOTOS}). Photos cached locally under
- *       {@code getFilesDir/drive_photos/} for thumbnails + retry resilience, then uploaded
- *       to the user's own Drive via {@link DriveFilesClient}. Each entry tracks
- *       {@code <localPath>|<fileId>} in {@link DriveKeys#REFERENCE_PHOTOS}; a blank
- *       file-id means upload is pending and will retry on next entry to this screen.</li>
- * </ol>
- *
- * <p>Picker mirrors the {@link com.prince.turtlekeyboard.ai.ImagePickerActivity}
- * pattern used by {@code /edit}: {@code ACTION_GET_CONTENT}, {@code image/*},
- * {@link android.content.ContentResolver#openInputStream} byte read. The shim Activity
- * isn't needed here because we already have an Activity context, so we use
- * {@link androidx.activity.result.contract.ActivityResultContracts.GetMultipleContents}
- * directly.
+ * Host-app screen for linking Google Drive to enable {@code /us}. Requests the
+ * {@code drive.file} scope, then accepts up to {@link DriveKeys#MAX_REFERENCE_PHOTOS}
+ * reference photos; each is cached locally under {@code getFilesDir/drive_photos/}
+ * and uploaded to the user's Drive via {@link DriveFilesClient}.
  */
 public class DriveLinkActivity extends AppCompatActivity {
 
     private static final String TAG = "DriveLinkActivity";
 
-    // -- design tokens (mirror landing-page CSS variables / SplitActivity) --
     private static final int CREAM = 0xFFF4EFE4;
     private static final int INK   = 0xFF0C0C0C;
     private static final int LIME  = 0xFF15803D;
@@ -84,8 +65,6 @@ public class DriveLinkActivity extends AppCompatActivity {
     private static final int WHITE = 0xFFFFFFFF;
     private static final int MUTED = 0xFF6B6B6B;
 
-    /** Subdir under {@link #getFilesDir} where copied selfies live. Same dir survives
-     *  app restarts; also the dir the upload retry path reads from. */
     private static final String PHOTO_DIR = "drive_photos";
 
     private GoogleAuth auth;
@@ -97,7 +76,6 @@ public class DriveLinkActivity extends AppCompatActivity {
     private TextView connectBtn;
     private TextView disconnectBtn;
 
-    // Photos card.
     private LinearLayout photosCardBody;
     private TextView photosHelper;
     private LinearLayout thumbsRow;
@@ -113,7 +91,6 @@ public class DriveLinkActivity extends AppCompatActivity {
             registerForActivityResult(new ActivityResultContracts.StartIntentSenderForResult(),
                     result -> finishAuth(result.getData()));
 
-    // Multi-pick image picker — mirrors /edit's ACTION_GET_CONTENT + image/* setup.
     private final ActivityResultLauncher<String> photosLauncher =
             registerForActivityResult(new ActivityResultContracts.GetMultipleContents(),
                     this::onPhotosPicked);
@@ -133,15 +110,11 @@ public class DriveLinkActivity extends AppCompatActivity {
         super.onResume();
         if (auth.isSignedIn()) auth.fetchAndStoreEmailIfMissing();
         render();
-        // Self-heal: if any entry is missing a file-id (upload failed last time, or app
-        // was killed mid-upload), kick off a fresh upload pass.
         maybeStartUploads();
     }
 
     @Override
     protected void onDestroy() {
-        // Recycle whatever's still on screen before the activity dies, and tear down the
-        // upload executor so its non-daemon thread doesn't outlive the activity.
         recycleThumbnails();
         io.shutdownNow();
         super.onDestroy();
@@ -444,7 +417,6 @@ public class DriveLinkActivity extends AppCompatActivity {
     private void onLinked() {
         Toast.makeText(this, "Drive linked", Toast.LENGTH_SHORT).show();
         render();
-        // Now that we have a token, retry any uploads that were pending pre-link.
         maybeStartUploads();
     }
 
@@ -499,9 +471,8 @@ public class DriveLinkActivity extends AppCompatActivity {
             long ts = System.currentTimeMillis();
             int idx = 0;
             for (Uri uri : accepted) {
-                // All accepted photos land as JPEGs after downsize — fixes the IME
-                // OOM-during-/us where five full-res selfies would together blow past
-                // the service heap once base64-encoded into the Nano Banana body.
+                // Downsize to JPEG — full-res selfies would OOM the IME service heap
+                // once base64-encoded into the model request body.
                 File dest = new File(outDir, ts + "_" + (idx++) + ".jpg");
                 if (copyDownsizedToFile(uri, dest)) {
                     entries.add(new PhotoEntry(dest.getAbsolutePath(), ""));
@@ -516,8 +487,8 @@ public class DriveLinkActivity extends AppCompatActivity {
         });
     }
 
-    /** Reads {@code uri}, downsizes to a heap-safe JPEG via {@link ImageDownsizer},
-     *  writes the result to {@code dest}. Returns false on read or encode failure. */
+    /** Reads {@code uri}, downsizes to JPEG via {@link ImageDownsizer}, writes to
+     *  {@code dest}. Returns false on read or encode failure. */
     private boolean copyDownsizedToFile(Uri uri, File dest) {
         byte[] raw = null;
         try (InputStream in = getContentResolver().openInputStream(uri)) {
@@ -532,7 +503,6 @@ public class DriveLinkActivity extends AppCompatActivity {
             return false;
         }
         byte[] downsized = ImageDownsizer.downsizeToJpegBytes(raw);
-        // Drop the raw reference promptly so GC can reclaim it before the next iteration.
         //noinspection UnusedAssignment
         raw = null;
         try (FileOutputStream out = new FileOutputStream(dest)) {
@@ -546,8 +516,7 @@ public class DriveLinkActivity extends AppCompatActivity {
 
     // -- upload pipeline -----------------------------------------------------
 
-    /** Kicks off uploads for any entries whose file-id is empty. Idempotent — guarded by
-     *  {@link #uploadingNow} so onResume + onPhotosPicked + onLinked can all call it. */
+    /** Kicks off uploads for entries with empty file-id. Idempotent. */
     private void maybeStartUploads() {
         if (!auth.isSignedIn()) return;
         List<PhotoEntry> entries = readEntries();
@@ -567,8 +536,6 @@ public class DriveLinkActivity extends AppCompatActivity {
             @Override public void onError(String reason, GoogleAuth.PendingUi pendingUi) {
                 uploadingNow.set(false);
                 if (pendingUi != null) {
-                    // Token expired and consent UI is needed — surface it so the user can
-                    // re-authorize without leaving the screen.
                     runOnUiThread(() -> launchAuthUi(pendingUi.intentSender));
                 } else {
                     Log.w(TAG, "upload aborted, no token: " + reason);
@@ -600,7 +567,7 @@ public class DriveLinkActivity extends AppCompatActivity {
                     });
                 } catch (IOException ex) {
                     Log.w(TAG, "upload failed for " + entry.localPath, ex);
-                    // Leave fileId empty so onResume retries next time.
+                    // Leave fileId empty so onResume retries.
                 }
             }
         } finally {
@@ -642,7 +609,6 @@ public class DriveLinkActivity extends AppCompatActivity {
 
     // -- entry persistence ---------------------------------------------------
 
-    /** A reference-photo entry. {@code fileId} is empty until the upload succeeds. */
     private static final class PhotoEntry {
         final String localPath;
         final String fileId;
@@ -652,7 +618,6 @@ public class DriveLinkActivity extends AppCompatActivity {
         }
     }
 
-    /** Reads {@link DriveKeys#REFERENCE_PHOTOS} and prunes entries whose local file is gone. */
     private List<PhotoEntry> readEntries() {
         String raw = driveStore.getString(DriveKeys.REFERENCE_PHOTOS, "");
         List<PhotoEntry> out = new ArrayList<>();
@@ -683,9 +648,7 @@ public class DriveLinkActivity extends AppCompatActivity {
 
     private void renderPhotos() {
         if (thumbsRow == null) return;
-        // Recycle previous thumbnails before dropping the ImageViews — otherwise the
-        // Bitmaps sit on heap until GC, and renderPhotos fires on every pick / upload /
-        // clear, compounding pressure right when /us is about to run.
+        // Recycle previous thumbnails so renderPhotos doesn't pile bitmaps on heap.
         recycleThumbnails();
         thumbsRow.removeAllViews();
         List<PhotoEntry> entries = readEntries();
@@ -713,7 +676,7 @@ public class DriveLinkActivity extends AppCompatActivity {
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(thumbSize, thumbSize);
             if (i > 0) lp.leftMargin = dp(8);
             img.setLayoutParams(lp);
-            // Border colour signals upload state: lime = in Drive, ink = pending.
+            // Border color signals upload state: lime = in Drive, ink = pending.
             img.setBackground(thumbBorder(entry.fileId.isEmpty() ? INK : LIME));
             img.setScaleType(ImageView.ScaleType.CENTER_CROP);
             Bitmap bmp = decodeThumb(entry.localPath, thumbSize);
@@ -723,7 +686,7 @@ public class DriveLinkActivity extends AppCompatActivity {
         updateUploadStatus(entries);
     }
 
-    /** Thumbnail-sized decode that subsamples on the way in to avoid OOM on big sources. */
+    /** Subsampling decode to avoid OOM on large sources. */
     private Bitmap decodeThumb(String path, int targetPx) {
         try {
             BitmapFactory.Options bounds = new BitmapFactory.Options();
@@ -774,8 +737,7 @@ public class DriveLinkActivity extends AppCompatActivity {
     }
 
     private void startClearAll() {
-        // Need a fresh token to delete from Drive. If it fails, still wipe locally —
-        // the user asked for it, and the Drive copies are recoverable from their Drive.
+        // If token fetch fails, still wipe locally — the user asked for it.
         auth.freshToken(this, DriveScopes.SCOPES, new GoogleAuth.Callback() {
             @Override public void onToken(String accessToken) {
                 io.execute(() -> deleteAll(accessToken));
@@ -794,10 +756,8 @@ public class DriveLinkActivity extends AppCompatActivity {
         List<PhotoEntry> entries = readEntries();
         int driveFails = 0;
         for (PhotoEntry e : entries) {
-            // Local file first — always wipe.
             //noinspection ResultOfMethodCallIgnored
             new File(e.localPath).delete();
-            // Then the Drive copy if we have a token + a file-id.
             if (accessToken != null && !e.fileId.isEmpty()) {
                 try {
                     DriveFilesClient.deleteFile(accessToken, e.fileId);
@@ -819,8 +779,6 @@ public class DriveLinkActivity extends AppCompatActivity {
         });
     }
 
-    // -- mime / extension helpers -------------------------------------------
-
     private static String mimeFromPath(String path) {
         int dot = path.lastIndexOf('.');
         if (dot < 0 || dot == path.length() - 1) return "image/jpeg";
@@ -835,8 +793,6 @@ public class DriveLinkActivity extends AppCompatActivity {
             default:     return "image/jpeg";
         }
     }
-
-    // -- drawables / helpers (mirror SplitActivity styles) ------------------
 
     private LinearLayout brutalCard(int fill) {
         LinearLayout card = new LinearLayout(this);
@@ -855,7 +811,6 @@ public class DriveLinkActivity extends AppCompatActivity {
         return lp;
     }
 
-    /** Layered card: ink rectangle offset 4dp bottom-right, fill rectangle on top. */
     private Drawable brutalistCard(int fill) {
         GradientDrawable shadow = new GradientDrawable();
         shadow.setColor(INK);
@@ -892,7 +847,6 @@ public class DriveLinkActivity extends AppCompatActivity {
         return String.valueOf(Character.toUpperCase(c));
     }
 
-    /** Picks a stable accent color for the avatar from the email hash. Mirrors SplitActivity. */
     private static int avatarColor(String email) {
         int[] palette = { LIME, PINK, BLUE, 0xFFFF7A1A /* orange */ };
         if (email == null || email.isEmpty()) return MUTED;

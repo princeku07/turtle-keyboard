@@ -7,14 +7,9 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Bridges the SymSpell-backed {@link SuggestionEngine} to the IME's
- * {@link SuggestionProvider} contract.
- *
- * Returns up to 3 candidates for the last whitespace-separated token in the
- * provided text. Capitalization tracks the user's typed case: if the prefix
- * starts uppercase, returned suggestions do too.
- *
- * Returns empty until the engine has finished loading the bundled dictionary.
+ * Bridges {@link SuggestionEngine} to the {@link SuggestionProvider} contract.
+ * Returns up to 3 candidates for the last whitespace-separated token, with
+ * leading capitalization preserved. Empty until the dictionary is loaded.
  */
 public class SymSpellSuggestionProvider implements SuggestionProvider {
 

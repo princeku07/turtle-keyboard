@@ -282,9 +282,7 @@ public class CommandPinsActivity extends AppCompatActivity {
         return t;
     }
 
-    /** Pull the union of every {@link CommandProvider} the IME registers. Keep in sync
-     *  if a new module is added — the available list is the only place outside the IME
-     *  that needs to know the module graph for display. */
+    /** Union of every {@link CommandProvider} the IME registers; keep in sync when adding modules. */
     private Map<String, CommandMeta> collectCommandMeta() {
         Map<String, CommandMeta> out = new LinkedHashMap<>();
         for (CommandProvider p : new CommandProvider[]{

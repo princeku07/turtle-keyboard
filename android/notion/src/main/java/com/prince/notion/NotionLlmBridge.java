@@ -8,13 +8,9 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 /**
- * Turns a free-form user prompt into a structured Notion page via the keyboard's LLM.
- *
- * <p>Asks the model to return JSON of the shape {@code {title, blocks: [{type, text, ...}]}}
- * where {@code type} is one of {@code heading_2}, {@code paragraph}, {@code to_do}.
- * Robust against the LLM wrapping the JSON in markdown fences or trailing prose. If
- * parsing fails entirely we fall back to a single paragraph block containing the raw
- * user prompt — the page still gets created, just unstyled.
+ * Turns a free-form user prompt into a structured Notion page via the LLM. Asks for
+ * JSON {@code {title, blocks: [{type, text, ...}]}}. Falls back to a single paragraph
+ * block when parsing fails so a page is always created.
  */
 public final class NotionLlmBridge {
 
@@ -43,7 +39,6 @@ public final class NotionLlmBridge {
             @Override public void onText(String text) {
                 Parsed p = parse(text);
                 if (p != null) { cb.onStructured(p.title, p.blocks); return; }
-                // Fallback: single paragraph block, title from the first ~80 chars of input.
                 String title = userPrompt == null ? "Untitled" :
                         userPrompt.length() > 80 ? userPrompt.substring(0, 80) : userPrompt;
                 JSONArray blocks = new JSONArray();
@@ -54,7 +49,6 @@ public final class NotionLlmBridge {
         });
     }
 
-    /** Build a Notion block JSON from a (type, text, checked) triple. */
     public static JSONObject buildBlock(String type, String text, boolean checked) {
         try {
             JSONObject block = new JSONObject()
@@ -80,12 +74,9 @@ public final class NotionLlmBridge {
 
     private static Parsed parse(String llmOutput) {
         if (llmOutput == null) return null;
-        // Reasoning models (ministral-*-reasoning, etc.) emit a [THINK]…[/THINK] block
-        // full of JSON-shaped scratch work before the real answer. Strip that first or
-        // brace-scanning will fold the entire trace into the parse window and fail.
+        // Strip reasoning [THINK]/<think> traces before brace-scanning.
         String cleaned = stripThinkBlocks(llmOutput);
-        // Prefer the LAST fenced code block — models that wrap the final answer in
-        // ```json … ``` always put the answer fence at the end, after any in-trace code.
+        // Prefer the LAST fenced block — final answer comes after any in-trace fences.
         String body = extractLastFencedBlock(cleaned);
         if (body == null) body = stripFences(cleaned);
         body = body.trim();
@@ -110,7 +101,6 @@ public final class NotionLlmBridge {
                     dst.put(buildBlock(type, text, checked));
                 }
             }
-            // If the LLM gave us nothing usable, treat as parse failure so we hit the fallback.
             if (dst.length() == 0) return null;
             return new Parsed(title, dst);
         } catch (Exception e) {
@@ -128,9 +118,7 @@ public final class NotionLlmBridge {
         return s;
     }
 
-    /** Remove every {@code [THINK]…[/THINK]} (or {@code <think>…</think>}) reasoning
-     *  block. Tag matching is loose — case-insensitive, both square-bracket and angle
-     *  forms — so the same helper covers ministral-*-reasoning, Qwen, DeepSeek, etc. */
+    /** Strip {@code [THINK]…[/THINK]} and {@code <think>…</think>} reasoning blocks. */
     private static String stripThinkBlocks(String s) {
         if (s == null) return null;
         String out = s;
@@ -139,16 +127,14 @@ public final class NotionLlmBridge {
         return out;
     }
 
-    /** Find the LAST triple-backtick fenced block in {@code s} and return its body
-     *  (without the fences). Skips any ```language``` info string. Returns null if no
-     *  complete fenced block is found. */
+    /** @return body of the last triple-backtick fenced block, or null if none. */
     private static String extractLastFencedBlock(String s) {
         if (s == null) return null;
         int closing = s.lastIndexOf("```");
         if (closing < 0) return null;
         int opening = s.lastIndexOf("```", closing - 1);
         if (opening < 0 || opening >= closing) return null;
-        // Skip the optional info string ("json", "python", …) that follows the opener.
+        // Skip the optional info string ("json", …) after the opener.
         int firstNl = s.indexOf('\n', opening + 3);
         int bodyStart = (firstNl > 0 && firstNl < closing) ? firstNl + 1 : opening + 3;
         return s.substring(bodyStart, closing);

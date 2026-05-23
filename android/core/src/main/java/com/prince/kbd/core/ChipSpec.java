@@ -3,9 +3,9 @@ package com.prince.kbd.core;
 import androidx.annotation.Nullable;
 
 /**
- * Data the IME needs to render the integration chip above the keys. Either {@link #iconPackage}
- * is set (the IME loads the launcher icon via PackageManager) or both icon fields are null
- * (text-only chip).
+ * Data the IME needs to render the integration chip above the keys. When
+ * {@link #iconPackage} is set, the IME loads that package's launcher icon; otherwise
+ * the chip is text-only.
  */
 public final class ChipSpec {
 

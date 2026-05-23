@@ -68,11 +68,13 @@ import com.prince.turtlekeyboard.ui.MainActivity;
 import com.prince.turtlekeyboard.voice.VoiceInputController;
 
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
- * Thin orchestrator. Owns nothing but the lifecycle hookup: it wires the bound view to a
- * {@link KeyboardController}, routes key events through a {@link ShiftController} and
- * {@link InputCommitter}, and forwards completed text to the slash-command pipeline.
+ * Thin IME orchestrator. Wires the bound view to a {@link KeyboardController}, routes
+ * key events through {@link ShiftController} + {@link InputCommitter}, and forwards
+ * completed text to the slash-command pipeline.
  */
 public class TurtleInputMethodService extends InputMethodService
         implements KeyboardView.OnKeyboardActionListener, CommandDispatcher.ResultUi {
@@ -89,19 +91,16 @@ public class TurtleInputMethodService extends InputMethodService
     private CommandComposer composer;
     private CommandDispatcher dispatcher;
     @Nullable private String currentPkg;
-    // Package the user was in when the *current* AI command fired. Snapshotted
-    // at loader-show time so that if the keyboard is gone by result time we
-    // can still offer a direct "Share to <originating app>" action in the
-    // notification — preserves the chat-thread context they started from.
+    // Snapshot of the host pkg at command-fire time so the notification can offer
+    // "Share to <originating app>" even if the keyboard is gone by result time.
     @Nullable private String pendingSourcePkg;
     private com.prince.turtlekeyboard.integration.PersistentAppProfileRegistry appProfiles;
     private com.prince.turtlekeyboard.integration.EnrolledShortcutsManager enrolledShortcuts;
     private SuggestionProvider suggestionProvider;
     private SuggestionEngine suggestionEngine;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    // SPI image-pick routing — see ImageBridge / PickerResultBus. Each ctx.pickImage()
-    // call allocates a fresh request id and parks its callback here until the picker
-    // activity delivers a result. Legacy /edit picks bypass this map entirely.
+    private final ExecutorService bitmapIo = Executors.newSingleThreadExecutor();
+    // SPI image-pick routing: each pickImage() allocates an id and parks its callback here.
     private final java.util.concurrent.atomic.AtomicInteger pickerReqIds =
             new java.util.concurrent.atomic.AtomicInteger(0);
     private final java.util.Map<Integer, com.prince.kbd.core.IntegrationContext.ImagePickCallback>
@@ -111,41 +110,30 @@ public class TurtleInputMethodService extends InputMethodService
     private KeyPreviewPopup preview;
     private KeyboardView keyboardView;
     private BackspaceMenuPopup deleteMenu;
-    /**
-     * Latched the moment the backspace long-press menu fires, cleared on the next
-     * fresh ACTION_DOWN on ⌫. While latched, all DELETE keycodes are dropped —
-     * even if the menu has been dismissed — so a still-held finger from the
-     * original hold (e.g. user tapped Clear with a second finger and then pasted
-     * fresh text) can't keep shredding what they just put back.
-     */
+    /** Latched on backspace long-press; while true, DELETE keycodes are swallowed so a still-held finger can't shred text. */
     private boolean backspaceHoldConsumed;
     private VoiceInputController voice;
     private IntegrationRegistry integrations;
-    /** True while {@link #onStartInputView} has fired and {@link #onFinishInputView}
-     *  has not. When false, image results are surfaced as a notification instead of
-     *  the in-keyboard preview because the keyboard isn't on screen. */
+    private LmStudioAiClient aiClient;
+    /** True between onStartInputView and onFinishInputView; results route to a notification when false. */
     private boolean inputViewVisible;
 
-    /** Set after a picker stages an image so the IME pulls itself back into view
-     *  once the shim activity finishes and the host editor re-binds. Cleared on
-     *  the first {@link #onStartInput} fire-after-stage or by the delayed fallback
-     *  in {@link #onEditImageStaged}, whichever wins. */
+    /** Re-shows the IME once the picker shim activity finishes and the editor re-binds. */
     private boolean pendingShowAfterPick;
 
-    /** Reference to the currently-mounted emoji panel, when one exists. The key
-     *  handler reads {@link com.prince.turtlekeyboard.ime.view.EmojiPanelView#isInSearchMode()}
-     *  on this to route keystrokes to the search field instead of committing
-     *  them to the host editor. */
+    /** Set when commitContent fails mid-async (commonly /gif) so a tap-to-insert chip can retry. */
+    @Nullable private Uri pendingInsertUri;
+    @Nullable private String pendingInsertMime;
+
     @Nullable private com.prince.turtlekeyboard.ime.view.EmojiPanelView activeEmojiPanel;
+
+    /** True after the user tapped the host editor during a prompt: panel stays visible but keystrokes route to host. */
+    private boolean composePaused;
 
     @Override
     public void onCreate() {
         super.onCreate();
-        // Kick off the dictionary load as soon as the IME service is created,
-        // not when the input view is inflated — buys ~100–300 ms of head start
-        // before the user actually focuses a text field, which is the
-        // difference between an empty strip on first launch and a populated
-        // one. Idempotent against onCreateInputView fallback below.
+        // Start dictionary load on service create (not view inflate) for a populated first strip.
         suggestionEngine = new SuggestionEngine(this);
         suggestionEngine.loadAsync(this);
     }
@@ -161,8 +149,7 @@ public class TurtleInputMethodService extends InputMethodService
         shift = new ShiftController();
         shift.attach(kv);
         kv.setOnKeyboardActionListener(this);
-        // Framework preview is disabled because its anchor math drifts when the
-        // KeyboardView isn't the IME root. We use a custom PopupWindow instead.
+        // Framework preview drifts when KeyboardView isn't the IME root; we use a custom popup.
         kv.setPreviewEnabled(false);
         kv.setHapticFeedbackEnabled(true);
         if (kv instanceof TurtleKeyboardView) {
@@ -176,7 +163,7 @@ public class TurtleInputMethodService extends InputMethodService
             });
             tkv.setBackspaceLongPressListener(() -> {
                 backspaceHoldConsumed = true;
-                if (deleteMenu != null) {
+                if (deleteMenu != null && hasInputText()) {
                     deleteMenu.showAbove(kv, Keycodes.DELETE);
                     kv.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
                 }
@@ -198,111 +185,73 @@ public class TurtleInputMethodService extends InputMethodService
         slashDetector = new SlashCommandDetector(committer, registry, this::onSlashCommand);
         composer = new CommandComposer(new CommandComposer.Ui() {
             @Override public void onNameChanged(String displayed) {
+                composePaused = false;
                 root.panel().hide();
                 root.banner().show(displayed);
                 refreshCommandSuggestions(displayed);
             }
             @Override public void onPromptStart(String commandName) {
+                composePaused = false;
                 root.banner().clear();
                 root.cmdSuggestions().hide();
                 CommandRegistry.Entry e = registry.get(commandName);
                 String label = (e != null ? e.emoji + " " + e.label : "/" + commandName);
                 root.panel().show(label, hintFor(commandName), "", 0);
-                // While typing a prompt the strip should show word predictions,
-                // not the host-paste preview pill (which otherwise owns the
-                // center and hides the suggestion slots). The panel grows its
-                // own 📋 button below so the user can still paste — into the
-                // prompt buffer, not the host editor.
+                // Hide the strip's paste pill so word predictions can show; the panel grows its own 📋 button.
                 root.strip().setPasteText(null);
-                // Surface a one-tap paste affordance when the clipboard has text — drops
-                // a URL / quote / phrase straight into the prompt without re-typing.
                 root.panel().setPasteAvailable(readClipboardText());
-                // Seed the suggestion strip with predictions for the empty
-                // prompt so the user sees options the moment the panel opens.
                 refreshPromptSuggestions("", 0);
-                // /edit, /style, /gif, /gift, /sticker can all consume an input image
-                // — launch the picker now so the user picks first, then comes back and
-                // types the instruction (or for /style, just a preset name like
-                // "ghibli"). /gif, /gift, and /sticker piggyback on the same staging
-                // slot; their integrations consume it on dispatch. /sticker is the only
-                // one of these where the photo is optional — if the user dismisses the
-                // picker, StickerIntegration falls back to text-to-image.
+                // Image-consuming commands share a single staging slot; launch the picker up-front.
                 if ("edit".equals(commandName) || "style".equals(commandName)
                         || "gif".equals(commandName) || "gift".equals(commandName)
                         || "sticker".equals(commandName)) {
-                    // Surface a 📷 button beside the label so the user can retry
-                    // the picker if they dismissed the sheet without selecting
-                    // (or want to swap the staged image). The button auto-hides
-                    // while a thumb is staged.
                     root.panel().setUploadAction(
                             TurtleInputMethodService.this::launchEditImagePicker);
                     launchEditImagePicker();
                 }
-                // /style + /us: surface curated preset chips so the user can fire a
-                // canned prompt with one tap. /style transforms the input photo; /us
-                // places the user's stored reference faces into a scenario.
                 if ("style".equals(commandName)) {
-                    root.presetStrip().setPresets(
+                    root.presetStrip().hide();
+                    root.stylePreviewStrip().setPresets(
                             LmStudioAiClient.stylePresetNames(),
                             TurtleInputMethodService.this::dispatchStylePreset);
                 } else if ("us".equals(commandName)) {
+                    root.stylePreviewStrip().hide();
                     root.presetStrip().setPresets(
                             LmStudioAiClient.usPresetNames(),
                             TurtleInputMethodService.this::dispatchUsPreset);
                 } else {
                     root.presetStrip().hide();
+                    root.stylePreviewStrip().hide();
                 }
             }
             @Override public void onPromptChanged(String commandName, String query, int cursorPos) {
                 root.panel().update(query, cursorPos);
-                // Keep word predictions flowing while the user types a
-                // command's prompt — the suggestion strip is hidden too
-                // aggressively otherwise and the user types blind. We feed
-                // it the prompt's last-word context, same as a regular
-                // text-input flow would.
                 refreshPromptSuggestions(query, cursorPos);
             }
             @Override public void onComposeEnd() {
+                composePaused = false;
                 root.banner().clear();
                 root.cmdSuggestions().hide();
                 root.panel().hide();
                 root.presetStrip().hide();
-                // Restore the strip's paste-preview pill for normal text
-                // editing — we hid it on prompt entry so word suggestions
-                // could show through.
+                root.stylePreviewStrip().hide();
                 root.strip().setPasteText(readClipboardText());
-                // Repaint the suggestion strip from the host editor's
-                // content; otherwise the strip still shows the
-                // prompt-context predictions from the last keystroke
-                // before the user dispatched or cancelled.
                 refreshSuggestions();
-                // Don't clear the staged /edit image here — onComposeEnd fires from
-                // composer.cancel() inside dispatchPromptPanel() *before* the dispatch
-                // reaches the AI client, which would wipe the image we just picked.
-                // Stale staged state is cleared at the next picker launch instead.
+                // Don't clear the staged image here — onComposeEnd fires before dispatch sees it.
             }
         });
-        // HostProvider returns the IME's SoftInputWindow decor so the HTML→image
-        // renderer can briefly attach a WebView to a real window. Using the
-        // IME's own decor keeps the WebView in this process and within a window
-        // that's actually attached when /org runs.
+        // HostProvider hands the IME's decor to the HTML→image renderer so the WebView attaches to a real window.
         LmStudioAiClient.HostProvider hostProvider = () -> {
             android.view.Window w = getWindow() == null ? null : getWindow().getWindow();
             View decor = w == null ? null : w.getDecorView();
             return decor instanceof android.view.ViewGroup ? (android.view.ViewGroup) decor : null;
         };
         if (suggestionEngine == null) {
-            // Fallback in case onCreate didn't run for some reason — should not
-            // happen in practice, but cheap insurance.
             suggestionEngine = new SuggestionEngine(this);
             suggestionEngine.loadAsync(this);
         }
         suggestionProvider = new SymSpellSuggestionProvider(suggestionEngine);
-        // Repaint the strip the moment the dictionary finishes loading. The
-        // engine fires this callback on its load thread; hop back to the main
-        // thread before touching views. Replacing the listener on each
-        // onCreateInputView is fine — only the most recent IME view's refresh
-        // is meaningful.
+        // Repaint the strip on dictionary load; callback fires on the load thread, hop to main.
         suggestionEngine.setOnReadyListener(
                 () -> mainHandler.post(this::refreshSuggestions));
         voice = new VoiceInputController(this);
@@ -310,13 +259,16 @@ public class TurtleInputMethodService extends InputMethodService
 
         root.panel().setOnGoListener(this::dispatchPromptPanel);
         root.panel().setOnPasteListener(text -> composer.appendString(text));
-        // Tap / drag inside the query area positions the composer's caret;
-        // subsequent keystrokes insert at that offset rather than always
-        // appending to the end.
-        root.panel().setOnCursorMoveListener(composer::setPromptCursor);
-        // When the picker stages a new /edit image (or clears one) we want to show a
-        // thumbnail in the prompt panel and bring the IME back to the foreground —
-        // the picker activity stole focus and many hosts don't auto-resume the IME.
+        // Tap/drag in the query positions the caret and also resumes a paused compose.
+        root.panel().setOnCursorMoveListener(pos -> {
+            if (composePaused) {
+                composePaused = false;
+                root.panel().setPaused(false);
+                refreshSuggestions();
+            }
+            composer.setPromptCursor(pos);
+        });
+        // Picker activity stole focus; we re-show the IME and reflect the staged image in the panel.
         LmStudioAiClient.setOnImageStagedListener(this::onEditImageStaged);
         root.strip().setOnPickListener(this::onSuggestionPicked);
         root.strip().setOnMicTapListener(this::toggleVoiceInput);
@@ -326,30 +278,17 @@ public class TurtleInputMethodService extends InputMethodService
         root.cmdSuggestions().setOnPickListener(this::onCommandSuggestionPicked);
         root.cmdSuggestions().setOnDismissListener(this::dismissCommandSuggestions);
 
-        // Build the integration context off the freshly inflated views, then construct the
-        // registry — its constructor pumps each integration's commands into the registry.
         Prefs prefs = new Prefs(this);
         appProfiles = new PersistentAppProfileRegistry(getApplicationContext(), prefs.root());
-        // User-configurable per-pkg command pins. Read by the registry's ranker so user
-        // overrides outrank the built-in affinity defaults.
+        // User pins outrank built-in affinity defaults in the registry ranker.
         registry.setPins(new UserCommandPins(prefs.root().scoped("pins")));
-        // One AiClient drives both the slash-command dispatcher and the module-side
-        // LLM service — saves duplicate construction and keeps /notion talking to the
-        // same backend as /cap, /fix, etc.
+        if (integrations != null) { integrations.shutdown(); integrations = null; }
+        if (aiClient != null) { aiClient.destroy(); aiClient = null; }
         LmStudioAiClient ai = new LmStudioAiClient(this, hostProvider, new StubAiClient());
-        // Single shared Gemini client — modules call ctx.ai() with their own system
-        // prompts. Replaced the legacy LlmService / ImageService composition; each
-        // command now owns its prompt + dispatch in its own integration.
+        aiClient = ai;
         com.prince.kbd.core.GeminiService gemini = new com.prince.ai.GeminiClient(
                 com.prince.turtlekeyboard.BuildConfig.GEMINI_API_KEY);
-        // Single shared MCP client — pure JSON-RPC tools/call transport. Endpoint URL
-        // and per-user auth token are owned by the calling integration (mirrors how
-        // each integration owns its system prompts for ctx.ai()).
         com.prince.kbd.core.McpService mcp = new com.prince.ai.McpClient();
-        // Shared Google OAuth — every module that hits Google APIs (Split for Sheets/Drive,
-        // Drive for /us reference photos, future Calendar / Gmail / Photos integrations)
-        // reuses this single instance via ctx.googleAuth(). Storage in the "google" namespace
-        // keeps token state consistent across modules and across host activities.
         com.prince.kbd.core.GoogleAuth googleAuth = new com.prince.kbd.core.GoogleAuthImpl(
                 getApplicationContext(), prefs.root().scoped("google"));
         com.prince.turtlekeyboard.integration.ImageBridge imageBridge =
@@ -364,21 +303,14 @@ public class TurtleInputMethodService extends InputMethodService
 
                     @Override
                     public void commitImage(android.net.Uri uri, String mime) {
-                        if (!insertImage(uri, mime)) copyToClipboard(uri, mime);
+                        // Async pipelines can land after focus has drifted; fall back to clipboard + insert chip.
+                        if (!insertImage(uri, mime)) {
+                            copyToClipboard(uri, mime);
+                            offerInsertChip(uri, mime);
+                        }
                     }
                 };
-        // SPI-routed picks land here on the main thread (ImagePickerActivity's
-        // onActivityResult posts via PickerResultBus). Legacy /edit picks don't
-        // touch this listener — they stay on LmStudioAiClient.setOnImageStagedListener.
-        //
-        // Mirrors the /edit onEditImageStaged dance precisely:
-        //   1. requestShowSelf attempted now AND via the pendingShowAfterPick flag
-        //      so the IME re-shows whether onStartInput fires (editor refocuses) or
-        //      not (only the IME window lost focus).
-        //   2. The integration's callback — which may mount UI via ctx.showPanel —
-        //      runs through root.post(...) so the keyboard view tree is settled
-        //      (and ideally already visible from the requestShowSelf above) before
-        //      we touch panelHost.
+        // SPI-routed picks (ImagePickerActivity → PickerResultBus). Re-shows IME and defers callback to a settled tree.
         com.prince.turtlekeyboard.ai.PickerResultBus.setListener(
                 (reqId, bytes, mime) -> mainHandler.post(() -> {
                     final com.prince.kbd.core.IntegrationContext.ImagePickCallback cb =
@@ -390,8 +322,7 @@ public class TurtleInputMethodService extends InputMethodService
                     android.util.Log.i("TurtleIME", "SPI picker delivery: reqId=" + reqId
                             + " bytes=" + (bytes == null ? "null" : bytes.length));
 
-                    // Kick the IME show NOW (often a no-op if input isn't ready yet)
-                    // and arm the deferred fallback.
+                    // Show now + delayed fallback in case input isn't ready yet.
                     pendingShowAfterPick = true;
                     requestShowSelf(0);
                     mainHandler.postDelayed(() -> {
@@ -401,8 +332,7 @@ public class TurtleInputMethodService extends InputMethodService
                         }
                     }, 250);
 
-                    // Defer the callback so any UI it mounts (ctx.showPanel) lands
-                    // on a settled view tree, after the IME's first show pass.
+                    // Defer the callback so ctx.showPanel lands on a settled view tree.
                     root.post(() -> {
                         android.util.Log.i("TurtleIME", "SPI picker firing onPicked, panelHost visibility="
                                 + root.panelHost().getVisibility());
@@ -418,12 +348,8 @@ public class TurtleInputMethodService extends InputMethodService
                 getApplicationContext(), root, committer, prefs.root(), appProfiles,
                 gemini, mcp, googleAuth, imageBridge);
         java.util.List<KeyboardIntegration> integrationList = java.util.Arrays.asList(
-                // PuzzleIntegration first so its activate(...) gets first crack
-                // when a /puzzle config flow is mid-pick — it re-mounts the
-                // pending panel that the registry's onInputEnd→deactivate wiped
-                // when the picker activity stole focus. Returns null in the
-                // common no-pending case, so other integrations still claim
-                // their sessions normally.
+                // PuzzleIntegration first: its activate(...) re-mounts a pending /puzzle panel
+                // wiped when the picker stole focus.
                 new PuzzleIntegration(),
                 new SplitIntegration(),
                 new NotionIntegration(),
@@ -434,30 +360,21 @@ public class TurtleInputMethodService extends InputMethodService
                 new WyrIntegration(),
                 new com.prince.turtlekeyboard.integration.gif.GifIntegration(),
                 new com.prince.turtlekeyboard.integration.sticker.StickerIntegration(),
-                // Generic MCP integration — registers N slash commands at construction
-                // time, one per user-added McpBinding from the host app's MCP Servers
-                // screen. Must come last so user bindings can't shadow built-in commands.
+                // UserMcpIntegration last so user bindings can't shadow built-in commands.
                 new UserMcpIntegration(integrationCtx));
         java.util.List<CommandProvider> builtins = java.util.Arrays.asList(new BuiltinAiCommands());
         integrations = new IntegrationRegistry(integrationList, builtins, integrationCtx, registry);
 
-        // Replay shortcut registrations for every enrolled app. Runs after module
-        // commands are registered, so per-app suggestions sit alongside (not on top of)
-        // module-owned triggers like /split.
         enrolledShortcuts = new com.prince.turtlekeyboard.integration.EnrolledShortcutsManager(
                 appProfiles, registry,
                 new com.prince.turtlekeyboard.integration.StaticSuggestedShortcutSource());
         enrolledShortcuts.registerAllEnrolled();
 
-        // /history — in-keyboard grid of generated images. Local-handler command
-        // (no AI round trip); the lambda captures the IME so it can mount the
-        // HistoryPanelView on the existing quickPanelHost slot.
+        // /history is a local-handler command (no AI round trip).
         registry.register(new com.prince.kbd.core.CommandSpec(
                 "history", "History", "🗂️", false,
                 (prompt, ctx) -> showHistoryPanel()));
 
-        // Dispatcher now takes the registry + a context provider so integration-contributed
-        // slash commands can run locally without an AI round trip.
         dispatcher = new CommandDispatcher(
                 ai, committer, this, registry, () -> integrationCtx);
 
@@ -493,20 +410,22 @@ public class TurtleInputMethodService extends InputMethodService
         logHostContext(info);
         if (integrations != null) {
             integrations.onInputStart(info);
-            // Field may already have text (e.g. user re-opened keyboard) — re-evaluate now.
+            // Re-evaluate in case the field already has text from a prior session.
             integrations.onTextChanged(committer.textBeforeCursor(16), committer.textAfterCursor(16));
         }
         maybeOfferEnrollment(info);
         refreshHostAppBadge(info);
         refreshSuggestions();
-        // Surface the top bar with mic + (paste preview, when clipboard has text).
         root.strip().setVisibility(View.VISIBLE);
         root.strip().setPasteText(readClipboardText());
     }
 
-    /** Wired to the center paste preview pill on the top bar. Commits the clipboard
-     *  text directly to the focused field, then dismisses the pill so it doesn't
-     *  re-fire on the next tap. */
+    private boolean hasInputText() {
+        if (committer == null) return false;
+        return committer.textBeforeCursor(1).length() > 0
+                || committer.textAfterCursor(1).length() > 0;
+    }
+
     private void pasteFromClipboard() {
         String text = readClipboardText();
         if (text == null) return;
@@ -514,8 +433,6 @@ public class TurtleInputMethodService extends InputMethodService
         root.strip().setPasteText(null);
     }
 
-    /** Wired to the leading hamburger button on the top bar. Mounts the more-options
-     *  panel in the same slot the Quick Panel uses, replacing the keys. */
     private void openHostDetailView() {
         showMoreActionsPanel();
     }
@@ -543,8 +460,6 @@ public class TurtleInputMethodService extends InputMethodService
     }
 
     private void onMoreActionPicked(int actionId) {
-        // Hide the panel first; specific actions either commit text, launch an
-        // activity, or surface another panel that handles its own visibility.
         hideQuickPanel();
         switch (actionId) {
             case com.prince.turtlekeyboard.ime.view.MoreActionsPanelView.ACTION_QUICK_PANEL:
@@ -572,7 +487,6 @@ public class TurtleInputMethodService extends InputMethodService
                 committer.backspace();
                 break;
             default:
-                // No-op for unknown actions.
                 break;
         }
     }
@@ -613,10 +527,7 @@ public class TurtleInputMethodService extends InputMethodService
         if (root != null && root.hostAppBadge() != null) root.hostAppBadge().hide();
     }
 
-    // onFinishInputView misses some app-switch cases (the input session can stay
-    // "open" while the IME window itself is gone). onWindowHidden/Shown is the
-    // ground truth for "is the keyboard pixel-on-screen right now", which is the
-    // signal we actually want for the image-ready notification fork.
+    // onWindowShown/Hidden is the ground truth for keyboard-on-screen; onFinishInputView misses some app-switch cases.
     @Override
     public void onWindowShown() {
         super.onWindowShown();
@@ -634,19 +545,32 @@ public class TurtleInputMethodService extends InputMethodService
                                   int newSelStart, int newSelEnd,
                                   int candStart, int candEnd) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candStart, candEnd);
+        // Any selection change mid-compose is user-initiated (composer never writes to host); pause so typing routes to host.
+        pauseComposeForHostFocus();
         if (integrations != null && committer != null) {
             integrations.onTextChanged(committer.textBeforeCursor(16), committer.textAfterCursor(16));
         }
+    }
+
+    /** Tap on the host editor: covers the cases onUpdateSelection misses (empty field, tap at current caret). */
+    @Override
+    public void onViewClicked(boolean focusChanged) {
+        super.onViewClicked(focusChanged);
+        pauseComposeForHostFocus();
+    }
+
+    private void pauseComposeForHostFocus() {
+        if (composer == null || !composer.isActive() || composePaused) return;
+        composePaused = true;
+        if (root != null && root.panel() != null) root.panel().setPaused(true);
+        refreshSuggestions();
     }
 
     @Override
     public void onKey(int primaryCode, int[] keyCodes) {
         if (committer.connection() == null) return;
 
-        // Emoji-search mode owns every keystroke while it's open: characters
-        // build up the query, backspace pops the last char (and exits on
-        // empty). We swallow function keys here so e.g. SHIFT doesn't leak
-        // into the host editor while the search bar is the visible target.
+        // Emoji search owns every keystroke; function keys swallowed so SHIFT doesn't leak to host.
         if (activeEmojiPanel != null && activeEmojiPanel.isInSearchMode()) {
             if (primaryCode == Keycodes.DELETE) {
                 activeEmojiPanel.backspaceQuery();
@@ -659,29 +583,20 @@ public class TurtleInputMethodService extends InputMethodService
             return;
         }
 
-        // Mic is global: works the same whether the user is mid-compose or
-        // typing into the host editor. The sink picks the destination.
         if (primaryCode == Keycodes.MIC) {
             toggleVoiceInput();
             return;
         }
         if (primaryCode == Keycodes.EMOJI) {
-            // The dedicated panel lives on the suggestion strip; routing the
-            // hardware key here gives users the same affordance on layouts
-            // that include an emoji key in their bottom row.
             toggleEmojiPanel();
             return;
         }
 
-        if (composer.isActive() && handleComposingKey(primaryCode)) return;
+        if (composer.isActive() && !composePaused && handleComposingKey(primaryCode)) return;
 
         switch (primaryCode) {
             case Keycodes.DELETE:
-                // Once a hold has triggered the long-press menu, drop every DELETE
-                // event from that same touch sequence — even after the menu closes.
-                // Otherwise a still-held finger keeps the framework's MSG_REPEAT
-                // firing and chews through text the user pastes back. Cleared on
-                // the next fresh ACTION_DOWN on ⌫ (see onPress).
+                // Swallow MSG_REPEAT DELETEs from a still-held finger after the long-press menu fired.
                 if (backspaceHoldConsumed) break;
                 committer.backspace();
                 refreshSuggestions();
@@ -698,7 +613,8 @@ public class TurtleInputMethodService extends InputMethodService
                 if (keyboard.isQwerty()) shift.reapply();
                 break;
             case Keycodes.SLASH:
-                if (atWordBoundary()) {
+                // Don't start a new compose over a paused prompt — that would clobber the staged buffer.
+                if (!composer.isActive() && atWordBoundary()) {
                     composer.startName();
                 } else {
                     emitChar(primaryCode);
@@ -730,7 +646,7 @@ public class TurtleInputMethodService extends InputMethodService
                 finishCompose((char) primaryCode);
                 return true;
             default:
-                if (primaryCode <= 0) return true; // swallow other function keys
+                if (primaryCode <= 0) return true;
                 char c = (char) primaryCode;
                 if (Character.isLetter(c) && shift.isUpper()) c = Character.toUpperCase(c);
                 composer.appendChar(c);
@@ -741,7 +657,7 @@ public class TurtleInputMethodService extends InputMethodService
 
     private void finishCompose(char terminator) {
         if (composer.mode() == CommandComposer.Mode.PROMPT) {
-            // Enter / Done in PROMPT mode dispatches; SPACE just appends to the query.
+            // Enter/Done dispatch; SPACE appends to the query.
             if (terminator == Keycodes.SPACE) {
                 composer.appendChar(' ');
                 return;
@@ -750,7 +666,6 @@ public class TurtleInputMethodService extends InputMethodService
             return;
         }
 
-        // NAME mode: terminator chosen by the user determines transition.
         String text = composer.nameText();
         SlashCommand cmd = SlashCommand.parse(text);
         if (cmd != null && registry.has(cmd.name)) {
@@ -762,7 +677,7 @@ public class TurtleInputMethodService extends InputMethodService
                 dispatcher.dispatchComposed(cmd);
             }
         } else {
-            // Unknown / malformed command — surface what was typed so the user doesn't lose it.
+            // Unknown command — surface what was typed so the user doesn't lose it.
             composer.cancel();
             committer.commitText(text + terminator);
             refreshSuggestions();
@@ -779,10 +694,6 @@ public class TurtleInputMethodService extends InputMethodService
         dispatcher.dispatchComposed(cmd);
     }
 
-    /** One-tap dispatch from a preset chip in {@code /style} prompt mode — bypasses
-     *  the typed prompt entirely so users can go selfie → Ghibli with a single tap.
-     *  The AI client looks up the preset name in its style map and expands it to the
-     *  full style instruction. */
     private void dispatchStylePreset(String preset) {
         if (preset == null || preset.isEmpty()) return;
         composer.cancel();
@@ -790,10 +701,6 @@ public class TurtleInputMethodService extends InputMethodService
         dispatcher.dispatchComposed(cmd);
     }
 
-    /** One-tap dispatch from a preset chip in {@code /us} prompt mode — same shape as
-     *  {@link #dispatchStylePreset}. The AI client looks up the preset key in its /us
-     *  scenario map and expands it to the full scenario description sent alongside the
-     *  user's reference selfies. */
     private void dispatchUsPreset(String preset) {
         if (preset == null || preset.isEmpty()) return;
         composer.cancel();
@@ -804,13 +711,7 @@ public class TurtleInputMethodService extends InputMethodService
     private static final String NOTIF_CHANNEL_ID = "image_ready";
     private boolean notifChannelCreated;
 
-    /** Posts a {@code BigPictureStyle} notification with the generated image when the
-     *  keyboard is hidden at result time. Tapping the notification opens a system
-     *  share sheet seeded with the image's FileProvider URI, so the user can drop
-     *  it into whichever app they're now in. If {@code originPkg} is the app the
-     *  user was prompting from (e.g. WhatsApp), a one-tap "Share to <App>" action
-     *  is added that routes the ACTION_SEND straight to that package — skipping
-     *  the chooser. */
+    /** BigPictureStyle notification with a share-sheet tap and an optional direct "Share to &lt;originPkg&gt;" action. */
     private void notifyImageReady(java.io.File img, Uri uri, @Nullable String originPkg) {
         android.app.NotificationManager nm =
                 (android.app.NotificationManager) getSystemService(NOTIFICATION_SERVICE);
@@ -818,10 +719,7 @@ public class TurtleInputMethodService extends InputMethodService
             Log.w("TurtleIME", "notify: NotificationManager null");
             return;
         }
-        // Android 13+: POST_NOTIFICATIONS is a runtime permission. Without it the
-        // notify() call below silently drops. MainActivity is responsible for asking
-        // the user (we can't request runtime perms from a Service). Log explicitly
-        // so the cause is visible in logcat instead of mysterious silence.
+        // Android 13+: POST_NOTIFICATIONS is a runtime permission; without it notify() silently drops.
         if (android.os.Build.VERSION.SDK_INT >= 33) {
             int granted = checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS);
             if (granted != android.content.pm.PackageManager.PERMISSION_GRANTED) {
@@ -842,13 +740,21 @@ public class TurtleInputMethodService extends InputMethodService
             Log.d("TurtleIME", "notify: created channel " + NOTIF_CHANNEL_ID);
         }
 
-        android.graphics.Bitmap big;
-        try {
-            big = android.graphics.BitmapFactory.decodeFile(img.getAbsolutePath());
-        } catch (Exception e) {
-            big = null;
-        }
+        bitmapIo.execute(() -> {
+            android.graphics.Bitmap decoded;
+            try {
+                decoded = android.graphics.BitmapFactory.decodeFile(img.getAbsolutePath());
+            } catch (Exception e) {
+                decoded = null;
+            }
+            final android.graphics.Bitmap big = decoded;
+            mainHandler.post(() -> buildAndPostImageNotification(nm, uri, originPkg, big));
+        });
+    }
 
+    private void buildAndPostImageNotification(android.app.NotificationManager nm,
+                                               Uri uri, @Nullable String originPkg,
+                                               @Nullable android.graphics.Bitmap big) {
         Intent share = new Intent(Intent.ACTION_SEND);
         share.setType("image/png");
         share.putExtra(Intent.EXTRA_STREAM, uri);
@@ -872,15 +778,7 @@ public class TurtleInputMethodService extends InputMethodService
             b.setStyle(new androidx.core.app.NotificationCompat.BigPictureStyle()
                     .bigPicture(big));
         }
-        // One-tap share back to the originating app. Two gotchas:
-        //   1. Intent.resolveActivity(pm) calls MATCH_DEFAULT_ONLY and misses
-        //      non-default receivers (e.g. WhatsApp's ContactPicker), so we
-        //      use queryIntentActivities(0) and pin the explicit component
-        //      that handles it. With a hard ComponentName, tapping the action
-        //      bypasses the system chooser entirely.
-        //   2. The FileProvider URI permission grant on a PendingIntent
-        //      doesn't reliably reach a setPackage target — grant it
-        //      explicitly so the target can actually read the image.
+        // resolveActivity misses non-default receivers (e.g. WhatsApp ContactPicker); query + pin a component instead.
         if (originPkg != null) {
             Intent direct = new Intent(Intent.ACTION_SEND);
             direct.setType("image/png");
@@ -894,8 +792,7 @@ public class TurtleInputMethodService extends InputMethodService
                 android.content.pm.ActivityInfo target = hits.get(0).activityInfo;
                 direct.setComponent(new android.content.ComponentName(
                         target.packageName, target.name));
-                // Explicit URI grant — survives the PendingIntent hop into the
-                // target package's process.
+                // Explicit URI grant — FileProvider's PendingIntent grant doesn't survive setPackage.
                 grantUriPermission(originPkg, uri,
                         Intent.FLAG_GRANT_READ_URI_PERMISSION);
                 CharSequence label;
@@ -924,34 +821,26 @@ public class TurtleInputMethodService extends InputMethodService
             nm.notify(id, b.build());
             Log.d("TurtleIME", "notify: posted id=" + id);
         } catch (SecurityException e) {
-            // Belt-and-suspenders — the explicit check above should have caught this,
-            // but catch it anyway in case of OEM quirks. Image is still in history.
+            // OEM quirk fallback; the explicit check above should catch this normally.
             Log.w("TurtleIME", "notify suppressed: " + e.getMessage());
         }
     }
 
-    /** Called from the {@link LmStudioAiClient.OnImageStagedListener} after the
-     *  picker delivers (or clears). Decodes a small thumbnail off the main thread,
-     *  pushes it into the prompt panel, and asks the IME to re-show — the picker
-     *  activity tore down focus and many host apps don't auto-resume the IME. */
+    /** Stages the picked image into the panel and re-shows the IME (picker shim stole focus). */
     private void onEditImageStaged(@Nullable byte[] bytes, @Nullable String mime) {
         if (bytes == null) {
             root.post(() -> root.panel().setStagedImage(null, null));
             return;
         }
-        // Decode at a small sample size — the panel slot is 32dp, no need for the
-        // full-res bitmap.
-        android.graphics.BitmapFactory.Options opts = new android.graphics.BitmapFactory.Options();
-        opts.inSampleSize = 4;
-        final android.graphics.Bitmap thumb =
-                android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.length, opts);
-        root.post(() -> root.panel().setStagedImage(thumb, () ->
-                LmStudioAiClient.stageEditImage(null, null)));
-        // The listener fires from ImagePickerActivity.onActivityResult — *before*
-        // the shim finishes and the host editor re-binds, so requestShowSelf is a
-        // no-op at this instant. Park a flag for onStartInput to consume when the
-        // editor reconnects, and schedule a delayed fallback in case the EditText
-        // never lost focus (only the IME window did) and onStartInput won't fire.
+        bitmapIo.execute(() -> {
+            android.graphics.BitmapFactory.Options opts = new android.graphics.BitmapFactory.Options();
+            opts.inSampleSize = 4;
+            final android.graphics.Bitmap thumb =
+                    android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.length, opts);
+            root.post(() -> root.panel().setStagedImage(thumb, () ->
+                    LmStudioAiClient.stageEditImage(null, null)));
+        });
+        // requestShowSelf is a no-op until the shim activity finishes; use a flag + delayed fallback.
         pendingShowAfterPick = true;
         mainHandler.postDelayed(() -> {
             if (pendingShowAfterPick) {
@@ -964,18 +853,18 @@ public class TurtleInputMethodService extends InputMethodService
     @Override
     public void onStartInput(EditorInfo info, boolean restarting) {
         super.onStartInput(info, restarting);
+        // Editor swap mid-compose: pause so keystrokes route to the new host (onUpdateSelection misses this).
+        if (!restarting && composer != null && composer.isActive() && !composePaused) {
+            composePaused = true;
+            if (root != null && root.panel() != null) root.panel().setPaused(true);
+        }
         if (pendingShowAfterPick) {
             pendingShowAfterPick = false;
-            // Editor just re-bound after the picker shim tore down — request show
-            // now that the IMM has a live connection to attach the IME to.
             mainHandler.post(() -> requestShowSelf(0));
         }
     }
 
-    /** SPI variant of {@link #launchEditImagePicker}. Passes a request id through the
-     *  picker so the result routes to the in-flight {@code ctx.pickImage()} callback
-     *  via {@link com.prince.turtlekeyboard.ai.PickerResultBus}, instead of staging
-     *  into {@code LmStudioAiClient}. */
+    /** SPI variant of {@link #launchEditImagePicker}; routes the result to the in-flight ctx.pickImage callback. */
     private void launchSpiImagePicker(int requestId) {
         android.content.Intent i = new android.content.Intent(this,
                 com.prince.turtlekeyboard.ai.ImagePickerActivity.class);
@@ -985,19 +874,14 @@ public class TurtleInputMethodService extends InputMethodService
             startActivity(i);
         } catch (Exception e) {
             android.util.Log.w("TurtleIME", "spi picker launch failed", e);
-            // Fire the callback with null so the integration doesn't hang waiting.
+            // Deliver null so the integration doesn't hang.
             com.prince.turtlekeyboard.ai.PickerResultBus.deliver(requestId, null, null);
         }
     }
 
-    /** Fires the system image picker via the transparent shim activity. The IME
-     *  isn't an Activity, so we route through {@code ImagePickerActivity} which
-     *  starts {@code ACTION_GET_CONTENT} and stages the picked bytes back into
-     *  {@code LmStudioAiClient} for the next {@code /edit} dispatch to consume. */
+    /** Launches the picker shim and stages the bytes into {@link LmStudioAiClient} for the next dispatch. */
     private void launchEditImagePicker() {
-        // Drop any leftover staged image from a prior /edit session that exited
-        // without dispatching. If the user cancels this picker, the static stays
-        // null instead of resurrecting an old image.
+        // Clear any leftover staged image so cancelling the picker doesn't resurrect an old one.
         LmStudioAiClient.stageEditImage(null, null);
         android.content.Intent i = new android.content.Intent(this,
                 com.prince.turtlekeyboard.ai.ImagePickerActivity.class);
@@ -1010,8 +894,7 @@ public class TurtleInputMethodService extends InputMethodService
         }
     }
 
-    /** Best-effort read of the system clipboard's primary item as plain text. Returns
-     *  null when there's nothing pasteable — the prompt panel hides its chip in that case. */
+    /** Returns null when the clipboard has nothing pasteable. */
     @Nullable
     private String readClipboardText() {
         android.content.ClipboardManager cm =
@@ -1054,31 +937,22 @@ public class TurtleInputMethodService extends InputMethodService
     }
 
     private void emitChar(int code) {
-        // Once the user starts typing, the clipboard preview is no longer the
-        // foreground action — dismiss it so the suggestion slots reclaim the
-        // center of the top bar.
+        // Dismiss the paste preview once the user starts typing so suggestion slots reclaim the strip.
         if (root != null && root.strip() != null) {
             root.strip().setPasteText(null);
         }
         char c = (char) code;
         if (Character.isLetter(c) && shift.isUpper()) c = Character.toUpperCase(c);
-        // No auto-correction on space — suggestions are applied only when the
-        // user taps a chip in the suggestion strip (onSuggestionPicked).
+        // No auto-correction on space; suggestions only apply on chip tap.
         committer.commitChar(c);
         if (code == Keycodes.SPACE) spaceGesture.onSpacePressed();
-        // Word boundary just committed (space, punctuation, etc.) — record the
-        // word that ended so personal vocabulary builds up over time.
         if (!Character.isLetter(c)) maybeLearnLastWord();
         shift.onCharCommitted();
         slashDetector.onTextChanged();
         refreshSuggestions();
     }
 
-    /**
-     * Looks back from the cursor, skips trailing whitespace, then walks the
-     * preceding alpha run (with {@code '} and {@code -} allowed) and feeds it
-     * to the suggestion engine.
-     */
+    /** Walks back from the cursor to the preceding word and feeds it to the suggestion engine. */
     private void maybeLearnLastWord() {
         if (suggestionEngine == null || committer == null) return;
         CharSequence before = committer.textBeforeCursor(64);
@@ -1096,13 +970,10 @@ public class TurtleInputMethodService extends InputMethodService
         }
     }
 
-    // -- Voice input ------------------------------------------------------
-
     private void toggleVoiceInput() {
         if (voice == null) return;
         if (!VoiceInputController.hasMicPermission(this)) {
-            // IMEs cannot request runtime permissions directly; bounce the
-            // user to MainActivity which holds the permission flow.
+            // IMEs can't request runtime perms; bounce to MainActivity which holds the flow.
             root.banner().showAndAutoHide("Enable mic in Turtle app", 2000);
             try {
                 Intent i = new Intent(this, MainActivity.class);
@@ -1118,15 +989,10 @@ public class TurtleInputMethodService extends InputMethodService
     private final VoiceInputController.Sink voiceSink = new VoiceInputController.Sink() {
         @Override public void onListeningStarted() {
             root.banner().clear();
-            // Mini banner-row bars are redundant once the stage takes over —
-            // keep one voice indicator on screen, not two.
+            // Stage replaces the mini bar; keep one voice indicator on screen.
             root.voiceListening().stop();
 
-            // The stage is a translucent overlay; we want it to occupy the
-            // same vertical slot as the keyboard without growing the IME
-            // window. Trick: height = keyboard.height, topMargin = -that —
-            // so its contribution to the LinearLayout's height is 0 while
-            // it visually overlaps the keys.
+            // Overlay the keys without growing the IME window: height=kh, topMargin=-kh.
             int kh = root.keyboardView().getHeight();
             if (kh > 0) {
                 android.view.ViewGroup.LayoutParams lp = root.voiceStage().getLayoutParams();
@@ -1137,9 +1003,6 @@ public class TurtleInputMethodService extends InputMethodService
                 root.voiceStage().setLayoutParams(lp);
             }
 
-            // Mic stays put in the suggestion strip throughout listening, so
-            // its window-space centre is stable; the stage resolves the local
-            // coordinate inside post() once layout settles.
             View mic = root.strip().micButton();
             int[] micLoc = new int[2];
             mic.getLocationInWindow(micLoc);
@@ -1157,7 +1020,7 @@ public class TurtleInputMethodService extends InputMethodService
         }
         @Override public void onFinal(String text) {
             if (text == null || text.isEmpty()) return;
-            if (composer.isActive()) {
+            if (composer.isActive() && !composePaused) {
                 // Route into whichever phase the composer is in (NAME / PROMPT).
                 for (int i = 0; i < text.length(); i++) composer.appendChar(text.charAt(i));
             } else {
@@ -1167,25 +1030,26 @@ public class TurtleInputMethodService extends InputMethodService
             }
         }
         @Override public void onError(String userVisibleMessage) {
-            root.voiceStage().stop();
-            root.banner().showAndAutoHide(userVisibleMessage, 1500);
+            if (root.voiceStage().getVisibility() == View.VISIBLE) {
+                root.voiceStage().showError(userVisibleMessage);
+            } else {
+                root.banner().showAndAutoHide(userVisibleMessage, 1500);
+            }
         }
     };
 
     @Override
     public void onDestroy() {
         if (voice != null) { voice.destroy(); voice = null; }
+        if (integrations != null) { integrations.shutdown(); integrations = null; }
+        if (aiClient != null) { aiClient.destroy(); aiClient = null; }
+        bitmapIo.shutdown();
         super.onDestroy();
     }
 
     private void refreshSuggestions() {
-        // While the composer is in PROMPT mode the host editor doesn't yet
-        // hold the typed text — it's all sitting in the composer buffer —
-        // so reading committer.textBeforeCursor here would yield whatever
-        // was in the host before the user started the slash flow. Route
-        // through the prompt-context path instead so suggestions track the
-        // panel's actual content.
-        if (composer != null && composer.isActive()
+        // Prompt buffer never reaches the host; use the prompt-context path so suggestions track the panel.
+        if (composer != null && composer.isActive() && !composePaused
                 && composer.mode() == com.prince.turtlekeyboard.command.CommandComposer.Mode.PROMPT) {
             refreshPromptSuggestions(composer.query(), composer.promptCursor());
             return;
@@ -1195,13 +1059,7 @@ public class TurtleInputMethodService extends InputMethodService
         root.strip().setSuggestions(list);
     }
 
-    /** Sibling of {@link #refreshSuggestions} for the slash-command prompt
-     *  flow. The composer's buffer holds the typed prompt (it never reaches
-     *  the host editor until dispatch), so the regular committer-based path
-     *  would return whatever's in the host instead of the prompt's text.
-     *  This feeds the suggestion provider the prompt substring up to the
-     *  caret so word predictions track what the user is actually typing
-     *  inside the panel. */
+    /** Sibling of refreshSuggestions that reads from the composer buffer instead of the host editor. */
     private void refreshPromptSuggestions(String query, int cursorPos) {
         if (suggestionProvider == null || root == null) return;
         String q = query == null ? "" : query;
@@ -1215,11 +1073,8 @@ public class TurtleInputMethodService extends InputMethodService
     }
 
     private void onSuggestionPicked(String suggestion) {
-        // In PROMPT mode the typed text lives in the composer buffer, not in
-        // the host editor. Route the pick through the composer so the prompt
-        // panel updates and the committer doesn't accidentally drop the
-        // suggestion straight into the host before the user hits Go.
-        if (composer != null && composer.isActive()
+        // PROMPT mode: route through the composer so the panel updates and the host doesn't see the suggestion.
+        if (composer != null && composer.isActive() && !composePaused
                 && composer.mode() == com.prince.turtlekeyboard.command.CommandComposer.Mode.PROMPT) {
             String q = composer.query();
             int cursor = composer.promptCursor();
@@ -1227,18 +1082,12 @@ public class TurtleInputMethodService extends InputMethodService
             while (wordStart > 0 && !Character.isWhitespace(q.charAt(wordStart - 1))) {
                 wordStart--;
             }
-            // Backspace the partial word the user has typed so far so the
-            // picked suggestion replaces it cleanly. We loop instead of a
-            // direct buffer edit because backspace is what fires the right
-            // composer Ui callback to repaint the panel.
+            // Looping backspace fires the composer Ui callback that repaints the panel.
             for (int i = cursor; i > wordStart; i--) composer.backspace();
             composer.appendString(suggestion + " ");
             if (suggestionEngine != null) suggestionEngine.learn(suggestion);
-            // No explicit refresh — appendString fires onPromptChanged which
-            // re-runs refreshPromptSuggestions for the next word context.
             return;
         }
-        // Default path: normal text editing against the host editor.
         CharSequence before = committer.textBeforeCursor(64);
         int wordLen = 0;
         for (int i = before.length() - 1; i >= 0; i--) {
@@ -1252,8 +1101,7 @@ public class TurtleInputMethodService extends InputMethodService
     }
 
     private void maybeOfferEnrollment(@Nullable EditorInfo info) {
-        // Decline early under any condition where a personalization prompt would be wrong:
-        // missing/system app, sensitive field (passwords, PIN, OTP), enrolled, suppressed.
+        // Skip system surfaces, sensitive fields, already-enrolled/suppressed pkgs.
         if (info == null || info.packageName == null) { hideEnrollmentBanner(); return; }
         String pkg = info.packageName;
         if (isSystemPackage(pkg)) { hideEnrollmentBanner(); return; }
@@ -1295,9 +1143,7 @@ public class TurtleInputMethodService extends InputMethodService
     }
 
     private void refreshHostAppBadge(@Nullable EditorInfo info) {
-        // Show only for apps the user has *mapped* (auto-enrolled seed apps + user-enrolled
-        // apps). Skip system surfaces and sensitive fields so the badge never leaks
-        // "we know where you are" into a password screen.
+        // Skip system surfaces and sensitive fields so the badge never appears on a password screen.
         if (info == null || info.packageName == null) { root.hostAppBadge().hide(); return; }
         String pkg = info.packageName;
         if (isSystemPackage(pkg)) { root.hostAppBadge().hide(); return; }
@@ -1320,9 +1166,7 @@ public class TurtleInputMethodService extends InputMethodService
     }
 
     private static boolean isSystemPackage(String pkg) {
-        // Only filter true system surfaces (system UI, settings, launcher, IMEs and our
-        // own host) — *not* arbitrary "com.android.*" packages, since Chrome ships as
-        // com.android.chrome and several Google apps use that prefix.
+        // Don't filter arbitrary "com.android.*" — Chrome ships as com.android.chrome.
         if (pkg.equals("com.prince.turtlekeyboard")) return true;
         if (pkg.equals("com.android.systemui")) return true;
         if (pkg.equals("com.android.settings")) return true;
@@ -1334,14 +1178,10 @@ public class TurtleInputMethodService extends InputMethodService
     }
 
     private void onDoubleTapSpace() {
-        // The two space chars were already committed by emitChar before the double-tap
-        // detector saw the gesture — undo them so the host editor doesn't keep stray
-        // spaces from a pure-gesture invocation.
+        // emitChar already committed the two space chars; undo them.
         committer.deleteBeforeCursor(2);
         slashDetector.onTextChanged();
         refreshSuggestions();
-        // PRD §6.6: double-tap-space toggles the Quick Panel — a 2-col grid of slash
-        // commands that *replaces* the key area.
         if (isQuickPanelVisible()) {
             hideQuickPanel();
             return;
@@ -1358,16 +1198,12 @@ public class TurtleInputMethodService extends InputMethodService
         com.prince.turtlekeyboard.ime.view.QuickPanelView panel =
                 new com.prince.turtlekeyboard.ime.view.QuickPanelView(this);
         panel.applyTheme(themes.current());
-        // Re-query the current host package right before ranking — onStartInputView
-        // stamps `currentPkg` but Android can re-enter the input view on some redraws
-        // without re-firing it, leaving the field stale. Asking for live info here
-        // guarantees /notion + /slack-affine commands hoist correctly in Slack, etc.
+        // Re-query: currentPkg can go stale if Android re-enters the input view without re-firing onStartInputView.
         EditorInfo liveInfo = getCurrentInputEditorInfo();
         if (liveInfo != null && liveInfo.packageName != null) currentPkg = liveInfo.packageName;
         panel.show(registry.allSortedFor(currentPkg), this::onQuickPanelPick, this::hideQuickPanel);
 
-        // Match the keyboard's measured height so the grid sits in the same vertical band
-        // the keys occupied — no jump in IME height when toggling.
+        // Match the keyboard's measured height so toggling doesn't jump IME height.
         android.inputmethodservice.KeyboardView keys = root.keyboardView();
         int targetHeight = keys.getHeight();
         host.removeAllViews();
@@ -1385,16 +1221,12 @@ public class TurtleInputMethodService extends InputMethodService
         root.keyboardView().setVisibility(View.VISIBLE);
     }
 
-    /** Top-left 😀 chip on the suggestion strip toggles the emoji panel.
-     *  Reuses the same {@code quickPanelHost} slot the slash-command Quick Panel
-     *  mounts into — emoji and Quick Panel are mutually exclusive UIs, both
-     *  replacing the keys at the same vertical band. */
+    /** Emoji panel and Quick Panel share the quickPanelHost slot. */
     private void toggleEmojiPanel() {
         if (isEmojiPanelVisible()) {
             hideEmojiPanel();
             return;
         }
-        // Close any sibling panel that might be holding the slot.
         if (isQuickPanelVisible()) hideQuickPanel();
         showEmojiPanel();
     }
@@ -1411,20 +1243,14 @@ public class TurtleInputMethodService extends InputMethodService
                 new com.prince.turtlekeyboard.ime.view.EmojiPanelView(this);
         panel.applyTheme(themes.current());
         panel.show(this::commitEmoji, this::hideEmojiPanel);
-        // GIF tab tile → commit the .gif inline (image/gif) into the focused
-        // host editor, then close the panel so the user sees it land. Mirrors
-        // the same FileProvider + commitContent flow used right after /gif
-        // generation, but sourced from history instead of a fresh encode.
         panel.setOnGifPickListener(this::insertHistoryGif);
 
         final android.inputmethodservice.KeyboardView keys = root.keyboardView();
         int targetHeight = keys.getHeight();
         if (targetHeight <= 0) targetHeight = android.widget.FrameLayout.LayoutParams.WRAP_CONTENT;
-        // Tell the panel what height to restore to when the user backs out of
-        // search mode — without it the panel would stay at the shrunken size.
+        // Without this the panel stays at the shrunken search-mode size after exiting search.
         panel.setBrowseHeightPx(targetHeight);
-        // Re-show the keys while the search bar is open so the user has
-        // something to type into; collapse them again on exit.
+        // Re-show keys while the search bar is open; collapse on exit.
         panel.setOnSearchStateListener(new com.prince.turtlekeyboard.ime.view.EmojiPanelView.OnSearchStateListener() {
             @Override public void onEnterSearch() { keys.setVisibility(View.VISIBLE); }
             @Override public void onExitSearch()  { keys.setVisibility(View.GONE);    }
@@ -1445,21 +1271,13 @@ public class TurtleInputMethodService extends InputMethodService
         hideQuickPanel();
     }
 
-    /** Drop the picked glyph into the host input field. Skips the slash-command
-     *  pipeline (emojis are never command triggers) and goes straight to the IC
-     *  so EmojiCompat-rendered text lands intact even on hosts that filter
-     *  custom span text. */
+    /** Goes straight to the IC so EmojiCompat-rendered text lands on hosts that filter custom spans. */
     private void commitEmoji(String emoji) {
         InputConnection ic = getCurrentInputConnection();
         if (ic == null || emoji == null || emoji.isEmpty()) return;
         ic.commitText(emoji, 1);
     }
 
-    /** Mounts the {@link com.prince.turtlekeyboard.ime.view.HistoryPanelView} in
-     *  the same slot the Quick Panel uses, replacing the keys. Tap on a thumbnail
-     *  fires {@link #insertHistoryImage} which uses {@code commitContent} to drop
-     *  the image into the host field directly (clipboard fallback for hosts that
-     *  don't accept inline images). */
     private void showHistoryPanel() {
         android.view.ViewGroup host = root.quickPanelHost();
         com.prince.turtlekeyboard.ime.view.HistoryPanelView panel =
@@ -1480,9 +1298,6 @@ public class TurtleInputMethodService extends InputMethodService
         keys.setVisibility(View.GONE);
     }
 
-    /** Inserts a history image into the host field. Mirrors the share path used by
-     *  the result preview, but skips the format picker — history files are PNGs
-     *  or GIFs that hosts overwhelmingly accept. */
     private void insertHistoryImage(java.io.File file) {
         if (file == null || !file.exists()) {
             root.banner().showAndAutoHide("File missing", 1500L);
@@ -1491,18 +1306,11 @@ public class TurtleInputMethodService extends InputMethodService
         Uri uri = androidx.core.content.FileProvider.getUriForFile(this,
                 getPackageName() + ".fileprovider", file);
         hideQuickPanel();
-        // Pick mime by extension — ImageHistory holds both .png and .gif
-        // entries now, and committing a .gif under image/png would prevent
-        // the host from animating it.
+        // GIFs committed under image/png lose their animation in the host.
         String mime = file.getName().endsWith(".gif") ? "image/gif" : "image/png";
         if (!insertImage(uri, mime)) copyToClipboard(uri, mime);
     }
 
-    /** Inserts a previously-generated GIF (from the emoji panel's GIFs tab)
-     *  into the host field. Same FileProvider + commitContent path as
-     *  {@link #insertHistoryImage}, but the mime is {@code image/gif} so
-     *  chat hosts know to animate it. Closes the emoji panel after commit
-     *  so the user sees the result land in the chat. */
     private void insertHistoryGif(java.io.File file) {
         if (file == null || !file.exists()) {
             root.banner().showAndAutoHide("File missing", 1500L);
@@ -1515,32 +1323,24 @@ public class TurtleInputMethodService extends InputMethodService
     }
 
     private void refreshCommandSuggestions(String displayed) {
-        // displayed is the composer NAME buffer including the leading "/". Wait for at
-        // least one letter after the slash before showing the strip — typing "/" alone
-        // shouldn't dump every registered command on the user.
+        // Wait for at least one letter after the slash so "/" alone doesn't dump every command.
         String prefix = displayed == null || displayed.isEmpty() || displayed.charAt(0) != '/'
                 ? "" : displayed.substring(1);
         if (prefix.isEmpty()) {
             root.cmdSuggestions().hide();
             return;
         }
-        // Affinity ranking: per-app shortcuts (like /standup in Slack) sit ahead of
-        // generic ones when both prefix-match.
         root.cmdSuggestions().show(registry.matchesFor(prefix, currentPkg));
     }
 
     private void dismissCommandSuggestions() {
-        // Close ✕ pill on the strip: exit NAME mode AND hide the strip so
-        // further typing goes through as plain text instead of restarting
-        // the suggestion flow on the next keystroke.
+        // Exit NAME mode AND hide the strip so further typing doesn't restart suggestions.
         composer.cancel();
         root.cmdSuggestions().hide();
     }
 
     private void onCommandSuggestionPicked(CommandRegistry.Entry entry) {
-        // No-prompt commands have nothing for the user to type or confirm — fire
-        // immediately on pick so e.g. /history doesn't need an extra Go-tap. The
-        // host editor never sees "/<name>" either way.
+        // No-prompt commands fire immediately on pick (e.g. /history needs no Go-tap).
         if (!entry.needsPrompt) {
             composer.cancel();
             dispatcher.dispatchComposed(
@@ -1573,14 +1373,9 @@ public class TurtleInputMethodService extends InputMethodService
     // ===== CommandDispatcher.ResultUi =====
 
     @Override public void showStatus(String message) {
-        // Trailing "…" is CommandDispatcher's loading marker — show the dark
-        // gradient loader panel (with the status text) until a terminal result
-        // arrives. Any other status (errors, completions) hides it and falls
-        // through to the transient banner.
+        // Trailing "…" marks a loading status; everything else falls through to a transient banner.
         if (message != null && message.endsWith("…")) {
-            // Remember which app the user was in *as the request fires* — if
-            // they background the keyboard before the result lands, the
-            // notification can route a one-tap share straight back to it.
+            // Snapshot the host pkg now so a backgrounded keyboard can still route the notification share.
             pendingSourcePkg = currentPkg;
             root.generatingLoader().show(message);
             root.shimmer().stop();
@@ -1611,8 +1406,6 @@ public class TurtleInputMethodService extends InputMethodService
             uri = Uri.parse(imagePayload.substring(0, sep));
             source = new java.io.File(imagePayload.substring(sep + 1));
         } else {
-            // No path provided — can't preview. Future remote-image commands will need
-            // to download to cache before reaching here.
             root.banner().showAndAutoHide("No local preview available", 2000L);
             return;
         }
@@ -1621,8 +1414,7 @@ public class TurtleInputMethodService extends InputMethodService
             root.banner().showAndAutoHide("Preview file missing", 2000L);
             return;
         }
-        // Keyboard isn't on screen (user switched apps mid-generation) — fall back to
-        // a notification so the result isn't silently dropped.
+        // Keyboard backgrounded mid-generation falls back to notification.
         Log.d("TurtleIME", "showImage visible=" + inputViewVisible + " path="
                 + (inputViewVisible ? "preview" : "notification"));
         if (!inputViewVisible) {
@@ -1631,9 +1423,6 @@ public class TurtleInputMethodService extends InputMethodService
             notifyImageReady(source, uri, originPkg);
             return;
         }
-        // Result landed while the keyboard is still visible — preview path
-        // takes over, so drop the pending origin so a later command doesn't
-        // inherit it.
         pendingSourcePkg = null;
         boolean ok = root.preview().show(source, new com.prince.turtlekeyboard.ime.view.ImagePreviewView.Listener() {
             @Override public void onShare(com.prince.turtlekeyboard.ai.ImageVariants.Type type) {
@@ -1647,8 +1436,7 @@ public class TurtleInputMethodService extends InputMethodService
         if (!ok) root.banner().showAndAutoHide("Preview decode failed", 2000L);
     }
 
-    /** Encode the source PNG into the user-picked format, then commitContent (or
-     *  fall back to clipboard) under the appropriate MIME. */
+    /** Encodes the source into the user-picked format, then commits or falls back to clipboard. */
     private void shareAs(java.io.File source, com.prince.turtlekeyboard.ai.ImageVariants.Type type) {
         com.prince.turtlekeyboard.ai.ImageVariants.Variant v;
         try {
@@ -1663,27 +1451,49 @@ public class TurtleInputMethodService extends InputMethodService
         if (!insertImage(uri, v.mime)) copyToClipboard(uri, v.mime);
     }
 
-    /**
-     * Tries {@link InputConnectionCompat#commitContent} so apps that accept the chosen
-     * MIME (Gmail, WhatsApp, Messages, …) receive the file inline. Returns false if
-     * the host field doesn't advertise that MIME — caller falls back to clipboard.
-     */
+    /** Tries {@link InputConnectionCompat#commitContent}; caller decides the fallback when it returns false. */
     private boolean insertImage(Uri uri, String mime) {
         InputConnection ic = getCurrentInputConnection();
         EditorInfo info = getCurrentInputEditorInfo();
-        if (ic == null || info == null) return false;
-        String[] mimes = androidx.core.view.inputmethod.EditorInfoCompat.getContentMimeTypes(info);
-        boolean accepts = false;
-        for (String m : mimes) {
-            if (ClipDescription.compareMimeTypes(m, mime)) { accepts = true; break; }
+        if (ic == null || info == null) {
+            android.util.Log.d("TurtleIME", "insertImage skip mime=" + mime
+                    + " ic=" + (ic == null ? "null" : "ok")
+                    + " info=" + (info == null ? "null" : "ok"));
+            return false;
         }
-        if (!accepts) return false;
+        // Don't pre-check contentMimeTypes: WhatsApp accepts image/gif via commitContent without listing it.
+        // The list is logged on failure so logcat shows what the host claims to support.
+        String[] advertised =
+                androidx.core.view.inputmethod.EditorInfoCompat.getContentMimeTypes(info);
         InputContentInfoCompat content = new InputContentInfoCompat(
                 uri, new ClipDescription("turtle", new String[]{mime}), null);
         int flags = InputConnectionCompat.INPUT_CONTENT_GRANT_READ_URI_PERMISSION;
         boolean ok = InputConnectionCompat.commitContent(ic, info, content, flags, null);
+        android.util.Log.d("TurtleIME", "insertImage commit pkg=" + info.packageName
+                + " mime=" + mime + " ok=" + ok
+                + (ok ? "" : " advertised=" + java.util.Arrays.toString(advertised)));
         if (ok) root.banner().showAndAutoHide("Inserted 🐢", 1500L);
         return ok;
+    }
+
+    /** Persistent chip offering to retry insertion of an image whose auto-commit failed. */
+    private void offerInsertChip(Uri uri, String mime) {
+        pendingInsertUri = uri;
+        pendingInsertMime = mime;
+        final String label = "image/gif".equals(mime)
+                ? "Tap to insert GIF 🎞️"
+                : "Tap to insert image 🖼️";
+        root.chip().show(label, null);
+        root.chip().setOnTapListener(() -> {
+            Uri u = pendingInsertUri;
+            String m = pendingInsertMime;
+            pendingInsertUri = null;
+            pendingInsertMime = null;
+            root.chip().setOnTapListener(null);
+            root.chip().hide();
+            if (u == null) return;
+            if (!insertImage(u, m)) copyToClipboard(u, m);
+        });
     }
 
     private void copyToClipboard(Uri uri, String mime) {
@@ -1744,7 +1554,7 @@ public class TurtleInputMethodService extends InputMethodService
         return true;
     }
     @Override public void onText(CharSequence text) {
-        if (composer.isActive()) {
+        if (composer.isActive() && !composePaused) {
             for (int i = 0; i < text.length(); i++) composer.appendChar(text.charAt(i));
         } else {
             committer.commitText(text);

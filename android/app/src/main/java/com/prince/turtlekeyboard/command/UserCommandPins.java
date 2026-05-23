@@ -10,14 +10,9 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Per-app user-configurable command ordering. Stored in a {@link KeyValueStore} scoped
- * to the {@code "pins"} namespace: one comma-separated list per package, ordered as the
- * user prefers ({@code pkg → "cap,sticker,tl"}).
- *
- * <p>{@link CommandRegistry#allSortedFor} consults this first. Pinned entries float to
- * the top in the user's order; remaining entries fall through to the affinity-based
- * default ranking. If a pinned name no longer exists in the registry it's silently
- * skipped — pruning happens lazily on the next save.
+ * Per-app user-configurable command ordering, stored as a comma-separated list per
+ * package in a {@link KeyValueStore}. {@link CommandRegistry#allSortedFor} reads this
+ * first; missing names are silently skipped and pruned lazily on the next save.
  */
 public final class UserCommandPins {
 

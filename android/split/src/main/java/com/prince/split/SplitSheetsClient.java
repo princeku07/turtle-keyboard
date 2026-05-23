@@ -17,11 +17,8 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Thin REST client for the bits of Sheets v4 + Drive v3 the SDK needs.
- *
- * <p>Auth is callers' problem — pass a fresh access token to every method. A 401 response
- * surfaces as {@link UnauthorizedException} so {@link SplitCloudSync} can re-auth and
- * retry without baking refresh logic into this layer.
+ * Thin REST client for the Sheets v4 endpoints Split uses. Caller supplies a fresh
+ * access token; 401/403 surfaces as {@link UnauthorizedException}.
  */
 final class SplitSheetsClient {
 
@@ -29,12 +26,10 @@ final class SplitSheetsClient {
     private static final int CONNECT_TIMEOUT_MS = 6000;
     private static final int READ_TIMEOUT_MS = 8000;
 
-    /** Tab + columns the SDK uses; mirrors the legacy Apps Script schema. */
     static final String TAB = "Splits";
     private static final String[] HEADERS = {
             "timestampIso", "timestampMs", "deviceId", "amount", "people", "perPerson"
     };
-    /** Columns A:F — full schema range for reads. */
     private static final String READ_RANGE = TAB + "!A2:F";
 
     static final class UnauthorizedException extends IOException {
@@ -56,10 +51,7 @@ final class SplitSheetsClient {
 
     private SplitSheetsClient() {}
 
-    /**
-     * Creates a new spreadsheet titled {@code "Turtle Splits"} with a {@code Splits} tab
-     * and header row. Returns the new spreadsheet ID.
-     */
+    /** Creates a "Turtle Splits" spreadsheet with the {@code Splits} tab and header row. */
     static String createSpreadsheet(String accessToken) throws IOException {
         JSONObject body = new JSONObject();
         try {
@@ -74,12 +66,11 @@ final class SplitSheetsClient {
         JSONObject resp = request("POST", SHEETS_BASE, accessToken, body.toString());
         String id = resp.optString("spreadsheetId", "");
         if (id.isEmpty()) throw new IOException("createSpreadsheet: empty spreadsheetId");
-        // Stamp headers in row 1.
         appendRows(accessToken, id, Collections.singletonList(asStringRow(HEADERS)));
         return id;
     }
 
-    /** Appends one or more value rows to the {@code Splits} tab. Each inner list is one row. */
+    /** Appends rows to the {@code Splits} tab. */
     static void appendRows(String accessToken, String spreadsheetId, List<List<Object>> rows)
             throws IOException {
         appendRowsToTab(accessToken, spreadsheetId, TAB, rows);
@@ -105,14 +96,14 @@ final class SplitSheetsClient {
         request("POST", url, accessToken, body.toString());
     }
 
-    /** Owner-only: nukes every data row from the {@code Splits} tab while preserving the header. */
+    /** Clears every data row while preserving the header. */
     static void deleteAllDataRows(String accessToken, String spreadsheetId) throws IOException {
         String url = SHEETS_BASE + "/" + spreadsheetId + "/values/"
                 + encode(TAB + "!A2:F") + ":clear";
         request("POST", url, accessToken, "{}");
     }
 
-    /** Reads every data row from the {@code Splits} tab into typed {@link Row}s. */
+    /** Reads every data row from the {@code Splits} tab. */
     static List<Row> listRows(String accessToken, String spreadsheetId) throws IOException {
         String url = SHEETS_BASE + "/" + spreadsheetId + "/values/" + encode(READ_RANGE);
         JSONObject resp = request("GET", url, accessToken, null);
@@ -133,26 +124,21 @@ final class SplitSheetsClient {
         return out;
     }
 
-    /**
-     * Deletes all data rows whose {@code deviceId} (column C) matches {@code deviceId}.
-     * Iterates row indices from the bottom up so deletions don't shift indexes mid-loop.
-     */
+    /** Deletes data rows whose column-C deviceId matches {@code deviceId}. */
     static void deleteRowsForDevice(String accessToken, String spreadsheetId, String deviceId)
             throws IOException {
-        // Need numeric sheetId for batchUpdate, not the title.
         int sheetId = resolveSheetId(accessToken, spreadsheetId, TAB);
-        // Read all current values to find matching indexes.
         String url = SHEETS_BASE + "/" + spreadsheetId + "/values/" + encode(READ_RANGE);
         JSONObject resp = request("GET", url, accessToken, null);
         JSONArray values = resp.optJSONArray("values");
         if (values == null || values.length() == 0) return;
 
-        // 0-based row indexes within the data range; absolute sheet rows are these + 1 (header).
+        // Iterate bottom-up so deletions don't shift indexes mid-loop.
         List<Integer> matches = new ArrayList<>();
         for (int i = 0; i < values.length(); i++) {
             JSONArray r = values.optJSONArray(i);
             if (r == null || r.length() < 3) continue;
-            if (deviceId.equals(r.optString(2, ""))) matches.add(i + 1); // +1 = absolute row index (0-based with header at 0)
+            if (deviceId.equals(r.optString(2, ""))) matches.add(i + 1);
         }
         if (matches.isEmpty()) return;
         Collections.sort(matches, Collections.reverseOrder());
@@ -191,8 +177,6 @@ final class SplitSheetsClient {
         }
         throw new IOException("tab '" + tabName + "' not found");
     }
-
-    // -- core HTTP --------------------------------------------------------------
 
     private static JSONObject request(String method, String url, String accessToken,
                                       @Nullable String jsonBody) throws IOException {
@@ -240,8 +224,6 @@ final class SplitSheetsClient {
         r.close();
         return sb.toString();
     }
-
-    // -- helpers ----------------------------------------------------------------
 
     private static List<Object> asStringRow(String[] cols) {
         List<Object> row = new ArrayList<>(cols.length);

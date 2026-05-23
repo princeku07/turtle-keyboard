@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "1071829055550",
+    "project_id": "blissful-land-459621-m2",
+    "storage_bucket": "blissful-land-459621-m2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1071829055550:android:145654e37a909afc97796f",
+        "android_client_info": {
+          "package_name": "com.prince.turtlekeyboard"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1071829055550-n6ce0h96tsupi3t05924e0rrur8k3amv.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.prince.turtlekeyboard",
+            "certificate_hash": "bab0dd5b7df975ac0c7f4ec58b26977d83d8237e"
+          }
+        },
+        {
+          "client_id": "1071829055550-1n80mo6qsukplc4ju2ag4uin9e2mdhap.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA8rweFu5DHWLjvTwSdYQbCtN1UUSfByFI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1071829055550-1n80mo6qsukplc4ju2ag4uin9e2mdhap.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1071829055550-ri4ont2ft9gt7c81kj3c7n4ls3pltn4u.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.turtlekeyboard"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

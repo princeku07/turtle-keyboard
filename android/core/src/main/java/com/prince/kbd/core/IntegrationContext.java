@@ -8,13 +8,12 @@ import android.view.View;
 import androidx.annotation.Nullable;
 
 /**
- * Surface integrations talk to. Owned by the IME service; passed into every integration
- * call so integrations don't reach into the IME's internals.
+ * Surface integrations talk to. Owned by the IME service and passed into every
+ * integration call so integrations don't reach into the IME's internals.
  */
 public interface IntegrationContext {
 
-    /** Result of a {@link #pickImage} call. Bytes are pre-downsized so integrations
-     *  don't have to repeat the heap-safety work the IME's picker already does. */
+    /** Result of a {@link #pickImage} call. Bytes are pre-downsized by the IME. */
     final class PickedImage {
         public final byte[] bytes;
         public final String mime;
@@ -25,8 +24,7 @@ public interface IntegrationContext {
     }
 
     interface ImagePickCallback {
-        /** Fires once, on the main thread. {@code picked == null} means the user
-         *  cancelled or the picker was unavailable. */
+        /** Fires once, on the main thread. {@code picked == null} means cancelled or unavailable. */
         void onPicked(@Nullable PickedImage picked);
     }
 
@@ -46,38 +44,25 @@ public interface IntegrationContext {
     /** Transient notice above the keyboard. Auto-hides after {@code autoHideMs}. */
     void showBanner(String text, long autoHideMs);
 
-    /** Loads the launcher icon for {@code pkg}, or null when the host isn't installed
+    /** @return the launcher icon for {@code pkg}, or null when the host isn't installed
      *  or isn't declared in the manifest's {@code <queries>} block. */
     @Nullable Drawable iconForPackage(String pkg);
 
-    /**
-     * Module-scoped persistent storage. Each call returns a {@link KeyValueStore} whose
-     * keys are isolated from every other namespace — so {@code store("notion")} can write
-     * {@code "access_token"} without colliding with {@code store("slack")}'s key of the
-     * same name. The app provides the underlying adapter; modules never touch it directly.
-     */
+    /** Module-scoped persistent storage. Keys are isolated per namespace. */
     KeyValueStore store(String namespace);
 
     /** Lookup for known host apps. Integrations use this to decide when to activate. */
     AppProfileRegistry profiles();
 
-    /** AI primitive — call Gemini directly with the integration's own system prompt.
-     *  Replaces the legacy {@code llm()} / {@code images()} ports; each command owns its
-     *  prompt and dispatch logic rather than routing through a god-class AI client. Use
-     *  is opt-in — modules that don't need AI simply don't call this. */
+    /** AI primitive — call the LLM directly with the integration's own system prompt.
+     *  Opt-in; modules that don't need AI simply don't call this. */
     GeminiService ai();
 
     /** MCP primitive — JSON-RPC {@code tools/call} transport against any MCP-over-HTTP
-     *  server. Endpoint URL + per-user auth token are owned by the integration (same
-     *  pattern as {@link #ai()} owning its prompts). Opt-in — modules that don't talk
-     *  to MCP servers simply don't call this. */
+     *  server. Endpoint URL and per-user auth token are owned by the integration. Opt-in. */
     McpService mcp();
 
-    /** Cross-module Google OAuth. Modules declare the scopes they need per call; tokens
-     *  are cached and shared across modules, so a feature that asks for a scope already
-     *  granted to another feature reuses the same token without a second consent dialog.
-     *  Same opt-in pattern as {@link #ai()} — modules that don't talk to Google APIs
-     *  simply don't call this. */
+    /** Cross-module Google OAuth. Tokens are cached and shared across modules. Opt-in. */
     GoogleAuth googleAuth();
 
     /** Commit text into the host editor at the cursor. */
@@ -86,24 +71,15 @@ public interface IntegrationContext {
     /** Delete {@code n} characters before the cursor in the host editor. */
     void deleteBeforeCursor(int n);
 
-    /** Launch the shared system photo picker. The callback fires once on the main
-     *  thread with downsized bytes (~bounded heap), or with null if the user cancels
-     *  or no picker is available. Integrations don't need to be an Activity — the
-     *  IME owns an invisible shim Activity for the {@code ACTION_GET_CONTENT} hand-off. */
+    /** Launch the shared system photo picker. Callback fires once on the main thread
+     *  with downsized bytes, or null if cancelled / unavailable. */
     void pickImage(ImagePickCallback cb);
 
-    /** Insert an image into the host editor. Uses {@code commitContent()} where the
-     *  host field accepts {@code mime}; falls back to placing the URI on the clipboard
-     *  with a "tap to paste" banner. Same path {@code /cap} and {@code /edit} use to
-     *  deliver their results today. */
+    /** Insert an image into the host editor. Uses {@code commitContent()} where the host
+     *  field accepts {@code mime}; falls back to clipboard with a "tap to paste" banner. */
     void commitImage(Uri uri, String mime);
 
-    /**
-     * Hand off to a deeper screen the host app provides. The {@code screenId} is a stable
-     * string the integration and the host agree on (e.g. {@code "split-detail"}). The host
-     * decides which Activity / view controller handles it.
-     *
-     * <p>No-op when the host doesn't recognize the screen id.
-     */
+    /** Hand off to a deeper screen the host app provides. {@code screenId} is a stable
+     *  string the integration and host agree on. No-op when the host doesn't recognize it. */
     void openScreen(String screenId);
 }

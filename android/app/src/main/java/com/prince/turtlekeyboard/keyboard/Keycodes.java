@@ -10,11 +10,9 @@ public final class Keycodes {
     public static final int SPACE = 32;
     public static final int SLASH = 47;
     public static final int ENTER = 10;
-    /** Synthetic keycode for the dedicated mic key. Negative so it never collides
-     *  with a printable character or the framework's reserved negative codes. */
+    /** Synthetic keycode for the mic key; negative to avoid collision with printable chars. */
     public static final int MIC = -10;
-    /** Synthetic keycode for the bottom-row emoji button (placeholder until the emoji
-     *  panel ships — for now {@code onKey} commits a default smiley). */
+    /** Synthetic keycode for the emoji button. */
     public static final int EMOJI = -11;
 
     private Keycodes() {}

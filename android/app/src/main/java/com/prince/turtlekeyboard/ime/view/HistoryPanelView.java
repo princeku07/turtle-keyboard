@@ -32,70 +32,31 @@ import java.io.File;
 import java.util.List;
 
 /**
- * In-keyboard grid of generated images. Mounts in the {@code quickPanelHost} so it
- * temporarily replaces the key area, mirroring the Quick Panel pattern. Tap a tile
- * → the IME inserts that image into the focused field via {@code commitContent}.
- *
- * <p>Layout structure:
- * <pre>
- *   ┌───────────────────────────────────────┐
- *   │ History  · 12              [   ×   ]  │  header (label + count + close)
- *   ├───────────────────────────────────────┤  hairline divider
- *   │ ┌──┐ ┌──┐ ┌──┐                        │
- *   │ │  │ │  │ │  │   tiles               │
- *   │ └──┘ └──┘ └──┘                        │
- *   └───────────────────────────────────────┘
- * </pre>
- *
- * <p>Each tile is a rounded card with a static thumbnail (decoded async via
- * {@link ThumbnailLoader} for zero scroll lag), a bottom-right {@code GIF}/
- * {@code IMG} badge, and a ripple foreground that provides press feedback
- * clipped to the rounded corner. The empty state replaces the grid with a
- * vertically-centred icon + heading + subtitle so the surface still feels
- * intentional when the user hasn't generated anything yet.
+ * In-keyboard grid of generated images. Mounts in the quick-panel host so it
+ * replaces the keys; tapping a tile inserts that image via commitContent.
+ * Thumbnails decode async through {@link ThumbnailLoader}; an empty state
+ * replaces the grid when the user has no history yet.
  */
 public class HistoryPanelView extends FrameLayout {
 
     public interface OnPick { void onPick(File file); }
     public interface OnClose { void onClose(); }
 
-    // ── Layout constants ───────────────────────────────────────────────
-    /** Grid columns. 3 strikes the right density vs tile-size trade — 4 makes
-     *  the thumbs feel like icons; 2 wastes the panel's horizontal space. */
     private static final int GRID_COLS = 3;
-    /** Both horizontal and vertical gutter between tiles. Same value used for
-     *  outer padding so the tiles read as a tidy regular cadence. */
     private static final int TILE_GUTTER_DP = 6;
-    /** Page padding around the grid. */
     private static final int PAGE_PAD_DP = 12;
-    /** Tile corner radius, applied via outline so the ripple clips inside it. */
     private static final int TILE_RADIUS_DP = 10;
-    /** Tile fixed height — a hair smaller than before so the empty-grid
-     *  feeling on a short-history first-run is less of a vertical gap. */
     private static final int TILE_HEIGHT_DP = 96;
-    /** Panel-card corner radius — matches the split surfaces so the
-     *  keyboard's panel family reads as one rounded-sheet design. */
     private static final int PANEL_RADIUS_DP = 16;
-    /** Space above the rounded card so the parent shows through and the
-     *  panel reads as a floating sheet rather than flush chrome. */
     private static final int TOP_GAP_DP = 12;
-    /** Translate-from offset for the entrance / exit animation. */
     private static final int SLIDE_OFFSET_DP = 28;
-    /** Material's "emphasized" easing — quick start, organic deceleration,
-     *  smooth settle. Feels notably more natural than a plain
-     *  DecelerateInterpolator on a panel that's rising into view. */
     private static final Interpolator ENTER_EASING =
             new PathInterpolator(0.05f, 0.7f, 0.1f, 1.0f);
     private static final Interpolator EXIT_EASING =
             new AccelerateInterpolator(1.2f);
 
-    // ── Color constants ────────────────────────────────────────────────
-    // Hardcoded dark palette — matches EmojiPanelView so the two panels
-    // that share the keyboard slot read as one design system instead of
-    // flipping with the keyboard theme. The keyboard's KeyboardTheme can
-    // be light (cream bannerBg) which previously made this panel render
-    // white; we deliberately ignore that for the panel chrome and stay
-    // dark so generated media always shows against a high-contrast bg.
+    // Hardcoded dark palette so generated media always shows on a high-contrast bg,
+    // regardless of the keyboard's light/dark KeyboardTheme.
     private static final int BG           = 0xFF000000;
     private static final int TEXT_PRIMARY = 0xFFF5F5F5;
     private static final int TEXT_MUTED   = 0xA0F5F5F5;
@@ -103,7 +64,6 @@ public class HistoryPanelView extends FrameLayout {
     private static final int CHIP_FILL    = 0x14FFFFFF;
     private static final int RIPPLE_WASH  = 0x33FFFFFF;
 
-    // ── Header views ──────────────────────────────────────────────────
     private LinearLayout container;
     private LinearLayout header;
     private TextView title;
@@ -111,7 +71,6 @@ public class HistoryPanelView extends FrameLayout {
     private TextView close;
     private View divider;
 
-    // ── Body views ────────────────────────────────────────────────────
     private GridView grid;
     private LinearLayout emptyState;
     private TextView emptyIcon;
@@ -125,15 +84,8 @@ public class HistoryPanelView extends FrameLayout {
     public HistoryPanelView(Context c, @Nullable AttributeSet a) { super(c, a); init(); }
 
     private void init() {
-        // Outer FrameLayout is transparent so the keyboard chrome above the
-        // panel shows through the TOP_GAP space — the card looks like it's
-        // floating in the panel slot rather than welded to the chrome.
-
         container = new LinearLayout(getContext());
         container.setOrientation(LinearLayout.VERTICAL);
-        // Rounded-card background + hairline stroke (see BG comment for why
-        // we don't pull these from KeyboardTheme). Outline + clipToOutline
-        // keeps the grid + header from painting into the curved corner area.
         final int radius = dp(PANEL_RADIUS_DP);
         GradientDrawable cardBg = new GradientDrawable();
         cardBg.setShape(GradientDrawable.RECTANGLE);
@@ -194,9 +146,6 @@ public class HistoryPanelView extends FrameLayout {
         close.setGravity(Gravity.CENTER);
         close.setIncludeFontPadding(false);
         close.setTextColor(TEXT_PRIMARY);
-        // Close lives inside a slightly larger touch target so the user
-        // doesn't have to land on a 16dp glyph. Ripple gives press feedback
-        // even though the visible chip is small.
         close.setClickable(true);
         close.setFocusable(true);
         GradientDrawable chip = new GradientDrawable();
@@ -228,7 +177,7 @@ public class HistoryPanelView extends FrameLayout {
                 dp(PAGE_PAD_DP), dp(PAGE_PAD_DP));
         grid.setClipToPadding(false);
         grid.setVerticalScrollBarEnabled(false);
-        grid.setSelector(new GradientDrawable()); // hide default amber selector
+        grid.setSelector(new GradientDrawable());
         grid.setVisibility(GONE);
         container.addView(grid,
                 new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
@@ -282,9 +231,6 @@ public class HistoryPanelView extends FrameLayout {
 
     public void show(List<ImageHistory.Entry> entries, OnPick onPick, OnClose onClose) {
         this.entries = entries;
-        // Close runs the exit animation first, then hands off to the host's
-        // teardown callback — so the panel slides away cleanly instead of
-        // popping out the instant the user taps ×.
         close.setOnClickListener(v ->
                 animateOut(() -> { if (onClose != null) onClose.onClose(); }));
         boolean empty = entries == null || entries.isEmpty();
@@ -297,9 +243,6 @@ public class HistoryPanelView extends FrameLayout {
             grid.setVisibility(VISIBLE);
             grid.setAdapter(new ThumbAdapter());
             grid.setOnItemClickListener((parent, v, position, id) -> {
-                // Same treatment for tile-tap as for ×: animate out before
-                // letting the host insert + tear down, so the dismissal feels
-                // like one motion instead of an abrupt cut.
                 if (onPick != null) {
                     final java.io.File picked = this.entries.get(position).file;
                     animateOut(() -> onPick.onPick(picked));
@@ -309,11 +252,6 @@ public class HistoryPanelView extends FrameLayout {
         animateIn();
     }
 
-    /** Slide-up + fade-in. PathInterpolator with Material's "emphasized"
-     *  easing curve gives an organic decelerating settle — quick start,
-     *  smooth tail — that reads as a sheet rising into place rather than
-     *  a linear translate. Cancels any in-flight exit so a rapid show after
-     *  a partial exit doesn't leave the panel mid-fade. */
     private void animateIn() {
         animate().cancel();
         setAlpha(0f);
@@ -326,10 +264,6 @@ public class HistoryPanelView extends FrameLayout {
                 .start();
     }
 
-    /** Mirror: fade + slide down. Slightly quicker than the entrance so the
-     *  dismissal feels snappy. {@code onEnd} fires after the animation
-     *  completes so the host can do its teardown (commit image + tear panel
-     *  off the slot) as a follow-up to the visual exit instead of racing it. */
     private void animateOut(Runnable onEnd) {
         animate().cancel();
         animate()
@@ -338,8 +272,6 @@ public class HistoryPanelView extends FrameLayout {
                 .setDuration(220)
                 .setInterpolator(EXIT_EASING)
                 .withEndAction(() -> {
-                    // Reset the transform so a re-attach starts clean — the
-                    // host may pool/re-use this panel across opens.
                     setAlpha(1f);
                     setTranslationY(0f);
                     if (onEnd != null) onEnd.run();
@@ -350,17 +282,12 @@ public class HistoryPanelView extends FrameLayout {
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
-        // Belt-and-braces: if the host force-removes us mid-animation,
-        // cancel and reset so the next attach starts from a clean state.
         animate().cancel();
         setAlpha(1f);
         setTranslationY(0f);
     }
 
-    /** Kept for API compatibility with the IME's panel-mount path; the panel
-     *  intentionally pins itself to the dark palette declared at the top of
-     *  this class, so the keyboard's light/dark theme can't repaint it white
-     *  underneath the generated thumbnails. */
+    /** No-op for API symmetry — the panel pins to its own dark palette. */
     @SuppressWarnings("unused")
     public void applyTheme(KeyboardTheme t) {
         this.theme = t;
@@ -405,18 +332,13 @@ public class HistoryPanelView extends FrameLayout {
         }
     }
 
-    /** Single history cell — rounded thumbnail with a small bottom-right type
-     *  badge ({@code GIF} for animated outputs, {@code IMG} for stills) and a
-     *  ripple foreground for press feedback clipped to the rounded corners. */
     private class HistoryTile extends FrameLayout {
         private final ImageView image;
         private final TextView badge;
 
         HistoryTile(Context ctx) {
             super(ctx);
-            // Rounded outline lives on this container so the badge sits
-            // inside the clipped region — moving the outline off the
-            // ImageView lets the corner radius apply to the whole tile.
+            // Outline on the container so the badge clips with the rounded corners.
             final int radius = dp(TILE_RADIUS_DP);
             setOutlineProvider(new ViewOutlineProvider() {
                 @Override public void getOutline(View view, Outline outline) {
@@ -424,15 +346,11 @@ public class HistoryPanelView extends FrameLayout {
                 }
             });
             setClipToOutline(true);
-            // Faint white card so tiles read as distinct surfaces against
-            // the panel's hardcoded black bg before the thumbnail decodes in.
             GradientDrawable bg = new GradientDrawable();
             bg.setShape(GradientDrawable.RECTANGLE);
             bg.setColor(CHIP_FILL);
             bg.setCornerRadius(radius);
             setBackground(bg);
-            // Ripple over the top — clipped to the tile's rounded corners via
-            // the mask drawable inside the RippleDrawable.
             setForeground(roundedRipple(RIPPLE_WASH, radius));
 
             image = new ImageView(ctx);
@@ -461,10 +379,6 @@ public class HistoryPanelView extends FrameLayout {
         }
 
         void bind(File file) {
-            // ThumbnailLoader replaces the previous main-thread
-            // BitmapFactory.decodeFile() — bitmaps are decoded once on a
-            // background pool, cached by absolute path, and reused on
-            // every subsequent scroll/rebind. That's the lag fix.
             ThumbnailLoader.load(file, dp(TILE_HEIGHT_DP), image);
             badge.setText(file.getName().endsWith(".gif") ? "GIF" : "IMG");
         }

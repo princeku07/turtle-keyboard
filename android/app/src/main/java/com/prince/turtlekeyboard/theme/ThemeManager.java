@@ -5,11 +5,7 @@ import android.content.res.Configuration;
 
 import com.prince.turtlekeyboard.settings.Prefs;
 
-/**
- * Resolves the active {@link KeyboardTheme}. Honors an explicit Prefs override
- * ({@code "turtle_light"} / {@code "turtle_dark"}); otherwise follows the system
- * dark-mode flag so the keyboard tracks the device's day/night state.
- */
+/** Resolves the active {@link KeyboardTheme} from Prefs, falling back to system dark-mode. */
 public class ThemeManager {
 
     public static final String AUTO = "auto";

@@ -17,19 +17,8 @@ import com.prince.turtlekeyboard.theme.KeyboardTheme;
 import java.util.List;
 
 /**
- * Autocomplete strip for slash commands. Mounts above the keys while the user
- * is composing a command name (composer NAME mode); each keystroke updates the
- * matches. Tapping a pill hands the command name back to the listener — the
- * IME calls {@code composer.enterPromptMode(name)}, identical to a Quick Panel
- * pick, so the user lands in the inline prompt panel without the host editor
- * seeing the slash text.
- *
- * <p>The leftmost pill is a small ✕ close button. Tapping it fires the
- * dismiss listener, which the IME wires to {@code composer.cancel()} so the
- * user can bail out of command mode without having to backspace the slash.
- *
- * <p>Matches are affinity-ranked: in Slack, {@code /standup} sits ahead of
- * {@code /search} even though both start with {@code /s}.
+ * Autocomplete strip for slash commands while the user composes a command name.
+ * The leading pill is a close button; remaining pills are affinity-ranked matches.
  */
 public class CommandSuggestionStripView extends HorizontalScrollView {
 
@@ -129,9 +118,7 @@ public class CommandSuggestionStripView extends HorizontalScrollView {
     }
 
     public void applyTheme(KeyboardTheme theme) {
-        // Surface and chip colours are fixed by the dark gradient design;
-        // nothing to wire to the theme here. Method kept for symmetry with
-        // sibling chip views.
+        // No-op; kept for symmetry with sibling chip views.
     }
 
     private int dp(int v) {

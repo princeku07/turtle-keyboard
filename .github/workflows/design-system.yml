@@ -1,0 +1,32 @@
+name: Design system
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - "design-system/**"
+      - "android/app/src/main/res/values/colors_tokens.xml"
+      - "android/app/src/main/res/values/dimens_tokens.xml"
+      - "android/app/src/main/res/values/styles_tokens.xml"
+      - "ios/TurtleKeyboard/Generated/BrandTokens.swift"
+      - "lading-app/lib/design-system.css"
+      - ".github/scripts/design-system-check.mjs"
+      - ".github/workflows/design-system.yml"
+
+jobs:
+  design-system:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install deps
+        run: npm install --no-save ajv
+
+      - name: Validate + drift-check
+        run: node .github/scripts/design-system-check.mjs

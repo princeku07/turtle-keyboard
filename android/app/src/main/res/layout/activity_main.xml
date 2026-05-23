@@ -4,209 +4,394 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fillViewport="true"
-    android:background="@color/cream"
+    android:background="@color/bg_root"
     tools:context=".ui.MainActivity">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="20dp">
+        android:paddingStart="@dimen/screen_margin"
+        android:paddingEnd="@dimen/screen_margin"
+        android:paddingTop="@dimen/space_3xl"
+        android:paddingBottom="@dimen/space_4xl">
 
-        <!-- Hero -->
-        <TextView
-            style="@style/TextHero"
-            android:layout_width="wrap_content"
+        <!-- ===== Hero ===== -->
+
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="🐢 Turtle"
-            android:layout_marginTop="8dp" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:fontFamily="monospace"
+                android:textColor="@color/green"
+                android:textSize="13sp"
+                android:letterSpacing="0.18"
+                android:textAllCaps="true"
+                android:text="🐢 Turtle" />
+
+            <TextView
+                android:id="@+id/hero_version"
+                style="@style/TextCaption"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="v1.0" />
+        </LinearLayout>
 
         <TextView
+            android:id="@+id/hero_title"
+            style="@style/TextHero"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_lg"
+            tools:text="Ready to slash." />
+
+        <TextView
+            android:id="@+id/hero_sub"
             style="@style/TextSubhero"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:layout_marginBottom="20dp"
-            android:text="The model-agnostic AI keyboard. Slash to invoke, double-tap space for the panel." />
+            android:layout_marginTop="@dimen/space_sm"
+            android:layout_marginBottom="@dimen/space_2xl"
+            android:textSize="16sp"
+            tools:text="Type /cap, /poll, or /us in any app." />
 
-        <!-- Setup card -->
+        <!-- ===== Status hero card ===== -->
+
         <LinearLayout
-            style="@style/CardBrutal"
+            android:id="@+id/status_card"
+            style="@style/CardHero"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <TextView style="@style/TextSectionLabel"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Setup" />
-
-            <Button
-                android:id="@+id/btn_enable"
-                style="@style/ButtonBrutalPrimary"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:text="1. Enable Turtle Keyboard" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
 
-            <Button
-                android:id="@+id/btn_choose"
-                style="@style/ButtonBrutalSecondary"
+                <View
+                    android:id="@+id/status_dot"
+                    android:layout_width="@dimen/size_status_dot"
+                    android:layout_height="@dimen/size_status_dot"
+                    android:background="@drawable/dot_connected" />
+
+                <TextView
+                    android:id="@+id/status_label"
+                    style="@style/TextTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="@dimen/space_sm"
+                    tools:text="Active" />
+
+                <TextView
+                    style="@style/TextCaption"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="STATUS" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/status_body"
+                style="@style/TextBodyMuted"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="2. Switch to Turtle Keyboard" />
+                android:layout_marginTop="@dimen/space_sm"
+                android:textSize="14sp"
+                tools:text="Turtle is your keyboard. Open any text field and slash to start." />
+
+            <LinearLayout
+                android:id="@+id/onboarding_actions"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_lg"
+                android:orientation="vertical"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <Button
+                    android:id="@+id/btn_enable"
+                    style="@style/ButtonPrimary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Enable Turtle Keyboard" />
+
+                <Button
+                    android:id="@+id/btn_choose"
+                    style="@style/ButtonSecondary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_sm"
+                    android:text="Switch to Turtle" />
+            </LinearLayout>
         </LinearLayout>
 
-        <!-- Test card -->
+        <!-- ===== Section header ===== -->
+
+        <TextView
+            style="@style/SectionHeader"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_md"
+            android:text="Explore" />
+
+        <!-- ===== Drill-in: Commands ===== -->
+
         <LinearLayout
-            style="@style/CardBrutal"
+            android:id="@+id/card_commands"
+            style="@style/CardClickable"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <TextView style="@style/TextSectionLabel"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Try it" />
-
-            <EditText
-                android:id="@+id/test_input"
-                style="@style/EditTextBrutal"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:gravity="top|start"
-                android:hint="Tap and type to test the keyboard…"
-                android:importantForAutofill="no"
-                android:inputType="textMultiLine"
-                android:minHeight="120dp" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    style="@style/TextCommandLarge"
+                    android:textColor="@color/green"
+                    android:text="⌘  Commands" />
+
+                <ImageView
+                    android:layout_width="@dimen/size_icon_sm"
+                    android:layout_height="@dimen/size_icon_sm"
+                    android:src="@drawable/ic_arrow_right"
+                    android:contentDescription="@null" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/commands_summary"
+                style="@style/TextBodyMuted"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_xs"
+                tools:text="12 ready · 3 pinned" />
+
+            <HorizontalScrollView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_md"
+                android:overScrollMode="never"
+                android:scrollbars="none">
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <TextView style="@style/ChipMono"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="@dimen/space_xs"
+                        android:text="/cap" />
+
+                    <TextView style="@style/ChipMono"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="@dimen/space_xs"
+                        android:text="/edit" />
+
+                    <TextView style="@style/ChipMono"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="@dimen/space_xs"
+                        android:text="/poll" />
+
+                    <TextView style="@style/ChipMono"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="@dimen/space_xs"
+                        android:text="/us" />
+
+                    <TextView style="@style/ChipMono"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="@dimen/space_xs"
+                        android:text="/wyr" />
+
+                    <TextView style="@style/ChipMono"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="@dimen/space_xs"
+                        android:text="/fix" />
+
+                    <TextView style="@style/ChipMono"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/text_tertiary"
+                        android:text="+6 more" />
+                </LinearLayout>
+            </HorizontalScrollView>
         </LinearLayout>
 
-        <!-- Personalization card -->
+        <!-- ===== Drill-in: Integrations ===== -->
+
         <LinearLayout
-            style="@style/CardBrutal"
+            android:id="@+id/card_integrations"
+            style="@style/CardClickable"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <TextView style="@style/TextSectionLabel"
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Personalize" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    style="@style/TextCommandLarge"
+                    android:textColor="@color/green"
+                    android:text="🔗  Integrations" />
+
+                <ImageView
+                    android:layout_width="@dimen/size_icon_sm"
+                    android:layout_height="@dimen/size_icon_sm"
+                    android:src="@drawable/ic_arrow_right"
+                    android:contentDescription="@null" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/integrations_summary"
+                style="@style/TextBodyMuted"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_xs"
+                tools:text="2 of 4 connected" />
+
+            <LinearLayout
+                android:id="@+id/integrations_dots"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="@dimen/space_md">
+                <!-- Filled at runtime. -->
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- ===== Drill-in: History ===== -->
+
+        <LinearLayout
+            android:id="@+id/card_history"
+            style="@style/CardClickable"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    style="@style/TextCommandLarge"
+                    android:textColor="@color/green"
+                    android:text="🖼  History" />
+
+                <ImageView
+                    android:layout_width="@dimen/size_icon_sm"
+                    android:layout_height="@dimen/size_icon_sm"
+                    android:src="@drawable/ic_arrow_right"
+                    android:contentDescription="@null" />
+            </LinearLayout>
 
             <TextView
                 style="@style/TextBodyMuted"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="10dp"
-                android:text="Manage which apps the keyboard adapts to. The keyboard prompts inline; this screen lets you undo or pin commands per app." />
-
-            <Button
-                android:id="@+id/btn_app_personalization"
-                style="@style/ButtonBrutalPrimary"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Manage app personalization" />
-
-            <Button
-                android:id="@+id/btn_connect_notion"
-                style="@style/ButtonBrutalSecondary"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="Connect Notion" />
-
-            <Button
-                android:id="@+id/btn_connect_slack"
-                style="@style/ButtonBrutalSecondary"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="Connect Slack" />
-
-            <Button
-                android:id="@+id/btn_connect_drive"
-                style="@style/ButtonBrutalSecondary"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="Connect Google Drive (for /us)" />
-
-            <Button
-                android:id="@+id/btn_history"
-                style="@style/ButtonBrutalSecondary"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="View image history" />
-
-            <Button
-                android:id="@+id/btn_mcp_servers"
-                style="@style/ButtonBrutalSecondary"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="MCP servers" />
-
-            <Button
-                android:id="@+id/btn_preview_sheet"
-                style="@style/ButtonBrutalSecondary"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="Preview poll sheet (dev)" />
-
-            <Button
-                android:id="@+id/btn_sprite_to_gif_test"
-                style="@style/ButtonBrutalSecondary"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="Sprite → GIF test (dev)" />
+                android:layout_marginTop="@dimen/space_xs"
+                android:text="Everything you've generated, in one place." />
         </LinearLayout>
 
-        <!-- Split card -->
+        <!-- ===== Drill-in: Settings ===== -->
+
         <LinearLayout
-            style="@style/CardBrutal"
+            android:id="@+id/card_settings"
+            style="@style/CardClickable"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <TextView style="@style/TextSectionLabel"
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Split" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    style="@style/TextCommandLarge"
+                    android:textColor="@color/green"
+                    android:text="⚙  Settings" />
+
+                <ImageView
+                    android:layout_width="@dimen/size_icon_sm"
+                    android:layout_height="@dimen/size_icon_sm"
+                    android:src="@drawable/ic_arrow_right"
+                    android:contentDescription="@null" />
+            </LinearLayout>
 
             <TextView
-                android:id="@+id/split_status"
-                style="@style/TextBody"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
-                tools:text="Default split: 2 people" />
-
-            <Button
-                android:id="@+id/btn_set_split"
-                style="@style/ButtonBrutalPrimary"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Set split count" />
-
-            <Button
-                android:id="@+id/btn_view_splits"
-                style="@style/ButtonBrutalSecondary"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="View saved splits" />
-
-            <TextView
+                android:id="@+id/settings_summary"
                 style="@style/TextBodyMuted"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:text="Tip: type /splits in any text field to view your saved splits inside the keyboard." />
+                android:layout_marginTop="@dimen/space_xs"
+                tools:text="Account · Privacy · Appearance" />
+        </LinearLayout>
+
+        <!-- ===== Footer ===== -->
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/border_hairline"
+            android:layout_marginTop="@dimen/space_2xl"
+            android:layout_marginBottom="@dimen/space_lg"
+            android:background="@color/border_subtle" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                style="@style/TextCaption"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Open source"
+                android:textAllCaps="false" />
+
+            <TextView
+                style="@style/TextMono"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="12sp"
+                android:textColor="@color/text_tertiary"
+                android:text="🐢 — for the type-y people" />
         </LinearLayout>
 
     </LinearLayout>

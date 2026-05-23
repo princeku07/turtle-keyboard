@@ -13,18 +13,14 @@ import java.util.Iterator;
 import java.util.List;
 
 /**
- * One user-configured MCP binding — a slash-command name bound to a single
- * {@code (endpoint, tool)} pair plus an argument template. Per-binding, not per-server:
- * if a user wants {@code /issue} and {@code /comment} against the same Linear server,
- * they create two bindings.
+ * One user-configured MCP binding: a slash-command name bound to a single
+ * {@code (endpoint, tool)} pair plus an argument template. Two commands against the
+ * same server require two bindings.
  *
- * <p>Storage lives in {@code ctx.store("user-mcp")} under key {@code "bindings"} as a JSON
- * array. Bearer tokens are stored separately under {@code "token:<binding_id>"} so
- * removing a binding nukes its credential atomically.
- *
- * <p><b>What this is not:</b> a transport. The keyboard's {@code McpService} is the only
- * thing that talks to MCP servers. This class is pure data + argument hydration +
- * result-string extraction.
+ * <p>Pure data plus argument hydration and result-string extraction; the keyboard's
+ * {@code McpService} owns the transport. Bindings persist in
+ * {@code ctx.store("user-mcp")} under {@code "bindings"}; bearer tokens live under
+ * {@code "token:<binding_id>"} so removing a binding drops its credential.
  */
 public final class McpBinding {
 
@@ -32,14 +28,17 @@ public final class McpBinding {
     private static final String TOKEN_KEY_PREFIX = "token:";
 
     public final String id;
-    public final String command;        // slash-command name, no leading slash
+    /** Slash-command name, no leading slash. */
+    public final String command;
     public final String label;
     public final String emoji;
-    public final String endpoint;       // full HTTPS URL
-    public final String tool;           // MCP tool name
+    /** Full HTTPS URL. */
+    public final String endpoint;
+    /** MCP tool name. */
+    public final String tool;
     public final JSONObject argTemplate;
-    /** {@code "${field}"} → look up {@code field} in result.structuredContent. Empty →
-     *  concat all {@code result.content[*].text} entries (the v1 default — safest fallback). */
+    /** {@code "${field}"} reads {@code field} from {@code result.structuredContent};
+     *  empty concatenates every {@code result.content[*].text} entry. */
     public final String resultFormat;
     public final long createdAt;
 
@@ -57,12 +56,10 @@ public final class McpBinding {
         this.createdAt = createdAt;
     }
 
-    // -- template hydration --------------------------------------------------
-
     /**
-     * Substitutes {@code ${prompt}}, {@code ${clipboard}}, {@code ${recipient}} inside every
-     * string value of {@link #argTemplate}, recursively. Non-string values pass through
-     * unchanged. Returns a fresh JSONObject — never mutates the template.
+     * Substitutes {@code ${prompt}}, {@code ${clipboard}}, {@code ${recipient}} inside
+     * every string value of {@link #argTemplate}, recursively. Returns a fresh
+     * JSONObject; the template is not mutated.
      */
     public JSONObject hydrateArgs(String prompt, String clipboard, @Nullable String recipient) {
         return (JSONObject) substituteValue(argTemplate, safe(prompt), safe(clipboard), safe(recipient));
@@ -77,7 +74,7 @@ public final class McpBinding {
                 String k = it.next();
                 try {
                     out.put(k, substituteValue(src.opt(k), prompt, clipboard, recipient));
-                } catch (JSONException ignored) { /* key collision impossible on fresh object */ }
+                } catch (JSONException ignored) { }
             }
             return out;
         }
@@ -98,18 +95,11 @@ public final class McpBinding {
         return v;
     }
 
-    // -- result extraction ---------------------------------------------------
-
     /**
-     * Flattens an MCP {@code result} object into a single string to commit into the host
-     * editor. v1 rules:
-     * <ul>
-     *   <li>If {@link #resultFormat} is {@code ${field}}, look up {@code field} in
-     *       {@code result.structuredContent} (deep-dotted paths not supported).</li>
-     *   <li>Otherwise, concatenate every {@code result.content[*].text} entry with newlines.</li>
-     * </ul>
-     * Returns empty string if neither shape is present — the caller surfaces that as the
-     * raw MCP response so the user can see what went wrong.
+     * Flattens an MCP {@code result} into a single string. If {@link #resultFormat}
+     * is {@code ${field}}, reads {@code field} from {@code result.structuredContent}
+     * (no dotted paths); otherwise joins every {@code result.content[*].text} with
+     * newlines. Returns empty string when neither shape applies.
      */
     public String extractText(JSONObject mcpResult) {
         if (mcpResult == null) return "";
@@ -138,8 +128,6 @@ public final class McpBinding {
         return sb.toString();
     }
 
-    // -- (de)serialization ---------------------------------------------------
-
     public JSONObject toJson() throws JSONException {
         return new JSONObject()
                 .put("id", id)
@@ -166,8 +154,6 @@ public final class McpBinding {
                 o.optLong("created_at", System.currentTimeMillis()));
     }
 
-    // -- store I/O -----------------------------------------------------------
-
     public static List<McpBinding> loadAll(KeyValueStore store) {
         List<McpBinding> out = new ArrayList<>();
         String raw = store.getString(STORE_KEY, null);
@@ -178,7 +164,7 @@ public final class McpBinding {
                 JSONObject o = arr.optJSONObject(i);
                 if (o != null) out.add(fromJson(o));
             }
-        } catch (JSONException ignored) { /* corrupt blob — treat as empty */ }
+        } catch (JSONException ignored) { }
         return out;
     }
 

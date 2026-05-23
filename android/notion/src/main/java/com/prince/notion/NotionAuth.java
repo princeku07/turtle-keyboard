@@ -22,20 +22,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Notion OAuth 2.0 helper. Two phases:
- *
- * <ol>
- *   <li>{@link #authorizeIntent} — start the user's browser at Notion's consent screen.</li>
- *   <li>{@link #exchangeCode} — once Notion redirects back to {@code OAUTH_REDIRECT_URI}
- *       with a {@code ?code=}, swap it for a long-lived access token + workspace info.</li>
- * </ol>
- *
- * <p>The token persists in {@link KeyValueStore} keyed by {@link NotionKeys#ACCESS_TOKEN}.
- * Notion tokens don't currently expire — no refresh flow needed today.
- *
- * <p><b>Security note:</b> Notion's token endpoint requires {@code client_secret} in the
- * Basic-auth header, so the secret rides along in BuildConfig. Acceptable for personal /
- * dev use; before any wider release, move the exchange to a tiny token-exchange Worker.
+ * Notion OAuth 2.0 helper. Call {@link #authorizeIntent} to start the consent flow,
+ * then {@link #exchangeCode} on the redirect's {@code ?code=} to mint a long-lived
+ * access token. Tokens persist in {@link KeyValueStore} under {@link NotionKeys#ACCESS_TOKEN}.
  */
 public final class NotionAuth {
 
@@ -47,8 +36,6 @@ public final class NotionAuth {
     private static final ExecutorService EXEC = Executors.newSingleThreadExecutor();
 
     public interface ExchangeCallback {
-        /** @param accessToken Notion bearer token (long-lived).
-         *  @param workspaceName Human-readable workspace label, may be null. */
         void onSuccess(String accessToken, @Nullable String workspaceName);
         void onError(String reason);
     }
@@ -76,7 +63,7 @@ public final class NotionAuth {
         store.putString(NotionKeys.DEFAULT_PARENT_T, "");
     }
 
-    /** Browser intent the connect Activity launches to start OAuth. */
+    /** Browser intent that launches Notion's consent screen. */
     public Intent authorizeIntent() {
         Uri url = Uri.parse(AUTHORIZE_URL).buildUpon()
                 .appendQueryParameter("client_id", BuildConfig.OAUTH_CLIENT_ID)
@@ -89,7 +76,7 @@ public final class NotionAuth {
         return i;
     }
 
-    /** Phase 2: turn the redirect's {@code ?code=} into a stored access token. */
+    /** Swap an authorization code for an access token and persist it. */
     public void exchangeCode(Context appContext, String code, ExchangeCallback cb) {
         EXEC.execute(() -> {
             HttpURLConnection conn = null;

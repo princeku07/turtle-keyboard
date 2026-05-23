@@ -23,20 +23,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Slack OAuth 2.0 helper. Two phases:
- *
- * <ol>
- *   <li>{@link #authorizeIntent} — start the user's browser at Slack's consent screen.</li>
- *   <li>{@link #exchangeCode} — Slack redirects back to {@code OAUTH_REDIRECT_URI?code=…},
- *       App Links route us into {@code SlackConnectActivity}, and this swaps the code
- *       for a long-lived user-token via {@code oauth.v2.access}.</li>
- * </ol>
- *
- * <p>We request <b>user-token</b> scopes (not bot scopes) so messages post as the user
- * and don't require inviting a bot to every channel. Token persists in {@link KeyValueStore}.
- *
- * <p><b>Security note:</b> client secret rides in BuildConfig — same trade-off Notion
- * makes. Move both exchanges to a single token-exchange Worker before public release.
+ * Slack OAuth 2.0 helper. Call {@link #authorizeIntent} to start consent, then
+ * {@link #exchangeCode} on the redirect's {@code ?code=}. Requests user-token scopes
+ * (not bot scopes) so messages post as the user.
  */
 public final class SlackAuth {
 
@@ -45,8 +34,6 @@ public final class SlackAuth {
     private static final String AUTHORIZE_URL = "https://slack.com/oauth/v2/authorize";
     private static final String TOKEN_URL     = "https://slack.com/api/oauth.v2.access";
 
-    /** Per-user-token scopes — chat:write to post, channels:read+groups:read so the
-     *  channel picker can list public + private rooms the user belongs to. */
     private static final String USER_SCOPES = "chat:write,channels:read,groups:read";
 
     private static final ExecutorService EXEC = Executors.newSingleThreadExecutor();
@@ -95,8 +82,7 @@ public final class SlackAuth {
         EXEC.execute(() -> {
             HttpURLConnection conn = null;
             try {
-                // Slack's oauth.v2.access expects form-encoded — different shape from
-                // Notion. client_id + secret go in the body, not Basic auth.
+                // oauth.v2.access expects form-encoded body with client_id + secret (not Basic auth).
                 String body = "code=" + URLEncoder.encode(code, "UTF-8")
                         + "&client_id=" + URLEncoder.encode(BuildConfig.OAUTH_CLIENT_ID, "UTF-8")
                         + "&client_secret=" + URLEncoder.encode(BuildConfig.OAUTH_CLIENT_SECRET, "UTF-8")
@@ -121,7 +107,7 @@ public final class SlackAuth {
                     return;
                 }
 
-                // Slack returns 200 even on errors; success requires "ok": true.
+                // Slack returns 200 on errors too; success requires "ok": true.
                 JSONObject json = new JSONObject(response);
                 if (!json.optBoolean("ok", false)) {
                     cb.onError("slack_oauth: " + json.optString("error", "unknown"));
@@ -134,8 +120,7 @@ public final class SlackAuth {
 
                 JSONObject team = json.optJSONObject("team");
                 String teamName = team == null ? null : team.optString("name", null);
-                // team domain isn't returned by oauth.v2.access — derive from team.id-keyed
-                // info via team.info call later, or skip and let SlackConnectActivity fetch.
+                // team domain isn't returned here; SlackConnectActivity fetches it later.
 
                 store.putString(SlackKeys.ACCESS_TOKEN, token);
                 if (teamName != null) store.putString(SlackKeys.TEAM_NAME, teamName);

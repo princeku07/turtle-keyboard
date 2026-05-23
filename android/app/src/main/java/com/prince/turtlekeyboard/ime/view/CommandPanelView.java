@@ -25,63 +25,33 @@ import androidx.annotation.Nullable;
 import com.prince.turtlekeyboard.theme.KeyboardTheme;
 
 /**
- * Inline panel shown above the keyboard while the user is typing a command
- * argument (e.g. the URL after "/search "). Mirrors the keystrokes captured
- * by the composer and exposes a "Go" button that dispatches the command.
- *
- * <p>Polish details:
- * <ul>
- *   <li>The leading icon + label are nudged ~2 dp up so they sit just above
- *       the query baseline — small typographic cue that they're chrome
- *       around the editable text rather than peers of it.</li>
- *   <li>A blinking caret renders inside the query area at the composer's
- *       cursor position; tap or drag on the query to move the caret, and
- *       subsequent keystrokes / backspaces / pastes operate at that
- *       position (via {@link com.prince.turtlekeyboard.command.CommandComposer}).</li>
- *   <li>Long-press still pastes the clipboard. The drag-to-move gesture
- *       coexists with long-press via a {@link GestureDetector} so neither
- *       fights the other for the same touch sequence.</li>
- * </ul>
+ * Inline panel shown above the keyboard while typing a command argument.
+ * Mirrors the composer buffer, renders a blinking caret with tap/drag
+ * positioning, supports long-press paste, and exposes a Go button that
+ * dispatches the command.
  */
 public class CommandPanelView extends LinearLayout {
 
     public interface OnGoListener { void onGo(); }
     public interface OnPasteListener { void onPaste(String text); }
-    /** Fires when the user taps or drags inside the query area to position
-     *  the prompt caret. {@code pos} is the character offset within the
-     *  current query string. The IME forwards this to
-     *  {@code CommandComposer#setPromptCursor(int)}. */
+    /** Fires when the user taps or drags inside the query area to position the prompt caret. */
     public interface OnCursorMoveListener { void onMove(int pos); }
 
-    // Surface palette — black panel, translucent-white chips, light glyphs.
     private static final int BG = 0xFF000000;
     private static final int TEXT_PRIMARY = 0xFFF5F5F5;
     private static final int CHIP_FILL_SUBTLE = 0x14FFFFFF;
 
-/** Caret blink period — 1100 ms total (550 on / 550 off) feels closer to
-     *  a system-style text-cursor than the harder 500/500 default. */
     private static final long CARET_BLINK_PERIOD_MS = 1100L;
 
     private ImageView stagedThumb;
     private TextView stagedClose;
     private TextView uploadButton;
-    /** Discoverable paste affordance shown when the clipboard has text. Tapping
-     *  pastes into the prompt buffer via the existing {@link OnPasteListener}
-     *  (which the IME wires to {@code composer.appendString}). The long-press
-     *  paste on the query area still works; this button is the explicit /
-     *  one-handed equivalent. */
     private TextView pasteButton;
     private TextView labelView;
 
-    /** Wraps the query TextView + an overlaid caret View. The wrapper takes
-     *  the weight=1 slot in the horizontal row; touch + drag events for
-     *  caret positioning live on it. */
     private FrameLayout queryWrapper;
     private TextView queryView;
     private View caretView;
-    /** Small filled circle that appears below the caret while the user is
-     *  actively dragging it — a finger-friendly "you're moving this" handle.
-     *  Hidden when the touch ends; the bare blinking caret remains. */
     private View dragHandleView;
     private boolean dragging;
     @Nullable private ValueAnimator caretBlinker;
@@ -96,14 +66,9 @@ public class CommandPanelView extends LinearLayout {
     private String hint = "type and tap →";
     @Nullable private String clipboardText;
 
-    /** Mirror of the composer's prompt cursor. We re-read it from
-     *  {@link #show(String, String, String, int)} / {@link #update(String, int)}
-     *  rather than tracking edits ourselves, so the source of truth stays
-     *  in the composer. */
     private int cursorPos;
-    /** Current rendered query string — kept so we can re-layout the caret
-     *  on size-change without going through {@link #update}. */
     private String currentQuery = "";
+    private boolean paused;
 
     public CommandPanelView(Context context) { super(context); init(); }
     public CommandPanelView(Context context, @Nullable AttributeSet attrs) { super(context, attrs); init(); }
@@ -119,9 +84,6 @@ public class CommandPanelView extends LinearLayout {
                 new int[]{ 0xFF1A1A1A, BG });
         setBackground(surface);
 
-        // Leading slot — staged thumb / × / upload / label, all of which
-        // get the LEADING_LIFT_DP nudge up so they read as caption-style
-        // chrome above the editable query baseline.
         stagedThumb = new ImageView(getContext());
         stagedThumb.setVisibility(GONE);
         stagedThumb.setScaleType(ImageView.ScaleType.CENTER_CROP);
@@ -164,11 +126,7 @@ stagedClose.setOnClickListener(v -> {
         upLp.rightMargin = dp(8);
         addView(uploadButton, upLp);
 
-        // Paste shortcut — same chip styling as the upload affordance.
-        // Visible only when the clipboard has text (via setPasteAvailable);
-        // tap calls firePaste() which fires the OnPasteListener so the
-        // clipboard content lands in the prompt buffer (composer.appendString
-        // in the IME wiring), not the host editor.
+        // Paste goes to the prompt buffer, not the host editor.
         pasteButton = new TextView(getContext());
         pasteButton.setVisibility(GONE);
         pasteButton.setText("📋");
@@ -193,8 +151,10 @@ stagedClose.setOnClickListener(v -> {
         labelView.setTypeface(labelView.getTypeface(), Typeface.BOLD);
         addView(labelView, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
 
-        // ── Query wrapper: TextView for the typed prompt + overlaid caret ──
         queryWrapper = new FrameLayout(getContext());
+        // Clip children so a mis-measured caret can't bleed down through the keyboard.
+        queryWrapper.setClipChildren(true);
+        queryWrapper.setClipToPadding(true);
         LayoutParams qLp = new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f);
         addView(queryWrapper, qLp);
 
@@ -211,25 +171,15 @@ stagedClose.setOnClickListener(v -> {
         qvLp.gravity = Gravity.CENTER_VERTICAL;
         queryWrapper.addView(queryView, qvLp);
 
-        // Caret — a 1.5 dp wide vertical bar that gets positioned over the
-        // query via translationX. Height is set in layoutCaret() once we
-        // know the line height. ValueAnimator toggles its alpha on a
-        // square-wave so the cursor pulses without easing (system text
-        // cursors don't fade smoothly).
         caretView = new View(getContext());
         caretView.setBackgroundColor(TEXT_PRIMARY);
         caretView.setVisibility(INVISIBLE);
+        // Concrete height avoids a WRAP_CONTENT caret blowing up to the wrapper's full height on first measure.
         FrameLayout.LayoutParams caretLp = new FrameLayout.LayoutParams(
-                dp(2), FrameLayout.LayoutParams.WRAP_CONTENT);
+                dp(2), dp(20));
         caretLp.gravity = Gravity.CENTER_VERTICAL | Gravity.START;
         queryWrapper.addView(caretView, caretLp);
 
-        // Drag handle — a small filled circle that sits below the caret line
-        // while the user is touching the query area, like the cursor handle
-        // in a standard Android text field. The wrapper's padding doesn't
-        // give us much vertical room, so the handle is small (10 dp) and
-        // gets translated downward by half its size + a hair so it sits
-        // visually beneath the bar rather than overlapping it.
         dragHandleView = new View(getContext());
         GradientDrawable handleBg = new GradientDrawable();
         handleBg.setShape(GradientDrawable.OVAL);
@@ -241,9 +191,7 @@ stagedClose.setOnClickListener(v -> {
         handleLp.gravity = Gravity.CENTER_VERTICAL | Gravity.START;
         queryWrapper.addView(dragHandleView, handleLp);
 
-        // Touch handler — tap or drag positions the caret; long-press still
-        // pastes. Routed through a GestureDetector so the two gestures
-        // can coexist on the same touch slot without fighting.
+        // Tap/drag positions the caret; long-press pastes. GestureDetector keeps both gestures from fighting.
         final GestureDetector detector = new GestureDetector(getContext(),
                 new GestureDetector.SimpleOnGestureListener() {
                     @Override public boolean onDown(MotionEvent e) {
@@ -262,10 +210,6 @@ stagedClose.setOnClickListener(v -> {
         queryWrapper.setClickable(true);
         queryWrapper.setOnTouchListener((v, event) -> {
             boolean handled = detector.onTouchEvent(event);
-            // Drag state flips on DOWN and resets on UP/CANCEL — the handle's
-            // visibility tracks this directly so the user gets a clear
-            // "you're moving the cursor" affordance only while their finger
-            // is down.
             int action = event.getActionMasked();
             if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_MOVE) {
                 if (!dragging) {
@@ -277,7 +221,6 @@ stagedClose.setOnClickListener(v -> {
                     || action == MotionEvent.ACTION_CANCEL) {
                 dragging = false;
                 showDragHandle(false);
-                // Resume the steady blink once the user has lifted off.
                 startCaretBlink();
             }
             return handled;
@@ -297,14 +240,9 @@ stagedClose.setOnClickListener(v -> {
         addView(goButton, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
     }
 
-    /** Translate a raw touch x (in queryWrapper coords) to a character offset
-     *  within the current query string, then notify the IME. The IME forwards
-     *  to {@code CommandComposer.setPromptCursor} which re-fires our
-     *  {@link #update(String, int)} so the rendered caret follows. */
     private void moveCaretToTouch(float rawX) {
         if (onCursorMove == null) return;
-        // queryView's left edge sits inside the wrapper after its own
-        // setPadding; getOffsetForPosition expects local-to-textView x.
+        // getOffsetForPosition expects local-to-TextView x.
         float xInTv = rawX - queryView.getLeft();
         int offset = queryView.getOffsetForPosition(xInTv, queryView.getHeight() / 2f);
         if (offset < 0) offset = 0;
@@ -352,8 +290,24 @@ stagedClose.setOnClickListener(v -> {
         this.hint = hint == null ? "" : hint;
         renderQuery(query, cursorPos);
         setVisibility(VISIBLE);
+        setPaused(false);
         startCaretBlink();
     }
+
+    /** Stops the caret blink and dims the surface to show the prompt is staged but not collecting keystrokes. */
+    public void setPaused(boolean paused) {
+        if (this.paused == paused) return;
+        this.paused = paused;
+        if (paused) {
+            stopCaretBlink();
+            setAlpha(0.55f);
+        } else {
+            setAlpha(1f);
+            if (getVisibility() == VISIBLE) startCaretBlink();
+        }
+    }
+
+    public boolean isPaused() { return paused; }
 
     public void update(String query, int cursorPos) {
         renderQuery(query, cursorPos);
@@ -362,6 +316,8 @@ stagedClose.setOnClickListener(v -> {
     public void hide() {
         setVisibility(GONE);
         stopCaretBlink();
+        paused = false;
+        setAlpha(1f);
         clipboardText = null;
         setStagedImage(null, null);
         setUploadAction(null);
@@ -407,7 +363,6 @@ stagedClose.setOnClickListener(v -> {
             queryView.setText(currentQuery);
             queryView.setAlpha(1f);
         }
-        // Wait for the new text to lay out before measuring caret position —
         // getLayout() returns null until measure runs.
         queryView.post(this::layoutCaret);
     }
@@ -415,35 +370,23 @@ stagedClose.setOnClickListener(v -> {
     private void layoutCaret() {
         android.text.Layout layout = queryView.getLayout();
         if (layout == null) return;
-        // Position uses the actual typed query (not the hint), so an empty
-        // prompt parks the caret at the left of the visible text area.
         int safePos = currentQuery.isEmpty() ? 0 : Math.min(cursorPos, currentQuery.length());
-        // getPrimaryHorizontal returns x in LAYOUT coordinates — i.e.
-        // relative to the layout's left edge, which sits at the TextView's
-        // paddingLeft. We add paddingLeft so the caret renders at the
-        // visible character boundary; without it the caret would appear
-        // ~paddingLeft pixels to the left of the actual letter (i.e.
-        // "before the last letter" once any padding > 0 is set on the TV).
+        // getPrimaryHorizontal is layout-local; add paddingLeft for the visible character boundary.
         float layoutX = currentQuery.isEmpty()
                 ? layout.getPrimaryHorizontal(0)
                 : layout.getPrimaryHorizontal(safePos);
         float wrapperX = queryView.getLeft() + queryView.getPaddingLeft() + layoutX;
-        // Caret height = line height minus a small inset so the bar doesn't
-        // hard-clip the rounded sans-serif descenders.
-        int caretHeight = Math.max(dp(14), layout.getHeight() - dp(2));
+        // Capped at dp(28) so a mis-measured layout can't render the bar full-keyboard tall.
+        int caretHeight = Math.max(dp(14),
+                Math.min(dp(28), layout.getHeight() - dp(2)));
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) caretView.getLayoutParams();
         if (lp.height != caretHeight) {
             lp.height = caretHeight;
             caretView.setLayoutParams(lp);
         }
-        // Center the 2 dp caret on the character boundary so it doesn't
-        // look pushed a hair to the right of the letter it sits beside.
         caretView.setTranslationX(wrapperX - lp.width / 2f);
         if (caretView.getVisibility() != VISIBLE) caretView.setVisibility(VISIBLE);
 
-        // Drag handle sits centred on the same x as the caret, but offset
-        // vertically so it visually grips the bar from below. translationY
-        // is applied here once the caret height is known.
         FrameLayout.LayoutParams handleLp =
                 (FrameLayout.LayoutParams) dragHandleView.getLayoutParams();
         dragHandleView.setTranslationX(wrapperX - handleLp.width / 2f);
@@ -452,12 +395,9 @@ stagedClose.setOnClickListener(v -> {
 
     private void showDragHandle(boolean show) {
         if (show) {
-            // Make sure the handle is positioned correctly before becoming
-            // visible — otherwise on first DOWN it would pop in at (0,0).
+            // Layout the handle before showing it so first DOWN doesn't pop in at (0,0).
             queryView.post(this::layoutCaret);
             dragHandleView.setVisibility(VISIBLE);
-            // Caret stays solid while a drag is in progress so the user
-            // can see the exact insertion point under their finger.
             caretView.setAlpha(1f);
             caretView.setVisibility(VISIBLE);
         } else {
@@ -474,9 +414,6 @@ stagedClose.setOnClickListener(v -> {
         caretView.setVisibility(VISIBLE);
     }
 
-    /** Square-wave blink: alpha snaps between 0 and 1 every half-period so
-     *  the caret matches the platform's hard cursor cadence instead of
-     *  smoothly fading (which reads as "shimmering"). */
     private void startCaretBlink() {
         if (caretBlinker != null && caretBlinker.isRunning()) return;
         caretView.setVisibility(VISIBLE);
@@ -507,9 +444,7 @@ stagedClose.setOnClickListener(v -> {
 
     public void applyTheme(KeyboardTheme theme) {
         this.theme = theme;
-        // Surface, chip fills, and glyph colours are fixed by the dark
-        // gradient design — only the lime accent on the Go button still
-        // tracks the theme so brand changes propagate.
+        // Only the Go button accent tracks the theme — surface/chips/glyphs are fixed.
         goButton.setBackground(pillBackground(theme.accent, dp(18)));
         goButton.setTextColor(0xFFFFFFFF);
     }

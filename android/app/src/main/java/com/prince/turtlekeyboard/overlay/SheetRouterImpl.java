@@ -8,11 +8,7 @@ import com.prince.kbd.core.SheetViewFactory;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * App-scoped {@link SheetRouter} impl. ConcurrentHashMap-backed so registration can
- * happen during {@code Application.onCreate} while the deep-link {@code BottomSheetActivity}
- * may concurrently look up factories — practically rare today, but free safety.
- */
+/** App-scoped {@link SheetRouter} backed by a {@link ConcurrentHashMap}. */
 public final class SheetRouterImpl implements SheetRouter {
 
     private final Map<String, SheetViewFactory> routes = new ConcurrentHashMap<>();

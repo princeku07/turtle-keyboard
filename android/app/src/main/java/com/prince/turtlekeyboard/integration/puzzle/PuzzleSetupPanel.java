@@ -16,25 +16,15 @@ import android.widget.TextView;
 import androidx.annotation.Nullable;
 
 /**
- * Puzzle config panel — mounted above the keys via {@code ctx.showPanel(...)}
- * the instant {@code /puzzle} dispatches (mirrors Split's flow: panel goes up
- * while the keyboard is still visible, no picker race). The picker is triggered
- * FROM this panel via its Upload button; when the picker returns the
- * integration calls {@link #setImage} to fill in the preview + enable Create.
+ * Puzzle config panel mounted above the keys when {@code /puzzle} dispatches.
+ * Triggers the image picker via its Upload button and re-renders the preview when
+ * the integration calls {@link #setImage}.
  *
- * <p>Why this shape (vs. building the panel inside the picker callback):
- * the picker activity steals window focus, the IME hides during the pick, and
- * many hosts don't auto-resume the IME afterwards — so a {@code showPanel}
- * called from inside the picker's result callback lands on a hidden parent
- * and stays invisible. Mounting BEFORE the picker fires guarantees the panel
- * lives on a visible window; the picker just updates state on the live view.
- *
- * <p>Colors match {@code KeyboardTheme.turtleLight()} — black canvas, green
- * accent, lifted dark surfaces.
+ * <p>The panel is mounted before the picker fires so it lives on a visible window;
+ * the picker callback only updates state on the live view.
  */
 public final class PuzzleSetupPanel extends LinearLayout {
 
-    // Palette mirrors KeyboardTheme.turtleLight().
     private static final int BG          = 0xFF000000;
     private static final int SURFACE     = 0xFF1E1E1E;
     private static final int SURFACE_2   = 0xFF141414;
@@ -47,11 +37,9 @@ public final class PuzzleSetupPanel extends LinearLayout {
     private static final int DEFAULT_DIFFICULTY = 3;
 
     public interface Callback {
-        /** User tapped the Upload/Change Image button. Integration should fire
-         *  the system picker and call {@link #setImage} on completion. */
+        /** Integration should fire the system picker and call {@link #setImage} on completion. */
         void onPickImage();
-        /** Final Create tap. Bytes are the user's pick (never null when this
-         *  fires — the button stays disabled until {@link #setImage} runs). */
+        /** Bytes are non-null; the Create button stays disabled until {@link #setImage} runs. */
         void onConfirm(byte[] bytes, @Nullable String mime, int gridSize);
         void onCancel();
     }
@@ -74,7 +62,6 @@ public final class PuzzleSetupPanel extends LinearLayout {
         int padH = dp(18);
         setPadding(padH, dp(14), padH, dp(14));
 
-        // Title strip
         TextView title = new TextView(context);
         title.setText("Make a puzzle");
         title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
@@ -93,7 +80,6 @@ public final class PuzzleSetupPanel extends LinearLayout {
         subtitle.setLayoutParams(subLp);
         addView(subtitle);
 
-        // Preview — frame layout-like wrapper. Tap anywhere to pick a (new) image.
         LinearLayout previewFrame = new LinearLayout(context);
         previewFrame.setBackground(roundedFill(SURFACE_2, BORDER));
         previewFrame.setGravity(Gravity.CENTER);
@@ -121,7 +107,6 @@ public final class PuzzleSetupPanel extends LinearLayout {
         previewFrame.addView(previewPlaceholder);
         addView(previewFrame);
 
-        // Upload button (becomes "Change image" after the first pick).
         uploadButton = secondaryButton(context, "Upload image");
         LinearLayout.LayoutParams uploadLp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -132,7 +117,6 @@ public final class PuzzleSetupPanel extends LinearLayout {
         });
         addView(uploadButton);
 
-        // Difficulty row.
         LinearLayout diffRow = new LinearLayout(context);
         diffRow.setOrientation(LinearLayout.HORIZONTAL);
         diffRow.setGravity(Gravity.CENTER);
@@ -160,7 +144,6 @@ public final class PuzzleSetupPanel extends LinearLayout {
         }
         addView(diffRow);
 
-        // Actions row — Cancel + Create (Create disabled until an image is picked).
         LinearLayout actionRow = new LinearLayout(context);
         actionRow.setOrientation(LinearLayout.HORIZONTAL);
         actionRow.setGravity(Gravity.CENTER);
@@ -196,8 +179,7 @@ public final class PuzzleSetupPanel extends LinearLayout {
         this.callback = cb;
     }
 
-    /** Called by the integration after the image picker delivers. Updates the
-     *  preview, enables Create, and swaps the upload button label. */
+    /** Called by the integration after the image picker delivers. */
     public void setImage(byte[] bytes, @Nullable String mime) {
         this.pickedBytes = bytes;
         this.pickedMime = mime;
@@ -215,8 +197,6 @@ public final class PuzzleSetupPanel extends LinearLayout {
         createButton.setEnabled(enabled);
         createButton.setAlpha(enabled ? 1f : 0.35f);
     }
-
-    // -- styling helpers -----------------------------------------------------
 
     private TextView pillButton(Context ctx, String text, boolean selected) {
         TextView t = new TextView(ctx);

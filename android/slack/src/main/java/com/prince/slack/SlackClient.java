@@ -19,16 +19,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Thin REST wrapper for the three Slack endpoints this module needs:
- * <ul>
- *   <li>{@code GET conversations.list} — fetch channels for the picker.</li>
- *   <li>{@code GET team.info} — workspace domain so we can build deep links.</li>
- *   <li>{@code POST chat.postMessage} — the dispatch.</li>
- * </ul>
- *
- * <p>All calls run on a single-threaded background executor; callbacks fire off the main
- * thread. Slack's API always returns HTTP 200 — success is signalled by {@code "ok": true}
- * in the JSON body, so each method checks that explicitly.
+ * Thin REST wrapper for the Slack endpoints this module uses
+ * ({@code team.info}, {@code users.conversations}, {@code chat.postMessage}). All calls
+ * run on a background executor; callbacks fire off the main thread. Slack always
+ * returns HTTP 200, so success requires {@code "ok": true} in the body.
  */
 public final class SlackClient {
 
@@ -37,7 +31,7 @@ public final class SlackClient {
     private static final ExecutorService EXEC = Executors.newSingleThreadExecutor();
 
     public interface PostCallback {
-        /** {@code permalink} is a deep link to the message; null if Slack didn't return one. */
+        /** {@code permalink} may be null if Slack didn't return one. */
         void onSuccess(String channelId, String ts, String permalink);
         void onError(String reason);
     }
@@ -91,14 +85,11 @@ public final class SlackClient {
     public void listChannels(ChannelsCallback cb) {
         EXEC.execute(() -> {
             try {
-                // users.conversations returns only the channels the authenticated user
-                // is a member of — naturally avoids the workspace-wide is_member filter
-                // we used to do client-side. Pagination is mandatory: workspaces with
-                // dozens of channels return the rest under response_metadata.next_cursor.
+                // users.conversations returns only channels the user belongs to; paginate via next_cursor.
                 List<Channel> out = new ArrayList<>();
                 String cursor = "";
                 int pages = 0;
-                final int MAX_PAGES = 10; // safety net, ~10k channels
+                final int MAX_PAGES = 10; // ~10k channels safety cap
                 while (pages++ < MAX_PAGES) {
                     String path = "/users.conversations?types=public_channel,private_channel"
                             + "&exclude_archived=true&limit=200";
@@ -158,9 +149,7 @@ public final class SlackClient {
                 }
                 String ts = json.optString("ts");
                 String channel = json.optString("channel", channelId);
-                // chat.postMessage doesn't return a permalink by default — fetch it so the
-                // notification can deep-link. If this fails we still return success with
-                // a synthesized URL the receiver can build.
+                // chat.postMessage doesn't return a permalink; fetch one for the notification deep link.
                 fetchPermalink(channel, ts, link -> cb.onSuccess(channel, ts, link));
             } catch (Exception e) {
                 Log.w(TAG, "chat.postMessage failed", e);

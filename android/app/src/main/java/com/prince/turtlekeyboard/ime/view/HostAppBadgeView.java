@@ -11,14 +11,9 @@ import android.widget.LinearLayout;
 import androidx.annotation.Nullable;
 
 /**
- * Tiny "you are here" indicator pinned to the top-left of the keyboard whenever the user
- * is typing in a host app the keyboard has mapped (seeded or user-enrolled). Passive —
- * no tap target, no actions; it just confirms the keyboard recognizes the context.
- *
- * <p>Distinct from {@link IntegrationChipView}: the chip is interactive and reflects an
- * <i>active integration session</i> (e.g. Split surfacing in GPay). The badge is a
- * lightweight identity marker that shows for every enrolled app, regardless of whether
- * any integration claims the session.
+ * Passive "you are here" indicator at the top-left of the keyboard when typing in
+ * an enrolled host app. Unlike {@link IntegrationChipView}, this is not interactive
+ * and shows for every enrolled app regardless of integration state.
  */
 public class HostAppBadgeView extends LinearLayout {
 

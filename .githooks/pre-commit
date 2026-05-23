@@ -1,0 +1,33 @@
+#!/bin/sh
+# Auto-regenerate design system whenever tokens.json is in the staged change set.
+# The generated outputs are added to the same commit so JSON and platform
+# artifacts stay in lockstep.
+#
+# Install once per clone: `git config core.hooksPath .githooks`
+
+set -e
+
+if ! git diff --cached --name-only | grep -q "^design-system/tokens.json$"; then
+  exit 0
+fi
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "[pre-commit] tokens.json staged but node is not on PATH."
+  echo "[pre-commit] Install Node 20+ and retry — or unstage tokens.json."
+  exit 1
+fi
+
+echo "[pre-commit] tokens.json changed — regenerating design system..."
+node design-system/build.mjs
+
+# Keep this list in sync with design-system/build.mjs `outputs` and
+# .github/scripts/design-system-check.mjs `generatedPaths`.
+git add \
+  design-system/preview.html \
+  android/app/src/main/res/values/colors_tokens.xml \
+  android/app/src/main/res/values/dimens_tokens.xml \
+  android/app/src/main/res/values/styles_tokens.xml \
+  ios/TurtleKeyboard/Generated/BrandTokens.swift \
+  lading-app/lib/design-system.css
+
+exit 0

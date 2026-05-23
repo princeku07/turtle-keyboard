@@ -14,11 +14,9 @@ import java.net.URL;
 import java.net.URLEncoder;
 
 /**
- * Minimal Drive v3 client — the {@code permissions} subset we need to share the owner's
- * "Turtle Splits" sheet via an anyone-with-link writer permission, and revoke it later.
- *
- * <p>Auth model mirrors {@link SplitSheetsClient}: caller passes a fresh access token;
- * 401/403 surfaces as {@link SplitSheetsClient.UnauthorizedException}.
+ * Minimal Drive v3 client covering the {@code permissions} subset used to share the
+ * Split sheet via an anyone-with-link writer permission and revoke it. Caller supplies a
+ * fresh access token; 401/403 surfaces as {@link SplitSheetsClient.UnauthorizedException}.
  */
 final class SplitDriveClient {
 
@@ -28,11 +26,7 @@ final class SplitDriveClient {
 
     private SplitDriveClient() {}
 
-    /**
-     * Adds an anyone-with-link writer permission. Returns the new {@code permissionId}
-     * so the caller can revoke it later via {@link #revokePermission}. Does not send
-     * notification emails (there's nobody to email).
-     */
+    /** Adds an anyone-with-link writer permission and returns the new {@code permissionId}. */
     static String grantAnyoneWriter(String accessToken, String fileId) throws IOException {
         String url = BASE + fileId + "/permissions?sendNotificationEmail=false";
         JSONObject body;
@@ -50,7 +44,7 @@ final class SplitDriveClient {
         return id;
     }
 
-    /** Removes a specific permission by ID. Idempotent — 404s are swallowed. */
+    /** Removes a permission by id. Idempotent — 404s are swallowed. */
     static void revokePermission(String accessToken, String fileId, String permissionId)
             throws IOException {
         String url = BASE + fileId + "/permissions/" + encode(permissionId);
@@ -66,7 +60,7 @@ final class SplitDriveClient {
                 throw new SplitSheetsClient.UnauthorizedException(
                         "HTTP " + code + " revokePermission");
             }
-            if (code == 404) return; // already gone — fine
+            if (code == 404) return;
             if (code < 200 || code >= 300) {
                 throw new IOException("HTTP " + code + ": " + readStream(conn.getErrorStream()));
             }

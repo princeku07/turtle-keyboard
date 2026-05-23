@@ -26,14 +26,8 @@ import com.prince.split.SplitContract;
 import java.util.Locale;
 
 /**
- * In-keyboard split sheet. Shown above the keys when the user taps the
- * integration chip in a payment app — lets them pick a head-count and save
- * the split without leaving the host. No activity launch.
- *
- * <p>Visual language matches the rest of the keyboard's polished panels
- * (history, emoji, GIFs): pure-black surface, white text at two opacities,
- * subtle-white chip secondary buttons, brand-lime primary CTA. Rounded pills
- * for every button, ripple foreground for press feedback.
+ * In-keyboard split sheet shown above the keys. Lets the user pick a head-count
+ * and save the split without leaving the host app.
  */
 public class SplitPanelView extends LinearLayout {
 
@@ -42,33 +36,17 @@ public class SplitPanelView extends LinearLayout {
         void onCancel();
     }
 
-    // ── Dark-panel color tokens (mirror HistoryPanelView / EmojiPanelView) ──
     private static final int BG           = 0xFF000000;
     private static final int TEXT_PRIMARY = 0xFFF5F5F5;
     private static final int TEXT_MUTED   = 0xA0F5F5F5;
     private static final int CHIP_FILL    = 0x14FFFFFF;
     private static final int RIPPLE_WASH  = 0x33FFFFFF;
-    /** Brand lime — same value as {@code colors.xml#lime} (#15803D). The
-     *  primary CTA carries it so the panel still reads as a Turtle surface
-     *  while the rest of the chrome stays neutral dark. */
     private static final int ACCENT_LIME  = 0xFF15803D;
-    /** Pill corner radius — 10 dp matches the history tiles. */
     private static final int PILL_RADIUS_DP = 10;
-    /** Panel-card corner radius. 16 dp reads as a deliberately curved card
-     *  without feeling fluffy; matches Material's bottom-sheet convention so
-     *  the panel sits in the keyboard slot like a floating sheet rather than
-     *  a flush rectangle. Applied to all four corners so the left and right
-     *  edges both curve. */
     private static final int PANEL_RADIUS_DP = 16;
-    /** Translate-from offset for the slide-up entrance / slide-down exit. */
     private static final int SLIDE_OFFSET_DP = 28;
-    /** Space above the rounded card so the keyboard chrome shows through
-     *  and the panel reads as a floating sheet — same value HistoryPanelView
-     *  and EmojiPanelView use, so all the rounded-card panels line up. */
     private static final int TOP_GAP_DP = 12;
-    /** Material's "emphasized" easing — organic, decelerating settle that
-     *  reads as a sheet rising into place rather than a linear translate.
-     *  Shared with {@link SplitHistoryView} and {@code HistoryPanelView}. */
+    /** Material's "emphasized" easing — shared with the other rounded-card panels. */
     private static final Interpolator ENTER_EASING =
             new PathInterpolator(0.05f, 0.7f, 0.1f, 1.0f);
 
@@ -86,15 +64,6 @@ public class SplitPanelView extends LinearLayout {
     private void init() {
         setOrientation(VERTICAL);
         setVisibility(GONE);
-        // Outer view is transparent so the keyboard chrome shows through
-        // the TOP_GAP_DP space above the rounded card — see the panel
-        // restructure on HistoryPanelView / EmojiPanelView for the same
-        // pattern.
-
-        // Rounded-card container — all real content (headline, stepper,
-        // actions) lives inside this. The card carries the background,
-        // hairline stroke, outline + clipToOutline. Outer LinearLayout
-        // stays transparent and only positions the card with its top gap.
         final int radius = dp(PANEL_RADIUS_DP);
         LinearLayout card = new LinearLayout(getContext());
         card.setOrientation(VERTICAL);
@@ -140,10 +109,6 @@ public class SplitPanelView extends LinearLayout {
         actionsLp.topMargin = dp(12);
         card.addView(buildActions(), actionsLp);
 
-        // Mount the card on the outer view with a top gap. WRAP_CONTENT
-        // height because the split sheet is content-sized, not a
-        // fixed-height panel — unlike the keyboard-slot panels which
-        // weight-fill the slot.
         LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -206,11 +171,6 @@ public class SplitPanelView extends LinearLayout {
         animateOut(() -> listener = null);
     }
 
-    /** Slide up + fade in from a 24 dp offset below rest. Cancels any
-     *  in-flight exit so a rapid hide→show during e.g. a stepper-tap
-     *  double-fire doesn't leave the panel mid-fade. ViewPropertyAnimator
-     *  is GPU-accelerated for translate/alpha so this stays smooth even
-     *  with the rounded-card outline clip applied above. */
     private void animateIn() {
         animate().cancel();
         setVisibility(VISIBLE);
@@ -224,8 +184,6 @@ public class SplitPanelView extends LinearLayout {
                 .start();
     }
 
-    /** Mirror: fade out + slide down, then setVisibility(GONE) and reset the
-     *  transform so the next animateIn starts from a clean state. */
     private void animateOut(Runnable onEnd) {
         animate().cancel();
         if (getVisibility() != VISIBLE) {
@@ -253,8 +211,6 @@ public class SplitPanelView extends LinearLayout {
         perPersonText.setText("₹" + formatAmount(per) + " each");
     }
 
-    // -- factories ------------------------------------------------------------
-
     private TextView text(int sp, int color, boolean bold) {
         TextView t = new TextView(getContext());
         t.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp);
@@ -264,14 +220,10 @@ public class SplitPanelView extends LinearLayout {
         return t;
     }
 
-    /** Subtle-white chip pill for the stepper buttons and Cancel — sits on
-     *  the panel's hardcoded black bg without competing with the lime CTA. */
     private Button chipButton(String label) {
         return pillButton(label, CHIP_FILL, TEXT_PRIMARY);
     }
 
-    /** Brand-lime primary action for the Save CTA. Only one of these on
-     *  screen so the user's eye lands on it. */
     private Button accentButton(String label) {
         return pillButton(label, ACCENT_LIME, Color.WHITE);
     }
@@ -292,9 +244,6 @@ public class SplitPanelView extends LinearLayout {
         bg.setColor(bgColor);
         bg.setCornerRadius(radius);
         b.setBackground(bg);
-        // Ripple foreground clipped to the pill's rounded corners — gives
-        // genuine press feedback instead of the platform Button's default
-        // tinted-rectangle press state.
         GradientDrawable mask = new GradientDrawable();
         mask.setShape(GradientDrawable.RECTANGLE);
         mask.setColor(Color.WHITE);

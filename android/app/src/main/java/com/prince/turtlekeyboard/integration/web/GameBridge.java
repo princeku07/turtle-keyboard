@@ -30,19 +30,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Native side of the WebView game bridge. Each {@code @JavascriptInterface} method is
- * callable from JS as {@code window.TurtleGame_native.<method>(...)}; the game's shim
- * (shipped in its JS bundle) wraps these into the canonical
- * {@code window.TurtleGame.subscribe/uid/writePlayerState} API.
- *
- * <p>Threading: {@code @JavascriptInterface} methods are invoked on a private WebView
- * worker thread, NOT the main thread. Firestore listener callbacks fire on the main
- * thread by default. {@link WebView#evaluateJavascript} must be called from the UI
- * thread — which is where Firestore callbacks deliver, so we just call it directly.
- *
- * <p>Schema is the generic {@code games/{id}} collection — see
- * {@code firebase/firestore.rules}. Games on a different backend (RTDB-based puzzle,
- * etc.) need a sibling bridge — this one is Firestore-only by design.
+ * Native side of the WebView game bridge, exposed to JS as
+ * {@code window.TurtleGame_native}. Backs the generic {@code games/{id}} Firestore
+ * collection; games on a different backend need a sibling bridge.
  */
 public final class GameBridge {
 
@@ -59,9 +49,8 @@ public final class GameBridge {
     @Nullable private ListenerRegistration docReg;
     @Nullable private ListenerRegistration playersReg;
 
-    /** Buffered last-good emissions — first {@code _onUpdate} fires only after both
-     *  the doc and players-collection listeners have delivered, so JS never sees a
-     *  partial state with no players or no game shape. */
+    // First _onUpdate fires only after both listeners deliver, so JS never sees
+    // a partial state.
     @Nullable private DocumentSnapshot lastDocSnap;
     @Nullable private QuerySnapshot lastPlayersSnap;
     private boolean docReady;
@@ -74,8 +63,6 @@ public final class GameBridge {
         this.db = FirebaseFirestore.getInstance();
     }
 
-    // -- JS-facing surface --------------------------------------------------
-
     @JavascriptInterface
     @Nullable
     public String uid() {
@@ -83,28 +70,23 @@ public final class GameBridge {
         return u == null ? null : u.getUid();
     }
 
-    /** Returns the game's route key ({@code "wyr"}, {@code "poll"}, …) so the JS bundle
-     *  can sanity-check it loaded the right game type for the artifact. */
+    /** Returns the game's route key so the JS bundle can verify it loaded the right type. */
     @JavascriptInterface
     @NonNull
     public String type() {
         return gameType;
     }
 
-    /** Returns the artifact id from the App Link URL. JS bundles need this to know
-     *  which game instance they're rendering — under the embedded-HTML model, the
-     *  WebView loads a static {@code file:///android_asset/...} URL with no query
-     *  string, so this method is the only way for JS to get the id. */
+    /** Returns the artifact id. The WebView loads a {@code file://} URL with no query
+     *  string, so this method is the only way for JS to learn which instance it renders. */
     @JavascriptInterface
     @NonNull
     public String artifactId() {
         return gameId;
     }
 
-    /** JS-facing entry: starts (or re-starts) the dual snapshot subscription. JS
-     *  should set its handlers ({@code window.TurtleGame._onUpdate}, {@code _onError})
-     *  BEFORE calling this. Safe to call multiple times — previous listeners are torn
-     *  down first. */
+    /** Starts (or re-starts) the dual snapshot subscription. JS must set
+     *  {@code _onUpdate} / {@code _onError} before calling. Safe to call multiple times. */
     @JavascriptInterface
     public void subscribe() {
         unsubscribe();
@@ -131,8 +113,7 @@ public final class GameBridge {
 
         playersReg = playersRef.addSnapshotListener((snap, e) -> {
             if (e != null) {
-                // Doc listener keeps delivering — player roster stays stale until the
-                // socket recovers. Better than tearing the whole sheet down.
+                // Keep doc listener alive; roster stays stale rather than tearing the sheet down.
                 Log.w(TAG, "players listener error", e);
                 return;
             }
@@ -153,10 +134,9 @@ public final class GameBridge {
     }
 
     /**
-     * Writes (creates) the caller's player doc. {@code payloadJson} is opaque to the
-     * bridge — schema is the game's concern, validated by Firestore rules per-type.
-     * Result is reported via {@code window.TurtleGame._onWriteResult(writeId, ok, err)}
-     * so the JS shim can resolve a Promise per call.
+     * Writes the caller's player doc. {@code payloadJson} is opaque to the bridge;
+     * schema is validated by Firestore rules per game type. Result is reported via
+     * {@code window.TurtleGame._onWriteResult(writeId, ok, err)}.
      */
     @JavascriptInterface
     public void writePlayerState(@NonNull String writeId, @NonNull String payloadJson) {
@@ -188,13 +168,10 @@ public final class GameBridge {
                 });
     }
 
-    /** Called by the host sheet view in {@code onDismiss}. Tears down listeners and
-     *  drops references so the WebView's destroy can finalize cleanly. */
+    /** Tears down listeners; called by the host sheet view in {@code onDismiss}. */
     public void cancel() {
         unsubscribe();
     }
-
-    // -- emission helpers ---------------------------------------------------
 
     private void maybeEmit() {
         if (!docReady || !playersReady) return;
@@ -208,9 +185,8 @@ public final class GameBridge {
         }
     }
 
-    /** {@code { id, type, state, createdAt, players: [{uid, state, joinedAt}, ...] }}.
-     *  Players are sorted by {@code joinedAt} so "Player 1" / "Player 2" stays stable
-     *  across snapshot redeliveries. */
+    /** Builds {@code { id, type, state, createdAt, players: [...] }}. Players are
+     *  sorted by {@code joinedAt} to keep "Player 1" / "Player 2" stable. */
     private JSONObject buildEmission(DocumentSnapshot docSnap, QuerySnapshot playersSnap)
             throws JSONException {
         JSONObject root = new JSONObject();
@@ -257,16 +233,10 @@ public final class GameBridge {
     }
 
     private void evalJs(String script) {
-        // Firestore callbacks fire on main thread; safe to call directly. For paths
-        // that originate on the JS worker thread we'd need a post-to-main hop, but
-        // every fire-* path above is already on main.
+        // Firestore callbacks fire on main thread; evaluateJavascript requires UI thread.
         webView.evaluateJavascript(script, null);
     }
 
-    // -- JSON shape helpers -------------------------------------------------
-
-    /** Recursive Map<String,Object> ← JSONObject. Bridge writes arbitrary nested
-     *  objects to Firestore so games can carry game-specific shapes. */
     private static Map<String, Object> jsonToMap(JSONObject o) throws JSONException {
         Map<String, Object> out = new HashMap<>();
         for (java.util.Iterator<String> it = o.keys(); it.hasNext(); ) {
@@ -289,9 +259,7 @@ public final class GameBridge {
         return v;
     }
 
-    /** Inverse: arbitrary Firestore value → JSON-safe shape. Firestore returns
-     *  {@link Map}, {@link List}, primitives, and {@link Timestamp}; we flatten
-     *  timestamps to epoch millis. */
+    /** Converts a Firestore value to a JSON-safe shape; timestamps flatten to epoch millis. */
     private static Object objectToJson(Object v) throws JSONException {
         if (v == null) return JSONObject.NULL;
         if (v instanceof Map) {

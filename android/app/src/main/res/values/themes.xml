@@ -1,41 +1,105 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <style name="Theme.TurtleKeyboard" parent="Theme.AppCompat.DayNight.NoActionBar">
-        <item name="android:windowBackground">@color/cream</item>
-        <item name="android:textColorPrimary">@color/ink</item>
-        <item name="android:textColorSecondary">@color/muted</item>
-        <item name="android:colorBackground">@color/cream</item>
-        <item name="colorPrimary">@color/lime</item>
-        <item name="colorPrimaryDark">@color/ink</item>
-        <item name="colorAccent">@color/pink</item>
+    <!-- Host app theme. Force-dark — the host should always match the keyboard chrome
+         regardless of system mode, so we don't use DayNight. -->
+    <style name="Theme.TurtleKeyboard" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@color/bg_root</item>
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
+        <item name="android:colorBackground">@color/bg_root</item>
+        <item name="android:statusBarColor">@color/bg_root</item>
+        <item name="android:navigationBarColor">@color/bg_root</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
+        <item name="colorPrimary">@color/green</item>
+        <item name="colorPrimaryDark">@color/bg_root</item>
+        <item name="colorAccent">@color/green</item>
     </style>
 
-    <!-- Dark variant for screens that should match the keyboard's near-black
-         chrome (HistoryActivity, and any future "viewing generated media"
-         surface). Same brand palette, just inverted: ink background with
-         cream text so the thumbnails read as the primary content. Status
-         bar dropped to ink so the strip above doesn't flash cream against
-         the dark activity. -->
-    <style name="Theme.TurtleKeyboard.Dark" parent="Theme.AppCompat.DayNight.NoActionBar">
-        <item name="android:windowBackground">@color/ink</item>
-        <item name="android:textColorPrimary">@color/cream</item>
-        <item name="android:textColorSecondary">#A0F4EFE4</item>
-        <item name="android:colorBackground">@color/ink</item>
-        <item name="android:statusBarColor">@color/ink</item>
-        <item name="colorPrimary">@color/lime</item>
-        <item name="colorPrimaryDark">@color/ink</item>
-        <item name="colorAccent">@color/pink</item>
+    <!-- Cold-launch splash. Inherits Theme.SplashScreen so the system draws the
+         splash before the app process is fully alive — zero perceived latency,
+         no transitional flash. The post-splash theme swap is automatic once
+         MainActivity calls SplashScreen.installSplashScreen(). -->
+    <style name="Theme.TurtleKeyboard.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/brand_green</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/brand_logo</item>
+        <item name="postSplashScreenTheme">@style/Theme.TurtleKeyboard</item>
+        <item name="android:statusBarColor">@color/brand_green</item>
+        <item name="android:navigationBarColor">@color/brand_green</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
+    </style>
+
+    <!-- Light onboarding theme — only used by FeatureOnboardingActivity for the
+         first-impression marketing screens. The rest of the app stays dark. -->
+    <style name="Theme.TurtleKeyboard.FeatureOnboarding" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="android:windowBackground">@color/onboard_bg</item>
+        <item name="android:colorBackground">@color/onboard_bg</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@color/onboard_bg</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="m">true</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="o_mr1">true</item>
+    </style>
+
+    <!-- Kept as an alias for HistoryActivity (which explicitly opts into a dark
+         theme in the manifest). Same as the base theme now that the base is dark. -->
+    <style name="Theme.TurtleKeyboard.Dark" parent="Theme.TurtleKeyboard" />
+
+    <!-- Modal preview theme for HistoryPreviewActivity. Translucent window so
+         the swipe-down dismiss can reveal the History grid underneath as the
+         sheet slides + fades. The content view (SwipeDismissLayout with its own
+         bg_root background) covers the screen when at rest. -->
+    <style name="Theme.TurtleKeyboard.Modal" parent="Theme.TurtleKeyboard.Dark">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:backgroundDimEnabled">false</item>
     </style>
 
     <!-- Translucent host theme for BottomSheetActivity. The activity draws its own
          dimmed backdrop + sheet card programmatically; this theme just makes sure
          the OS window is transparent and doesn't show its own title bar or default
          background underneath. -->
-    <style name="Theme.TurtleKeyboard.BottomSheet" parent="Theme.AppCompat.DayNight.NoActionBar">
+    <style name="Theme.TurtleKeyboard.BottomSheet" parent="Theme.AppCompat.NoActionBar">
         <item name="android:windowIsTranslucent">true</item>
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:colorBackgroundCacheHint">@null</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:windowNoTitle">true</item>
         <item name="android:backgroundDimEnabled">false</item>
+        <!-- Suppress the OS task-transition slide-up that fires when this activity is
+             launched cross-task via an App Link. The activity drives its own enter/exit
+             (backdrop fade + card slide) inside the content view, so the window itself
+             must enter instantly. -->
+        <item name="android:windowAnimationStyle">@style/Animation.TurtleKeyboard.NoAnim</item>
+    </style>
+
+    <!-- Translucent theme for ImagePickerActivity. The activity is a transient shim
+         that immediately launches MediaStore.ACTION_PICK_IMAGES (or ACTION_GET_CONTENT
+         on pre-Tiramisu) and finishes on result. The default
+         @android:style/Theme.Translucent.NoTitleBar lets the OS render a preview
+         window AND run the activity-transition animation, which together flash a
+         thin status-bar-coloured strip over the IME host as the picker slides in.
+         Kill the preview window + transition + system-bar redraws so the picker
+         sheet appears to layer onto the host in place, with no visible transition
+         of the shim itself. -->
+    <style name="Theme.TurtleKeyboard.PickerShim" parent="@android:style/Theme.Translucent.NoTitleBar">
+        <item name="android:windowAnimationStyle">@style/Animation.TurtleKeyboard.NoAnim</item>
+        <item name="android:windowDisablePreview">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+
+    <style name="Animation.TurtleKeyboard.NoAnim" parent="@android:style/Animation">
+        <item name="android:activityOpenEnterAnimation">@null</item>
+        <item name="android:activityOpenExitAnimation">@null</item>
+        <item name="android:activityCloseEnterAnimation">@null</item>
+        <item name="android:activityCloseExitAnimation">@null</item>
+        <item name="android:taskOpenEnterAnimation">@null</item>
+        <item name="android:taskOpenExitAnimation">@null</item>
+        <item name="android:taskCloseEnterAnimation">@null</item>
+        <item name="android:taskCloseExitAnimation">@null</item>
+        <item name="android:taskToFrontEnterAnimation">@null</item>
+        <item name="android:taskToFrontExitAnimation">@null</item>
+        <item name="android:taskToBackEnterAnimation">@null</item>
+        <item name="android:taskToBackExitAnimation">@null</item>
     </style>
 </resources>

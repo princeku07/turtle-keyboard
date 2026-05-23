@@ -10,17 +10,14 @@ import android.inputmethodservice.Keyboard;
 import android.inputmethodservice.KeyboardView;
 import android.util.AttributeSet;
 import android.util.TypedValue;
+import android.view.HapticFeedbackConstants;
 
 import com.prince.turtlekeyboard.theme.KeyboardTheme;
 
 /**
- * Custom KeyboardView that fully self-paints every key. We bypass {@code super.onDraw}
- * so we control face color, label color, the digit-hint corner, and the circular Enter
- * button independently — the framework reuses one drawable per key, which can't express
- * "letter key vs function key vs enter circle" in one pass.
- *
- * <p>Touch handling and {@link Keyboard.Key#pressed} state still come from the parent;
- * we only swap out the visual layer.
+ * KeyboardView that fully self-paints every key (bypasses {@code super.onDraw})
+ * so face color, label color, digit hint, and the circular Enter button can be
+ * varied per key. Touch and pressed-state handling stay with the parent.
  */
 public class TurtleKeyboardView extends KeyboardView {
 
@@ -33,12 +30,10 @@ public class TurtleKeyboardView extends KeyboardView {
     private static final int CODE_COMMA = 44;
     private static final int CODE_PERIOD = 46;
 
-    /** Notified when the mode-toggle (?123 / ABC) key is long-pressed. */
     public interface ModeKeyLongPressListener {
         void onModeKeyLongPress();
     }
 
-    /** Notified when the backspace key is long-pressed (finger still down at LONGPRESS_TIMEOUT). */
     public interface BackspaceLongPressListener {
         void onBackspaceLongPress();
     }
@@ -110,10 +105,22 @@ public class TurtleKeyboardView extends KeyboardView {
             backspaceLongPressListener.onBackspaceLongPress();
             return true;
         }
+        // Long-press on a letter key with a single popupCharacter commits the alt directly.
+        // Returning true aborts KeyboardView's queued release so the base letter doesn't also commit.
+        if (!isFunctionKey(popupKey)
+                && popupKey.popupCharacters != null
+                && popupKey.popupCharacters.length() == 1) {
+            char alt = popupKey.popupCharacters.charAt(0);
+            OnKeyboardActionListener l = getOnKeyboardActionListener();
+            if (l != null) {
+                performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+                l.onKey(alt, new int[]{ alt });
+                return true;
+            }
+        }
         return super.onLongPress(popupKey);
     }
 
-    /** Apply theme-driven colors. Safe to call repeatedly. */
     public void applyTheme(KeyboardTheme theme) {
         this.keyFace = theme.keyFace;
         this.functionFace = theme.functionFace;
@@ -128,8 +135,7 @@ public class TurtleKeyboardView extends KeyboardView {
 
     @Override
     public void onDraw(Canvas canvas) {
-        // Intentionally do NOT call super — we own the drawing pass. Touch/state still
-        // flow through the parent class normally.
+        // Intentionally skip super.onDraw — touch/state still flow through the parent normally.
         Keyboard kb = getKeyboard();
         if (kb == null) return;
         int padLeft = getPaddingLeft();
@@ -157,14 +163,12 @@ public class TurtleKeyboardView extends KeyboardView {
 
         tmp.set(left, top, right, bottom);
         int face = isFunctionKey(key) ? functionFace : keyFace;
-        // The shift key adopts the brand accent fill while shifted/caps-locked so
-        // there's a visible "this is on" cue.
+        // Shift adopts the brand accent fill while shifted/caps-locked as an "on" cue.
         if (isShiftKey && shifted) face = enterFill;
         if (key.pressed) face = pressedFace;
         facePaint.setColor(face);
         c.drawRoundRect(tmp, keyCornerPx, keyCornerPx, facePaint);
 
-        // Label — uppercase letter keys when the keyboard is shifted.
         CharSequence label = key.label;
         if (label != null && label.length() > 0) {
             CharSequence drawLabel = label;
@@ -185,7 +189,6 @@ public class TurtleKeyboardView extends KeyboardView {
             labelPaint.setColor(prevColor);
         }
 
-        // Hint digit, top-right, only on letter keys.
         if (key.popupCharacters != null && key.popupCharacters.length() > 0
                 && !isFunctionKey(key)) {
             char hint = key.popupCharacters.charAt(0);
@@ -202,8 +205,7 @@ public class TurtleKeyboardView extends KeyboardView {
         enterFillPaint.setColor(pressed ? darken(enterFill) : enterFill);
         c.drawCircle(cx, cy, r, enterFillPaint);
 
-        // Two-segment ↵ glyph: vertical leg from top-right down, horizontal arm to the
-        // arrow head on the left. Reads better than the unicode ↵ at this size.
+        // Hand-drawn ↵ glyph reads better than the unicode character at this size.
         float arm = Math.min(right - left, bottom - top) * 0.18f;
         enterIconPaint.setColor(enterIcon);
         c.drawLine(cx + arm, cy - arm, cx + arm, cy + arm * 0.2f, enterIconPaint);
@@ -222,7 +224,6 @@ public class TurtleKeyboardView extends KeyboardView {
             case CODE_PERIOD:
                 return true;
             default:
-                // Space + slash + letters all read as "letter-style" keys.
                 return false;
         }
     }

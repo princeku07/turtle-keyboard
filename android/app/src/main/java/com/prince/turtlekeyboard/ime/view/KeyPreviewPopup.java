@@ -18,10 +18,9 @@ import com.prince.turtlekeyboard.R;
 import java.util.List;
 
 /**
- * Custom key preview that floats directly above the pressed key. Uses a PopupWindow
- * anchored in window coordinates so positioning is correct regardless of where the
- * KeyboardView sits inside its parent (the framework's built-in preview drifts when
- * the KeyboardView isn't the IME root).
+ * Custom key preview floating above the pressed key. Anchored in window
+ * coordinates because the framework's built-in preview drifts when the
+ * KeyboardView isn't the IME root.
  */
 public class KeyPreviewPopup {
 
@@ -75,15 +74,12 @@ public class KeyPreviewPopup {
         }
         main.removeCallbacks(dismissRunnable);
 
-        // Re-tapping the same key while its preview is still visible: nothing to do.
-        // Reapplying setText/measure/update on PopupWindow causes a brief reflow that
-        // reads as a visible gap above the key on rapid double-taps.
+        // Same-key re-tap: skip the reflow that would flash a visible gap on rapid double-taps.
         if (window.isShowing() && primaryCode == shownPrimaryCode) {
             return;
         }
 
         label.setText(key.label);
-        // Measure to get the natural width given the label.
         int wSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
         int hSpec = View.MeasureSpec.makeMeasureSpec(previewHeightPx, View.MeasureSpec.EXACTLY);
         label.measure(wSpec, hSpec);

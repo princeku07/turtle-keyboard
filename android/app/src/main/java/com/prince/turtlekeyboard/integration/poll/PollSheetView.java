@@ -18,6 +18,9 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.prince.kbd.core.SheetContext;
 import com.prince.kbd.core.SheetView;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Poll sheet — listens to {@code polls/{id}} + its voters subcollection via
  * {@link RealtimePollClient#subscribePoll} and re-renders on every state change, so
@@ -60,10 +63,23 @@ public class PollSheetView implements SheetView {
 
     @Nullable private RealtimePollClient.Cancellable subscription;
 
-    /** Last successfully rendered poll. Used to redraw on vote failure so the disabled
-     *  "…" buttons revert without an extra round-trip — the listener doesn't fire when
-     *  a write fails, so there's no live state to redraw from. */
+    /** Last successfully rendered poll. Used to redraw on vote failure so the
+     *  optimistic UI reverts without an extra round-trip — the listener doesn't fire
+     *  when a write fails, so there's no live state to redraw from. */
     @Nullable private RealtimePollClient.Poll lastPoll;
+
+    /** Local "I voted" marker. Two ways it gets set:
+     *  <ol>
+     *    <li>Server-derived: the listener's {@link RealtimePollClient.Poll#myVoteIndex}
+     *        is non-negative when the user's uid already exists in the voters subtree
+     *        (i.e. they voted in a prior session). Adopted only while local is null
+     *        so a racing listener fire can't unset our optimistic value.</li>
+     *    <li>Optimistic: the instant the user taps Vote, before the network round-trip.
+     *        Cleared on vote failure and reverted from {@link #lastPoll}.</li>
+     *  </ol>
+     *  Consulted by {@link #renderPoll} so the chosen pill stays "✓ Voted" across
+     *  re-renders. */
+    @Nullable private Integer myVoteIndex;
 
     @Override
     public View buildView(SheetContext sheet) {
@@ -103,6 +119,13 @@ public class PollSheetView implements SheetView {
         subscription = RealtimePollClient.subscribePoll(id, new RealtimePollClient.PollListener() {
             @Override public void onPoll(RealtimePollClient.Poll poll) {
                 lastPoll = poll;
+                // Adopt server-derived vote only if we don't already have a local
+                // optimistic value. Otherwise a listener fire that races our own
+                // setValue() (e.g. a remote update arriving first) could briefly
+                // unset our optimistic "✓ Voted" pill.
+                if (myVoteIndex == null && poll.myVoteIndex >= 0) {
+                    myVoteIndex = poll.myVoteIndex;
+                }
                 renderPoll(poll);
             }
             @Override public void onError(String reason) {
@@ -122,11 +145,19 @@ public class PollSheetView implements SheetView {
     }
 
     private void submitVote(final int optionIndex) {
+        if (lastPoll == null || myVoteIndex != null) return;
+
+        // Optimistic: bump the chosen option's count and re-render before the
+        // network round-trip. RTDB offline persistence usually fires the listener
+        // ~50ms later with the same count, so this is mostly a perceived-latency
+        // win — the tap responds instantly instead of waiting for the listener.
+        myVoteIndex = optionIndex;
+        renderPoll(applyOptimisticVote(lastPoll, optionIndex));
+
         final String id = sheetCtx.artifactId();
-        markVoting();
         RealtimePollClient.vote(id, optionIndex, new RealtimePollClient.VoteCallback() {
             @Override public void onSuccess() {
-                // Snapshot listener will fire with the new count — no manual refresh.
+                // Listener catches up with the real count — no manual refresh.
             }
             @Override public void onError(String code, String message) {
                 String msg;
@@ -144,11 +175,25 @@ public class PollSheetView implements SheetView {
                         msg = "Vote failed. Try again.";
                 }
                 Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show();
-                // Listener won't fire on a failed write — redraw from cached state so
-                // the disabled "…" buttons aren't stuck.
+                // Server rejected our optimistic +1 — revert to the cached state.
+                myVoteIndex = null;
                 if (lastPoll != null) renderPoll(lastPoll);
             }
         });
+    }
+
+    /** Returns a copy of {@code base} with the chosen option's vote count bumped
+     *  by one. Used only for the optimistic render — never written to lastPoll. */
+    private static RealtimePollClient.Poll applyOptimisticVote(
+            RealtimePollClient.Poll base, int votedIdx) {
+        List<RealtimePollClient.Option> opts = new ArrayList<>(base.options.size());
+        for (int i = 0; i < base.options.size(); i++) {
+            RealtimePollClient.Option o = base.options.get(i);
+            opts.add(new RealtimePollClient.Option(
+                    o.label, o.votes + (i == votedIdx ? 1 : 0)));
+        }
+        return new RealtimePollClient.Poll(
+                base.id, base.question, opts, base.createdAt, base.expiresAt, votedIdx);
     }
 
     // -- render --------------------------------------------------------------
@@ -183,23 +228,6 @@ public class PollSheetView implements SheetView {
         lp.bottomMargin = dp(28);
         t.setLayoutParams(lp);
         root.addView(t);
-    }
-
-    /** Switch all visible Vote buttons to "…" + disabled. Called from main thread. */
-    private void markVoting() {
-        if (root == null) return;
-        for (int i = 0; i < root.getChildCount(); i++) {
-            View v = root.getChildAt(i);
-            if (!(v instanceof LinearLayout)) continue;
-            LinearLayout row = (LinearLayout) v;
-            for (int j = 0; j < row.getChildCount(); j++) {
-                View c = row.getChildAt(j);
-                if (c instanceof TextView && "Vote".contentEquals(((TextView) c).getText())) {
-                    ((TextView) c).setText("…");
-                    c.setEnabled(false);
-                }
-            }
-        }
     }
 
     private void renderPoll(RealtimePollClient.Poll poll) {
@@ -308,16 +336,28 @@ public class PollSheetView implements SheetView {
         pctChip.setLayoutParams(chipLp);
         row.addView(pctChip);
 
-        TextView vote = new TextView(ctx);
-        vote.setText("Vote");
-        vote.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
-        vote.setTextColor(TEXT);
-        vote.setTypeface(Typeface.DEFAULT_BOLD);
-        vote.setBackground(pill(ACCENT));
-        vote.setPadding(dp(14), dp(6), dp(14), dp(6));
-        vote.setGravity(Gravity.CENTER);
-        vote.setOnClickListener(v -> submitVote(index));
-        row.addView(vote);
+        // Three button states keyed off myVoteIndex:
+        //   null              — not voted yet, tappable "Vote" pill on every row
+        //   == index          — this row is the user's choice, "✓ Voted" pill (locked)
+        //   != index          — user voted elsewhere, hide the pill on this row
+        boolean voted = myVoteIndex != null;
+        if (!voted || myVoteIndex == index) {
+            TextView vote = new TextView(ctx);
+            vote.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+            vote.setTextColor(TEXT);
+            vote.setTypeface(Typeface.DEFAULT_BOLD);
+            vote.setBackground(pill(ACCENT));
+            vote.setPadding(dp(14), dp(6), dp(14), dp(6));
+            vote.setGravity(Gravity.CENTER);
+            if (voted) {
+                vote.setText("✓ Voted");
+                vote.setEnabled(false);
+            } else {
+                vote.setText("Vote");
+                vote.setOnClickListener(v -> submitVote(index));
+            }
+            row.addView(vote);
+        }
 
         return row;
     }

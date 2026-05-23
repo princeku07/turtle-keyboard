@@ -6,10 +6,9 @@ import android.view.inputmethod.EditorInfo;
 import java.util.Locale;
 
 /**
- * Lightweight inspection of the host editor's {@link EditorInfo} to decide whether a numeric
- * field is safe to expose contextual chips on. We deliberately keep this conservative —
- * suppressing the chip on a sensitive field is a privacy choice; surfacing it on an OTP
- * field would be both noisy and a small trust leak.
+ * Inspects the host editor's {@link EditorInfo} to decide whether a numeric field is safe
+ * to expose contextual chips on. Conservative on purpose — sensitive fields (PIN, OTP, CVV)
+ * must never show a chip.
  */
 public final class EditorFieldHeuristics {
 
@@ -22,10 +21,7 @@ public final class EditorFieldHeuristics {
         return cls == InputType.TYPE_CLASS_NUMBER;
     }
 
-    /**
-     * True when the field has signals indicating it's a PIN, OTP, CVV, or password —
-     * places where an amount-watching chip must never appear.
-     */
+    /** True when the field looks like a PIN, OTP, CVV, or password. */
     public static boolean looksSensitive(EditorInfo info) {
         if (info == null) return true;
 

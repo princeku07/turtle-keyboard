@@ -18,6 +18,7 @@ import com.prince.kbd.core.KeyValueStore;
 import com.prince.kbd.core.McpService;
 import com.prince.turtlekeyboard.R;
 import com.prince.turtlekeyboard.integration.usermcp.McpBinding;
+import com.prince.turtlekeyboard.integration.usermcp.McpErrorMessages;
 import com.prince.turtlekeyboard.settings.Prefs;
 
 import org.json.JSONArray;
@@ -29,17 +30,8 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Three-step add flow in a single Activity:
- *
- * <ol>
- *   <li><b>Endpoint</b> — user pastes HTTPS URL + optional bearer token, taps "Discover tools".
- *       We call {@link McpService#tools} once; on success step 2 unhides.</li>
- *   <li><b>Pick tool</b> — radio list of discovered tools. User picks one, taps "Use this tool".</li>
- *   <li><b>Name binding</b> — command name, label, emoji, arg template (JSON), result format.
- *       Save persists the binding and the bearer token, then finishes.</li>
- * </ol>
- *
- * <p>v1 has no editing flow — once saved, a binding is read-only. Delete + recreate to change.
+ * Three-step add flow (Endpoint → Pick tool → Name binding) for a user MCP binding.
+ * Bindings are read-only once saved; delete and recreate to change.
  */
 public class McpAddBindingActivity extends AppCompatActivity {
 
@@ -64,8 +56,6 @@ public class McpAddBindingActivity extends AppCompatActivity {
 
     /** Cached tools/list response so step 3 can prefill the schema hint. */
     private JSONArray discoveredTools;
-    /** Tool name resolved at step 2 — kept in a field so step 3 doesn't have to parse it
-     *  back out of the radio button label. */
     private String selectedToolName;
 
     @Override
@@ -123,7 +113,7 @@ public class McpAddBindingActivity extends AppCompatActivity {
             }
             @Override public void onError(String reason) {
                 btnDiscover.setEnabled(true);
-                discoverStatus.setText("Discovery failed: " + reason);
+                discoverStatus.setText(McpErrorMessages.userMessage(reason, "Discovery"));
             }
         });
     }
@@ -164,9 +154,7 @@ public class McpAddBindingActivity extends AppCompatActivity {
         selectedToolName = name;
         editCommand.setText(name);
         editLabel.setText(name);
-        // Prefill arg template with the tool's input schema keys mapped to ${prompt} placeholders.
-        // Best-effort — caller can edit. Mismatches surface as raw mcp_ errors at runtime
-        // (per design decision: surface raw error, no auto-retry).
+        // Prefill arg template from the tool's input schema; user can edit before saving.
         editArgs.setText(buildArgTemplateHint(t.optJSONObject("inputSchema")));
 
         stepPickTool.setVisibility(View.GONE);
@@ -183,8 +171,7 @@ public class McpAddBindingActivity extends AppCompatActivity {
         while (it.hasNext()) {
             String k = it.next();
             try {
-                // First string field gets ${prompt}; subsequent fields get empty string
-                // so users can see the shape and fill in defaults.
+                // First string field gets ${prompt}; the rest get type-appropriate defaults.
                 JSONObject p = props.optJSONObject(k);
                 String type = p == null ? "string" : p.optString("type", "string");
                 if ("string".equals(type) && firstStringField) {
@@ -233,7 +220,7 @@ public class McpAddBindingActivity extends AppCompatActivity {
             return;
         }
 
-        // Collision check — refuse to override a built-in or another user binding.
+        // Refuse to override a built-in or another user binding.
         KeyValueStore store = new Prefs(this).root().scoped("user-mcp");
         for (McpBinding existing : McpBinding.loadAll(store)) {
             if (existing.command.equals(command)) {
@@ -271,8 +258,7 @@ public class McpAddBindingActivity extends AppCompatActivity {
         finish();
     }
 
-    /** Hardcoded reservations for built-in command names. Kept narrow on purpose — the
-     *  list grows whenever a new built-in integration ships a command. */
+    /** Hardcoded reservations for built-in command names. */
     private static boolean isReservedCommand(String name) {
         switch (name) {
             case "split": case "splits":

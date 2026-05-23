@@ -1,162 +1,108 @@
 package com.prince.turtlekeyboard.ui;
 
 import android.Manifest;
-import android.app.AlertDialog;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.content.pm.PackageManager;
-import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.view.Gravity;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.inputmethod.InputMethodInfo;
 import android.view.inputmethod.InputMethodManager;
-import android.widget.NumberPicker;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.IntentSenderRequest;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
+import androidx.core.splashscreen.SplashScreen;
 
 import com.google.firebase.auth.FirebaseUser;
 import com.prince.kbd.core.GoogleAuth;
 import com.prince.kbd.core.GoogleAuthImpl;
-import com.prince.notion.ui.NotionConnectActivity;
-import com.prince.slack.ui.SlackConnectActivity;
-import com.prince.split.SplitCloudSync;
-import com.prince.split.SplitContract;
-import com.prince.split.SplitKeys;
-import com.prince.split.SplitOAuthScopes;
-import com.prince.split.ui.SplitActivity;
 import com.prince.turtlekeyboard.R;
 import com.prince.turtlekeyboard.auth.FirebaseAuthBridge;
 import com.prince.turtlekeyboard.databinding.ActivityMainBinding;
-import com.prince.turtlekeyboard.integration.drive.DriveLinkActivity;
-import com.prince.turtlekeyboard.ui.mcp.McpServersActivity;
-import com.prince.turtlekeyboard.overlay.BottomSheetActivity;
-import com.prince.turtlekeyboard.overlay.OverlayUrls;
 import com.prince.turtlekeyboard.settings.Prefs;
 
 /**
- * Host app entry point — keyboard onboarding plus a small playground for the Split feature
- * (set the default head-count, jump straight into the on-demand Split view). Also holds
- * the mandatory Google Sign-In gate that authorizes Sheets/Drive sync for the Split SDK.
+ * Host app Home: live status card plus drill-in cards (Commands, Integrations,
+ * History, Settings). Status card cycles NOT_ENABLED → ENABLED_NOT_SELECTED → ACTIVE.
  */
 public class MainActivity extends AppCompatActivity {
 
-    /** Set on the launching Intent when the IME bounces the user here to grant
-     *  the RECORD_AUDIO permission. {@link #onCreate} reads it and triggers the
-     *  request immediately, then finishes once the OS dialog returns. */
+    /** Set when the IME bounces here to request RECORD_AUDIO. */
     public static final String EXTRA_REQUEST_MIC = "extra_request_mic";
 
     private static final int REQ_MIC = 4242;
     private static final int REQ_NOTIF = 4243;
+    private static final String IME_PACKAGE = "com.prince.turtlekeyboard";
+    private static final String IME_SERVICE = "com.prince.turtlekeyboard.ime.TurtleInputMethodService";
 
     private ActivityMainBinding binding;
     private Prefs prefs;
-    private com.prince.kbd.core.KeyValueStore splitStore;
     private GoogleAuth auth;
     private FirebaseAuthBridge firebaseBridge;
-    private AlertDialog signInDialog;
-
-    /** True between {@code kickoffFirebaseSignIn} firing and its callback resolving.
-     *  Guards against onResume re-kicking the One Tap flow while
-     *  {@code signInWithCredential} is still completing in the background — the result
-     *  launcher callback runs before onResume, but Firebase Auth's network step lands
-     *  later, so {@code currentUser()} is still null when onResume checks. */
     private boolean firebaseSignInInFlight;
 
-    private final ActivityResultLauncher<IntentSenderRequest> authLauncher =
-            registerForActivityResult(new ActivityResultContracts.StartIntentSenderForResult(),
-                    result -> finishAuth(result.getData()));
-
-    /** Separate from {@link #authLauncher}: the One Tap sign-in intent (used for the
-     *  Firebase ID token path) is structurally identical but carries a different payload,
-     *  so the bridge needs its own result hand-back. */
     private final ActivityResultLauncher<IntentSenderRequest> firebaseSignInLauncher =
             registerForActivityResult(new ActivityResultContracts.StartIntentSenderForResult(),
                     result -> finishFirebaseSignIn(result.getData()));
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // Must run before super.onCreate so the system swaps from the splash
+        // theme back to Theme.TurtleKeyboard for the rest of the activity life.
+        SplashScreen.installSplashScreen(this);
         super.onCreate(savedInstanceState);
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
+
         prefs = new Prefs(this);
-        splitStore = prefs.root().scoped("split");
-        // Web client id comes from google-services.json via the google-services plugin —
-        // required for the Firebase ID-token path; harmless for the existing access-token
-        // path which ignores it.
+
+        // Dev: always show onboarding on launch. Re-gate with KEY_FEATURE_ONBOARDING_SHOWN
+        // once the design is locked.
+        String campaign = prefs.getString(Prefs.KEY_INSTALL_CAMPAIGN_ID, null);
+        startActivity(FeatureOnboardingActivity.intentFor(this, campaign));
         String webClientId = getString(R.string.default_web_client_id);
         auth = new GoogleAuthImpl(this, prefs.root().scoped("google"), webClientId);
         firebaseBridge = new FirebaseAuthBridge(this, auth);
 
         binding.btnEnable.setOnClickListener(v -> openInputMethodSettings());
         binding.btnChoose.setOnClickListener(v -> showInputMethodPicker());
-        binding.btnSetSplit.setOnClickListener(v -> showSplitPicker());
-        binding.btnViewSplits.setOnClickListener(v ->
-                startActivity(new Intent(this, SplitActivity.class)));
-        binding.btnAppPersonalization.setOnClickListener(v ->
-                startActivity(new Intent(this, AppPersonalizationActivity.class)));
-        binding.btnConnectNotion.setOnClickListener(v ->
-                startActivity(new Intent(this, NotionConnectActivity.class)));
-        binding.btnConnectSlack.setOnClickListener(v ->
-                startActivity(new Intent(this, SlackConnectActivity.class)));
-        binding.btnConnectDrive.setOnClickListener(v ->
-                startActivity(new Intent(this, DriveLinkActivity.class)));
-        binding.btnHistory.setOnClickListener(v ->
-                startActivity(new Intent(this, HistoryActivity.class)));
-        binding.btnMcpServers.setOnClickListener(v ->
-                startActivity(new Intent(this, McpServersActivity.class)));
-        binding.btnSpriteToGifTest.setOnClickListener(v ->
-                startActivity(new Intent(this, SpriteToGifTestActivity.class)));
-        // Dev button — direct-launches BottomSheetActivity with a synthetic URL so the
-        // sheet rails can be verified without depending on deep-link routing (which
-        // requires assetlinks.json hosted on the App Link domain). Remove once Cloudflare
-        // Worker is live and tap-link-in-chat is verified end-to-end.
-        binding.btnPreviewSheet.setOnClickListener(v -> {
-            Intent i = new Intent(this, BottomSheetActivity.class);
-            i.setData(Uri.parse(OverlayUrls.forArtifact("poll", "testid123")));
-            startActivity(i);
-        });
 
-        refreshSplitStatus();
+        binding.cardCommands.setOnClickListener(v ->
+                startActivity(new Intent(this, CommandsActivity.class)));
+        binding.cardIntegrations.setOnClickListener(v ->
+                startActivity(new Intent(this, IntegrationsActivity.class)));
+        binding.cardHistory.setOnClickListener(v ->
+                startActivity(new Intent(this, HistoryActivity.class)));
+        binding.cardSettings.setOnClickListener(v ->
+                startActivity(new Intent(this, SettingsActivity.class)));
 
         if (getIntent() != null && getIntent().getBooleanExtra(EXTRA_REQUEST_MIC, false)) {
             requestMicPermission();
         }
-        // Android 13+ runtime permission for the "image ready" notification the IME
-        // posts when the keyboard is closed mid-generation. The IME is a Service and
-        // can't request runtime perms itself, so we ask here on host-app open.
+        // Android 13+ POST_NOTIFICATIONS for the IME's "image ready" notification; IME can't request itself.
         maybeRequestNotificationPermission();
-    }
-
-    private void maybeRequestNotificationPermission() {
-        if (android.os.Build.VERSION.SDK_INT < 33) return;
-        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
-                == PackageManager.PERMISSION_GRANTED) return;
-        requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQ_NOTIF);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        if (!auth.isSignedIn()) {
-            promptSignIn();
-        } else {
-            dismissSignInDialog();
-            // Heal legacy installs that signed in before the email scope was added.
-            auth.fetchAndStoreEmailIfMissing();
-            // Provision sheet on first run; pull latest rows on every entry.
-            SplitCloudSync.ensureSheet(this, auth, splitStore, changed -> {
-                SplitCloudSync.fetchAndMerge(MainActivity.this, auth, splitStore, null);
-            });
-            // Backfill Firebase Auth for users who signed in before the bridge existed.
-            // No-op if currentUser is already populated (Firebase persists its own session)
-            // or if a sign-in we kicked off earlier is still completing.
-            if (firebaseBridge.currentUser() == null && !firebaseSignInInFlight) {
-                kickoffFirebaseSignIn();
-            }
+        refreshStatus();
+        // Silent Firebase Auth backfill: only fires for users with cached Google sign-in.
+        if (auth.isSignedIn()
+                && firebaseBridge.currentUser() == null
+                && !firebaseSignInInFlight) {
+            kickoffFirebaseSignIn();
         }
     }
 
@@ -167,112 +113,154 @@ public class MainActivity extends AppCompatActivity {
         if (intent.getBooleanExtra(EXTRA_REQUEST_MIC, false)) requestMicPermission();
     }
 
-    // -- Sign-in gate --------------------------------------------------------
+    // -- Live status -----------------------------------------------------------
 
-    private void promptSignIn() {
-        if (signInDialog != null && signInDialog.isShowing()) return;
-        // Dismissible — users who only want /us, /cap, etc. can skip Split sync entirely.
-        // Sheets / Drive scopes are only requested if the user opts in here.
-        signInDialog = new AlertDialog.Builder(this)
-                .setTitle("Sync your splits across devices?")
-                .setMessage(
-                        "Optional. Turtle saves your splits to a private spreadsheet in "
-                        + "your Google Drive so they sync to your other devices.\n\n"
-                        + "What you'd allow:\n"
-                        + "• Read & write the one sheet this app creates\n"
-                        + "• Nothing else in your Drive is ever touched\n\n"
-                        + "Skip this if you only want /us, /cap, and other commands.")
-                .setCancelable(true)
-                .setNegativeButton("Maybe later", (d, w) -> dismissSignInDialog())
-                .setPositiveButton("Continue with Google", (d, w) -> startAuth())
-                .create();
-        signInDialog.show();
-    }
+    private void refreshStatus() {
+        ImeState state = currentImeState();
 
-    private void dismissSignInDialog() {
-        if (signInDialog != null && signInDialog.isShowing()) {
-            signInDialog.dismiss();
+        switch (state) {
+            case ACTIVE:
+                binding.statusDot.setBackgroundResource(R.drawable.dot_connected);
+                binding.statusLabel.setText("Active");
+                binding.statusBody.setText("Turtle is your keyboard. "
+                        + "Open any text field and slash to start.");
+                binding.onboardingActions.setVisibility(View.GONE);
+                binding.heroTitle.setText("Ready to slash.");
+                binding.heroSub.setText("Every model, one slash, any app.");
+                break;
+            case ENABLED_NOT_SELECTED:
+                binding.statusDot.setBackgroundResource(R.drawable.dot_pending);
+                binding.statusLabel.setText("One step left");
+                binding.statusBody.setText("Turtle is installed but not in use. "
+                        + "Switch to it to start typing slash commands.");
+                binding.onboardingActions.setVisibility(View.VISIBLE);
+                binding.btnEnable.setVisibility(View.GONE);
+                binding.btnChoose.setVisibility(View.VISIBLE);
+                binding.heroTitle.setText("Almost there.");
+                binding.heroSub.setText("Pick Turtle in the keyboard switcher.");
+                break;
+            case NOT_ENABLED:
+            default:
+                binding.statusDot.setBackgroundResource(R.drawable.dot_pending);
+                binding.statusLabel.setText("Setup needed");
+                binding.statusBody.setText("Turtle isn't enabled yet. "
+                        + "Two taps and you're done.");
+                binding.onboardingActions.setVisibility(View.VISIBLE);
+                binding.btnEnable.setVisibility(View.VISIBLE);
+                binding.btnChoose.setVisibility(View.VISIBLE);
+                binding.heroTitle.setText("Let's set up Turtle.");
+                binding.heroSub.setText("The AI keyboard. Every model, one slash, any app.");
+                break;
         }
-        signInDialog = null;
+
+        refreshCardSummaries();
     }
 
-    private void startAuth() {
-        auth.authorize(this, SplitOAuthScopes.SCOPES, new GoogleAuth.Callback() {
-            @Override public void onToken(String accessToken) {
-                runOnUiThread(MainActivity.this::onSignedIn);
-            }
-            @Override public void onError(String reason, GoogleAuth.PendingUi pendingUi) {
-                if (pendingUi != null) {
-                    launchAuthUi(pendingUi.intentSender);
-                } else {
-                    runOnUiThread(() -> {
-                        Toast.makeText(MainActivity.this,
-                                "Sign-in failed: " + reason, Toast.LENGTH_LONG).show();
-                        promptSignIn();
-                    });
-                }
-            }
-        });
+    private void refreshCardSummaries() {
+        // Static count avoids loading the full registry just to render a summary line.
+        binding.commandsSummary.setText("12 commands ready · tap to customize");
+
+        renderIntegrationDots();
+
+        binding.settingsSummary.setText("Account · Appearance · Privacy");
     }
 
-    private void launchAuthUi(IntentSender sender) {
-        try {
-            authLauncher.launch(new IntentSenderRequest.Builder(sender).build());
-        } catch (Exception e) {
-            Toast.makeText(this, "Could not start sign-in: " + e.getMessage(),
-                    Toast.LENGTH_LONG).show();
+    private void renderIntegrationDots() {
+        LinearLayout host = binding.integrationsDots;
+        host.removeAllViews();
+
+        boolean drive = auth.isSignedIn();
+        boolean notion = prefs.root().scoped("notion").getString("access_token", null) != null;
+        boolean slack = prefs.root().scoped("slack").getString("access_token", null) != null;
+        boolean mcp = prefs.root().scoped("usermcp").getString("bindings", null) != null;
+
+        int connected = (drive ? 1 : 0) + (notion ? 1 : 0) + (slack ? 1 : 0) + (mcp ? 1 : 0);
+        binding.integrationsSummary.setText(connected + " of 4 connected");
+
+        host.addView(makeIntegrationChip("Drive", drive));
+        host.addView(makeIntegrationChip("Notion", notion));
+        host.addView(makeIntegrationChip("Slack", slack));
+        host.addView(makeIntegrationChip("MCP", mcp));
+    }
+
+    private View makeIntegrationChip(String label, boolean connected) {
+        int padH = dp(10);
+        int padV = dp(6);
+
+        LinearLayout chip = new LinearLayout(this);
+        chip.setOrientation(LinearLayout.HORIZONTAL);
+        chip.setGravity(Gravity.CENTER_VERTICAL);
+        chip.setBackgroundResource(connected ? R.drawable.bg_chip_green : R.drawable.bg_chip_mono);
+        chip.setPadding(padH, padV, padH, padV);
+
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.setMarginEnd(dp(6));
+        chip.setLayoutParams(lp);
+
+        View dot = new View(this);
+        dot.setBackgroundResource(connected ? R.drawable.dot_connected : R.drawable.dot_pending);
+        LinearLayout.LayoutParams dotLp = new LinearLayout.LayoutParams(dp(7), dp(7));
+        dotLp.setMarginEnd(dp(7));
+        chip.addView(dot, dotLp);
+
+        TextView text = new TextView(this);
+        text.setText(label);
+        text.setTextColor(connected
+                ? ContextCompat.getColor(this, R.color.green)
+                : ContextCompat.getColor(this, R.color.text_secondary));
+        text.setTextSize(13f);
+        chip.addView(text);
+
+        return chip;
+    }
+
+    private int dp(int v) {
+        return Math.round(v * getResources().getDisplayMetrics().density);
+    }
+
+    // -- IME state probes ------------------------------------------------------
+
+    private enum ImeState { NOT_ENABLED, ENABLED_NOT_SELECTED, ACTIVE }
+
+    private ImeState currentImeState() {
+        InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (imm == null) return ImeState.NOT_ENABLED;
+
+        boolean enabled = false;
+        for (InputMethodInfo info : imm.getEnabledInputMethodList()) {
+            ComponentName cn = info.getComponent();
+            if (cn != null
+                    && IME_PACKAGE.equals(cn.getPackageName())
+                    && IME_SERVICE.equals(cn.getClassName())) {
+                enabled = true;
+                break;
+            }
         }
+        if (!enabled) return ImeState.NOT_ENABLED;
+
+        String selected = Settings.Secure.getString(
+                getContentResolver(), Settings.Secure.DEFAULT_INPUT_METHOD);
+        if (selected != null && selected.startsWith(IME_PACKAGE + "/")) {
+            return ImeState.ACTIVE;
+        }
+        return ImeState.ENABLED_NOT_SELECTED;
     }
 
-    private void finishAuth(Intent data) {
-        auth.onAuthorizationResult(this, data, new GoogleAuth.Callback() {
-            @Override public void onToken(String accessToken) {
-                runOnUiThread(MainActivity.this::onSignedIn);
-            }
-            @Override public void onError(String reason, GoogleAuth.PendingUi pendingUi) {
-                runOnUiThread(() -> {
-                    Toast.makeText(MainActivity.this,
-                            "Sign-in failed: " + reason, Toast.LENGTH_LONG).show();
-                    promptSignIn();
-                });
-            }
-        });
-    }
-
-    private void onSignedIn() {
-        dismissSignInDialog();
-        Toast.makeText(this, "Signed in — provisioning sheet…", Toast.LENGTH_SHORT).show();
-        SplitCloudSync.ensureSheet(this, auth, splitStore, ready -> {
-            SplitCloudSync.fetchAndMerge(MainActivity.this, auth, splitStore, null);
-        });
-        // The user just picked a Google account 0.5s ago for the access-token grant —
-        // Play Services should auto-select silently for the One Tap ID-token path that
-        // backs Firebase Auth. Worst case: One Tap shows a chooser; user picks the same
-        // account; Firebase user materializes. Either way it's fire-and-forget for the
-        // primary Drive/Sheets flow.
-        kickoffFirebaseSignIn();
-    }
-
-    // -- Firebase Auth bridge -----------------------------------------------
+    // -- Firebase Auth bridge (silent backfill) --------------------------------
 
     private void kickoffFirebaseSignIn() {
         firebaseSignInInFlight = true;
         firebaseBridge.ensureSignedIn(this, new FirebaseAuthBridge.Callback() {
             @Override public void onSignedIn(FirebaseUser user) {
                 firebaseSignInInFlight = false;
-                // Plumbing — no UI feedback. Poll/wyr features will pick up the session
-                // automatically the next time they read FirebaseAuth.getInstance().
             }
             @Override public void onError(String reason, GoogleAuth.PendingUi pendingUi) {
                 if (pendingUi != null) {
-                    // Keep flight flag set — the launcher result handler will land in
-                    // finishFirebaseSignIn, which clears the flag in its callbacks.
                     runOnUiThread(() -> launchFirebaseSignInUi(pendingUi.intentSender));
                     return;
                 }
                 firebaseSignInInFlight = false;
-                // Other errors are deliberately swallowed — Firebase Auth failure must
-                // never block the existing Drive/Sheets flow. Bridge already logs.
             }
         });
     }
@@ -282,7 +270,6 @@ public class MainActivity extends AppCompatActivity {
             firebaseSignInLauncher.launch(new IntentSenderRequest.Builder(sender).build());
         } catch (Exception e) {
             firebaseSignInInFlight = false;
-            // Non-fatal: user can still use the app without a Firebase session.
         }
     }
 
@@ -297,35 +284,14 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    // -- Split ----------------------------------------------------------------
+    // -- Permissions -----------------------------------------------------------
 
-    private void refreshSplitStatus() {
-        int n = prefs.root().scoped("split").getInt(SplitKeys.DEFAULT_PEOPLE, SplitContract.DEFAULT_PEOPLE);
-        binding.splitStatus.setText("Default split: " + n + (n == 1 ? " person" : " people"));
+    private void maybeRequestNotificationPermission() {
+        if (android.os.Build.VERSION.SDK_INT < 33) return;
+        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                == PackageManager.PERMISSION_GRANTED) return;
+        requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQ_NOTIF);
     }
-
-    private void showSplitPicker() {
-        int current = prefs.root().scoped("split").getInt(SplitKeys.DEFAULT_PEOPLE, SplitContract.DEFAULT_PEOPLE);
-
-        NumberPicker picker = new NumberPicker(this);
-        picker.setMinValue(SplitContract.MIN_PEOPLE);
-        picker.setMaxValue(SplitContract.MAX_PEOPLE);
-        picker.setValue(current);
-        picker.setWrapSelectorWheel(false);
-
-        new AlertDialog.Builder(this)
-                .setTitle("Split between how many?")
-                .setView(picker)
-                .setPositiveButton("Save", (d, w) -> {
-                    prefs.root().scoped("split").putInt(SplitKeys.DEFAULT_PEOPLE, picker.getValue());
-                    refreshSplitStatus();
-                    Toast.makeText(this, "Saved", Toast.LENGTH_SHORT).show();
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-    // -- Mic permission (IME bounces here) -----------------------------------
 
     private void requestMicPermission() {
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
@@ -353,7 +319,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // -- IME setup helpers ----------------------------------------------------
+    // -- IME setup helpers -----------------------------------------------------
 
     private void openInputMethodSettings() {
         try {

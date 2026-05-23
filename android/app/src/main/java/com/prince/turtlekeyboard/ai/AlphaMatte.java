@@ -3,65 +3,61 @@ package com.prince.turtlekeyboard.ai;
 import android.graphics.Bitmap;
 
 /**
- * Difference-matting math shared between any AI-image feature that needs to
- * recover per-pixel transparency from two model renders of the same subject —
- * one on pure white, one on pure black. Used by:
+ * Difference-matting math: recovers per-pixel alpha from two model renders of the
+ * same subject on pure white and pure black backgrounds. Shared by GifIntegration
+ * and StickerIntegration; each caller supplies its own pass-2 prompt.
  *
- * <ul>
- *   <li>{@code GifIntegration} — recovers alpha for the sprite-sheet so
- *       animated GIF frames drop cleanly onto chat backgrounds.</li>
- *   <li>{@code StickerIntegration} — recovers alpha for single-frame stickers
- *       so they read as cut-outs rather than rectangles with a baked bg.</li>
- * </ul>
- *
- * <p>Each caller supplies its own pass-2 user prompt (the "swap white to
- * black" instruction text), since the surrounding constraints differ — GIF
- * tells the model to preserve the cell grid; sticker just tells it to
- * preserve the subject. The math itself is identical in both cases, hence
- * its presence here.
- *
- * <p>Algorithm (from <em>jidefr.medium.com/generating-transparent-background-images-with-nano-banana-pro</em>):
- * <pre>
- *   pixelDist = euclidean(pixOnWhite, pixOnBlack)
- *   bgDist    = euclidean(WHITE, BLACK) = sqrt(3 · 255²) ≈ 441.67
- *   alpha     = 1 - (pixelDist / bgDist)
- * </pre>
- * Subject pixels match across both renders ⇒ {@code pixelDist ≈ 0} ⇒
- * {@code alpha = 1}. Background pixels differ by the full distance ⇒
- * {@code alpha = 0}. Anti-aliased edges and translucent regions get a
- * proportional alpha. True RGB is back-solved from the black render:
- * {@code observed = α · true} ⇒ {@code true = observed / α}. Snap thresholds
- * at the two ends clean up small model-side RGB drift.
+ * <p>Algorithm: {@code alpha = 1 - euclidean(onWhite, onBlack) / sqrt(3·255²)};
+ * true RGB back-solved from the black render as {@code observed / alpha}.
  */
 public final class AlphaMatte {
 
-    /** Snap-to-opaque / snap-to-transparent thresholds on recovered alpha.
-     *  Tiny model-side RGB drift on subject pixels otherwise leaves them at
-     *  ~0.97 alpha (faint translucency); pure-background pixels otherwise
-     *  sit at ~0.02 (faint ghost). Snapping cleans both ends. */
+    /** Snap thresholds clean up sub-pixel model-side RGB drift at the two ends. */
     private static final double SNAP_OPAQUE = 0.95;
     private static final double SNAP_TRANS  = 0.05;
+
+    /** Max corner-pixel RGB drift from the expected background before a pass is
+     *  treated as invalid; beyond this the matte collapses to garbage. */
+    public static final int MAX_BG_DRIFT = 105;
 
     private AlphaMatte() {}
 
     /**
-     * Given two model renders of the same scene on pure-white and pure-black
-     * backgrounds, recover per-pixel alpha and true subject RGB.
-     *
-     * <p>Caller is responsible for ensuring the two bitmaps have matching
-     * dimensions — this method does not validate. (In practice both callers
-     * already check dimensions before invoking, so duplicating the guard
-     * here would just hide bugs in their bookkeeping.)
+     * Max euclidean RGB distance between the bitmap's four corners and the
+     * expected background. Callers use this to detect a pass where the model
+     * ignored the background instruction and bail to a non-matte fallback.
+     */
+    public static int maxCornerDistance(Bitmap bitmap, int er, int eg, int eb) {
+        int w = bitmap.getWidth(), h = bitmap.getHeight();
+        int[] corners = {
+                bitmap.getPixel(0, 0),
+                bitmap.getPixel(w - 1, 0),
+                bitmap.getPixel(0, h - 1),
+                bitmap.getPixel(w - 1, h - 1),
+        };
+        int max = 0;
+        for (int c : corners) {
+            int dr = ((c >> 16) & 0xff) - er;
+            int dg = ((c >> 8)  & 0xff) - eg;
+            int db = ( c        & 0xff) - eb;
+            int d = (int) Math.sqrt(dr * dr + dg * dg + db * db);
+            if (d > max) max = d;
+        }
+        return max;
+    }
+
+    /**
+     * Recovers per-pixel alpha and subject RGB from white/black-background renders.
+     * Caller must ensure matching dimensions; passed-in bitmaps are not recycled.
      *
      * @param onWhite render with the locked white background
      * @param onBlack render with the locked black background
-     * @return a new {@code ARGB_8888} bitmap with recovered alpha; the
-     *         passed-in bitmaps are not recycled or otherwise touched.
+     * @return a new {@code ARGB_8888} bitmap with recovered alpha
      */
     public static Bitmap differenceMatte(Bitmap onWhite, Bitmap onBlack) {
         int w = onWhite.getWidth();
         int h = onWhite.getHeight();
-        final double BG_DIST = Math.sqrt(3.0 * 255.0 * 255.0); // = 441.67
+        final double BG_DIST = Math.sqrt(3.0 * 255.0 * 255.0);
 
         int[] whitePix = new int[w * h];
         int[] blackPix = new int[w * h];
@@ -85,13 +81,10 @@ public final class AlphaMatte {
             int a = (int) Math.round(alpha * 255.0);
             int r, g, b;
             if (alpha <= 0.0) {
-                // Fully transparent — color is irrelevant; zero it so the
-                // downstream encoder doesn't waste a palette slot on a
-                // never-visible color.
+                // Zero color on fully-transparent pixels so the encoder doesn't waste a palette slot.
                 r = 0; g = 0; b = 0;
             } else {
-                // From the black render: observed = α·subject ⇒
-                // subject = observed/α.
+                // observed = α·subject ⇒ subject = observed/α.
                 r = (int) Math.min(255.0, Math.round(rb / alpha));
                 g = (int) Math.min(255.0, Math.round(gb / alpha));
                 b = (int) Math.min(255.0, Math.round(bb / alpha));
