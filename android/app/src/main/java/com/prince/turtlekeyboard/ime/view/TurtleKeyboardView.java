@@ -34,12 +34,7 @@ public class TurtleKeyboardView extends KeyboardView {
         void onModeKeyLongPress();
     }
 
-    public interface BackspaceLongPressListener {
-        void onBackspaceLongPress();
-    }
-
     private ModeKeyLongPressListener modeKeyLongPressListener;
-    private BackspaceLongPressListener backspaceLongPressListener;
 
     private final Paint facePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint labelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -90,19 +85,11 @@ public class TurtleKeyboardView extends KeyboardView {
         this.modeKeyLongPressListener = l;
     }
 
-    public void setBackspaceLongPressListener(BackspaceLongPressListener l) {
-        this.backspaceLongPressListener = l;
-    }
-
     @Override
     protected boolean onLongPress(Keyboard.Key popupKey) {
         int code = codeOf(popupKey);
         if (code == CODE_MODE && modeKeyLongPressListener != null) {
             modeKeyLongPressListener.onModeKeyLongPress();
-            return true;
-        }
-        if (code == CODE_BACKSPACE && backspaceLongPressListener != null) {
-            backspaceLongPressListener.onBackspaceLongPress();
             return true;
         }
         // Long-press on a letter key with a single popupCharacter commits the alt directly.

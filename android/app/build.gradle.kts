@@ -64,6 +64,12 @@ android {
         dataBinding = true
         buildConfig = true
     }
+
+    testOptions {
+        // Robolectric needs merged resources/assets on the JVM test classpath.
+        unitTests.isIncludeAndroidResources = true
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 // Copy the repo-shared system prompts (../../commands/prompts/) into the app's
@@ -121,7 +127,12 @@ dependencies {
     implementation(libs.firebase.auth)
     implementation(libs.firebase.database)
     implementation(libs.revenuecat.purchases)
+    implementation(libs.ai.edge.aicore)
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.test.core)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
+    androidTestImplementation(libs.test.runner)
+    androidTestImplementation(libs.test.rules)
 }

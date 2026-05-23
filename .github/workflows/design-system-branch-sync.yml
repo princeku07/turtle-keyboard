@@ -1,0 +1,35 @@
+name: Design system · design-tokens branch sync
+
+# Keeps a long-lived `design-tokens` branch fast-forwarded to main so designers
+# have a known target when opening token PRs from the GitHub web UI.
+#
+# Non-destructive: if the branch has diverged (designer has open work), the
+# push is skipped silently — never force-push over in-flight changes.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fast-forward design-tokens to main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git push origin main:design-tokens 2>&1; then
+            echo "design-tokens fast-forwarded to main"
+          else
+            echo "design-tokens has diverged from main — skipping (designers may have work in progress)"
+          fi

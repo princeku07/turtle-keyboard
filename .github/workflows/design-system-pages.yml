@@ -1,0 +1,55 @@
+name: Design system · Pages
+
+# Publishes the design-system preview + raw tokens.json to GitHub Pages on
+# every merge to main so designers have a stable URL for both.
+#
+#   /            -> preview.html (live token gallery)
+#   /tokens.json -> raw W3C tokens for Tokens Studio uploads
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "design-system/preview.html"
+      - "design-system/tokens.json"
+      - "design-system/V1.tokens.json"
+      - ".github/workflows/design-system-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: design-system-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Stage site
+        run: |
+          mkdir -p _site
+          cp design-system/preview.html _site/index.html
+          cp design-system/tokens.json _site/tokens.json
+          cp design-system/V1.tokens.json _site/V1.tokens.json
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

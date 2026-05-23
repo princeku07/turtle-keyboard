@@ -46,7 +46,6 @@ public class CommandPanelView extends LinearLayout {
     private ImageView stagedThumb;
     private TextView stagedClose;
     private TextView uploadButton;
-    private TextView pasteButton;
     private TextView labelView;
 
     private FrameLayout queryWrapper;
@@ -125,25 +124,6 @@ stagedClose.setOnClickListener(v -> {
         LayoutParams upLp = new LayoutParams(dp(32), dp(32));
         upLp.rightMargin = dp(8);
         addView(uploadButton, upLp);
-
-        // Paste goes to the prompt buffer, not the host editor.
-        pasteButton = new TextView(getContext());
-        pasteButton.setVisibility(GONE);
-        pasteButton.setText("📋");
-        pasteButton.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f);
-        pasteButton.setGravity(Gravity.CENTER);
-        pasteButton.setIncludeFontPadding(false);
-        GradientDrawable pasteBg = new GradientDrawable();
-        pasteBg.setShape(GradientDrawable.RECTANGLE);
-        pasteBg.setColor(CHIP_FILL_SUBTLE);
-        pasteBg.setCornerRadius(dp(6));
-        pasteButton.setBackground(pasteBg);
-        pasteButton.setClickable(true);
-        pasteButton.setFocusable(true);
-        pasteButton.setOnClickListener(v -> firePaste());
-        LayoutParams pasteLp = new LayoutParams(dp(32), dp(32));
-        pasteLp.rightMargin = dp(8);
-        addView(pasteButton, pasteLp);
 
         labelView = new TextView(getContext());
         labelView.setTextColor(TEXT_PRIMARY);
@@ -325,7 +305,6 @@ stagedClose.setOnClickListener(v -> {
 
     public void setPasteAvailable(@Nullable String text) {
         this.clipboardText = (text == null || text.isEmpty()) ? null : text;
-        pasteButton.setVisibility(this.clipboardText != null ? VISIBLE : GONE);
     }
 
     public void setStagedImage(@Nullable Bitmap thumb, @Nullable Runnable onClear) {

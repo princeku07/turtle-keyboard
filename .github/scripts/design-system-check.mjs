@@ -3,6 +3,8 @@
 //
 // Hard fails (exit 1):
 //   - design-system/tokens.json fails JSON Schema validation (ajv, draft 2020-12)
+//   - re-importing V1.tokens.json produces a tokens.json that drifts from the
+//     committed one (designer-led Figma export wasn't followed by import-figma.mjs)
 //   - regenerating from tokens.json produces output that drifts from the committed
 //     platform artifacts (Android XML, iOS Swift, landing-app CSS, preview.html)
 //
@@ -19,6 +21,7 @@ const repoRoot = join(__dirname, "..", "..");
 const dsDir = join(repoRoot, "design-system");
 
 const generatedPaths = [
+  "design-system/tokens.json",
   "android/app/src/main/res/values/colors_tokens.xml",
   "android/app/src/main/res/values/dimens_tokens.xml",
   "android/app/src/main/res/values/styles_tokens.xml",
@@ -27,7 +30,10 @@ const generatedPaths = [
   "design-system/preview.html",
 ];
 
-// 1. Schema validate.
+// 1. Re-import V1.tokens.json so tokens.json reflects the latest Figma export.
+execSync("node import-figma.mjs", { cwd: dsDir, stdio: "inherit" });
+
+// 2. Schema validate the (re-imported) tokens.json.
 const schema = JSON.parse(readFileSync(join(dsDir, "tokens.schema.json"), "utf8"));
 const tokens = JSON.parse(readFileSync(join(dsDir, "tokens.json"), "utf8"));
 
@@ -41,17 +47,17 @@ if (!validate(tokens)) {
   process.exit(1);
 }
 
-// 2. Regenerate.
+// 3. Regenerate platform artifacts.
 execSync("node build.mjs", { cwd: dsDir, stdio: "inherit" });
 
-// 3. Drift check — generated files must match what's committed.
+// 4. Drift check — tokens.json + generated files must match what's committed.
 const dirty = execSync(`git status --porcelain ${generatedPaths.join(" ")}`, {
   cwd: repoRoot,
   encoding: "utf8",
 }).trim();
 
 if (dirty) {
-  console.error("design-system: generated output drifted from tokens.json. Run `node design-system/build.mjs` and commit:");
+  console.error("design-system: drift from committed state. Run `node design-system/import-figma.mjs && node design-system/build.mjs` and commit:");
   for (const line of dirty.split("\n")) console.error(`  ${line}`);
   console.error("\nDiff:");
   try {

@@ -5,7 +5,8 @@
   "description": "W3C-Design-Tokens-aligned schema. Leaves carry $value + $type; intermediate keys group tokens.",
   "type": "object",
   "properties": {
-    "$schema": { "type": "string" }
+    "$schema": { "type": "string" },
+    "$description": { "type": "string" }
   },
   "patternProperties": {
     "^(?!\\$)[a-z0-9][a-z0-9-]*$": {
@@ -16,6 +17,9 @@
   "$defs": {
     "group": {
       "type": "object",
+      "properties": {
+        "$description": { "type": "string" }
+      },
       "patternProperties": {
         "^(?!\\$)[a-z0-9][a-z0-9-]*$": {
           "oneOf": [
@@ -64,11 +68,31 @@
                 "type": "object",
                 "required": ["fontFamily", "fontWeight", "fontSize", "lineHeight"],
                 "properties": {
-                  "fontFamily":    { "type": "string" },
-                  "fontWeight":    { "type": ["string", "number"] },
-                  "fontSize":      { "type": ["string", "number"] },
-                  "lineHeight":    { "type": ["string", "number"] },
-                  "letterSpacing": { "type": ["string", "number"] }
+                  "fontFamily": { "type": "string", "minLength": 1 },
+                  "fontWeight": {
+                    "oneOf": [
+                      { "type": "integer", "minimum": 100, "maximum": 900, "multipleOf": 100 },
+                      { "type": "string", "enum": ["thin", "extra-light", "light", "regular", "medium", "semi-bold", "bold", "extra-bold", "black"] }
+                    ]
+                  },
+                  "fontSize": {
+                    "oneOf": [
+                      { "type": "string", "pattern": "^\\d+(\\.\\d+)?(px|pt|rem|em)$" },
+                      { "type": "number", "exclusiveMinimum": 0 }
+                    ]
+                  },
+                  "lineHeight": {
+                    "oneOf": [
+                      { "type": "number", "exclusiveMinimum": 0 },
+                      { "type": "string", "pattern": "^\\d+(\\.\\d+)?(px|em|%)?$" }
+                    ]
+                  },
+                  "letterSpacing": {
+                    "oneOf": [
+                      { "type": "number" },
+                      { "type": "string", "pattern": "^(0|-?\\d+(\\.\\d+)?(px|pt|rem|em|%))$" }
+                    ]
+                  }
                 },
                 "additionalProperties": false
               }

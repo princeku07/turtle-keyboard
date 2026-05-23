@@ -46,6 +46,7 @@ public class GifGridView extends FrameLayout {
     private static final String TAG = "GifGridView";
 
     public interface OnGifPick { void onPick(File file); }
+    public interface OnAddClick { void onAdd(); }
 
     private static final int COLUMNS = 3;
 
@@ -59,6 +60,7 @@ public class GifGridView extends FrameLayout {
     private final LinearLayout emptyState;
     private final GifAdapter adapter;
     @Nullable private OnGifPick pickListener;
+    @Nullable private OnAddClick addListener;
 
     public GifGridView(Context context) {
         this(context, null);
@@ -139,13 +141,17 @@ public class GifGridView extends FrameLayout {
 
     public void setData(List<File> gifs) {
         adapter.setData(gifs == null ? new ArrayList<>() : gifs);
-        boolean empty = adapter.getCount() == 0;
-        grid.setVisibility(empty ? GONE : VISIBLE);
-        emptyState.setVisibility(empty ? VISIBLE : GONE);
+        // The "+" tile is always rendered at position 0, so the grid is never truly empty.
+        grid.setVisibility(VISIBLE);
+        emptyState.setVisibility(GONE);
     }
 
     public void setOnGifPick(@Nullable OnGifPick listener) {
         this.pickListener = listener;
+    }
+
+    public void setOnAddClick(@Nullable OnAddClick listener) {
+        this.addListener = listener;
     }
 
     private int dp(int v) {
@@ -156,17 +162,43 @@ public class GifGridView extends FrameLayout {
     private class GifAdapter extends BaseAdapter {
         private List<File> data = new ArrayList<>();
 
+        // Position 0 is the always-present "+" tile; positions 1..N are GIF files at index p-1.
+        private static final int VIEW_TYPE_ADD = 0;
+        private static final int VIEW_TYPE_GIF = 1;
+
         void setData(List<File> next) {
             this.data = next;
             notifyDataSetChanged();
         }
 
-        @Override public int getCount() { return data.size(); }
-        @Override public Object getItem(int p) { return data.get(p); }
-        @Override public long getItemId(int p) { return data.get(p).getName().hashCode(); }
+        @Override public int getCount() { return data.size() + 1; }
+        @Override public Object getItem(int p) { return p == 0 ? null : data.get(p - 1); }
+        @Override public long getItemId(int p) {
+            return p == 0 ? -1L : data.get(p - 1).getName().hashCode();
+        }
+
+        @Override public int getViewTypeCount() { return 2; }
+        @Override public int getItemViewType(int p) {
+            return p == 0 ? VIEW_TYPE_ADD : VIEW_TYPE_GIF;
+        }
 
         @Override
         public View getView(int position, View convertView, ViewGroup parent) {
+            if (position == 0) {
+                AddTileView add;
+                if (convertView instanceof AddTileView) {
+                    add = (AddTileView) convertView;
+                } else {
+                    add = new AddTileView(getContext());
+                    add.setLayoutParams(new GridView.LayoutParams(
+                            GridView.LayoutParams.MATCH_PARENT, dp(TILE_SIDE_DP)));
+                }
+                add.setOnClickListener(v -> {
+                    v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+                    if (addListener != null) addListener.onAdd();
+                });
+                return add;
+            }
             GifTileView tile;
             if (convertView instanceof GifTileView) {
                 tile = (GifTileView) convertView;
@@ -175,13 +207,51 @@ public class GifGridView extends FrameLayout {
                 tile.setLayoutParams(new GridView.LayoutParams(
                         GridView.LayoutParams.MATCH_PARENT, dp(TILE_SIDE_DP)));
             }
-            final File file = data.get(position);
+            final File file = data.get(position - 1);
             tile.bind(file);
             tile.setOnClickListener(v -> {
                 v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
                 if (pickListener != null) pickListener.onPick(file);
             });
             return tile;
+        }
+    }
+
+    /** Empty "+" placeholder tile rendered at position 0 — same size as a GIF tile,
+     *  faintly outlined to read as a slot waiting to be filled. */
+    private class AddTileView extends FrameLayout {
+        AddTileView(Context ctx) {
+            super(ctx);
+            setClickable(true);
+            setFocusable(true);
+            final int radius = dp(10);
+            setOutlineProvider(new ViewOutlineProvider() {
+                @Override public void getOutline(View view, Outline outline) {
+                    outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), radius);
+                }
+            });
+            setClipToOutline(true);
+            GradientDrawable card = new GradientDrawable();
+            card.setShape(GradientDrawable.RECTANGLE);
+            card.setColor(0x0AFFFFFF);
+            card.setStroke(dp(1), 0x33FFFFFF);
+            card.setCornerRadius(radius);
+            setBackground(card);
+            GradientDrawable rippleMask = new GradientDrawable();
+            rippleMask.setShape(GradientDrawable.RECTANGLE);
+            rippleMask.setColor(Color.WHITE);
+            rippleMask.setCornerRadius(radius);
+            setForeground(new RippleDrawable(
+                    ColorStateList.valueOf(0x33FFFFFF), null, rippleMask));
+
+            TextView plus = new TextView(ctx);
+            plus.setText("+");
+            plus.setTextColor(0xFFF5F5F5);
+            plus.setTextSize(TypedValue.COMPLEX_UNIT_SP, 36f);
+            plus.setIncludeFontPadding(false);
+            plus.setGravity(Gravity.CENTER);
+            addView(plus, new LayoutParams(LayoutParams.MATCH_PARENT,
+                    LayoutParams.MATCH_PARENT));
         }
     }
 
