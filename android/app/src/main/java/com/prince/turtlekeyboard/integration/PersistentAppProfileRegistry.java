@@ -18,26 +18,15 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * App profile + enrollment store. Three layers, queried in order:
- *
- * <ol>
- *   <li><b>Seed</b> — fixed list of well-known apps with display names and tags. Used by
- *       integrations (e.g. Split looks up {@code "payment"} tag). Seeded apps that already
- *       light up an integration are auto-enrolled so the user is never asked to add an
- *       app whose value is already on screen.</li>
- *   <li><b>PackageManager</b> — for any package not in the seed, the device-installed
- *       label fills in the display name. No tags. Lets the registry return a usable
- *       profile for arbitrary apps the user encounters.</li>
- *   <li><b>KeyValueStore (persistent)</b> — per-package enrollment + suppression flags
- *       written by {@link #enroll}/{@link #suppress}.</li>
- * </ol>
+ * App profile + enrollment store. Three layers queried in order: a hardcoded seed of
+ * well-known apps with display names and tags, a {@link PackageManager} fallback for
+ * device-installed labels, and a {@link KeyValueStore}-backed enrollment / suppression
+ * map.
  */
 public final class PersistentAppProfileRegistry implements AppProfileRegistry {
 
     private static final String KEY_ENROLLED       = "app.%s.enrolled";
     private static final String KEY_SUPPRESS       = "app.%s.suppressed";
-    /** CSV indexes kept in lockstep with the per-pkg flags so the IME and the settings
-     *  UI can enumerate without scanning every key. */
     private static final String KEY_ENROLLED_LIST  = "app.enrolled_list";
     private static final String KEY_SUPPRESS_LIST  = "app.suppressed_list";
 
@@ -71,8 +60,6 @@ public final class PersistentAppProfileRegistry implements AppProfileRegistry {
         AppProfile s = seed.get(pkg);
         if (s != null) return s;
 
-        // Fall back to whatever PackageManager can resolve. Tagless profile means
-        // tag-driven integrations (Split's "payment" check) correctly skip.
         String label = resolveLabel(pkg);
         if (label == null) return null;
         return new AppProfile(pkg, label, Collections.emptySet());
@@ -81,8 +68,8 @@ public final class PersistentAppProfileRegistry implements AppProfileRegistry {
     @Override
     public Status statusFor(@Nullable String pkg) {
         if (pkg == null) return Status.UNKNOWN;
-        // Seeded apps with at least one tag are pre-enrolled — Split (or future
-        // tag-driven integrations) is already surfacing value, no need to ask.
+        // Seeded apps with at least one tag are pre-enrolled (a tag-driven integration
+        // is already surfacing value).
         AppProfile seedProfile = seed.get(pkg);
         if (seedProfile != null && !seedProfile.tags.isEmpty()) return Status.ENROLLED;
 
@@ -126,8 +113,7 @@ public final class PersistentAppProfileRegistry implements AppProfileRegistry {
     @Override
     public Set<String> enrolledPackages() {
         Set<String> seeded = new LinkedHashSet<>();
-        // Seeded apps that auto-enroll (currently: payment-tagged) belong here too — the
-        // registration replay should treat them just like user-enrolled apps.
+        // Seeded apps with tags auto-enroll; treat them like user-enrolled apps.
         for (Map.Entry<String, AppProfile> e : seed.entrySet()) {
             if (!e.getValue().tags.isEmpty()) seeded.add(e.getKey());
         }

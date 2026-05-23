@@ -35,7 +35,6 @@ public class ImagePreviewView extends LinearLayout {
         void onCancel();
     }
 
-    // Dark gradient palette — matches CommandPanelView and the voice stage.
     private static final int BG = 0xFF000000;
     private static final int TEXT_PRIMARY = 0xFFF5F5F5;
     private static final int CHIP_FILL = 0x22FFFFFF;
@@ -69,8 +68,6 @@ public class ImagePreviewView extends LinearLayout {
         rp.topMargin = dp(8);
         row.setLayoutParams(rp);
 
-        // Close pill is subtler and a fixed width — the three share types each
-        // get equal weight so they read as a unified action row.
         row.addView(makePill("✕",       v -> { if (listener != null) listener.onCancel(); }, CHIP_FILL_SUBTLE, 0.6f));
         row.addView(makePill("Image",   v -> share(ImageVariants.Type.IMAGE),                 CHIP_FILL,        1f));
         row.addView(makePill("Sticker", v -> share(ImageVariants.Type.STICKER),               CHIP_FILL,        1f));
@@ -83,8 +80,6 @@ public class ImagePreviewView extends LinearLayout {
         if (listener != null) listener.onShare(t);
     }
 
-    /** Translucent-white pill matching the dark gradient design. No outline, no
-     *  offset shadow — soft edges only. */
     private TextView makePill(String label, View.OnClickListener onClick, int fill, float weight) {
         TextView b = new TextView(getContext());
         b.setText(label);
@@ -111,13 +106,9 @@ public class ImagePreviewView extends LinearLayout {
 
     public boolean show(File file, Listener l) {
         this.listener = l;
-        // Release any previous preview's bitmap before decoding a new one — show() can
-        // be called again without an intervening hide() if the user dispatches a second
-        // image command while the preview is still up.
+        // show() may be re-entered without hide() if a second command races a preview.
         recycleCurrent();
-        // Subsample on decode so the preview's ImageView (≤ display width × 180dp tall)
-        // doesn't pull a full-res bitmap onto the heap. Even with /cap's 512px outputs
-        // this saves a redundant decode pass after the gen-time peak.
+        // Subsample so the preview doesn't pull the full-res bitmap onto the heap.
         String path = file.getAbsolutePath();
         int targetPx = Math.max(1, getResources().getDisplayMetrics().widthPixels);
         BitmapFactory.Options bounds = new BitmapFactory.Options();
@@ -166,7 +157,7 @@ public class ImagePreviewView extends LinearLayout {
     }
 
     public void applyTheme(KeyboardTheme theme) {
-        // Surface and chip colours fixed by the dark gradient design.
+        // No-op; chrome is fixed by the dark gradient design.
     }
 
     private int dp(int v) {

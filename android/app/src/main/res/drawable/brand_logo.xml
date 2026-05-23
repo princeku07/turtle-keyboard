@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Turtle brand mark: 3x2 dot grid + gradient slash. Drawn in a 192x192 viewport
+     to fit Android 12+ SplashScreen safe-zone (no clipping on circular masks).
+     VectorDrawable so it scales density-free with zero bitmap cost. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="192dp"
+    android:height="192dp"
+    android:viewportWidth="192"
+    android:viewportHeight="192">
+
+    <!-- Dot grid: cols at x=56,80 ; rows at y=68,92,116 ; radius 7. -->
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M56,68 m-7,0 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0" />
+    <path android:fillColor="#FFD9CBA0"
+        android:pathData="M80,68 m-7,0 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0" />
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M56,92 m-7,0 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0" />
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M80,92 m-7,0 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0" />
+    <path android:fillColor="#FFD9CBA0"
+        android:pathData="M56,116 m-7,0 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0" />
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M80,116 m-7,0 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0" />
+
+    <!-- Slash: thick rounded stroke, top-right to bottom-left, white→deep-green
+         vertical gradient. The gradient simulates the wet highlight in the brand
+         art without alpha so it renders solidly on the splash background. -->
+    <path
+        android:pathData="M126,56 L106,128"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="14">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="116"
+                android:startY="56"
+                android:endX="116"
+                android:endY="128"
+                android:type="linear">
+                <item android:color="#FFFFFFFF" android:offset="0.0" />
+                <item android:color="#FFB6D8C4" android:offset="0.55" />
+                <item android:color="#FF0E5C2C" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+</vector>

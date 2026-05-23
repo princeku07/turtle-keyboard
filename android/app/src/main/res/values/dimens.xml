@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Spacing scale is generated into dimens_tokens.xml by design-system/build.mjs.
+         Edit tokens.json, regenerate. -->
+
+    <!-- Screen edge padding. Used as the leading/trailing inset on the root scroll
+         column of every full-screen layout. Top bars use space_md for tighter optics. -->
+    <dimen name="screen_margin">20dp</dimen>
+    <dimen name="topbar_margin">14dp</dimen>
+
+    <!-- ===== Radius scale ===== -->
+    <dimen name="radius_card">16dp</dimen>
+    <dimen name="radius_button">12dp</dimen>
+    <dimen name="radius_input">12dp</dimen>
+    <dimen name="radius_chip">999dp</dimen>
+
+    <!-- ===== Sizes ===== -->
+    <dimen name="size_icon_sm">16dp</dimen>
+    <dimen name="size_icon">22dp</dimen>
+    <dimen name="size_icon_lg">28dp</dimen>
+    <dimen name="size_avatar">40dp</dimen>
+    <dimen name="size_topbar_btn">40dp</dimen>
+    <dimen name="size_status_dot">10dp</dimen>
+    <dimen name="size_button_min_h">52dp</dimen>
+    <dimen name="size_button_h_cta">56dp</dimen>
+
+    <!-- ===== Border weights ===== -->
+    <dimen name="border_hairline">1dp</dimen>
+
+    <!-- ===== Type sizes (when not driven by TextAppearance) ===== -->
+    <dimen name="text_display">28sp</dimen>
+    <dimen name="text_hero">36sp</dimen>
+    <dimen name="text_title">17sp</dimen>
+    <dimen name="text_body">15sp</dimen>
+    <dimen name="text_sub">13sp</dimen>
+    <dimen name="text_caption">11sp</dimen>
+    <dimen name="text_mono">14sp</dimen>
+</resources>

@@ -1,9 +1,6 @@
 package com.prince.turtlekeyboard.gesture;
 
-/**
- * Encapsulates space-bar gestures. Currently: double-tap-space → Quick Panel (PRD §6.6).
- * The host wires the listener to a Quick Panel toggler.
- */
+/** Encapsulates space-bar gestures; currently double-tap-space → Quick Panel. */
 public class SpaceGestureHandler {
 
     public interface Listener {

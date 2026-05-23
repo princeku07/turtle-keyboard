@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Drill-in card with ripple. Use on rows the user taps to navigate. -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="@color/green_glow">
+    <item android:id="@android:id/mask">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/white" />
+            <corners android:radius="16dp" />
+        </shape>
+    </item>
+    <item>
+        <selector>
+            <item android:state_pressed="true" android:drawable="@drawable/bg_card_pressed" />
+            <item android:drawable="@drawable/bg_card_dark" />
+        </selector>
+    </item>
+</ripple>

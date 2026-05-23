@@ -17,17 +17,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Thin REST wrapper for the two Notion endpoints this module needs:
- * <ul>
- *   <li>{@code POST /v1/search} — fetch granted top-level pages so the user can pick a
- *       default parent during connect.</li>
- *   <li>{@code POST /v1/pages} — create a child page under the chosen parent. The body
- *       is built from the structured output of {@link NotionLlmBridge}.</li>
- * </ul>
- *
- * <p>All calls run on a single-threaded background executor so the IME thread is never
- * blocked. Callbacks are invoked off the main thread — call sites that touch UI must
- * post to a Handler themselves.
+ * Thin REST wrapper for the Notion endpoints this module uses: {@code /v1/search} and
+ * {@code /v1/pages}. All calls run on a background executor; callbacks fire off the
+ * main thread.
  */
 public final class NotionClient {
 
@@ -160,7 +152,6 @@ public final class NotionClient {
     private static String extractTitle(JSONObject page) {
         JSONObject props = page.optJSONObject("properties");
         if (props == null) return null;
-        // Walk properties to find the one whose type is "title".
         java.util.Iterator<String> keys = props.keys();
         while (keys.hasNext()) {
             JSONObject p = props.optJSONObject(keys.next());
@@ -178,7 +169,7 @@ public final class NotionClient {
         return null;
     }
 
-    /** Build a Notion {@code rich_text} object wrapping plain text. */
+    /** Build a Notion {@code rich_text} text segment for {@code text}. */
     static JSONObject textObject(String text) {
         try {
             return new JSONObject()

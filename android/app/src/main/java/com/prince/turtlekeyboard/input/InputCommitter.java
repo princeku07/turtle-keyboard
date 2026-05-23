@@ -5,9 +5,8 @@ import android.view.KeyEvent;
 import android.view.inputmethod.InputConnection;
 
 /**
- * Thin wrapper over the active {@link InputConnection}. The keyboard service rebinds the
- * underlying connection on every input session, so callers should grab the current one via
- * {@link #connection()} on each use rather than holding a reference.
+ * Thin wrapper over the active {@link InputConnection}. Callers grab the current
+ * connection via {@link #connection()} on each use, since the IME rebinds per session.
  */
 public class InputCommitter {
 
@@ -74,10 +73,7 @@ public class InputCommitter {
         if (ic != null) ic.deleteSurroundingText(n, 0);
     }
 
-    /**
-     * Delete one "word" before the cursor: first eat trailing whitespace, then eat
-     * back to the next whitespace boundary. Mirrors the Gboard / iOS behavior.
-     */
+    /** Delete one word before the cursor: trailing whitespace, then back to the next whitespace. */
     public void deleteWord() {
         InputConnection ic = connection();
         if (ic == null) return;
@@ -91,10 +87,8 @@ public class InputCommitter {
     }
 
     /**
-     * Delete one "sentence" before the cursor: eat trailing whitespace, then back to
-     * the last sentence-ending punctuation (. ! ?) or a hard line break. If none is
-     * found within the lookback window, deletes everything before the cursor (within
-     * that window).
+     * Delete one sentence before the cursor: trailing whitespace, then back to the last
+     * sentence-ending punctuation or line break (or the lookback boundary).
      */
     public void deleteSentence() {
         InputConnection ic = connection();
@@ -113,12 +107,8 @@ public class InputCommitter {
     }
 
     /**
-     * Delete every character on both sides of the cursor. We previously used
-     * {@code performContextMenuAction(selectAll)} + {@code commitText("")}, but that
-     * pairing is async in some editors: the select-all hadn't applied yet when the
-     * follow-up commitText ran, leaving the field in an all-selected state — the
-     * next typed character would replace the still-selected text and read as
-     * characters "being deleted." Explicit deletion sidesteps that race.
+     * Delete every character on both sides of the cursor. Uses explicit deletion
+     * because {@code performContextMenuAction(selectAll)} + commitText races in some editors.
      */
     public void clearAll() {
         InputConnection ic = connection();

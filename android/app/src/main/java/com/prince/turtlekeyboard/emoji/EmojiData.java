@@ -1,24 +1,11 @@
 package com.prince.turtlekeyboard.emoji;
 
-/**
- * Static catalog of emoji codepoints grouped by category, in Gboard-style display
- * order. Each entry is the literal emoji string — EmojiCompat handles font fallback
- * so the same byte sequence renders consistently on Android 7+.
- *
- * <p>This is a curated subset of the Unicode emoji set, not exhaustive. Picks favour
- * commonly used emojis so the panel feels fast to scan; adding more is a one-line
- * append.
- */
+/** Static catalog of emoji codepoints grouped by category, in Gboard-style display order. */
 public final class EmojiData {
 
     public enum Category {
         RECENT("Recent", "🕘"),
-        // GIFS is data-less from this class's perspective — its grid is
-        // sourced from ImageHistory at runtime by EmojiPanelView, not from
-        // the static Unicode arrays below. The category exists here only so
-        // it shows up in the tab strip alongside the emoji categories.
-        // tabIsText=true makes EmojiPanelView's TabView style it as a small
-        // bold text chip ("GIF") instead of a full-size emoji glyph.
+        // GIFS is data-less here; EmojiPanelView sources its grid from ImageHistory at runtime.
         GIFS("GIFs", "GIF", true),
         SMILEYS("Smileys", "😀"),
         PEOPLE("People", "👋"),
@@ -32,8 +19,7 @@ public final class EmojiData {
 
         public final String title;
         public final String tabGlyph;
-        /** When true, the tab strip renders {@link #tabGlyph} as a text
-         *  chip (smaller font, bold) rather than as an emoji glyph. */
+        /** When true, the tab strip renders {@link #tabGlyph} as a bold text chip. */
         public final boolean tabIsText;
 
         Category(String title, String tabGlyph) {

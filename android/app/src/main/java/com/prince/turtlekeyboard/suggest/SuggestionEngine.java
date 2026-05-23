@@ -22,18 +22,12 @@ import java.util.Locale;
 /**
  * Facade over the vendored SymSpell engine and the per-user word store.
  *
- * Lifecycle:
- *   1. Construct once (e.g. in InputMethodService.onCreate).
- *   2. Call {@link #loadAsync(Context)} — kicks off background dictionary load.
- *   3. Call {@link #suggest(String, int)} from the IME's text path. It returns
- *      an empty list until {@link #isReady()} is true; safe to poll.
- *   4. Call {@link #learn(String)} when a word is committed (space/punctuation).
+ * <p>Lifecycle: construct once, call {@link #loadAsync(Context)} to start
+ * background load, call {@link #suggest(String, int)} from the IME text path
+ * (returns empty until {@link #isReady()}), and {@link #learn(String)} on each
+ * committed word.
  *
- * Privacy: this class is read-only against the network — there is intentionally
- * no HTTP / file-IO surface beyond reading the bundled asset and the private
- * SharedPreferences for {@link UserWordStore}. The PRD's "no logging of
- * non-slash text" invariant applies — none of the methods here log word
- * contents.
+ * <p>Does not touch the network and does not log word contents.
  */
 public final class SuggestionEngine {
 
@@ -41,20 +35,19 @@ public final class SuggestionEngine {
     private static final String DICT_ASSET = "dict/en_unigrams.txt";
 
     private static final int INITIAL_CAPACITY = 82_000;
-    private static final int MAX_EDIT_DISTANCE = 2;
+    /** Distance 1 only — distance 2 over 82k words OOMs against the 256MB IME heap. */
+    private static final int MAX_EDIT_DISTANCE = 1;
     private static final int PREFIX_LENGTH = 7;
     private static final int COUNT_THRESHOLD = 1;
-    private static final int LOOKUP_DISTANCE = 2;
+    private static final int LOOKUP_DISTANCE = 1;
 
     private final UserWordStore userStore;
     private volatile SymSpell symSpell;
-    /** Dictionary words sorted by frequency descending — backs prefix completion. */
+    /** Dictionary words sorted by frequency descending, used for prefix completion. */
     private volatile String[] sortedWords;
     private volatile boolean ready;
     private volatile boolean loading;
-    /** Fired exactly once after the bundled dictionary finishes loading. The
-     *  IME uses this to repaint the suggestion strip — without it, the strip
-     *  stays empty until the next keystroke even after the engine is ready. */
+    /** Fired once when the bundled dictionary finishes loading. */
     private volatile Runnable onReadyListener;
 
     public SuggestionEngine(Context ctx) {
@@ -66,19 +59,16 @@ public final class SuggestionEngine {
     }
 
     /**
-     * Sets a listener fired when the bundled dictionary becomes ready. If the
-     * engine is already ready when this is called, the listener fires
-     * synchronously. Replaces any previously set listener.
-     *
-     * The listener fires on the load thread — callers that need main-thread
-     * work should post via a Handler.
+     * Sets a listener fired when the dictionary becomes ready. Fires synchronously
+     * if already ready. Replaces any previously set listener. Fires on the load
+     * thread; post to the main thread before touching views.
      */
     public void setOnReadyListener(Runnable listener) {
         this.onReadyListener = listener;
         if (ready && listener != null) listener.run();
     }
 
-    /** Idempotent. Returns immediately; load happens on a background thread. */
+    /** Idempotent. Returns immediately; load runs on a background thread. */
     public void loadAsync(Context ctx) {
         if (ready || loading) return;
         loading = true;
@@ -86,11 +76,8 @@ public final class SuggestionEngine {
         Thread t = new Thread(() -> {
             long t0 = SystemClock.elapsedRealtime();
             try {
-                // Phase 1 — frequency-sorted word list for prefix completion.
-                // Fast (~150–250 ms), and this is the primary suggestion source
-                // for normal typing. Ship it first so the strip populates almost
-                // immediately on cold IME launch instead of waiting on the much
-                // slower SymSpell index build.
+                // Phase 1: prefix completion ships first so the strip populates
+                // before the slower SymSpell index finishes.
                 sortedWords = loadSortedWords(appCtx);
                 ready = true;
                 Log.i(TAG, "prefix completion ready in "
@@ -98,18 +85,22 @@ public final class SuggestionEngine {
                 Runnable cb = onReadyListener;
                 if (cb != null) cb.run();
 
-                // Phase 2 — SymSpell edit-distance index. Slow (~1–3 s) but
-                // only a typo-correction fallback; suggest() works without it
-                // and folds it in once non-null.
-                SymSpell s = new SymSpell(
-                        INITIAL_CAPACITY, MAX_EDIT_DISTANCE,
-                        PREFIX_LENGTH, COUNT_THRESHOLD);
-                try (InputStream in = appCtx.getAssets().open(DICT_ASSET)) {
-                    s.loadDictionary(in, 0, 1);
+                // Phase 2: SymSpell edit-distance index. OOM here degrades to
+                // prefix-only instead of killing the IME.
+                try {
+                    SymSpell s = new SymSpell(
+                            INITIAL_CAPACITY, MAX_EDIT_DISTANCE,
+                            PREFIX_LENGTH, COUNT_THRESHOLD);
+                    try (InputStream in = appCtx.getAssets().open(DICT_ASSET)) {
+                        s.loadDictionary(in, 0, 1);
+                    }
+                    symSpell = s;
+                    Log.i(TAG, "symspell ready in "
+                            + (SystemClock.elapsedRealtime() - t0) + "ms");
+                } catch (OutOfMemoryError oom) {
+                    symSpell = null;
+                    Log.w(TAG, "symspell build OOM — falling back to prefix-only", oom);
                 }
-                symSpell = s;
-                Log.i(TAG, "symspell ready in "
-                        + (SystemClock.elapsedRealtime() - t0) + "ms");
             } catch (IOException e) {
                 Log.e(TAG, "dictionary load failed", e);
             } finally {
@@ -121,13 +112,9 @@ public final class SuggestionEngine {
     }
 
     /**
-     * Top suggestions for {@code prefix}, in priority order:
-     *   1. user vocabulary (words the user has typed before, by personal frequency)
-     *   2. dictionary prefix completion (predictive — by global frequency)
-     *   3. SymSpell edit-distance corrections (fallback for typos)
-     *
-     * Deduped and capped at {@code max}. Returns lowercase strings — the caller
-     * restores case to match the active shift state when committing.
+     * Top suggestions for {@code prefix}, in priority order: user vocabulary,
+     * dictionary prefix completion, then SymSpell typo corrections. Deduped and
+     * capped at {@code max}. Returns lowercase; the caller restores case.
      */
     public List<String> suggest(String prefix, int max) {
         if (prefix == null || prefix.isEmpty() || max <= 0) {
@@ -168,12 +155,7 @@ public final class SuggestionEngine {
         return new ArrayList<>(out);
     }
 
-    /**
-     * Walks the frequency-sorted dictionary collecting up to {@code max} words
-     * that start with {@code prefix}. Linear scan, but the array is ordered by
-     * frequency so common prefixes find their hits in the first few hundred
-     * entries; rare prefixes worst-case scan all 82k words (~1–2 ms on device).
-     */
+    /** Linear scan of the frequency-sorted dictionary for entries starting with {@code prefix}. */
     private List<String> prefixComplete(String prefix, int max) {
         String[] dict = sortedWords;
         if (dict == null || prefix.isEmpty() || max <= 0) {
@@ -189,15 +171,9 @@ public final class SuggestionEngine {
         return out;
     }
 
-    /**
-     * Parses the bundled dictionary a second time and returns the words sorted
-     * by frequency descending. We could share storage with SymSpell, but its
-     * internal {@code words} map is private and we'd rather not patch the
-     * vendored source for this.
-     */
+    /** Returns the bundled dictionary words sorted by frequency descending. */
     private static String[] loadSortedWords(Context appCtx) throws IOException {
-        // Each line is "<word><space><frequency>". Build a parallel words/freqs
-        // pair so we can sort by freq without boxing into wrapper objects.
+        // Each line is "<word><space><frequency>".
         ArrayList<String> words = new ArrayList<>(82_000);
         ArrayList<Long> freqs = new ArrayList<>(82_000);
         try (BufferedReader br = new BufferedReader(new InputStreamReader(
@@ -216,7 +192,6 @@ public final class SuggestionEngine {
                 freqs.add(freq);
             }
         }
-        // Sort indices by freq desc, then materialize the word array.
         Integer[] idx = new Integer[words.size()];
         for (int i = 0; i < idx.length; i++) idx[i] = i;
         Arrays.sort(idx, (a, b) -> Long.compare(freqs.get(b), freqs.get(a)));
@@ -227,8 +202,8 @@ public final class SuggestionEngine {
 
     /**
      * Record a committed word so personal vocabulary accrues over time.
-     * Filters out tokens that are not pure alpha (hyphen and apostrophe ok),
-     * so URLs, numbers, slash commands, and emoji are skipped.
+     * Skips non-alpha tokens (URLs, numbers, slash commands, emoji); hyphen and
+     * apostrophe are allowed.
      */
     public void learn(String word) {
         if (word == null) return;
@@ -241,7 +216,7 @@ public final class SuggestionEngine {
         userStore.bump(w);
     }
 
-    /** Wipes personal vocabulary. Bundled dictionary is unaffected. */
+    /** Wipes personal vocabulary; the bundled dictionary is unaffected. */
     public void resetUserVocabulary() {
         userStore.clear();
     }

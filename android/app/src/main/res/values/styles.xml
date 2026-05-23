@@ -1,81 +1,185 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- ============================================================
+         Turtle host design system.
 
-    <!-- Section header in all-caps used at the top of each card row group. -->
-    <style name="TextSectionLabel">
-        <item name="android:textSize">12sp</item>
-        <item name="android:textColor">@color/muted</item>
-        <item name="android:textAllCaps">true</item>
-        <item name="android:letterSpacing">0.08</item>
-        <item name="android:fontFamily">sans-serif-medium</item>
-        <item name="android:paddingTop">4dp</item>
-        <item name="android:paddingBottom">8dp</item>
-    </style>
+         Naming convention:
+           Text*    text appearance / role
+           Button*  CTA backgrounds + sizing
+           Card*    surface containers
+           Chip*    pill / inline tag
+           Section* group headers
+
+         Aliases at the bottom of each section preserve older names used by
+         the MCP screens and external modules so we never have to touch
+         those files when iterating on the system.
+         ============================================================ -->
+
+    <!-- =================== Typography =================== -->
 
     <style name="TextHero">
-        <item name="android:textSize">32sp</item>
-        <item name="android:textColor">@color/ink</item>
+        <item name="android:textSize">36sp</item>
+        <item name="android:textColor">@color/text_primary</item>
         <item name="android:textStyle">bold</item>
         <item name="android:fontFamily">sans-serif-black</item>
+        <item name="android:lineSpacingMultiplier">1.05</item>
+    </style>
+
+    <style name="TextDisplay">
+        <item name="android:textSize">@dimen/text_display</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:fontFamily">sans-serif-black</item>
+        <item name="android:lineSpacingMultiplier">1.1</item>
     </style>
 
     <style name="TextSubhero">
-        <item name="android:textSize">14sp</item>
-        <item name="android:textColor">@color/muted</item>
-        <item name="android:lineSpacingMultiplier">1.3</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:textColor">@color/text_secondary</item>
+        <item name="android:lineSpacingMultiplier">1.4</item>
+    </style>
+
+    <style name="TextTitle">
+        <item name="android:textSize">@dimen/text_title</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
     </style>
 
     <style name="TextBody">
-        <item name="android:textSize">15sp</item>
-        <item name="android:textColor">@color/ink</item>
+        <item name="android:textSize">@dimen/text_body</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:lineSpacingMultiplier">1.35</item>
     </style>
 
     <style name="TextBodyMuted">
-        <item name="android:textSize">13sp</item>
-        <item name="android:textColor">@color/muted</item>
-        <item name="android:lineSpacingMultiplier">1.3</item>
+        <item name="android:textSize">@dimen/text_sub</item>
+        <item name="android:textColor">@color/text_secondary</item>
+        <item name="android:lineSpacingMultiplier">1.4</item>
     </style>
 
-    <!-- Big primary CTA. Lime fill, ink shadow + border, ink text. -->
-    <style name="ButtonBrutalPrimary" parent="@android:style/Widget.Button">
+    <style name="TextCaption">
+        <item name="android:textSize">12sp</item>
+        <item name="android:textColor">@color/text_tertiary</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:letterSpacing">0.04</item>
+    </style>
+
+    <style name="SectionHeader">
+        <item name="android:textSize">@dimen/text_caption</item>
+        <item name="android:textColor">@color/text_tertiary</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:letterSpacing">0.14</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:paddingTop">@dimen/space_xs</item>
+        <item name="android:paddingBottom">@dimen/space_sm</item>
+    </style>
+    <!-- Alias — older screens reference this name. -->
+    <style name="TextSectionLabel" parent="SectionHeader" />
+
+    <style name="TextMono">
+        <item name="android:textSize">@dimen/text_mono</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:fontFamily">monospace</item>
+    </style>
+
+    <style name="TextMonoGreen" parent="TextMono">
+        <item name="android:textColor">@color/green</item>
+    </style>
+
+    <!-- Used for slash-command headlines on drill-in cards. -->
+    <style name="TextCommandLarge">
+        <item name="android:textSize">20sp</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:fontFamily">monospace</item>
+    </style>
+
+    <!-- =================== Buttons =================== -->
+
+    <style name="ButtonPrimary" parent="@android:style/Widget.Button">
         <item name="android:background">@drawable/bg_btn_primary</item>
-        <item name="android:textColor">@color/ink</item>
+        <item name="android:textColor">@color/text_on_green</item>
         <item name="android:textStyle">bold</item>
         <item name="android:textAllCaps">false</item>
         <item name="android:textSize">15sp</item>
-        <item name="android:paddingTop">14dp</item>
-        <item name="android:paddingBottom">14dp</item>
-        <item name="android:paddingLeft">20dp</item>
-        <item name="android:paddingRight">20dp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:minHeight">@dimen/size_button_min_h</item>
+        <item name="android:paddingTop">@dimen/space_md</item>
+        <item name="android:paddingBottom">@dimen/space_md</item>
+        <item name="android:paddingStart">@dimen/space_xl</item>
+        <item name="android:paddingEnd">@dimen/space_xl</item>
         <item name="android:stateListAnimator">@null</item>
         <item name="android:elevation">0dp</item>
-        <item name="android:layout_marginRight">4dp</item>
-        <item name="android:layout_marginBottom">4dp</item>
     </style>
 
-    <style name="ButtonBrutalSecondary" parent="ButtonBrutalPrimary">
+    <style name="ButtonSecondary" parent="ButtonPrimary">
         <item name="android:background">@drawable/bg_btn_secondary</item>
+        <item name="android:textColor">@color/text_primary</item>
     </style>
 
-    <style name="ButtonBrutalAccent" parent="ButtonBrutalPrimary">
+    <style name="ButtonAccent" parent="ButtonPrimary">
         <item name="android:background">@drawable/bg_btn_accent</item>
-        <item name="android:textColor">@color/ink</item>
+        <item name="android:textColor">@color/text_on_green</item>
     </style>
 
-    <!-- Card container — outline + offset shadow. Use as background on a LinearLayout
-         and reserve 4dp right+bottom margin so the shadow fits without clipping. -->
-    <style name="CardBrutal">
-        <item name="android:background">@drawable/bg_card_brutal</item>
-        <item name="android:padding">16dp</item>
-        <item name="android:layout_marginRight">4dp</item>
-        <item name="android:layout_marginBottom">12dp</item>
+    <!-- Aliases — older screens. -->
+    <style name="ButtonBrutalPrimary" parent="ButtonPrimary" />
+    <style name="ButtonBrutalSecondary" parent="ButtonSecondary" />
+    <style name="ButtonBrutalAccent" parent="ButtonAccent" />
+
+    <!-- =================== Cards =================== -->
+
+    <style name="Card">
+        <item name="android:background">@drawable/bg_card_dark</item>
+        <item name="android:padding">@dimen/space_xl</item>
+        <item name="android:layout_marginBottom">@dimen/space_md</item>
     </style>
 
-    <style name="EditTextBrutal" parent="@android:style/Widget.EditText">
+    <style name="CardClickable" parent="Card">
+        <item name="android:background">@drawable/bg_card_clickable</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+    </style>
+
+    <!-- Hero status card — uses a green-tinted accent border to read as a
+         distinct surface vs the neutral drill-in cards. -->
+    <style name="CardHero" parent="Card">
+        <item name="android:background">@drawable/bg_card_hero</item>
+        <item name="android:padding">@dimen/space_xl</item>
+        <item name="android:layout_marginBottom">@dimen/space_lg</item>
+    </style>
+
+    <!-- Alias — older brutalist name. -->
+    <style name="CardBrutal" parent="Card" />
+
+    <!-- =================== Inputs =================== -->
+
+    <style name="EditTextDark" parent="@android:style/Widget.EditText">
         <item name="android:background">@drawable/bg_input_brutal</item>
-        <item name="android:textColor">@color/ink</item>
-        <item name="android:textColorHint">@color/muted</item>
-        <item name="android:padding">14dp</item>
-        <item name="android:textSize">15sp</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textColorHint">@color/text_tertiary</item>
+        <item name="android:padding">@dimen/space_md</item>
+        <item name="android:textSize">@dimen/text_body</item>
+    </style>
+
+    <style name="EditTextBrutal" parent="EditTextDark" />
+
+    <!-- =================== Chips =================== -->
+
+    <style name="ChipMono">
+        <item name="android:background">@drawable/bg_chip_mono</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:fontFamily">monospace</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:paddingStart">@dimen/space_md</item>
+        <item name="android:paddingEnd">@dimen/space_md</item>
+        <item name="android:paddingTop">@dimen/space_xs</item>
+        <item name="android:paddingBottom">@dimen/space_xs</item>
+        <item name="android:singleLine">true</item>
+    </style>
+
+    <style name="ChipMonoGreen" parent="ChipMono">
+        <item name="android:background">@drawable/bg_chip_green</item>
+        <item name="android:textColor">@color/green</item>
     </style>
 </resources>

@@ -4,15 +4,11 @@ import android.content.Context;
 import android.content.SharedPreferences;
 
 /**
- * The only {@link KeyValueStore} adapter in the system. Backed by {@link SharedPreferences};
- * keeps namespacing in-process (no separate prefs file per module) so we don't fan out
- * disk I/O. The scoped views are zero-allocation light: they hold the parent {@link
- * SharedPreferences} and a string prefix.
+ * {@link SharedPreferences}-backed {@link KeyValueStore} adapter. Namespacing is
+ * in-process via a key prefix — one prefs file backs the entire app and all modules.
  */
 public final class SharedPrefsKeyValueStore implements KeyValueStore {
 
-    /** SharedPreferences file every module reads/writes through. Single file keeps the
-     *  on-disk format predictable and lets one xml back the entire app + all modules. */
     public static final String DEFAULT_FILE = "turtle_prefs";
 
     private final SharedPreferences sp;

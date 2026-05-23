@@ -11,6 +11,8 @@ zxingCore = "3.5.3"
 browser = "1.8.0"
 emoji2 = "1.5.0"
 transition = "1.4.1"
+viewpager2 = "1.1.0"
+coreSplashscreen = "1.0.1"
 googleServices = "4.4.2"
 firebaseBom = "33.7.0"
 revenuecat = "8.10.0"
@@ -28,6 +30,8 @@ browser = { group = "androidx.browser", name = "browser", version.ref = "browser
 emoji2 = { group = "androidx.emoji2", name = "emoji2", version.ref = "emoji2" }
 emoji2-views-helper = { group = "androidx.emoji2", name = "emoji2-views-helper", version.ref = "emoji2" }
 transition = { group = "androidx.transition", name = "transition", version.ref = "transition" }
+viewpager2 = { group = "androidx.viewpager2", name = "viewpager2", version.ref = "viewpager2" }
+core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "coreSplashscreen" }
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
 firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore" }
 firebase-auth = { group = "com.google.firebase", name = "firebase-auth" }

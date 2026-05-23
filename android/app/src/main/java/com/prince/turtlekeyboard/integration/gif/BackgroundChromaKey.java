@@ -4,23 +4,10 @@ import android.graphics.Bitmap;
 import android.util.Log;
 
 /**
- * Replaces a uniform solid-color sprite-sheet background with full transparency
- * (alpha=0) so the downstream GIF encoder can render the subject against the
- * player's background.
- *
- * <p>Strategy: sample the four sheet corners. If they're all opaque and at least
- * three share the same RGB, treat that color as the sheet's background and
- * rewrite every matching pixel to transparent. If corners disagree — e.g. the
- * subject extends to a corner — the bitmap is returned unchanged. Conservative
- * on purpose; a wrong key would punch holes in the subject.
- *
- * <p>Used by:
- * <ul>
- *   <li>{@link GifIntegration} as the fallback when the difference-matte pass
- *       can't run.</li>
- *   <li>{@code SpriteToGifTestActivity} on the bundled green-screen test sheet
- *       and on any user-picked sheet.</li>
- * </ul>
+ * Replaces a uniform solid-color sprite-sheet background with full transparency by
+ * sampling the four corners and rewriting every matching pixel to alpha=0. Requires
+ * three of four corners to agree on the same RGB; otherwise the bitmap is returned
+ * unchanged so the subject is never accidentally punched through.
  */
 public final class BackgroundChromaKey {
 
@@ -39,13 +26,10 @@ public final class BackgroundChromaKey {
                 sheet.getPixel(0, h - 1),
                 sheet.getPixel(w - 1, h - 1)
         };
-        // All four corners must be opaque (model gave us a solid bg, not the
-        // intended transparent output). If any corner already has low alpha,
-        // assume the source did honor transparency — leave the bitmap alone.
+        // If any corner already has low alpha, assume the source honored transparency.
         for (int c : corners) {
             if (((c >>> 24) & 0xff) < 250) return sheet;
         }
-        // Pick the most-common corner RGB. Need ≥ 3 agreement to commit.
         int target = corners[0] & 0xFFFFFF;
         int matches = countMatches(corners, target);
         if (matches < 3) {
@@ -77,19 +61,11 @@ public final class BackgroundChromaKey {
         return n;
     }
 
-    /** Deterministic single-color mask. Sweeps every opaque pixel; any pixel
-     *  within Euclidean RGB distance ≤ {@code tolerance} of {@code targetRgb}
-     *  is replaced with alpha=0. Used by {@code /gif} where the system prompt
-     *  locks the model's background to a specific known color — there's no
-     *  need to detect it via corner sampling, and a fixed target catches
-     *  anti-aliasing artifacts that exact-match {@link #apply} would miss.
-     *
-     *  @param sheet       source bitmap; recycled if a new ARGB_8888 result is built
-     *  @param targetRgb   24-bit RGB (no alpha channel), e.g. {@code 0xFFFFFF} for white
-     *  @param tolerance   Euclidean RGB distance (0 = exact match; 10 catches mild
-     *                     anti-aliasing; 30+ risks eating subject highlights)
-     *  @return new ARGB_8888 bitmap with matching pixels keyed transparent, or the
-     *          input bitmap unchanged when no pixels matched (input recycled either way) */
+    /**
+     * Single-color mask. Replaces every opaque pixel within Euclidean RGB distance
+     * ≤ {@code tolerance} of {@code targetRgb} with alpha=0. Used when the system
+     * prompt locks the background to a known color.
+     */
     public static Bitmap applyForColor(Bitmap sheet, int targetRgb, int tolerance) {
         int w = sheet.getWidth();
         int h = sheet.getHeight();
@@ -104,7 +80,7 @@ public final class BackgroundChromaKey {
         for (int i = 0; i < pixels.length; i++) {
             int p = pixels[i];
             int alpha = (p >>> 24) & 0xff;
-            if (alpha < 250) continue; // already (semi-)transparent — leave alone
+            if (alpha < 250) continue; // already (semi-)transparent
             int dr = ((p >> 16) & 0xff) - tr;
             int dg = ((p >>  8) & 0xff) - tg;
             int db = ( p        & 0xff) - tb;

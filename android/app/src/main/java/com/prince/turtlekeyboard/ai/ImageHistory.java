@@ -13,20 +13,9 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Append-only on-disk log of generated media. Each entry is a
- * {@code <ts>.<ext>} in {@code filesDir/history/} with a sidecar
- * {@code <ts>.txt} holding {@code command\nprompt}. Sidecar files keep the
- * format readable from a shell and avoid bringing in a JSON dependency just
- * for two fields.
- *
- * <p>Extensions tracked today: {@code .png} for still images ({@code /cap},
- * {@code /edit}, {@code /style}, {@code /sticker}, plus the {@code /gif}
- * sprite-sheet debug artifact) and {@code .gif} for animated outputs
- * ({@code /gif}, {@code /gift}). The list call returns all of them in one
- * pass, newest first — surfaces filter by command or extension as needed.
- *
- * <p>Capped at {@link #MAX_ENTRIES} — older entries are pruned on every record
- * so the directory can't grow unbounded.
+ * Append-only on-disk log of generated media. Entries are {@code <ts>.<ext>} in
+ * {@code filesDir/history/} with a sidecar {@code <ts>.txt} holding
+ * {@code command\nprompt}. Capped at {@link #MAX_ENTRIES} via prune on record.
  */
 public class ImageHistory {
 
@@ -49,16 +38,12 @@ public class ImageHistory {
         return d;
     }
 
-    /** Recognised source/target extensions. Files that don't match are
-     *  ignored by {@link #list} and {@link #prune} so unrelated junk
-     *  dropped into {@code filesDir/history/} can't corrupt the listing. */
-    private static final String[] TRACKED_EXTS = { ".png", ".gif" };
+    /** Recognised extensions; anything else in the directory is ignored.
+     *  WebP is required for /sticker so messengers route the alpha through their
+     *  sticker pipeline instead of treating it as a photo. */
+    private static final String[] TRACKED_EXTS = { ".png", ".gif", ".webp" };
 
-    /** Copies {@code src} into the history directory under a fresh timestamp,
-     *  preserving the source extension (so {@code foo.gif} lands as
-     *  {@code <ts>.gif} and stays animatable). Writes the sidecar with the
-     *  command + prompt. Best-effort — IO failures are logged and swallowed
-     *  so history persistence never blocks the user-visible result. */
+    /** Best-effort copy + sidecar write; IO failures are logged and swallowed. */
     public static void record(Context ctx, File src, String command, String prompt) {
         if (src == null || !src.exists()) return;
         try {
@@ -84,11 +69,7 @@ public class ImageHistory {
         }
     }
 
-    /** Newest entries first. Returns every tracked-extension file in one pass;
-     *  callers filter by {@link Entry#command} or by the file's extension
-     *  (e.g. the GIF tab keeps only {@code .gif}, the test screen keeps only
-     *  {@code .png} sprite sheets). Empty when the directory is missing or
-     *  unreadable. Performs disk I/O — call from a background thread. */
+    /** Newest first. Performs disk I/O — call from a background thread. */
     public static List<Entry> list(Context ctx) {
         File dir = historyDir(ctx);
         File[] files = dir.listFiles((d, name) -> hasTrackedExt(name));
@@ -122,7 +103,7 @@ public class ImageHistory {
                     } else {
                         command = text;
                     }
-                } catch (Exception ignored) { /* keep empty fields */ }
+                } catch (Exception ignored) {}
             }
             entries.add(new Entry(ts, command, prompt, f));
         }
@@ -133,8 +114,7 @@ public class ImageHistory {
     private static void prune(File dir) {
         File[] media = dir.listFiles((d, name) -> hasTrackedExt(name));
         if (media == null || media.length <= MAX_ENTRIES) return;
-        // Sort by name = sort by timestamp (filenames are <ts>.<ext>), so the
-        // lexicographic sort puts oldest first. Don't trust extension order.
+        // Filenames are <ts>.<ext>; lexicographic sort = chronological, oldest first.
         Arrays.sort(media, (a, b) -> a.getName().compareTo(b.getName()));
         int toDelete = media.length - MAX_ENTRIES;
         for (int i = 0; i < toDelete; i++) {

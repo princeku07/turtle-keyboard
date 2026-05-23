@@ -43,26 +43,22 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Routes {@code /ask} to a locally running LM Studio server that exposes the
- * OpenAI-compatible {@code /v1/chat/completions} endpoint. Every other command falls
- * through to the supplied delegate (typically {@link StubAiClient}) so the rest of
- * the pipeline keeps its current behavior.
+ * AI client routing built-in commands to Gemini. Unhandled commands fall through
+ * to the supplied delegate (typically {@link StubAiClient}).
  */
 public class LmStudioAiClient implements AiClient {
 
     private static final String TAG = "LmStudioAiClient";
     private static final String GEMINI_URL =
             "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent";
-    /** "Nano Banana" — Gemini 2.5 Flash Image. Same generateContent endpoint, different
-     *  model id; response carries inlineData PNG bytes instead of text. */
+    /** Gemini 2.5 Flash Image ("Nano Banana"); same endpoint, inlineData PNG response. */
     private static final String GEMINI_IMAGE_URL =
             "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent";
     private static final String GEMINI_API_KEY = BuildConfig.GEMINI_API_KEY;
     private static final int CONNECT_TIMEOUT_MS = 5_000;
     private static final int READ_TIMEOUT_MS = 90_000;
 
-    /** Returns a window-attached ViewGroup the renderer can briefly add a
-     *  WebView to. In the IME this is the SoftInputWindow's decor view. */
+    /** Supplies a window-attached ViewGroup the renderer can briefly add a WebView to. */
     public interface HostProvider {
         ViewGroup getRenderHost();
     }
@@ -75,7 +71,6 @@ public class LmStudioAiClient implements AiClient {
     private final AiClient delegate;
     private final Context appContext;
     private final HostProvider hostProvider;
-    /** Cached system prompts loaded from assets. Keyed by command name. */
     private final Map<String, String> promptCache = new HashMap<>();
 
     public LmStudioAiClient(Context context, HostProvider hostProvider, AiClient delegate) {
@@ -84,19 +79,16 @@ public class LmStudioAiClient implements AiClient {
         this.delegate = delegate;
     }
 
-    /** Synthetic command name for raw text completions — no built-in system prompt, the
-     *  caller embeds its own instructions in the user prompt. Routed straight to Gemini,
-     *  never to the stub. Legacy from when {@code AiClientLlmService} bridged an
-     *  {@code LlmService} consumer to this client; the bridge is gone but the sentinel
-     *  is preserved in case a future caller needs the same "raw prompt" door. */
+    public void destroy() {
+        io.shutdown();
+    }
+
+    /** Synthetic command for raw text completions; caller embeds instructions in the user prompt. */
     private static final String RAW_COMPLETION = "_llm";
 
     @Override
     public void execute(SlashCommand cmd, Callback callback) {
         String name = cmd.name == null ? "" : cmd.name.toLowerCase();
-        // /sticker used to live here but has moved to StickerIntegration, which
-        // pipes it through the two-pass difference-matte for transparency. Don't
-        // re-add a branch for /sticker here — the integration owns it now.
         if (!name.equals("ask") && !name.equals("org") && !name.equals("cap")
                 && !name.equals("edit") && !name.equals("style")
                 && !name.equals("us")
@@ -120,7 +112,7 @@ public class LmStudioAiClient implements AiClient {
             io.execute(() -> {
                 try {
                     byte[] png = callGeminiImage(prompt, systemPromptFor("cap"));
-                    // /cap has no input image — skip aspect-fix, keep model output's shape.
+                    // No input image; skip aspect-fix.
                     main.post(() -> saveImageBytes(png, callback, 0f, "cap", prompt));
                 } catch (Exception e) {
                     Log.w(TAG, "cap failed", e);
@@ -129,13 +121,10 @@ public class LmStudioAiClient implements AiClient {
             });
             return;
         }
-        // /sticker handled by StickerIntegration via the two-pass matte. No
-        // branch here.
         if (name.equals("edit")) {
             io.execute(() -> {
-                // Picker is launched proactively when the user enters /edit prompt mode,
-                // so by the time we get here the image has typically been staged. Fall
-                // back to the clipboard if the user skipped the picker (e.g. cancelled).
+                // Picker is launched when the user enters /edit prompt mode; fall back
+                // to the clipboard if the user skipped it.
                 ClipImage src = stagedEditImage.getAndSet(null);
                 if (src == null) src = readClipboardImage();
                 if (src == null) {
@@ -194,8 +183,7 @@ public class LmStudioAiClient implements AiClient {
             return;
         }
         boolean isOrg = name.equals("org");
-        // Raw completions skip the asset-loaded system prompt; the integration that
-        // requested the call has already prefixed its own instructions in `prompt`.
+        // Raw completions skip the asset-loaded system prompt.
         String systemPrompt = name.equals(RAW_COMPLETION) ? "" : systemPromptFor(name);
         io.execute(() -> {
             try {
@@ -214,14 +202,12 @@ public class LmStudioAiClient implements AiClient {
         });
     }
 
-    /** Writes the PNG bytes returned by Nano Banana to the shared cache and emits the
-     *  {@code "<uri>|<path>"} payload {@code showImage} expects.
-     *  <p>If {@code targetAspect > 0}, center-crops the model output to that aspect
-     *  ratio first — Nano Banana frequently returns 1:1 even when {@code /edit} is
-     *  given a portrait/landscape input, and {@code /edit} should give the user
-     *  back an image with the same shape they handed in. Then caps the longest
-     *  side at {@link #MAX_OUTPUT_SIDE_PX}, preserving aspect.
-     *  <p>{@code /cap} passes 0 to skip the crop (no input image to match). Main thread. */
+    /**
+     * Writes PNG bytes to the shared cache and emits the {@code "<uri>|<path>"} payload.
+     * Center-crops to {@code targetAspect} if positive (recovers input aspect when the
+     * model returns 1:1), then caps the longest side at {@link #MAX_OUTPUT_SIDE_PX}.
+     * Main thread.
+     */
     private void saveImageBytes(byte[] png, Callback callback, float targetAspect,
                                 String command, String prompt) {
         try {
@@ -234,17 +220,14 @@ public class LmStudioAiClient implements AiClient {
                 int sw = src.getWidth();
                 int sh = src.getHeight();
                 float current = (float) sw / sh;
-                // Skip a no-op crop when the model already matched the input aspect.
                 if (Math.abs(current - targetAspect) > 0.01f) {
                     int cropW, cropH, x, y;
                     if (current > targetAspect) {
-                        // Output too wide — trim left/right to match input ratio.
                         cropH = sh;
                         cropW = Math.max(1, Math.round(sh * targetAspect));
                         x = (sw - cropW) / 2;
                         y = 0;
                     } else {
-                        // Output too tall — trim top/bottom.
                         cropW = sw;
                         cropH = Math.max(1, Math.round(sw / targetAspect));
                         x = 0;
@@ -276,8 +259,6 @@ public class LmStudioAiClient implements AiClient {
                 scaled.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, os);
             }
             scaled.recycle();
-            // Persist a copy in the long-lived history dir before exposing the cache
-            // file to the host. Best-effort; doesn't block the user-visible result.
             ImageHistory.record(appContext, img, command, prompt);
             Uri uri = FileProvider.getUriForFile(appContext,
                     appContext.getPackageName() + ".fileprovider", img);
@@ -288,12 +269,8 @@ public class LmStudioAiClient implements AiClient {
         }
     }
 
-    /** Renders the Mistral-produced JSON document to a 500×500 bitmap with
-     *  {@link NativeCardRenderer}, saves it as a WebP, and emits the
-     *  {@code "<uri>|<path>"} payload the share pipeline already expects.
-     *  No WebView, no {@code hostProvider} dependency — runs in ~10 ms.
-     *  Must be called on the main thread (Bitmap save is fast but the
-     *  callback contract upstream is main-thread). */
+    /** Renders the model JSON to a 500x500 bitmap via {@link NativeCardRenderer},
+     *  saves as WebP, and emits the {@code "<uri>|<path>"} payload. Main thread. */
     private void renderJsonToImage(String jsonText, Callback callback) {
         Bitmap bitmap;
         try {
@@ -326,12 +303,7 @@ public class LmStudioAiClient implements AiClient {
         }
     }
 
-    /** Loads the system prompt for {@code name} from
-     *  {@code assets/prompts/<name>.txt}. The same files live at the repo root
-     *  under {@code commands/prompts/} and are copied in by Gradle, so both
-     *  Android and iOS read the exact same prompt text. Cached after first
-     *  read; falls back to a built-in default for {@code /ask} if the asset
-     *  is missing (e.g., during a partial build). */
+    /** Loads {@code assets/prompts/<name>.txt}, cached. Falls back to a built-in default. */
     private String systemPromptFor(String name) {
         String cached = promptCache.get(name);
         if (cached != null) return cached;
@@ -396,7 +368,6 @@ public class LmStudioAiClient implements AiClient {
         conn.disconnect();
 
         JSONObject resp = new JSONObject(raw);
-        // Gemini: { "candidates": [ { "content": { "parts": [ { "text": "..." } ] } } ] }
         JSONArray candidates = resp.optJSONArray("candidates");
         if (candidates == null || candidates.length() == 0) {
             throw new RuntimeException("no candidates: " + raw);
@@ -416,31 +387,13 @@ public class LmStudioAiClient implements AiClient {
         return stripReasoning(text).trim();
     }
 
-    /** Maximum length of the longest side after downscale. The shorter side scales
-     *  proportionally so a non-square model output (or {@code /edit} on a portrait
-     *  input that the model returns at a different aspect) keeps its ratio. 512 is
-     *  Nano Banana's smallest native square dimension, so square outputs stay
-     *  square at 512×512 with no redundant resample. */
+    /** Cap on the longest side of saved output, preserving aspect. */
     private static final int MAX_OUTPUT_SIDE_PX = 512;
 
-    // System prompts for /cap, /edit, /sticker, /us live in commands/prompts/<name>.txt
-    // — copied into assets/prompts/ at build time and loaded via {@link #systemPromptFor}.
-    // Same path /ask and /org already use; gives iOS prompt parity for free. Integrations
-    // migrated off this class (e.g. PollIntegration) load their prompts directly via
-    // {@code AssetPrompts.load(ctx.appContext(), name)} from :core.
-
-    /** Curated style presets for /style. The user types a preset name (e.g. "ghibli")
-     *  and the matching value is sent as the user prompt to the same image-edit
-     *  endpoint /edit uses. Anything not in the map is treated as a free-form style
-     *  description, so power users can write their own.
-     *
-     *  <p>Built once and never mutated; values are tuned to bias Nano Banana toward
-     *  visually distinct, recognizable looks (the kind of thing that goes viral when
-     *  applied to a selfie). */
+    /** Curated style presets for /style; unknown keys are treated as free-form descriptions. */
     private static final java.util.Map<String, String> STYLE_PRESETS = buildStylePresets();
 
     private static java.util.Map<String, String> buildStylePresets() {
-        // Insertion-ordered so the UI chip strip renders in the same order every time.
         java.util.Map<String, String> m = new java.util.LinkedHashMap<>();
         m.put("ghibli",     "Studio Ghibli watercolor anime style. Soft pastel palette, hand-drawn feel, dreamy atmosphere, gentle natural lighting, painterly textures.");
         m.put("anime",      "Modern Japanese anime style. Crisp lineart, vibrant cel-shaded colors, expressive eyes, stylized features.");
@@ -461,16 +414,11 @@ public class LmStudioAiClient implements AiClient {
         return java.util.Collections.unmodifiableMap(m);
     }
 
-    /** Display order of style preset keys, used by the IME to render the chip strip
-     *  shown when the user enters {@code /style} prompt mode. Lower-case keys; the
-     *  caller is responsible for any title-casing in the UI. */
+    /** Display order of /style preset keys; lower-case. */
     public static java.util.List<String> stylePresetNames() {
         return new java.util.ArrayList<>(STYLE_PRESETS.keySet());
     }
 
-    /** Maps the user's /style prompt to the image-edit user prompt sent to Nano
-     *  Banana. Recognized preset → curated description; otherwise the free-form
-     *  text is treated as a custom style instruction. */
     private static String stylePromptFor(String request) {
         String key = request == null ? "" : request.trim().toLowerCase();
         String preset = STYLE_PRESETS.get(key);
@@ -482,14 +430,7 @@ public class LmStudioAiClient implements AiClient {
                 + ". Preserve the subject's identity and composition.";
     }
 
-    /** Curated scenario presets for /us. The user types or taps a key (e.g. "astronauts")
-     *  and the matching value is sent as the prompt to Nano Banana with the user's
-     *  reference selfies as inline image parts. Anything not in the map is treated as a
-     *  free-form scenario description, so power users can write their own.
-     *
-     *  <p>Tuned toward couple-shaped / shareable scenarios for the launch positioning —
-     *  every entry should look great as a /us image dropped into a chat. Insertion-ordered
-     *  so the chip strip renders the same way every time. */
+    /** Curated scenario presets for /us; unknown keys are free-form descriptions. */
     private static final java.util.Map<String, String> US_PRESETS = buildUsPresets();
 
     private static java.util.Map<String, String> buildUsPresets() {
@@ -511,18 +452,11 @@ public class LmStudioAiClient implements AiClient {
         return java.util.Collections.unmodifiableMap(m);
     }
 
-    /** Display order of /us preset keys. The IME renders a horizontal chip strip from
-     *  this list whenever the user enters {@code /us} prompt mode, mirroring the /style
-     *  chip strip. Lower-case keys; the chip view title-cases for display. */
+    /** Display order of /us preset keys; lower-case. */
     public static java.util.List<String> usPresetNames() {
         return new java.util.ArrayList<>(US_PRESETS.keySet());
     }
 
-    /** Maps the user's /us prompt to the user-prompt text sent alongside reference photos
-     *  in the Nano Banana request. Recognized preset → curated description; otherwise the
-     *  free-form text is treated as a custom scenario description. The system prompt
-     *  (loaded from {@code commands/prompts/us.txt}) instructs the model to preserve identity and place
-     *  the reference faces into whatever scenario this returns. */
     private static String usPromptFor(String request) {
         String key = request == null ? "" : request.trim().toLowerCase();
         String preset = US_PRESETS.get(key);
@@ -530,10 +464,7 @@ public class LmStudioAiClient implements AiClient {
         return request == null ? "" : request;
     }
 
-    /** Bytes + mime type + decoded pixel dimensions of an image read from the system
-     *  clipboard or picked by the user. Dimensions let us recover the input's aspect
-     *  ratio after the model returns (Nano Banana frequently returns 1:1 even when
-     *  the input is portrait/landscape) so we can center-crop back. */
+    /** Bytes + mime + decoded dimensions for an image from clipboard or picker. */
     private static class ClipImage {
         final byte[] bytes;
         final String mime;
@@ -542,14 +473,11 @@ public class LmStudioAiClient implements AiClient {
         ClipImage(byte[] b, String m, int w, int h) {
             this.bytes = b; this.mime = m; this.width = w; this.height = h;
         }
-        /** Aspect ratio of the input image, or 0 if the bounds couldn't be decoded. */
         float aspect() {
             return (width > 0 && height > 0) ? (float) width / height : 0f;
         }
     }
 
-    /** Bounds-only decode of the image bytes — much cheaper than a full decode and
-     *  enough to pull width/height for aspect-ratio recovery. */
     private static int[] decodeBounds(byte[] bytes) {
         android.graphics.BitmapFactory.Options opts = new android.graphics.BitmapFactory.Options();
         opts.inJustDecodeBounds = true;
@@ -557,14 +485,10 @@ public class LmStudioAiClient implements AiClient {
         return new int[]{opts.outWidth, opts.outHeight};
     }
 
-    /** Image staged by {@link ImagePickerActivity} when the user enters {@code /edit}
-     *  prompt mode. Consumed by the next {@code /edit} dispatch. Null until the picker
-     *  delivers; reset to null on consume. */
+    /** Image staged by the picker for the next {@code /edit} dispatch. */
     private static final AtomicReference<ClipImage> stagedEditImage = new AtomicReference<>();
 
-    /** Notified whenever {@link #stageEditImage} updates the staged slot — the IME
-     *  uses this to refresh its prompt panel preview and bring itself back to the
-     *  foreground after the picker activity tore down focus. */
+    /** Notified when the staged slot changes so the IME can refresh its UI. */
     public interface OnImageStagedListener {
         /** {@code bytes} null means the staged image was cleared. */
         void onImageStaged(@Nullable byte[] bytes, @Nullable String mime);
@@ -577,17 +501,8 @@ public class LmStudioAiClient implements AiClient {
         stageListener.set(l);
     }
 
-    /** Called by {@link ImagePickerActivity} after the user picks. Null bytes (cancel
-     *  or read failure) leave the staged image cleared; the next {@code /edit} dispatch
-     *  will then fall back to the clipboard or surface "Pick an image first". Also
-     *  fires the {@link OnImageStagedListener} so the IME can refresh its UI. */
-    /** Read-and-clear accessor used by integrations on the new SPI path
-     *  ({@code GifIntegration}, future image-input integrations) to consume whatever
-     *  the pre-launched picker staged. Mirrors how the in-class {@code /edit} branch
-     *  reads {@code stagedEditImage.getAndSet(null)} but returns the SPI-typed
-     *  {@link com.prince.kbd.core.IntegrationContext.PickedImage} so callers don't
-     *  depend on the private {@code ClipImage} representation. Returns null when no
-     *  image has been picked since the last consume. */
+    /** Read-and-clear accessor for SPI integrations; returns the SPI-typed
+     *  {@link com.prince.kbd.core.IntegrationContext.PickedImage}. */
     @Nullable
     public static com.prince.kbd.core.IntegrationContext.PickedImage consumeStagedEditImage() {
         ClipImage src = stagedEditImage.getAndSet(null);
@@ -607,9 +522,7 @@ public class LmStudioAiClient implements AiClient {
         if (l != null) l.onImageStaged(bytes, mime);
     }
 
-    /** Looks for the first image-typed item on the primary clip and reads its bytes
-     *  via {@link android.content.ContentResolver}. Returns null if the clipboard is
-     *  empty, holds only text, or the source app revoked URI access. */
+    /** First image-typed item on the primary clip, or null. */
     private ClipImage readClipboardImage() {
         ClipboardManager cm = (ClipboardManager)
                 appContext.getSystemService(Context.CLIPBOARD_SERVICE);
@@ -639,9 +552,7 @@ public class LmStudioAiClient implements AiClient {
         return null;
     }
 
-    /** Calls Nano Banana ({@code gemini-2.5-flash-image}) and returns the first
-     *  {@code inlineData} part as raw image bytes (PNG). The model occasionally also
-     *  returns a text part; we ignore it. */
+    /** Returns the first {@code inlineData} part as PNG bytes. */
     private byte[] callGeminiImage(String prompt, String systemPrompt) throws Exception {
         HttpURLConnection conn = (HttpURLConnection) new URL(GEMINI_IMAGE_URL).openConnection();
         conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
@@ -676,19 +587,14 @@ public class LmStudioAiClient implements AiClient {
         return decodeImagePart(raw);
     }
 
-    /** Reference photo for /us — bytes + mime type. Bytes are read from the local cache
-     *  populated by {@code DriveLinkActivity}; the same files are also synced to the user's
-     *  own Drive via {@code DriveFilesClient}, but for the gen call we use the local copy
-     *  to skip the Drive download round-trip. */
+    /** Reference photo for /us — bytes + mime, read from the local cache. */
     private static final class ReferenceImage {
         final byte[] bytes;
         final String mime;
         ReferenceImage(byte[] b, String m) { bytes = b; mime = m; }
     }
 
-    /** Loads the locally-cached reference selfies the user picked in {@code DriveLinkActivity}.
-     *  Reads {@link DriveKeys#REFERENCE_PHOTOS} (newline-separated {@code <path>|<fileId>}
-     *  entries), drops entries whose local file is gone, returns bytes + mime for each. */
+    /** Loads locally-cached reference selfies; drops entries whose file is gone. */
     private List<ReferenceImage> readDriveReferencePhotos() {
         KeyValueStore store = new SharedPrefsKeyValueStore(
                 appContext, SharedPrefsKeyValueStore.DEFAULT_FILE).scoped("drive");
@@ -727,10 +633,7 @@ public class LmStudioAiClient implements AiClient {
         }
     }
 
-    /** /us — sends every reference selfie inline plus the user's scenario prompt to Nano
-     *  Banana. The model treats the inline images as identity references and places them
-     *  into the prompted scene. Same endpoint as /cap and /edit; difference is multiple
-     *  image parts in {@code contents.parts} ahead of the text part. */
+    /** Sends every reference selfie inline plus the scenario prompt; image parts precede the text part. */
     private byte[] callGeminiImageUs(String prompt, List<ReferenceImage> refs, String systemPrompt) throws Exception {
         HttpURLConnection conn = (HttpURLConnection) new URL(GEMINI_IMAGE_URL).openConnection();
         conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
@@ -770,9 +673,7 @@ public class LmStudioAiClient implements AiClient {
         return decodeImagePart(raw);
     }
 
-    /** Sends the user's clipboard image plus a text instruction to Nano Banana for
-     *  in-place editing. The image goes first in {@code parts} so the model treats it
-     *  as the primary input; the text part is the edit instruction. */
+    /** Image-first edit request; the trailing text part is the edit instruction. */
     private byte[] callGeminiImageEdit(byte[] imageBytes, String mime, String prompt)
             throws Exception {
         HttpURLConnection conn = (HttpURLConnection) new URL(GEMINI_IMAGE_URL).openConnection();
@@ -810,8 +711,7 @@ public class LmStudioAiClient implements AiClient {
         return decodeImagePart(raw);
     }
 
-    /** Walks {@code candidates[0].content.parts} for the first inlineData entry
-     *  (camelCase or snake_case) and Base64-decodes it. */
+    /** First inlineData entry (camelCase or snake_case) in {@code candidates[0].content.parts}. */
     private static byte[] decodeImagePart(String raw) throws Exception {
         JSONObject resp = new JSONObject(raw);
         JSONArray candidates = resp.optJSONArray("candidates");
@@ -845,13 +745,13 @@ public class LmStudioAiClient implements AiClient {
         return sb.toString();
     }
 
-    /** ministral-3b-reasoning emits a {@code <think>…</think>} block before the answer. */
+    /** Strips a leading {@code <think>…</think>} reasoning block if present. */
     private static String stripReasoning(String s) {
         int end = s.lastIndexOf("</think>");
         return end >= 0 ? s.substring(end + "</think>".length()) : s;
     }
 
-    /** Even when told not to, models often wrap output in ```html … ``` fences. */
+    /** Strips ```html … ``` fences models often wrap output in. */
     private static String stripCodeFences(String s) {
         String t = s.trim();
         if (t.startsWith("```")) {

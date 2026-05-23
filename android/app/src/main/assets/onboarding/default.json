@@ -1,0 +1,27 @@
+{
+  "id": "default",
+  "version": 1,
+  "pages": [
+    {
+      "id": "ai_keyboard",
+      "heroKey": "image_grid",
+      "title": "Your AI Keyboard for Every App",
+      "subtitle": "Try and experience the magic of turtle keyboard",
+      "ctaLabel": "Continue"
+    },
+    {
+      "id": "gif_sticker",
+      "heroKey": "stickers",
+      "title": "GIF and sticker made easy for more fun",
+      "subtitle": "Try and experience the magic of turtle keyboard",
+      "ctaLabel": "Continue"
+    },
+    {
+      "id": "polls_puzzle",
+      "heroKey": "polls_puzzle",
+      "title": "Polls & quizzes without switching any apps",
+      "subtitle": "Try and experience the magic of turtle keyboard",
+      "ctaLabel": "Get Started"
+    }
+  ]
+}

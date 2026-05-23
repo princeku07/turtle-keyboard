@@ -1,7 +1,6 @@
 package com.prince.turtlekeyboard.ai;
 
-/** Result of an AI command invocation. Image results carry a clipboard URI; text results
- *  carry the replacement string; suggestion results carry up to three options. */
+/** Result of an AI command. Image carries a URI, text a replacement string, suggestions up to three options. */
 public class AiResult {
 
     public enum Kind { TEXT, IMAGE, SUGGESTIONS, ERROR }

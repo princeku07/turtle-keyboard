@@ -18,11 +18,9 @@ import com.prince.turtlekeyboard.theme.KeyboardTheme;
 import java.util.List;
 
 /**
- * Horizontal strip of one-tap preset chips shown above the keyboard during
- * {@code /style} prompt mode (and reusable for other commands later). Tapping
- * a chip fires the supplied listener — the IME wires this to dispatch the
- * command directly with the chip's value as the prompt, skipping the typing
- * step entirely.
+ * Horizontal strip of one-tap preset chips above the keyboard. Tapping a chip
+ * fires the listener with the chip's value, letting the IME dispatch a command
+ * without typing.
  */
 public class PresetChipStripView extends HorizontalScrollView {
 
@@ -49,9 +47,7 @@ public class PresetChipStripView extends HorizontalScrollView {
         addView(row, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
     }
 
-    /** Show the strip with the given chip labels. The {@code displayLabel} is
-     *  what the user sees; the {@code value} is what gets passed to {@code onTap}.
-     *  {@code labels} == null or empty hides the strip. */
+    /** {@code null}/empty {@code values} hides the strip. */
     public void setPresets(@Nullable List<String> values, @Nullable OnPresetTap listener) {
         row.removeAllViews();
         if (values == null || values.isEmpty()) {
@@ -61,7 +57,6 @@ public class PresetChipStripView extends HorizontalScrollView {
         for (String value : values) {
             row.addView(makeChip(displayLabel(value), value, listener));
         }
-        // Reset scroll so the first chip is always visible when the strip re-appears.
         scrollTo(0, 0);
         setVisibility(VISIBLE);
     }
@@ -81,7 +76,6 @@ public class PresetChipStripView extends HorizontalScrollView {
         GradientDrawable bg = new GradientDrawable();
         bg.setShape(GradientDrawable.RECTANGLE);
         bg.setColor(CHIP_FILL);
-        // No stroke — keep edges soft to match the gradient/aesthetic direction.
         bg.setCornerRadius(dp(16));
         t.setBackground(bg);
         t.setClickable(true);
@@ -94,14 +88,13 @@ public class PresetChipStripView extends HorizontalScrollView {
         return t;
     }
 
-    /** Title-case the canonical lowercase preset key for display. */
     private static String displayLabel(String value) {
         if (value == null || value.isEmpty()) return "";
         return Character.toUpperCase(value.charAt(0)) + value.substring(1);
     }
 
     public void applyTheme(KeyboardTheme theme) {
-        // Surface and chip colours fixed by the dark gradient design — no-op.
+        // No-op; chrome is fixed by the dark gradient design.
     }
 
     private int dp(int v) {

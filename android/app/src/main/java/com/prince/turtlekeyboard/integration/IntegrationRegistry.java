@@ -15,12 +15,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Holds the IME's list of {@link KeyboardIntegration}s and dispatches lifecycle events to
- * whichever integration claims the current input session. First-match-wins on activation.
- *
- * <p>Constructed with a separate {@link CommandProvider} list so non-integration providers
- * (e.g. built-in AI commands) can register through the same path. Every command in the
- * registry came from a provider — there is no implicit list anywhere else.
+ * Holds the IME's list of {@link KeyboardIntegration}s and dispatches lifecycle events
+ * to whichever integration claims the current input session (first-match-wins).
+ * A separate {@link CommandProvider} list is also registered so non-integration
+ * providers can contribute commands through the same path.
  */
 public class IntegrationRegistry {
 
@@ -56,6 +54,13 @@ public class IntegrationRegistry {
 
     public void onInputEnd() {
         deactivate();
+    }
+
+    public void shutdown() {
+        deactivate();
+        for (KeyboardIntegration i : integrations) {
+            try { i.destroy(); } catch (RuntimeException ignored) {}
+        }
     }
 
     private void deactivate() {

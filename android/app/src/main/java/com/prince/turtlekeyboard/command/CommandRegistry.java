@@ -13,18 +13,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Pure registry of slash commands. Starts empty — every entry comes from a
- * {@link com.prince.kbd.core.CommandProvider}: built-in AI commands ({@code BuiltinAiCommands}
- * in {@code :app}) and feature integrations ({@code SplitIntegration}, {@code NotionIntegration},
- * etc.). Commands with a non-null {@link Entry#handler} run locally; the rest go to the AI
- * backend via the dispatcher.
- *
- * <p>Ranking for a given host pkg is a three-tier fall-through:
- * <ol>
- *   <li><b>User pins</b> for the pkg — in the order the user set them.</li>
- *   <li><b>Default affinity</b> — commands whose {@code affinityPkgs} contains the pkg.</li>
- *   <li><b>Rest</b> — everything else, in registration order.</li>
- * </ol>
+ * Pure registry of slash commands populated from {@link com.prince.kbd.core.CommandProvider}s.
+ * Ranking for a given host pkg falls through user pins → default affinity → registration order.
  */
 public class CommandRegistry {
 
@@ -35,9 +25,7 @@ public class CommandRegistry {
         public final boolean needsPrompt;
         @Nullable public final CommandSpec.Handler handler;
         public final Set<String> affinityPkgs;
-        /** Optional per-command status copy shown in the loader while an AI
-         *  request is in flight (e.g. "Generating image"). Null falls back to
-         *  {@code "/" + name} in the dispatcher. */
+        /** Status copy shown in the loader (e.g. "Generating image"); null falls back to "/" + name. */
         @Nullable public final String loadingMessage;
 
         public Entry(String name, String label, String emoji, boolean needsPrompt) {
@@ -70,8 +58,6 @@ public class CommandRegistry {
     private final Map<String, Entry> entries = new LinkedHashMap<>();
     @Nullable private UserCommandPins pins;
 
-    /** @param pins optional source of user-configurable per-pkg ordering. Null means
-     *  ranking falls back to default affinity only. */
     public void setPins(@Nullable UserCommandPins pins) {
         this.pins = pins;
     }
@@ -95,11 +81,7 @@ public class CommandRegistry {
         return Collections.unmodifiableList(new ArrayList<>(entries.values()));
     }
 
-    /**
-     * Commands whose name starts with {@code prefix}, ranked for {@code currentPkg}
-     * via the same three-tier order as {@link #allSortedFor}. Drives the autocomplete
-     * strip while the user types {@code /…}.
-     */
+    /** Commands matching {@code prefix}, ranked for {@code currentPkg} via {@link #allSortedFor}. */
     public List<Entry> matchesFor(@Nullable String prefix, @Nullable String currentPkg) {
         List<Entry> ranked = allSortedFor(currentPkg);
         if (prefix == null || prefix.isEmpty()) return ranked;
@@ -115,8 +97,7 @@ public class CommandRegistry {
         List<Entry> base = new ArrayList<>(entries.values());
         if (currentPkg == null) return Collections.unmodifiableList(base);
 
-        // Tier 1 — user pins, in the user's chosen order. Names that no longer resolve
-        // (command was uninstalled or renamed) are silently skipped.
+        // Tier 1: user pins in order; unresolved names (uninstalled/renamed) silently skipped.
         List<String> pinNames = pins == null ? Collections.emptyList() : pins.pinsFor(currentPkg);
         Set<String> pinned = new HashSet<>();
         List<Entry> pinnedEntries = new ArrayList<>();
@@ -125,7 +106,7 @@ public class CommandRegistry {
             if (e != null && pinned.add(e.name.toLowerCase())) pinnedEntries.add(e);
         }
 
-        // Tiers 2 + 3 — default affinity vs the rest, preserving registration order.
+        // Tiers 2+3: default affinity vs the rest, preserving registration order.
         List<Entry> affine = new ArrayList<>();
         List<Entry> rest = new ArrayList<>();
         for (Entry e : base) {

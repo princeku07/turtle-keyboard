@@ -26,17 +26,9 @@ import com.prince.kbd.core.SharedPrefsKeyValueStore;
 import java.util.List;
 
 /**
- * Three-stage onboarding (mirrors {@code NotionConnectActivity}):
- *
- * <ol>
- *   <li>Initial — "Connect Slack" launches the OAuth browser flow.</li>
- *   <li>OAuth callback — App-Link redirect lands here with {@code ?code=…}.</li>
- *   <li>Channel picker — list of channels the user is a member of; tap to set default.</li>
- * </ol>
- *
- * <p>Side effect during the picker render: every visible channel name is also written to
- * {@code slack.channel_map.<name> → id} so {@link com.prince.slack.SlackIntegration}'s
- * {@code #channel} override can resolve names without an extra API call.
+ * Slack onboarding: launches OAuth, handles the redirect, then lets the user pick a
+ * default channel. Caches a {@code name → id} map so {@code SlackIntegration}'s
+ * {@code #channel} override resolves names locally.
  */
 public class SlackConnectActivity extends AppCompatActivity {
 
@@ -88,15 +80,14 @@ public class SlackConnectActivity extends AppCompatActivity {
             renderExchanging();
             auth.exchangeCode(getApplicationContext(), code, new SlackAuth.ExchangeCallback() {
                 @Override public void onSuccess(String accessToken, @Nullable String teamName, @Nullable String teamDomain) {
-                    // Slack's oauth.v2.access doesn't return team domain; fetch it now so
-                    // the channel picker render has it before the user sees this screen again.
+                    // oauth.v2.access omits team domain; fetch it now for the picker.
                     new SlackClient(accessToken).teamInfo(new SlackClient.TeamInfoCallback() {
                         @Override public void onSuccess(String teamId, String domain) {
                             store.putString(SlackKeys.TEAM_DOMAIN, domain);
                             runOnUiThread(() -> renderChannelPicker(teamName));
                         }
                         @Override public void onError(String reason) {
-                            // Non-fatal — the picker still works without a domain.
+                            // Non-fatal — picker still works without a domain.
                             runOnUiThread(() -> renderChannelPicker(teamName));
                         }
                     });
@@ -161,7 +152,7 @@ public class SlackConnectActivity extends AppCompatActivity {
                     }
                     String currentChannel = store.getString(SlackKeys.DEFAULT_CHANNEL, "");
                     for (SlackClient.Channel c : channels) {
-                        // Side effect: maintain the name→id cache used by /slack #channel.
+                        // Cache name→id for /slack #channel resolution.
                         store.putString("channel_map." + c.name.toLowerCase(), c.id);
                         column.addView(channelRow(c, c.id.equals(currentChannel)));
                     }

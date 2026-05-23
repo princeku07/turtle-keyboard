@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Single onboarding page. The hero panel is a FrameLayout so per-heroKey
+     artwork can be inflated/registered into @id/hero_slot from code without
+     touching this layout. Until real assets land, the bg_onboard_placeholder
+     card stands in. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <FrameLayout
+        android:id="@+id/hero_panel"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@drawable/bg_onboard_hero">
+
+        <FrameLayout
+            android:id="@+id/hero_slot"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <!-- Default placeholder shown when no heroKey binder is registered. -->
+            <View
+                android:id="@+id/hero_placeholder"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/bg_onboard_placeholder" />
+
+            <TextView
+                android:id="@+id/hero_placeholder_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:fontFamily="monospace"
+                android:textColor="#993D3D3D"
+                android:textSize="12sp"
+                android:letterSpacing="0.15"
+                android:textAllCaps="true"
+                tools:text="hero · image_grid" />
+        </FrameLayout>
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/page_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/space_2xl"
+        android:layout_marginEnd="@dimen/space_2xl"
+        android:layout_marginTop="@dimen/space_3xl"
+        android:gravity="center"
+        android:textAppearance="@style/TextAppearance.Token.Display"
+        android:textColor="@color/onboard_title"
+        tools:text="Your AI Keyboard for Every App" />
+
+    <TextView
+        android:id="@+id/page_subtitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/space_3xl"
+        android:layout_marginEnd="@dimen/space_3xl"
+        android:layout_marginTop="@dimen/space_md"
+        android:gravity="center"
+        android:textAppearance="@style/TextAppearance.Token.Body"
+        android:textColor="@color/onboard_subtitle"
+        tools:text="Try and experience the magic of turtle keyboard" />
+
+    <Space
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="0.18" />
+</LinearLayout>

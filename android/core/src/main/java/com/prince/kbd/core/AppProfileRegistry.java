@@ -6,8 +6,8 @@ import java.util.Set;
 
 /**
  * Lookup for {@link AppProfile}s the keyboard knows about, plus per-app enrollment state.
- * Integrations call {@link #get} to decide chip/activation; the IME calls
- * {@link #statusFor} to decide whether to offer the user an enrollment banner.
+ * Integrations use {@link #get} to decide chip/activation; the IME uses {@link #statusFor}
+ * to decide whether to offer an enrollment banner.
  */
 public interface AppProfileRegistry {
 

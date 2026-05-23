@@ -41,14 +41,9 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
-/**
- * Reports / detail view for splits. Visual style follows the repo's neo-brutalist palette
- * (cream background, ink borders, lime + pink accents, offset shadow cards) so the SDK's
- * surface stays cohesive with the landing page and the keyboard panel.
- */
+/** Detail / reports view for splits. */
 public class SplitActivity extends AppCompatActivity {
 
-    // -- design tokens (mirror landing-page CSS variables) -------------------
     private static final int CREAM = 0xFFF4EFE4;
     private static final int INK   = 0xFF0C0C0C;
     private static final int LIME  = 0xFF15803D;
@@ -91,7 +86,6 @@ public class SplitActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        // Heal email/owner stamping for installs that signed in pre-invite-feature.
         auth.fetchAndStoreEmailIfMissing();
         render();
         SplitCloudSync.fetchAndMerge(this, auth, store, changed -> { if (changed) render(); });
@@ -108,7 +102,6 @@ public class SplitActivity extends AppCompatActivity {
         scroll.addView(root, new LinearLayout.LayoutParams(
                 LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
-        // Page heading
         TextView heading = new TextView(this);
         heading.setText("Splits");
         heading.setTextSize(TypedValue.COMPLEX_UNIT_SP, 38);
@@ -129,7 +122,6 @@ public class SplitActivity extends AppCompatActivity {
         root.addView(buildProfileCard());
         root.addView(buildStatsRow());
 
-        // History header
         TextView listHeader = new TextView(this);
         listHeader.setText("HISTORY");
         listHeader.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
@@ -156,8 +148,6 @@ public class SplitActivity extends AppCompatActivity {
         return scroll;
     }
 
-    // -- profile card --------------------------------------------------------
-
     private View buildProfileCard() {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
@@ -167,11 +157,10 @@ public class SplitActivity extends AppCompatActivity {
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         lp.topMargin = dp(20);
-        lp.rightMargin = dp(4); // leave room for offset shadow
+        lp.rightMargin = dp(4);
         lp.bottomMargin = dp(4);
         card.setLayoutParams(lp);
 
-        // Top row: avatar + email + sign-out
         LinearLayout topRow = new LinearLayout(this);
         topRow.setOrientation(LinearLayout.HORIZONTAL);
         topRow.setGravity(Gravity.CENTER_VERTICAL);
@@ -229,7 +218,6 @@ public class SplitActivity extends AppCompatActivity {
 
         card.addView(topRow);
 
-        // Role badge ("Owner" or "Member")
         roleBadge = new TextView(this);
         roleBadge.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
         roleBadge.setTypeface(Typeface.DEFAULT_BOLD);
@@ -241,13 +229,12 @@ public class SplitActivity extends AppCompatActivity {
         roleBadge.setLayoutParams(rbLp);
         card.addView(roleBadge);
 
-        // Sheet link row (below)
         sheetLinkBtn = new TextView(this);
         sheetLinkBtn.setText("📊  Open in Google Sheets  →");
         sheetLinkBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
         sheetLinkBtn.setTextColor(INK);
         sheetLinkBtn.setTypeface(Typeface.DEFAULT_BOLD);
-        sheetLinkBtn.setBackground(pillDrawable(0xFFEAF7EE)); // soft lime tint
+        sheetLinkBtn.setBackground(pillDrawable(0xFFEAF7EE));
         sheetLinkBtn.setPadding(dp(14), dp(10), dp(14), dp(10));
         sheetLinkBtn.setGravity(Gravity.CENTER);
         sheetLinkBtn.setOnClickListener(v -> openSheet());
@@ -257,7 +244,6 @@ public class SplitActivity extends AppCompatActivity {
         sheetLinkBtn.setLayoutParams(sbLp);
         card.addView(sheetLinkBtn);
 
-        // Owner action: open / close anyone-with-link membership.
         inviteBtn = new TextView(this);
         inviteBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
         inviteBtn.setTypeface(Typeface.DEFAULT_BOLD);
@@ -270,7 +256,6 @@ public class SplitActivity extends AppCompatActivity {
         inviteBtn.setLayoutParams(ibLp);
         card.addView(inviteBtn);
 
-        // Clear-row pair (clear mine, clear all)
         LinearLayout clearRow = new LinearLayout(this);
         clearRow.setOrientation(LinearLayout.HORIZONTAL);
         LinearLayout.LayoutParams crLp = new LinearLayout.LayoutParams(
@@ -313,8 +298,6 @@ public class SplitActivity extends AppCompatActivity {
         return card;
     }
 
-    // -- stats row -----------------------------------------------------------
-
     private View buildStatsRow() {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
@@ -323,7 +306,6 @@ public class SplitActivity extends AppCompatActivity {
         lp.topMargin = dp(16);
         row.setLayoutParams(lp);
 
-        // This month — pink accent
         LinearLayout monthCard = statCard(PINK, WHITE);
         TextView monthLabel = new TextView(this);
         monthLabel.setText("THIS MONTH");
@@ -356,7 +338,6 @@ public class SplitActivity extends AppCompatActivity {
 
         addHSpacer(row, dp(10));
 
-        // Lifetime — white card
         LinearLayout lifeCard = statCard(WHITE, INK);
         TextView lifeLabel = new TextView(this);
         lifeLabel.setText("LIFETIME");
@@ -398,7 +379,6 @@ public class SplitActivity extends AppCompatActivity {
         return card;
     }
 
-    /** Wraps a card so its bottom-right has the offset-shadow gap. Equal-weight columns. */
     private View wrapWithRightShadow(View card, float weight) {
         LinearLayout wrap = new LinearLayout(this);
         LinearLayout.LayoutParams wLp = new LinearLayout.LayoutParams(
@@ -412,8 +392,6 @@ public class SplitActivity extends AppCompatActivity {
         wrap.addView(card);
         return wrap;
     }
-
-    // -- empty state ---------------------------------------------------------
 
     private View buildEmptyCard() {
         LinearLayout card = new LinearLayout(this);
@@ -461,10 +439,7 @@ public class SplitActivity extends AppCompatActivity {
         return card;
     }
 
-    // -- render --------------------------------------------------------------
-
     private void render() {
-        // Profile bits
         String email = auth.accountEmail();
         profileEmail.setText(email != null ? email : "your Google account");
         profileAvatar.setText(initial(email));
@@ -473,7 +448,6 @@ public class SplitActivity extends AppCompatActivity {
         sheetLinkBtn.setEnabled(haveSheet);
         sheetLinkBtn.setAlpha(haveSheet ? 1f : 0.45f);
 
-        // Role + visibility
         boolean isOwner = SplitCloudSync.isOwner(auth, store);
         if (isOwner) {
             roleBadge.setText("OWNER");
@@ -484,7 +458,6 @@ public class SplitActivity extends AppCompatActivity {
             roleBadge.setTextColor(INK);
             roleBadge.setBackground(pillDrawable(0xFFEEF1FF));
         }
-        // Invite button is owner-only; label flips based on current membership state.
         boolean canInvite = isOwner && haveSheet;
         inviteBtn.setVisibility(canInvite ? View.VISIBLE : View.GONE);
         if (canInvite) {
@@ -501,7 +474,6 @@ public class SplitActivity extends AppCompatActivity {
         }
         clearAllBtn.setVisibility(isOwner ? View.VISIBLE : View.GONE);
 
-        // Stats + list
         List<SplitHistory.Entry> entries = history.all();
         int monthCount = 0;
         double lifetime = 0;
@@ -528,7 +500,6 @@ public class SplitActivity extends AppCompatActivity {
     }
 
     private View buildRow(SplitHistory.Entry e, long now) {
-        // Wrap so the offset shadow has room on the right + bottom.
         LinearLayout wrap = new LinearLayout(this);
         wrap.setOrientation(LinearLayout.VERTICAL);
         LinearLayout.LayoutParams wLp = new LinearLayout.LayoutParams(
@@ -547,7 +518,6 @@ public class SplitActivity extends AppCompatActivity {
         rLp.bottomMargin = dp(4);
         row.setLayoutParams(rLp);
 
-        // Top: amount on left, count chip on right
         LinearLayout top = new LinearLayout(this);
         top.setOrientation(LinearLayout.HORIZONTAL);
         top.setGravity(Gravity.CENTER_VERTICAL);
@@ -571,7 +541,6 @@ public class SplitActivity extends AppCompatActivity {
         top.addView(chip);
         row.addView(top);
 
-        // Per-person breakdown
         double per = e.people > 0 ? e.amount / e.people : e.amount;
         TextView breakdown = new TextView(this);
         breakdown.setText("₹" + formatAmount(per) + " each");
@@ -584,7 +553,6 @@ public class SplitActivity extends AppCompatActivity {
         breakdown.setLayoutParams(bLp);
         row.addView(breakdown);
 
-        // When
         TextView when = new TextView(this);
         when.setText(fullDate.format(new Date(e.timestampMs))
                 + "  ·  " + DateUtils.getRelativeTimeSpanString(
@@ -597,7 +565,6 @@ public class SplitActivity extends AppCompatActivity {
         when.setLayoutParams(wnLp);
         row.addView(when);
 
-        // Action row
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
         LinearLayout.LayoutParams aLp = new LinearLayout.LayoutParams(
@@ -659,9 +626,7 @@ public class SplitActivity extends AppCompatActivity {
                 .show();
     }
 
-    // -- invite + clear ------------------------------------------------------
-
-    /** Owner taps the invite button. Opens membership and shows the QR, or stops it. */
+    /** Owner taps the invite button: opens membership and shows the QR, or stops it. */
     private void onInviteTapped() {
         if (SplitCloudSync.isMembershipOpen(store)) {
             confirmStopMembership();
@@ -696,7 +661,7 @@ public class SplitActivity extends AppCompatActivity {
                 .show();
     }
 
-    /** Owner-only: renders the join QR + share/copy actions. */
+    /** Renders the join QR dialog with share/copy actions. */
     private void showInviteQr(final String deepLink) {
         Bitmap qr = QrRenderer.render(deepLink, dp(240));
 
@@ -812,8 +777,6 @@ public class SplitActivity extends AppCompatActivity {
         startActivity(Intent.createChooser(send, "Share split"));
     }
 
-    // -- drawables -----------------------------------------------------------
-
     /** Layered card: ink rectangle offset 4dp bottom-right, fill rectangle on top. */
     private Drawable brutalistCard(int fill) {
         GradientDrawable shadow = new GradientDrawable();
@@ -845,8 +808,6 @@ public class SplitActivity extends AppCompatActivity {
         return d;
     }
 
-    // -- helpers -------------------------------------------------------------
-
     private static String initial(String email) {
         if (email == null || email.isEmpty()) return "·";
         char c = email.charAt(0);
@@ -855,7 +816,7 @@ public class SplitActivity extends AppCompatActivity {
 
     /** Picks a stable accent color for the avatar from the email hash. */
     private static int avatarColor(String email) {
-        int[] palette = { LIME, PINK, BLUE, 0xFFFF7A1A /* orange */ };
+        int[] palette = { LIME, PINK, BLUE, 0xFFFF7A1A };
         if (email == null || email.isEmpty()) return MUTED;
         return palette[Math.floorMod(email.hashCode(), palette.length)];
     }

@@ -22,11 +22,7 @@ import com.prince.turtlekeyboard.settings.Prefs;
 
 import java.util.Set;
 
-/**
- * Manages per-app personalization state. Two sections: enrolled apps (Customize / Remove)
- * and suppressed apps (Allow). Built programmatically using {@link Brutal} so it shares
- * the host app's neo-brutalist look without an XML round-trip per row.
- */
+/** Per-app personalization screen with enrolled (Customize/Remove) and suppressed (Allow) lists. */
 public class AppPersonalizationActivity extends AppCompatActivity {
 
     private AppProfileRegistry profiles;

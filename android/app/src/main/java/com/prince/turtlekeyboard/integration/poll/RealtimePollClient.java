@@ -78,13 +78,18 @@ public final class RealtimePollClient {
         public final List<Option> options;
         public final long createdAt;
         public final long expiresAt;
+        /** Option index the currently signed-in user voted for, or {@code -1} if
+         *  they haven't voted (or no user is signed in). Derived from the voters
+         *  subtree in {@link #parsePoll}. */
+        public final int myVoteIndex;
         public Poll(String id, String question, List<Option> options,
-                    long createdAt, long expiresAt) {
+                    long createdAt, long expiresAt, int myVoteIndex) {
             this.id = id;
             this.question = question;
             this.options = options;
             this.createdAt = createdAt;
             this.expiresAt = expiresAt;
+            this.myVoteIndex = myVoteIndex;
         }
     }
 
@@ -253,13 +258,20 @@ public final class RealtimePollClient {
         }
         if (labels.isEmpty()) return null;
 
+        FirebaseUser current = FirebaseAuth.getInstance().getCurrentUser();
+        String myUid = current == null ? null : current.getUid();
+
         int[] counts = new int[labels.size()];
+        int myVoteIndex = -1;
         for (DataSnapshot s : snap.child(VOTERS_PATH).getChildren()) {
             Object v = s.getValue();
             int idx = (v instanceof Long) ? ((Long) v).intValue()
                     : (v instanceof Integer) ? (Integer) v
                     : -1;
-            if (idx >= 0 && idx < counts.length) counts[idx]++;
+            if (idx >= 0 && idx < counts.length) {
+                counts[idx]++;
+                if (myUid != null && myUid.equals(s.getKey())) myVoteIndex = idx;
+            }
         }
 
         List<Option> options = new ArrayList<>(labels.size());
@@ -272,7 +284,8 @@ public final class RealtimePollClient {
                 question,
                 options,
                 longOf(snap.child("createdAt")),
-                longOf(snap.child("expiresAt"))
+                longOf(snap.child("expiresAt")),
+                myVoteIndex
         );
     }
 

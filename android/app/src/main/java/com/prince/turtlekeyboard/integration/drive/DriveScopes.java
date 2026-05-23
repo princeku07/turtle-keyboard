@@ -4,13 +4,8 @@ import java.util.Collections;
 import java.util.Set;
 
 /**
- * OAuth scopes Drive-backed commands need from Google. Currently just {@code drive.file}
- * — the app can only read / write files it created, never the user's broader Drive.
- * That's the whole point of this scope: minimal consent dialog, no full-Drive Google
- * verification process required.
- *
- * <p>Powers /us (reference photo storage). Future Drive-backed commands extend this
- * set if needed.
+ * OAuth scopes Drive-backed commands need. Limited to {@code drive.file} — the app can
+ * only access files it created.
  */
 public final class DriveScopes {
 

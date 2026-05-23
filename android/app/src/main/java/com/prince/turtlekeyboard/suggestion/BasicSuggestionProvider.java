@@ -5,10 +5,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * Minimal placeholder. Returns the typed word and two trivial completions so the strip is
- * visibly wired. Swap with a dictionary-backed provider (or on-device LM) for real parity.
- */
+/** Minimal placeholder returning the typed word plus two trivial completions. */
 public class BasicSuggestionProvider implements SuggestionProvider {
 
     private static final List<String> COMMON =

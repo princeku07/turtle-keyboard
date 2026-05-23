@@ -6,14 +6,8 @@ import com.prince.turtlekeyboard.ai.AiResult;
 import com.prince.turtlekeyboard.input.InputCommitter;
 
 /**
- * Glue between detection and execution. Two paths:
- *
- * <ul>
- *   <li>Built-in AI commands round-trip to the {@link AiClient} and the result is written
- *       back into the host editor.</li>
- *   <li>Integration-contributed commands (with a non-null handler) run locally — the
- *       handler receives the parsed prompt and the live {@link IntegrationContext}.</li>
- * </ul>
+ * Glue between detection and execution. AI commands round-trip to {@link AiClient};
+ * integration commands with a non-null handler run locally with an {@link IntegrationContext}.
  */
 public class CommandDispatcher {
 
@@ -44,12 +38,12 @@ public class CommandDispatcher {
     }
 
     public void dispatch(SlashCommand cmd) {
-        // Remove the typed "/cmd args " from the field before showing the result.
+        // Strip the typed "/cmd args " from the field before showing the result.
         committer.deleteBeforeCursor(cmd.raw.length() + 1);
         run(cmd);
     }
 
-    /** Dispatch a command that was composed in the keyboard UI and never reached the field. */
+    /** Dispatch a command composed in the keyboard UI that never reached the field. */
     public void dispatchComposed(SlashCommand cmd) {
         run(cmd);
     }
@@ -57,14 +51,10 @@ public class CommandDispatcher {
     private void run(SlashCommand cmd) {
         CommandRegistry.Entry e = registry.get(cmd.name);
         if (e != null && e.handler != null) {
-            // Local handler — runs synchronously, no AI round trip.
             e.handler.handle(cmd.prompt == null ? "" : cmd.prompt, contextProvider.get());
             return;
         }
-        // Per-command loading text (e.g. "Generating image…") falls back to
-        // the raw slash name when the entry hasn't declared one. The trailing
-        // "…" is the loader marker — TurtleInputMethodService.showStatus uses
-        // it to decide between the loader panel and the transient banner.
+        // Trailing "…" is the loader marker: showStatus uses it to pick the loader vs transient banner.
         String base = (e != null && e.loadingMessage != null && !e.loadingMessage.isEmpty())
                 ? e.loadingMessage
                 : "/" + cmd.name;

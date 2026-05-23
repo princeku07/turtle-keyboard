@@ -3,21 +3,12 @@ package com.prince.turtlekeyboard.overlay;
 import android.net.Uri;
 
 /**
- * Canonical URL builder for overlay-sheet artifacts. Single source of truth for the
- * scheme + host so a future domain change is one edit, not a grep.
- *
- * <p>URL shape: {@code https://<HOST>/<routeKey>/<id>[?<query>]}. The
- * {@code AndroidManifest.xml} intent-filter for {@code BottomSheetActivity} must match
- * the same host. {@code assetlinks.json} hosted at
- * {@code https://<HOST>/.well-known/assetlinks.json} (served by the landing-app's
- * {@code public/} folder) lets {@code android:autoVerify="true"} pass on install, so
- * taps in chat open Turtle directly without a chooser.
+ * Canonical URL builder for overlay-sheet artifacts: {@code https://<HOST>/<routeKey>/<id>}.
+ * The manifest's BottomSheetActivity intent-filter host and the {@code assetlinks.json}
+ * domain must match {@link #HOST} for {@code autoVerify="true"} App Links to work.
  */
 public final class OverlayUrls {
 
-    /** App Link host. Must match the {@code <data android:host="..."/>} in the
-     *  manifest's BottomSheetActivity intent-filter AND the domain serving
-     *  {@code /.well-known/assetlinks.json} from {@code lading-app/public/}. */
     public static final String HOST = "www.turtlekeyboard.com";
 
     private OverlayUrls() {}

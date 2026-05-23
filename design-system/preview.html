@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Turtle Keyboard · Design Tokens</title>
+<style>
+  /* AUTO-GENERATED — page chrome dogfoods the tokens it documents */
+  :root {
+  --brand-green: #008658;
+  --brand-green-deep: #0E5C2C;
+  --brand-dot-gold: #D9CBA0;
+  --onboard-bg: #F1F5E8;
+  --onboard-hero-top: #DDE7F4;
+  --onboard-hero-mid: #F3EAF6;
+  --onboard-hero-bottom: #E8F0E2;
+  --onboard-title: #0C0C0C;
+  --onboard-subtitle: #6B6B6B;
+  --onboard-cta-bg: #0C0C0C;
+  --onboard-cta-text: #FFFFFF;
+  --onboard-dot-active: #0C0C0C;
+  --onboard-dot-inactive: #CDD3C2;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 20px;
+  --space-2xl: 24px;
+  --space-3xl: 32px;
+  --space-4xl: 40px;
+    --bg: #0c0c0c;
+    --bg-card: #161616;
+    --bg-card-hover: #1c1c1c;
+    --border: #262626;
+    --text: #f5f5f5;
+    --text-muted: #9a9a9a;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); padding: var(--space-3xl) var(--space-2xl); line-height: 1.5; }
+  main { max-width: 1120px; margin: 0 auto; }
+
+  header { margin-bottom: var(--space-4xl); padding-bottom: var(--space-2xl); border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 32px; font-weight: 900; letter-spacing: -0.02em; }
+  header h1 .brand { color: var(--brand-green); }
+  header p { color: var(--text-muted); margin-top: var(--space-sm); font-family: var(--mono); font-size: 13px; }
+
+  section { margin-bottom: var(--space-4xl); }
+  section > h2 { font-size: 13px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-muted); margin-bottom: var(--space-lg); }
+
+  /* Color grid */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-md); }
+  .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; transition: background 120ms ease, transform 120ms ease; }
+  .card:hover { background: var(--bg-card-hover); transform: translateY(-1px); }
+  .color-card .swatch { aspect-ratio: 16 / 9; }
+  .meta { padding: var(--space-md) var(--space-lg); display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); font-family: var(--mono); font-size: 12px; }
+  .meta .name { color: var(--text); }
+  .meta .value { color: var(--text-muted); }
+
+  /* Spacing list */
+  .space-list { display: flex; flex-direction: column; gap: var(--space-sm); }
+  .space-row { display: grid; grid-template-columns: 100px 1fr 160px; align-items: center; gap: var(--space-lg); padding: var(--space-md) var(--space-lg); background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; }
+  .space-row .name { font-family: var(--mono); font-size: 12px; }
+  .space-bar { height: 12px; background: var(--brand-green); border-radius: 999px; max-width: 100%; }
+  .space-row .value { font-family: var(--mono); font-size: 12px; color: var(--text-muted); text-align: right; }
+
+  /* Typography list */
+  .type-list { display: flex; flex-direction: column; gap: var(--space-md); }
+  .type-card { padding: var(--space-2xl); }
+  .type-sample { color: var(--text); margin-bottom: var(--space-lg); }
+  .type-card .meta { padding: 0; border-top: 1px dashed var(--border); padding-top: var(--space-md); }
+
+  footer { color: var(--text-muted); font-family: var(--mono); font-size: 11px; padding-top: var(--space-xl); border-top: 1px solid var(--border); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Turtle Keyboard <span class="brand">/</span> Design Tokens</h1>
+    <p>13 colors · 8 dimensions · 3 text styles · generated from <code>design-system/tokens.json</code></p>
+  </header>
+
+  <section>
+    <h2>Color</h2>
+    <div class="grid">
+        <article class="card color-card">
+          <div class="swatch" style="background: #008658"></div>
+          <div class="meta">
+            <code class="name">brand.green</code>
+            <code class="value">#008658</code>
+          </div>
+        </article>
+        <article class="card color-card">
+          <div class="swatch" style="background: #0E5C2C"></div>
+          <div class="meta">
+            <code class="name">brand.green-deep</code>
+            <code class="value">#0E5C2C</code>
+          </div>
+        </article>
+        <article class="card color-card">
+          <div class="swatch" style="background: #D9CBA0"></div>
+          <div class="meta">
+            <code class="name">brand.dot-gold</code>
+            <code class="value">#D9CBA0</code>
+          </div>
+        </article>
+        <article class="card color-card">
+          <div class="swatch" style="background: #F1F5E8"></div>
+          <div class="meta">
+            <code class="name">onboard.bg</code>
+            <code class="value">#F1F5E8</code>
+          </div>
+        </article>
+        <article class="card color-card">
+          <div class="swatch" style="background: #DDE7F4"></div>
+          <div class="meta">
+            <code class="name">onboard.hero-top</code>
+            <code class="value">#DDE7F4</code>
+          </div>
+        </article>
+        <article class="card color-card">
+          <div class="swatch" style="background: #F3EAF6"></div>
+          <div class="meta">
+            <code class="name">onboard.hero-mid</code>
+            <code class="value">#F3EAF6</code>
+          </div>
+        </article>
+        <article class="card color-card">
+          <div class="swatch" style="background: #E8F0E2"></div>
+          <div class="meta">
+            <code class="name">onboard.hero-bottom</code>
+            <code class="value">#E8F0E2</code>
+          </div>
+        </article>
+        <article class="card color-card">
+          <div class="swatch" style="background: #0C0C0C"></div>
+          <div class="meta">
+            <code class="name">onboard.title</code>
+            <code class="value">#0C0C0C</code>
+          </div>
+        </article>
+        <article class="card color-card">
+          <div class="swatch" style="background: #6B6B6B"></div>
+          <div class="meta">
+            <code class="name">onboard.subtitle</code>
+            <code class="value">#6B6B6B</code>
+          </div>
+        </article>
+        <article class="card color-card">
+          <div class="swatch" style="background: #0C0C0C"></div>
+          <div class="meta">
+            <code class="name">onboard.cta-bg</code>
+            <code class="value">#0C0C0C</code>
+          </div>
+        </article>
+        <article class="card color-card">
+          <div class="swatch" style="background: #FFFFFF"></div>
+          <div class="meta">
+            <code class="name">onboard.cta-text</code>
+            <code class="value">#FFFFFF</code>
+          </div>
+        </article>
+        <article class="card color-card">
+          <div class="swatch" style="background: #0C0C0C"></div>
+          <div class="meta">
+            <code class="name">onboard.dot-active</code>
+            <code class="value">#0C0C0C</code>
+          </div>
+        </article>
+        <article class="card color-card">
+          <div class="swatch" style="background: #CDD3C2"></div>
+          <div class="meta">
+            <code class="name">onboard.dot-inactive</code>
+            <code class="value">#CDD3C2</code>
+          </div>
+        </article>
+    </div>
+  </section>
+
+  <section>
+    <h2>Spacing</h2>
+    <div class="space-list">
+        <div class="space-row">
+          <code class="name">space.xs</code>
+          <div class="space-bar" style="width: 4px;"></div>
+          <code class="value">4dp · 4px</code>
+        </div>
+        <div class="space-row">
+          <code class="name">space.sm</code>
+          <div class="space-bar" style="width: 8px;"></div>
+          <code class="value">8dp · 8px</code>
+        </div>
+        <div class="space-row">
+          <code class="name">space.md</code>
+          <div class="space-bar" style="width: 12px;"></div>
+          <code class="value">12dp · 12px</code>
+        </div>
+        <div class="space-row">
+          <code class="name">space.lg</code>
+          <div class="space-bar" style="width: 16px;"></div>
+          <code class="value">16dp · 16px</code>
+        </div>
+        <div class="space-row">
+          <code class="name">space.xl</code>
+          <div class="space-bar" style="width: 20px;"></div>
+          <code class="value">20dp · 20px</code>
+        </div>
+        <div class="space-row">
+          <code class="name">space.2xl</code>
+          <div class="space-bar" style="width: 24px;"></div>
+          <code class="value">24dp · 24px</code>
+        </div>
+        <div class="space-row">
+          <code class="name">space.3xl</code>
+          <div class="space-bar" style="width: 32px;"></div>
+          <code class="value">32dp · 32px</code>
+        </div>
+        <div class="space-row">
+          <code class="name">space.4xl</code>
+          <div class="space-bar" style="width: 40px;"></div>
+          <code class="value">40dp · 40px</code>
+        </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Typography</h2>
+    <div class="type-list">
+        <article class="card type-card">
+          <div class="type-sample" style="font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-weight: 900; font-size: 28px; line-height: 1.1; letter-spacing: 0;">
+            The quick brown fox jumps over the lazy dog
+          </div>
+          <div class="meta">
+            <code class="name">text.display</code>
+            <code class="value">900 · 28px · 1.1 lh</code>
+          </div>
+        </article>
+        <article class="card type-card">
+          <div class="type-sample" style="font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-weight: 400; font-size: 15px; line-height: 1.4; letter-spacing: 0;">
+            The quick brown fox jumps over the lazy dog
+          </div>
+          <div class="meta">
+            <code class="name">text.body</code>
+            <code class="value">400 · 15px · 1.4 lh</code>
+          </div>
+        </article>
+        <article class="card type-card">
+          <div class="type-sample" style="font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-weight: 500; font-size: 16px; line-height: 1; letter-spacing: 0.02em;">
+            The quick brown fox jumps over the lazy dog
+          </div>
+          <div class="meta">
+            <code class="name">text.button</code>
+            <code class="value">500 · 16px · 1 lh · 0.02em tracking</code>
+          </div>
+        </article>
+    </div>
+  </section>
+
+  <footer>AUTO-GENERATED by design-system/build.mjs — edit tokens.json, regenerate, commit.</footer>
+</main>
+</body>
+</html>

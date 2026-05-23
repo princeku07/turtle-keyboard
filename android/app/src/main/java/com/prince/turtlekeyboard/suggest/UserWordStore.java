@@ -11,15 +11,9 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * On-device store for words the user has typed, with per-word counts.
- *
- * Persistence is via a private SharedPreferences file. Reads hit an in-memory
- * mirror so suggestion lookups stay off the disk path.
- *
- * Capped at MAX_ENTRIES; eviction drops the lowest-count entries in batches.
- *
- * Privacy note: this stores plain words. The backing prefs file is MODE_PRIVATE
- * (readable only by this app). Nothing here writes outside the device.
+ * On-device per-word counter for words the user has typed. Backed by a private
+ * SharedPreferences file; reads hit an in-memory mirror. Capped at
+ * {@link #MAX_ENTRIES}; eviction drops the lowest-count entries in batches.
  */
 public final class UserWordStore {
 
@@ -55,10 +49,7 @@ public final class UserWordStore {
         return v == null ? 0 : v;
     }
 
-    /**
-     * Returns words in the store that start with {@code prefix}, sorted by
-     * count descending. Case-insensitive (the store is lowercase by convention).
-     */
+    /** Words starting with {@code prefix}, sorted by count desc. Case-insensitive. */
     public synchronized List<String> prefixMatches(String prefix, int max) {
         if (prefix == null || prefix.isEmpty() || max <= 0) {
             return Collections.emptyList();

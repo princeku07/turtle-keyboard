@@ -24,18 +24,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Renders an HTML snippet to a WebP. Returns the absolute file path AND a FileProvider
- * URI: the path is what the in-keyboard preview decodes (cheap, no permission paths),
- * the URI is what {@code commitContent()} / clipboard need.
- *
- * <p>Two non-obvious bits:
- * <ul>
- *   <li>WebView is forced to LAYER_TYPE_SOFTWARE before drawing. Hardware-accelerated
- *       WebViews drawn via {@code view.draw(canvas)} into an offscreen bitmap come out
- *       blank on most devices, particularly inside an IME process.</li>
- *   <li>We post twice — first {@code DRAW_DELAY_MS} after onPageFinished to let layout
- *       settle, then a second microtask so the software layer is in place before drawing.</li>
- * </ul>
+ * Renders an HTML snippet to WebP, returning both the file path and a FileProvider URI.
+ * WebView is forced to software layer because hardware-accelerated WebViews drawn
+ * into an offscreen bitmap render blank, especially in the IME process.
  */
 public final class HtmlImageRenderer {
 
@@ -48,15 +39,12 @@ public final class HtmlImageRenderer {
     private static final ExecutorService ENCODE_EXECUTOR = Executors.newSingleThreadExecutor();
     private static final AtomicInteger TRACE_SEQ = new AtomicInteger(0);
 
-    /** Per-render breadcrumb tracker. All times in ms since {@link #start}. */
     private static final class Trace {
         final int id;
         final long start = SystemClock.uptimeMillis();
         long lastMark = start;
         Trace(int id) { this.id = id; }
-        /** Total ms since render() entry. */
         long total() { return SystemClock.uptimeMillis() - start; }
-        /** Logs phase name + ms-since-start AND ms-since-previous-mark, then resets the lap timer. */
         void mark(String phase) {
             long now = SystemClock.uptimeMillis();
             long sinceStart = now - start;

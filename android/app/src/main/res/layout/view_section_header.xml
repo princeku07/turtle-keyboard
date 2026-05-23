@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Section header — small all-caps label above a card group. Use the style
+     directly via <TextView style="@style/SectionHeader" .../> rather than including
+     this file; this layout is kept for reference / future expansion (e.g. when a
+     section gets a trailing action button). -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    style="@style/SectionHeader"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content" />

@@ -11,13 +11,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Loads a command's system prompt from {@code assets/prompts/<name>.txt} (mirrored from
- * {@code commands/prompts/<name>.txt} at the repo root by a Gradle copy task). Process-wide
+ * Loads a command's system prompt from {@code assets/prompts/<name>.txt}. Process-wide
  * in-memory cache — each prompt is read off disk at most once per process lifetime.
- *
- * <p>Used by integrations to load their own system prompts before calling
- * {@link GeminiService}. The same path Android + iOS read from, so prompt edits in
- * {@code commands/prompts/} propagate to both platforms without code changes.
  */
 public final class AssetPrompts {
 
@@ -25,9 +20,7 @@ public final class AssetPrompts {
 
     private AssetPrompts() {}
 
-    /** Returns the prompt for {@code name}, or empty string when the file is missing.
-     *  Caller decides what to do with empty (error out, fall back to a raw completion,
-     *  show "rebuild" hint) — this helper has no opinion on missing prompts. */
+    /** @return the prompt for {@code name}, or empty string when the file is missing. */
     public static String load(Context context, String name) {
         if (context == null || name == null || name.isEmpty()) return "";
         String cached = CACHE.get(name);

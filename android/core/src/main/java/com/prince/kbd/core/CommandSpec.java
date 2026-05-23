@@ -7,17 +7,9 @@ import java.util.Set;
 
 /**
  * A slash command a {@link CommandProvider} contributes to the keyboard. Commands with a
- * non-null {@link #handler} run locally — the dispatcher invokes the handler instead of
- * routing to the AI backend.
- *
- * <p>{@link #affinityPkgs} is a ranking signal, not a gate: a command is always callable
- * everywhere, but tiles for it float to the top of the Quick Panel when the user is in
- * one of the listed apps. Empty set ⇒ no preference.
- *
- * <p>{@link #loadingMessage} (optional, AI-routed commands only) is the user-facing
- * status shown while the request is in flight. Lets each command have its own copy
- * ("Generating image", "Translating", …) instead of the bare slash name. Null falls back
- * to {@code "/" + name} in the dispatcher.
+ * non-null {@link #handler} run locally; otherwise the dispatcher routes to the AI backend.
+ * {@link #affinityPkgs} is a ranking signal (Quick Panel ordering), not a gate.
+ * {@link #loadingMessage} is the in-flight status; null falls back to {@code "/" + name}.
  */
 public final class CommandSpec {
 

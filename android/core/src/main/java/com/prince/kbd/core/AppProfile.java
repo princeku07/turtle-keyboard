@@ -4,9 +4,8 @@ import java.util.Collections;
 import java.util.Set;
 
 /**
- * Profile for a host app the keyboard knows about. Tags drive integration affinity — a
- * payments integration looks for {@code "payment"}, a chat-template integration for
- * {@code "chat"}. New integrations add new tags without touching existing ones.
+ * Profile for a host app the keyboard knows about. Tags drive integration affinity
+ * (e.g. a payments integration looks for {@code "payment"}).
  */
 public final class AppProfile {
 

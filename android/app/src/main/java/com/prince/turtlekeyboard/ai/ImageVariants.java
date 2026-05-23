@@ -11,9 +11,8 @@ import java.io.File;
 import java.io.FileOutputStream;
 
 /**
- * Re-encodes a source PNG into the format the user picked from the share-type row.
- * Each variant returns a fresh file under {@code shared_images/} so the FileProvider
- * URI mime is derived purely from the extension.
+ * Re-encodes a source PNG into the user's chosen share format. Each variant writes
+ * a fresh file under {@code shared_images/} so the FileProvider mime comes from the extension.
  */
 public final class ImageVariants {
 
@@ -39,8 +38,7 @@ public final class ImageVariants {
         throw new IllegalArgumentException("unknown share type: " + type);
     }
 
-    /** Square 512×512 PNG, source centered with white padding. Acceptable as a sticker
-     *  in most messengers that take {@code image/png}. */
+    /** 512x512 PNG with source centered on white padding; accepted as a sticker by most messengers. */
     private static File asSticker(File source, File outDir) throws Exception {
         Bitmap src = BitmapFactory.decodeFile(source.getAbsolutePath());
         if (src == null) throw new Exception("decode failed");
@@ -66,7 +64,7 @@ public final class ImageVariants {
         return out;
     }
 
-    /** Single-frame static GIF89a built via the embedded {@link GifEncoder}. */
+    /** Single-frame static GIF89a built via {@link GifEncoder}. */
     private static File asGif(File source, File outDir) throws Exception {
         Bitmap src = BitmapFactory.decodeFile(source.getAbsolutePath());
         if (src == null) throw new Exception("decode failed");

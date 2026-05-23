@@ -1,13 +1,15 @@
-<resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Dark mode shares the same palette — landing page and keyboard panels are
-         neo-brutalist, not theme-adaptive. Revisit when product wants a dark surface. -->
+<resources>
+    <!-- Night-mode override is a no-op — the host theme is force-dark in both modes.
+         Kept to silence the resource-fallback warning when the OS is in night mode. -->
     <style name="Theme.TurtleKeyboard" parent="Theme.AppCompat.NoActionBar">
-        <item name="android:windowBackground">@color/cream</item>
-        <item name="android:textColorPrimary">@color/ink</item>
-        <item name="android:textColorSecondary">@color/muted</item>
-        <item name="android:colorBackground">@color/cream</item>
-        <item name="colorPrimary">@color/lime</item>
-        <item name="colorPrimaryDark">@color/ink</item>
-        <item name="colorAccent">@color/pink</item>
+        <item name="android:windowBackground">@color/bg_root</item>
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
+        <item name="android:colorBackground">@color/bg_root</item>
+        <item name="android:statusBarColor">@color/bg_root</item>
+        <item name="android:navigationBarColor">@color/bg_root</item>
+        <item name="colorPrimary">@color/green</item>
+        <item name="colorPrimaryDark">@color/bg_root</item>
+        <item name="colorAccent">@color/green</item>
     </style>
 </resources>

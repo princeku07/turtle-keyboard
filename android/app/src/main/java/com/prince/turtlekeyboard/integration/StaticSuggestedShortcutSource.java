@@ -7,10 +7,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Local catalog of shortcut templates keyed by Android package name. No network, no AI —
- * just text templates that survive ENterPromptMode → tap-Go → commit. Each enrolled app
- * gets these registered as commands with affinity for the package, so they float to the
- * top of the Quick Panel inside that app and stay reachable elsewhere too.
+ * Local catalog of shortcut templates keyed by Android package name. Each enrolled
+ * app gets these registered as commands with affinity for the package.
  */
 public final class StaticSuggestedShortcutSource implements SuggestedShortcutSource {
 
@@ -64,8 +62,6 @@ public final class StaticSuggestedShortcutSource implements SuggestedShortcutSou
                         "AFK for a bit — back in ", true)
         ));
 
-        // Chrome: search-modifier templates that drop into the omnibox before a query.
-        // The user types the rest after the prefix, then submits as normal.
         m.put("com.android.chrome", Arrays.asList(
                 new SuggestedShortcut("site", "Site search", "🔎",
                         "site:", true),

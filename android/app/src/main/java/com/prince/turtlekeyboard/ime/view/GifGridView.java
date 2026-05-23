@@ -37,25 +37,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Scrollable grid of generated GIFs surfaced as a tab inside
- * {@link EmojiPanelView}. Each tile previews a single GIF; tapping inserts
- * the GIF into the focused input via the keyboard's commitImage path.
- *
- * <p>Performance posture:
- * <ul>
- *   <li>{@link ThumbnailLoader} provides an instant first-frame static
- *       placeholder so scrolling never blocks waiting for a decode.</li>
- *   <li>Animated drawables ({@code AnimatedImageDrawable}, API 28+) are
- *       decoded on a small background pool with {@code setTargetSize()} so
- *       each in-memory frame matches the on-screen tile, not the source.</li>
- *   <li>{@code onScroll} sweeps the GridView's currently-attached children
- *       and starts their animations; cells recycled out of view are stopped
- *       on their next {@code bind()} so off-screen tiles don't keep
- *       invalidating.</li>
- *   <li>API 24–27 devices fall back to a static first-frame preview — the
- *       tile still scrolls fast and tapping still inserts the animated GIF;
- *       only the in-panel preview is non-moving.</li>
- * </ul>
+ * Scrollable grid of generated GIFs surfaced as a tab inside {@link EmojiPanelView}.
+ * Tapping a tile inserts the GIF via the keyboard's commitImage path. API 24–27
+ * shows a static first-frame preview; API 28+ decodes the animated drawable lazily.
  */
 public class GifGridView extends FrameLayout {
 
@@ -63,17 +47,10 @@ public class GifGridView extends FrameLayout {
 
     public interface OnGifPick { void onPick(File file); }
 
-    /** Three columns mirror the still-image {@link HistoryPanelView}, so the
-     *  two surfaces feel like the same UI affordance just split by type. */
     private static final int COLUMNS = 3;
 
-    /** Target side in dp for the in-panel decoded tile. We feed this to
-     *  {@code ImageDecoder.setTargetSize()} so each in-memory animated frame
-     *  is just big enough for the visible cell (×2 for hi-dpi headroom). */
     private static final int TILE_SIDE_DP = 96;
 
-    /** Decode pool size 2 keeps responsiveness on scroll without
-     *  monopolising the device when several GIFs are decoded together. */
     private static final ExecutorService DECODE_IO = Executors.newFixedThreadPool(2);
 
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
@@ -102,10 +79,7 @@ public class GifGridView extends FrameLayout {
         grid.setSelector(new GradientDrawable());
         adapter = new GifAdapter();
         grid.setAdapter(adapter);
-        // On every scroll we re-evaluate which children are visible and
-        // ensure their animations are running. Children recycled out of
-        // view get a stop() on their next bind() so we don't burn CPU on
-        // off-screen cells.
+        // Restart animations on newly-visible tiles; recycled tiles get stop() on their next bind().
         grid.setOnScrollListener(new android.widget.AbsListView.OnScrollListener() {
             @Override public void onScrollStateChanged(android.widget.AbsListView v, int s) {}
             @Override public void onScroll(android.widget.AbsListView v, int firstVisibleItem,
@@ -118,9 +92,6 @@ public class GifGridView extends FrameLayout {
         });
         addView(grid, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
 
-        // Empty state: icon + heading + subtitle, vertically centred. Mirrors
-        // HistoryPanelView's pattern so both keyboard surfaces feel like one
-        // designed system rather than two ad-hoc grids.
         emptyState = new LinearLayout(context);
         emptyState.setOrientation(LinearLayout.VERTICAL);
         emptyState.setGravity(Gravity.CENTER);
@@ -214,22 +185,12 @@ public class GifGridView extends FrameLayout {
         }
     }
 
-    /** Single GIF tile. Lifecycle: {@link #bind(File)} cancels any in-flight
-     *  decode, clears the previous animation, shows the cached static
-     *  first-frame thumb (via {@link ThumbnailLoader}), and dispatches an
-     *  async {@code ImageDecoder} for the full animated drawable. When the
-     *  animated decode completes <i>and</i> the tile is still bound to the
-     *  same file <i>and</i> still on-screen, the drawable replaces the
-     *  thumb and starts looping. The tile also carries a small bottom-right
-     *  {@code GIF} badge for visual consistency with the still-image
-     *  history surfaces (which use {@code GIF}/{@code IMG}). */
     private class GifTileView extends FrameLayout {
 
         private final ImageView image;
         private final TextView badge;
         @Nullable private File currentFile;
-        /** Monotonic token used to drop stale decode callbacks when bind()
-         *  has reassigned this tile to a different file mid-decode. */
+        // Monotonic token; stale decode callbacks drop themselves.
         private long bindEpoch;
         @Nullable private Drawable animatedDrawable;
 
@@ -237,8 +198,7 @@ public class GifGridView extends FrameLayout {
             super(ctx);
             setClickable(true);
             setFocusable(true);
-            // Outline lives on the container so the badge sits inside the
-            // rounded clip region rather than over a hard square corner.
+            // Outline on the container so the badge clips with the rounded corners.
             final int radius = dp(10);
             setOutlineProvider(new ViewOutlineProvider() {
                 @Override public void getOutline(View view, Outline outline) {
@@ -246,18 +206,12 @@ public class GifGridView extends FrameLayout {
                 }
             });
             setClipToOutline(true);
-            // Faint card behind the image so each tile reads as a distinct
-            // surface before its thumbnail finishes decoding — the panel
-            // bg is plain black, so without this the grid would look like
-            // a checkerboard of placeholder rectangles during initial scroll.
+            // Faint card behind the image so the tile is visible before its thumbnail decodes.
             GradientDrawable cardBg = new GradientDrawable();
             cardBg.setShape(GradientDrawable.RECTANGLE);
             cardBg.setColor(0x14FFFFFF);
             cardBg.setCornerRadius(radius);
             setBackground(cardBg);
-            // Ripple feedback, masked to the tile's rounded corners. A white
-            // wash reads well against the dark panel — for the host-app
-            // history surface a different mask colour is in HistoryPanelView.
             GradientDrawable rippleMask = new GradientDrawable();
             rippleMask.setShape(GradientDrawable.RECTANGLE);
             rippleMask.setColor(Color.WHITE);
@@ -296,14 +250,12 @@ public class GifGridView extends FrameLayout {
                 ensurePlaying();
                 return;
             }
-            // Tear down whatever the previous bind set up so a recycled
-            // tile never bleeds the old animation onto the new file.
+            // Recycled tile must not bleed the previous animation onto the new file.
             stopAnimation();
             animatedDrawable = null;
             currentFile = file;
             final long epoch = ++bindEpoch;
 
-            // Instant placeholder via the shared cached loader.
             ThumbnailLoader.load(file, dp(TILE_SIDE_DP), image);
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -312,9 +264,6 @@ public class GifGridView extends FrameLayout {
                     Drawable d = decodeAnimated(captured);
                     if (d == null) return;
                     MAIN.post(() -> {
-                        // Tile may have been reassigned to a different
-                        // file or another decode may have raced ahead.
-                        // Drop the result if either is true.
                         if (epoch != bindEpoch) return;
                         animatedDrawable = d;
                         image.setImageDrawable(d);
@@ -324,10 +273,7 @@ public class GifGridView extends FrameLayout {
             }
         }
 
-        /** Idempotent: starts the animation if the tile has an
-         *  AnimatedImageDrawable assigned and it's not already running.
-         *  Called both from {@code bind()} and from the parent grid's
-         *  scroll callback so newly-visible tiles begin moving. */
+        /** Idempotent; safe to call from both bind() and the scroll callback. */
         void ensurePlaying() {
             if (animatedDrawable instanceof AnimatedImageDrawable) {
                 AnimatedImageDrawable aid = (AnimatedImageDrawable) animatedDrawable;
@@ -345,8 +291,6 @@ public class GifGridView extends FrameLayout {
         @Override
         protected void onDetachedFromWindow() {
             super.onDetachedFromWindow();
-            // Belt-and-braces: a tile leaving the window (panel close,
-            // configuration change) should release its animation timer.
             stopAnimation();
         }
 
@@ -355,7 +299,7 @@ public class GifGridView extends FrameLayout {
         private Drawable decodeAnimated(File file) {
             try {
                 ImageDecoder.Source src = ImageDecoder.createSource(file);
-                int targetPx = dp(TILE_SIDE_DP) * 2; // hi-dpi headroom
+                int targetPx = dp(TILE_SIDE_DP) * 2;
                 Drawable d = ImageDecoder.decodeDrawable(src, (decoder, info, source) -> {
                     int w = info.getSize().getWidth();
                     int h = info.getSize().getHeight();

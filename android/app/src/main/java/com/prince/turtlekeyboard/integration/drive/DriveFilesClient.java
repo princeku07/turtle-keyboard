@@ -18,14 +18,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Drive REST helpers for files this app created (drive.file scope). Used by /us reference
- * photos. All methods are network-blocking — call from a background thread. A 401 means
- * the access token expired; callers should refresh via
- * {@link com.prince.kbd.core.GoogleAuth} and retry once.
- *
- * <p>Same shape as {@code SplitSheetsClient} / {@code SplitDriveClient} in {@code :split}
- * — static methods that take a bearer token + the operation's parameters, throw
- * {@link IOException} on any non-2xx, return parsed JSON values otherwise.
+ * Drive REST helpers for files this app created (drive.file scope). All methods are
+ * network-blocking; a 401 means the access token expired and the caller should refresh
+ * via {@link com.prince.kbd.core.GoogleAuth} and retry once.
  */
 public final class DriveFilesClient {
 
@@ -37,16 +32,7 @@ public final class DriveFilesClient {
 
     private DriveFilesClient() {}
 
-    /**
-     * Uploads {@code bytes} as a Drive file owned by the user. Returns the new file's id
-     * on success.
-     *
-     * @param accessToken Bearer token with {@code drive.file} scope
-     * @param name        visible filename in Drive (e.g. {@code turtle-us-ref-1.jpg})
-     * @param mimeType    e.g. {@code image/jpeg}
-     * @param bytes       file contents
-     * @throws IOException on any non-2xx response or network failure
-     */
+    /** Uploads {@code bytes} as a Drive file owned by the user. Returns the new file id. */
     public static String uploadImage(String accessToken, String name, String mimeType,
                                      byte[] bytes) throws IOException {
         HttpURLConnection conn = (HttpURLConnection) new URL(UPLOAD_URL).openConnection();
@@ -92,11 +78,7 @@ public final class DriveFilesClient {
         }
     }
 
-    /**
-     * Lists files this app has created. {@code drive.file} scope auto-filters to
-     * app-created files, so no explicit owner filter is needed. Returns at most 100
-     * entries (no pagination — for /us we only ever have ~5).
-     */
+    /** Lists files this app has created. Returns at most 100 entries (no pagination). */
     public static List<FileEntry> listAppFiles(String accessToken) throws IOException {
         String q = URLEncoder.encode("trashed=false", "UTF-8");
         String fields = URLEncoder.encode("files(id,name,mimeType,createdTime)", "UTF-8");
@@ -134,14 +116,8 @@ public final class DriveFilesClient {
     }
 
     /**
-     * Grants {@code anyone with the link} reader permission on a file the app
-     * created. Required for puzzle source images so non-creator players (who never
-     * authorized Drive in their own session) can fetch the image via
-     * {@link #publicImageUrl}. The {@code drive.file} scope DOES allow modifying
-     * permissions on files the app owns — we just don't broaden Drive access.
-     *
-     * <p>Idempotent: re-granting the same role/type to {@code anyone} is a no-op
-     * server-side; Drive returns 200 and an existing permission id.
+     * Grants {@code anyone with the link} reader permission on a file the app created,
+     * enabling fetch via {@link #publicImageUrl} without per-viewer auth. Idempotent.
      */
     public static void makePublicReadable(String accessToken, String fileId) throws IOException {
         HttpURLConnection conn = (HttpURLConnection) new URL(FILES_URL + "/" + fileId + "/permissions").openConnection();
@@ -172,20 +148,12 @@ public final class DriveFilesClient {
         }
     }
 
-    /**
-     * URL that serves the raw image bytes of a publicly-readable Drive file.
-     * Google's documented image-embed pattern — works in plain {@code <img src>}
-     * tags without authentication once {@link #makePublicReadable} has been called.
-     * Sized for puzzle display; bigger values still work (Drive scales).
-     */
+    /** URL that serves the raw image bytes of a publicly-readable Drive file. */
     public static String publicImageUrl(String fileId) {
         return "https://drive.google.com/thumbnail?id=" + fileId + "&sz=w1200";
     }
 
-    /**
-     * Deletes a Drive file by id. {@code 404} is treated as success — the file is
-     * already gone, which is what the caller wanted.
-     */
+    /** Deletes a Drive file by id. {@code 404} is treated as success. */
     public static void deleteFile(String accessToken, String fileId) throws IOException {
         HttpURLConnection conn = (HttpURLConnection) new URL(FILES_URL + "/" + fileId).openConnection();
         conn.setRequestMethod("DELETE");

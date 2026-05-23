@@ -12,10 +12,8 @@ import android.widget.TextView;
 import androidx.annotation.Nullable;
 
 /**
- * Persistent chip that surfaces a contextual integration above the keys
- * (e.g. "GPay" while typing in Google Pay, "GPay · Split ₹500" once an amount is detected).
- * Distinct from {@link BannerView}: the chip sticks as long as the host context is valid;
- * the banner is transient.
+ * Persistent chip that surfaces a contextual integration above the keys. Sticks
+ * as long as the host context is valid (unlike the transient {@link BannerView}).
  */
 public class IntegrationChipView extends TextView {
 
@@ -36,9 +34,6 @@ public class IntegrationChipView extends TextView {
         setVisibility(GONE);
         setGravity(Gravity.CENTER_VERTICAL);
         setTextColor(0xFFF5F5F5);
-        // Translucent white wash on the now-black canvas; reads as a soft chip
-        // rather than a hard rectangle. No corner radius — this view spans the
-        // full width above the keys, so a flat fill is correct.
         setBackgroundColor(0x22FFFFFF);
         setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         int padV = (int) TypedValue.applyDimension(
@@ -54,10 +49,7 @@ public class IntegrationChipView extends TextView {
 
     public void setOnTapListener(@Nullable OnTapListener l) { this.tapListener = l; }
 
-    /**
-     * Show the chip with a label and an optional leading icon (e.g. the host app icon).
-     * Pass {@code null} for the icon to clear it.
-     */
+    /** Pass {@code null} for {@code icon} to clear it. */
     public void show(String label, @Nullable Drawable icon) {
         if (icon != null) icon.setBounds(0, 0, iconPx, iconPx);
         setCompoundDrawables(icon, null, null, null);

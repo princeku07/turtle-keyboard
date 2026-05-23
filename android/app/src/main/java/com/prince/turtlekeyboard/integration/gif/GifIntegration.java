@@ -17,6 +17,7 @@ import com.prince.kbd.core.GeminiService;
 import com.prince.kbd.core.IntegrationContext;
 import com.prince.kbd.core.IntegrationSession;
 import com.prince.kbd.core.KeyboardIntegration;
+import com.prince.turtlekeyboard.ai.AiErrorMessages;
 import com.prince.turtlekeyboard.ai.AlphaMatte;
 import com.prince.turtlekeyboard.ai.GifEncoder;
 import com.prince.turtlekeyboard.ai.ImageHistory;
@@ -35,44 +36,16 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * {@code /gif} — turn a photo + a description into a looping animated GIF.
+ * {@code /gif} — turn a photo plus a description into a looping animated GIF.
  *
- * <p>End-to-end flow:
- * <ol>
- *   <li>User types {@code /gif} → the IME pre-launches the photo picker (same hook
- *       {@code /edit} and {@code /style} use). Picked bytes land in
- *       {@code LmStudioAiClient.stagedEditImage} and a thumbnail appears in the
- *       prompt panel.</li>
- *   <li>User types {@code <animation idea>} and hits Go.</li>
- *   <li><b>Pass 1.</b> Handler consumes the staged image via
- *       {@link LmStudioAiClient#consumeStagedEditImage} and sends it plus the user
- *       prompt to {@code ctx.ai().imageEdit} with the locked sprite-sheet system
- *       prompt ({@code commands/prompts/gif.txt}). The prompt requires a pure white
- *       {@code #FFFFFF} background.</li>
- *   <li><b>Pass 2.</b> The white-bg PNG is fed back as an edit reference with the
- *       fixed {@link #EDIT_TO_BLACK_PROMPT} — "change white to black, preserve
- *       everything else." This second render is used purely to recover alpha.</li>
- *   <li>{@link AlphaMatte#differenceMatte} computes per-pixel alpha from the two renders
- *       (technique from {@code jidefr.medium.com/.../1866c88a33c5}). Result is an
- *       ARGB_8888 sheet with proper transparency, including anti-aliased edges and
- *       any translucent regions the model rendered.</li>
- *   <li>Grid shape is auto-detected from the sheet's aspect ratio (5×2 = 10 frames,
- *       5×1 strip = 5 frames). Frames are sliced via {@link SpriteSheetSlicer} and
- *       encoded by {@link GifEncoder#encodeAnimated} with a global palette and
- *       disposal=2. Frame delay scales to keep a 1-second loop either way.</li>
- *   <li>Final {@code image/gif} bytes are written to the shared cache and inserted
- *       into the host editor via {@code ctx.commitImage}.</li>
- * </ol>
+ * <p>Two-pass pipeline: the model first renders the subject as a sprite sheet on
+ * a pure white background, then the same sheet on pure black. {@link AlphaMatte}
+ * recovers per-pixel alpha from the difference. Grid shape (4×4 / 4×2 / 4×1) is
+ * auto-detected from the sheet aspect ratio, frames are sliced, and the result
+ * is encoded as an animated GIF and committed to the host editor.
  *
- * <p><b>Fallback.</b> If Pass 2 fails at the model level (or the two renders
- * disagree on dimensions), we degrade automatically to single-pass chroma-key on
- * Pass 1's image alone. The user still gets a GIF; just with rougher hard-edge
- * transparency instead of the matted alpha gradient.
- *
- * <p>Latency: two image-edit calls + decode + matte + encode. Budget ~12–15 s; the
- * keyboard shows an "Animating…" gradient loader for up to 60 s. Both raw renders
- * and the matted sheet are persisted to {@link ImageHistory} with distinguishing
- * labels so you can inspect each stage from the host app's History screen.
+ * <p>Falls back to single-pass chroma-keying if Pass 2 fails or the two renders
+ * disagree on dimensions.
  */
 public class GifIntegration implements KeyboardIntegration {
 
@@ -82,28 +55,17 @@ public class GifIntegration implements KeyboardIntegration {
     private static final long FAIL_BANNER_MS  = 2_500L;
     private static final long EMPTY_BANNER_MS = 2_200L;
 
-    /** Locked by {@code gif.txt}: the model always returns 4 columns. The row count
-     *  is detected at runtime from the returned sheet's aspect ratio:
-     *  <ul>
-     *    <li>4×4 (16 frames) — preferred. Sheet 1024×1024 ⇒ aspect 1.0.</li>
-     *    <li>4×2 (8 frames) — fallback. Sheet 1024×512 ⇒ aspect 2.0.</li>
-     *    <li>4×1 (4 frames) — last resort. Sheet 1024×256 ⇒ aspect 4.0.</li>
-     *  </ul> */
+    /** When true, intermediate sprite-sheet PNGs are written to {@link ImageHistory} for inspection. */
+    private static final boolean DEBUG_HISTORY = false;
+
+    /** Model always returns 4 columns (locked by {@code gif.txt}); row count is inferred from aspect ratio. */
     private static final int COLS = 4;
 
-    /** Aspect-ratio cutoffs between the three layouts. {@code ≤ GRID_4X4_MAX_ASPECT}
-     *  is the 4×4 square; {@code GRID_4X4_MAX_ASPECT..STRIP_4X1_MIN_ASPECT} is
-     *  the 4×2 wide grid; above {@code STRIP_4X1_MIN_ASPECT} is the 4×1 strip.
-     *  Picked at the midpoints between the nominal aspects (1.0, 2.0, 4.0) so
-     *  noise on either side doesn't flip the detection. */
+    /** Aspect-ratio cutoffs between the 4×4 / 4×2 / 4×1 layouts, set at midpoints to absorb noise. */
     private static final double GRID_4X4_MAX_ASPECT  = 1.5;
     private static final double STRIP_4X1_MIN_ASPECT = 3.0;
 
-    /** Per-frame delay in centiseconds. Each layout targets ~1-second loop so
-     *  perceived speed is layout-independent:
-     *  16 frames ×  6 cs = 0.96 s,
-     *   8 frames × 12 cs = 0.96 s,
-     *   4 frames × 25 cs = 1.00 s. */
+    /** Per-frame delays in centiseconds. Each layout targets a ~1 second loop. */
     private static final int FRAME_DELAY_CS_4X4 = 6;
     private static final int FRAME_DELAY_CS_4X2 = 12;
     private static final int FRAME_DELAY_CS_4X1 = 25;
@@ -111,11 +73,7 @@ public class GifIntegration implements KeyboardIntegration {
     /** 0 = loop forever. */
     private static final int LOOP_FOREVER = 0;
 
-    /** Pass-2 user prompt for the difference-matte technique. Pass 1 renders the
-     *  subject on pure white (per {@code gif.txt}); Pass 2 asks the model to swap
-     *  the background to pure black while preserving everything else. The client
-     *  then computes alpha per pixel from the two renders. Article:
-     *  jidefr.medium.com/generating-transparent-background-images-with-nano-banana-pro-2 */
+    /** Pass-2 prompt: replace the white background with pure black, leave the subject unchanged. */
     private static final String EDIT_TO_BLACK_PROMPT =
             "Change the white background to a solid pure black #000000 background. "
                     + "Keep every cell, every frame, every pose, every expression, and "
@@ -123,11 +81,7 @@ public class GifIntegration implements KeyboardIntegration {
                     + "recolor, or restyle the subject. Do not change the layout, cell "
                     + "count, or frame ordering. Only the background color changes.";
 
-    /** Same affinity set as the other image-generating commands in
-     *  {@code BuiltinAiCommands}: chat-style apps where dropping a GIF inline is
-     *  the dominant use case. Redeclared locally because the constant in
-     *  {@code BuiltinAiCommands} is private and this integration owns its own
-     *  affinity per the migration direction. */
+    /** Chat-style host apps where an inline GIF is the dominant use case. */
     private static final Set<String> CHAT_AFFINITY;
     static {
         Set<String> s = new HashSet<>(Arrays.asList(
@@ -143,6 +97,8 @@ public class GifIntegration implements KeyboardIntegration {
     private final Handler main = new Handler(Looper.getMainLooper());
 
     @Override public String id() { return "gif"; }
+
+    @Override public void destroy() { io.shutdown(); }
 
     @Override
     @Nullable
@@ -229,7 +185,8 @@ public class GifIntegration implements KeyboardIntegration {
                         }
                     }
                     @Override public void onError(String reason) {
-                        ctx.showBanner("Gif failed: " + reason, FAIL_BANNER_MS);
+                        Log.w(TAG, "gif imageEditPro failed: " + reason);
+                        ctx.showBanner(AiErrorMessages.userMessage(reason), FAIL_BANNER_MS);
                     }
                 });
     }
@@ -282,6 +239,28 @@ public class GifIntegration implements KeyboardIntegration {
                     Log.w(TAG, "matte dim mismatch white=" + onWhite.getWidth() + "x"
                             + onWhite.getHeight() + " black=" + onBlack.getWidth() + "x"
                             + onBlack.getHeight() + " — falling back to chroma");
+                    onWhite.recycle();
+                    onBlack.recycle();
+                    assembleGifChromaFallbackInline(ctx, whitePng, userPrompt);
+                    return;
+                }
+
+                // Verify pass-2 actually swapped the background — the model
+                // sometimes ignores EDIT_TO_BLACK_PROMPT and returns the
+                // original white-bg sheet. Running differenceMatte on two
+                // white-bg sheets yields alpha=1.0 everywhere → opaque GIF
+                // frames (the bug this catches). Sample corners; bail to the
+                // chroma path if the black bg never landed. Pass-1's white
+                // drift is logged for diagnosis only.
+                int whiteDrift = AlphaMatte.maxCornerDistance(onWhite, 255, 255, 255);
+                int blackDrift = AlphaMatte.maxCornerDistance(onBlack,   0,   0,   0);
+                Log.d(TAG, "matte verify whiteCornerDrift=" + whiteDrift
+                        + " blackCornerDrift=" + blackDrift
+                        + " (max " + AlphaMatte.MAX_BG_DRIFT + ")");
+                if (blackDrift > AlphaMatte.MAX_BG_DRIFT) {
+                    Log.w(TAG, "pass-2 didn't produce a black bg (corner drift="
+                            + blackDrift + ") — model ignored EDIT_TO_BLACK_PROMPT, "
+                            + "falling back to chroma on pass-1");
                     onWhite.recycle();
                     onBlack.recycle();
                     assembleGifChromaFallbackInline(ctx, whitePng, userPrompt);
@@ -416,9 +395,16 @@ public class GifIntegration implements KeyboardIntegration {
      *  the prompt sidecar so the four debug artifacts produced by one /gif call
      *  (Pass-1 white, Pass-2 black, post-matte, and the chroma fallback) are
      *  distinguishable in History. Best-effort: IO failures are logged and
-     *  swallowed so a history hiccup never blocks the user-visible result. */
+     *  swallowed so a history hiccup never blocks the user-visible result.
+     *
+     *  <p>Production-gated: three opaque PNG sheets cluttering the user-facing
+     *  History panel for every /gif is confusing ("why is there one GIF and
+     *  three weird sprite sheets per command?"). The final encoded GIF is still
+     *  recorded via {@link ImageHistory#record} in {@link #sliceAndEncode},
+     *  unaffected. */
     private static void recordSheetToHistory(IntegrationContext ctx, byte[] png,
                                              String userPrompt, String label) {
+        if (!DEBUG_HISTORY) return;
         try {
             File tmpDir = new File(ctx.appContext().getCacheDir(), "shared_images");
             if (!tmpDir.exists() && !tmpDir.mkdirs()) return;
@@ -437,9 +423,11 @@ public class GifIntegration implements KeyboardIntegration {
     /** Sibling of {@link #recordSheetToHistory} for an in-memory bitmap (e.g. the
      *  matted sheet — never present as bytes). PNG-encodes the bitmap to a temp
      *  file, then routes through the same {@link ImageHistory#record} path so it
-     *  shows up alongside the other debug artifacts. */
+     *  shows up alongside the other debug artifacts. Production-gated for the
+     *  same reason as {@link #recordSheetToHistory}. */
     private static void recordBitmapToHistory(IntegrationContext ctx, Bitmap bitmap,
                                               String userPrompt, String label) {
+        if (!DEBUG_HISTORY) return;
         try {
             File tmpDir = new File(ctx.appContext().getCacheDir(), "shared_images");
             if (!tmpDir.exists() && !tmpDir.mkdirs()) return;

@@ -29,10 +29,8 @@ import com.prince.split.SplitContract;
 import com.prince.split.SplitOAuthScopes;
 
 /**
- * Handles {@code turtlekeyboard://join?sheetId=...&owner=...} deep links — the second
- * step of the joiner-shows-QR / owner-scans flow. The owner has already granted writer
- * access via {@link GrantAccessActivity}, so all this activity does is point the local
- * store at the shared sheet and trigger an initial fetch.
+ * Handles {@code turtlekeyboard://join?sheetId=...&owner=...} deep links: points the
+ * local store at the shared sheet and triggers an initial fetch.
  */
 public class JoinSplitActivity extends AppCompatActivity {
 
@@ -145,7 +143,6 @@ public class JoinSplitActivity extends AppCompatActivity {
             doJoin();
             return;
         }
-        // Prompt for the broader Sheets/Drive scope if the joiner hasn't signed in yet.
         auth.authorize(this, SplitOAuthScopes.SCOPES, new GoogleAuth.Callback() {
             @Override public void onToken(String accessToken) {
                 runOnUiThread(JoinSplitActivity.this::doJoin);

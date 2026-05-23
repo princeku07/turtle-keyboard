@@ -25,15 +25,8 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Pluggable Split integration. Activates whenever the user is typing into a numeric,
- * non-sensitive field of a known payment app — surfaces a chip, opens the in-keyboard
- * split panel on tap, and persists saves to {@link SplitHistory}.
- *
- * <p>Also contributes two slash commands available in any field:
- * <ul>
- *   <li>{@code /split <amount>} — open the split panel for a manually-entered amount</li>
- *   <li>{@code /splits} — open the saved-history activity</li>
- * </ul>
+ * Split integration: surfaces a chip in payment apps, opens the in-keyboard split panel,
+ * and contributes the {@code /split} and {@code /splits} slash commands.
  */
 public class SplitIntegration implements KeyboardIntegration {
 
@@ -68,7 +61,6 @@ public class SplitIntegration implements KeyboardIntegration {
     }
 
     private void handleSplit(String prompt, IntegrationContext ctx) {
-        // Strip currency / commas / spaces — same shape as AmountWatcher.
         String cleaned = prompt == null ? "" : prompt.replaceAll("[^\\d.]", "");
         if (cleaned.isEmpty() || !cleaned.matches("^\\d{1,7}(\\.\\d{1,2})?$")) {
             ctx.showBanner("Try /split 1500", 1500L);
@@ -100,7 +92,6 @@ public class SplitIntegration implements KeyboardIntegration {
                 ctx.openScreen("split-detail");
             }
         };
-        // Render local immediately, then refresh once the cloud pull lands.
         view.show(history.all(), listener);
         SplitCloudSync.fetchAndMerge(ctx.appContext(), ctx.googleAuth(), ctx.store("split"), new SplitCloudSync.SyncCallback() {
             @Override public void onComplete(boolean changed) {
@@ -128,7 +119,7 @@ public class SplitIntegration implements KeyboardIntegration {
         cm.setPrimaryClip(ClipData.newPlainText("Split", text));
     }
 
-    /** Builds + attaches the split panel, wires save/cancel against the SDK's history. */
+    /** Attaches the split panel and wires save/cancel against {@link SplitHistory}. */
     static void showPanel(IntegrationContext ctx, String amount) {
         int defaultPeople = ctx.store("split").getInt(SplitKeys.DEFAULT_PEOPLE, SplitContract.DEFAULT_PEOPLE);
         SplitPanelView panel = new SplitPanelView(ctx.appContext());
@@ -148,13 +139,9 @@ public class SplitIntegration implements KeyboardIntegration {
         });
     }
 
-    // -- Session ---------------------------------------------------------------
-
     /**
-     * Lives for one input session. If {@code armable} is true we watch text for amount
-     * shapes; if false (e.g. PIN field inside GPay) we still mark the integration active
-     * so the chip can re-light when the user moves to the amount field, but never surface
-     * the chip while inside the sensitive field.
+     * One input session. When {@code armable} the session watches text for amount
+     * shapes; sensitive fields keep the session alive without surfacing a chip.
      */
     private static class SplitSession implements IntegrationSession {
 
@@ -170,7 +157,6 @@ public class SplitIntegration implements KeyboardIntegration {
             this.armable = armable;
             this.watcher = armable ? new AmountWatcher(this::onAmount) : null;
             if (watcher != null) watcher.arm();
-            // Surface the host badge immediately, even before an amount is detected.
             ctx.showChip(ChipSpec.withHostIcon(host.displayName, host.pkg), this::onChipTap);
         }
 

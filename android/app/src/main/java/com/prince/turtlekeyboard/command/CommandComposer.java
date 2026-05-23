@@ -1,19 +1,10 @@
 package com.prince.turtlekeyboard.command;
 
 /**
- * In-keyboard command buffer with two phases:
- *   NAME   — user is still typing "/foo"; rendered in the banner.
- *   PROMPT — command name is locked in and the keyboard is collecting its argument
- *            (e.g. the URL after "/search "); rendered in the command panel.
- *
- * <p>All keystrokes captured by the IME while {@link #isActive()} go here instead
- * of the input connection, so the slash invocation never reaches the editor.
- *
- * <p>In PROMPT mode the buffer carries an explicit insertion cursor
- * ({@link #promptCursor()}) so the panel can render a movable caret and the user
- * can tap/drag inside the typed prompt to edit it. Subsequent {@link #appendChar}
- * and {@link #backspace} insert / delete at the cursor's current position rather
- * than always operating at the end of the buffer.
+ * In-keyboard command buffer with two phases: NAME (typing "/foo", rendered in the
+ * banner) and PROMPT (collecting the argument after the command name, rendered in
+ * the command panel). PROMPT mode carries an explicit insertion cursor so taps and
+ * drags can move the caret without retyping.
  */
 public class CommandComposer {
 
@@ -22,11 +13,7 @@ public class CommandComposer {
     public interface Ui {
         void onNameChanged(String displayed);
         void onPromptStart(String commandName);
-        /**
-         * Fires whenever the prompt's buffer <i>or</i> caret position changes —
-         * including pure cursor moves with no text edit, so the panel can move
-         * its rendered caret in lock-step with drags.
-         */
+        /** Fires on any prompt buffer or caret change, including pure cursor moves. */
         void onPromptChanged(String commandName, String query, int cursorPos);
         void onComposeEnd();
     }
@@ -35,8 +22,7 @@ public class CommandComposer {
     private final StringBuilder buf = new StringBuilder();
     private Mode mode;
     private String commandName;
-    /** Cursor index within the prompt buffer (0..buf.length()). Only meaningful
-     *  in {@link Mode#PROMPT}; resets to 0 on prompt entry and tracks edits. */
+    /** Cursor index within the prompt buffer; only meaningful in {@link Mode#PROMPT}. */
     private int promptCursor;
 
     public CommandComposer(Ui ui) {
@@ -48,8 +34,6 @@ public class CommandComposer {
     public String commandName() { return commandName; }
     public String query() { return mode == Mode.PROMPT ? buf.toString() : ""; }
     public String nameText() { return mode == Mode.NAME ? buf.toString() : ""; }
-    /** Current insertion-cursor position in the prompt buffer. Always within
-     *  {@code [0, buf.length()]}. Meaningless when {@code mode != PROMPT}. */
     public int promptCursor() { return promptCursor; }
 
     public void startName() {
@@ -74,16 +58,13 @@ public class CommandComposer {
             buf.append(c);
             ui.onNameChanged(buf.toString());
         } else {
-            // PROMPT: insert at cursor, advance cursor.
             buf.insert(promptCursor, c);
             promptCursor++;
             ui.onPromptChanged(commandName, buf.toString(), promptCursor);
         }
     }
 
-    /** Append a whole string at once — used for paste. No-op when not composing.
-     *  In PROMPT mode the inserted block lands at the current cursor and the
-     *  cursor advances by the string's length. */
+    /** Insert {@code s} at the current cursor (paste path). No-op when not composing. */
     public void appendString(String s) {
         if (mode == null || s == null || s.isEmpty()) return;
         if (mode == Mode.NAME) {
@@ -105,12 +86,9 @@ public class CommandComposer {
             ui.onNameChanged(buf.toString());
             return true;
         }
-        // PROMPT mode — delete the char to the left of the cursor.
         if (buf.length() == 0) { cancel(); return true; }
         if (promptCursor == 0) {
-            // Caret at the very start with text still present: do nothing
-            // (rather than canceling — the user has typed something they
-            // want to keep, they just dragged the caret all the way left).
+            // Caret at start with text present: do nothing — user has typed something they want to keep.
             return true;
         }
         buf.deleteCharAt(promptCursor - 1);
@@ -119,9 +97,7 @@ public class CommandComposer {
         return true;
     }
 
-    /** Move the prompt caret to {@code pos} (clamped to the buffer's bounds).
-     *  No-op if not in PROMPT mode. Notifies the UI so the rendered caret
-     *  can follow without changing the typed text. */
+    /** Move the prompt caret to {@code pos}, clamped to buffer bounds. No-op outside PROMPT mode. */
     public void setPromptCursor(int pos) {
         if (mode != Mode.PROMPT) return;
         int clamped = Math.max(0, Math.min(buf.length(), pos));

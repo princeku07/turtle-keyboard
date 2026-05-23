@@ -16,20 +16,11 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Generic create-side helper for the {@code games/{id}} collection. Per-game-type
- * subscription / reads / writes live in {@link GameBridge} on the WebView side — this
- * class is only the host-app create flow: keyboard integration parses user/AI input,
- * builds a {@code state} map, and POSTs to Firestore here.
+ * Create-side helper for the {@code games/{id}} Firestore collection. Subscription
+ * and per-player writes live in {@link GameBridge}.
  *
- * <p>Schema (rules validate {@code type} allowlist + per-type state shape):
- * <pre>
- *   games/{id} = { type, state, createdByUid, createdAt }
- * </pre>
- *
- * <p>{@link CreateResult#url} uses {@link OverlayUrls#forArtifact} so the shareable URL
- * format ({@code https://www.turtlekeyboard.com/<routeKey>/<id>}) matches the existing
- * App Link intent filter and the WebView shell loads
- * {@code https://games.turtlekeyboard.com/<routeKey>/?id=<id>}.
+ * <p>Schema: {@code games/{id} = { type, state, createdByUid, createdAt }} — rules
+ * validate the {@code type} allowlist and per-type state shape.
  */
 public final class GamesFirestoreClient {
 
@@ -53,11 +44,9 @@ public final class GamesFirestoreClient {
     private GamesFirestoreClient() {}
 
     /**
-     * @param type   game type — must be in the {@code type} allowlist in
-     *               {@code firestore.rules}. Currently {@code 'wyr'}.
-     * @param state  game-type-specific state, persisted verbatim. The rules apply a
-     *               per-{@code type} schema check; malformed state fails at the rule
-     *               layer with {@code permission_denied}.
+     * @param type   must be in the {@code type} allowlist in {@code firestore.rules}.
+     * @param state  game-type-specific state, persisted verbatim. Malformed state fails
+     *               at the rule layer with {@code permission_denied}.
      */
     public static void createGame(@NonNull String type, @NonNull Map<String, Object> state,
                                   @NonNull CreateCallback cb) {

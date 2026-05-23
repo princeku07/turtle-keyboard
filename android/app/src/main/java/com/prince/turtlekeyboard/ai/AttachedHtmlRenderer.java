@@ -17,14 +17,9 @@ import android.widget.FrameLayout;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * HTML → bitmap renderer that hosts the WebView inside a real window. Use this
- * from an Activity (pass any FrameLayout already in the view tree as host) —
- * window attachment is the missing ingredient that made {@link HtmlImageRenderer}
- * draw blank from the IME process.
- *
- * <p>The host container is expected to be tiny / invisible; we resize it just
- * long enough to lay out the WebView at {@link #RENDER_WIDTH_PX}, capture, then
- * remove the WebView again.
+ * HTML to bitmap renderer that hosts the WebView inside a real window. Use from an
+ * Activity by passing an existing FrameLayout as host. Window attachment is required;
+ * unattached WebViews (see {@link HtmlImageRenderer}) draw blank from the IME process.
  */
 public final class AttachedHtmlRenderer {
 
@@ -34,7 +29,6 @@ public final class AttachedHtmlRenderer {
 
     private static final AtomicInteger TRACE_SEQ = new AtomicInteger(0);
 
-    /** Per-render breadcrumb tracker. All times in ms since start. */
     private static final class Trace {
         final int id;
         final long start = SystemClock.uptimeMillis();
@@ -63,8 +57,7 @@ public final class AttachedHtmlRenderer {
         int htmlLen = htmlFragment == null ? 0 : htmlFragment.length();
         t.mark("render() entry", "htmlChars=" + htmlLen + " host=" + host.getClass().getSimpleName());
 
-        // Render at OUTPUT_SIZE × density device px so CSS px maps ~1:1 to
-        // device px in the laid-out content, then downscale to OUTPUT_SIZE.
+        // Render at OUTPUT_SIZE × density so CSS px ≈ device px, then downscale.
         float density = ctx.getResources().getDisplayMetrics().density;
         final int captureSize = Math.max(OUTPUT_SIZE_PX, Math.round(OUTPUT_SIZE_PX * density));
 
@@ -78,10 +71,8 @@ public final class AttachedHtmlRenderer {
         webView.setBackgroundColor(Color.WHITE);
         webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
 
-        // Position the WebView fully offscreen via a negative left margin so
-        // the host's measured size isn't affected. In an Activity that's a
-        // nicety; in the IME, expanding the host (the SoftInputWindow's decor)
-        // would resize the visible keyboard window — must avoid.
+        // Offscreen via negative margin so the host's measured size isn't affected
+        // (expanding the IME's SoftInputWindow would resize the visible keyboard).
         ViewGroup.MarginLayoutParams lp = new ViewGroup.MarginLayoutParams(captureSize, captureSize);
         lp.leftMargin = -captureSize;
         lp.topMargin = -captureSize;
@@ -133,8 +124,6 @@ public final class AttachedHtmlRenderer {
 
         if (captureSize == OUTPUT_SIZE_PX) return full;
 
-        // Downscale to the exact OUTPUT_SIZE_PX × OUTPUT_SIZE_PX. Bilinear is
-        // fine for the typography here.
         Bitmap out = Bitmap.createBitmap(OUTPUT_SIZE_PX, OUTPUT_SIZE_PX, Bitmap.Config.ARGB_8888);
         Canvas dst = new Canvas(out);
         dst.drawColor(Color.WHITE);
@@ -148,11 +137,6 @@ public final class AttachedHtmlRenderer {
     }
 
     private static String wrap(String inner) {
-        // Design system: a small, opinionated set of primitives so the model
-        // can pick the right structure without inventing inline styles. CSS px
-        // ≈ device px in the rendered bitmap because the WebView is sized at
-        // OUTPUT_SIZE × density and downscaled afterward. Body is centered so
-        // short fragments sit in the middle of the 500×500 frame.
         return "<!doctype html><html><head><meta charset=\"utf-8\">"
                 + "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
                 + "<style>"
@@ -161,32 +145,24 @@ public final class AttachedHtmlRenderer {
                 + "body{padding:20px;font-family:-apple-system,Roboto,'Helvetica Neue',sans-serif;"
                 +   "font-size:18px;line-height:1.35;color:#0c0c0c;background:#f4efe4;"
                 +   "display:flex;flex-direction:column;justify-content:center;gap:10px;}"
-
-                // Headings ---------------------------------------------------
                 + "h1{font-size:26px;margin:0;font-weight:800;}"
                 + "h2{font-size:22px;margin:0;font-weight:700;}"
                 + "h3{font-size:20px;margin:0;font-weight:700;}"
                 + "p{margin:0;}"
                 + "b,strong{font-weight:700;}"
                 + "em{font-style:italic;}"
-
-                // Table ------------------------------------------------------
                 + "table{border-collapse:collapse;width:100%;box-shadow:3px 3px 0 #0c0c0c;}"
                 + "th,td{border:2px solid #0c0c0c;padding:10px 12px;text-align:left;"
                 +   "vertical-align:middle;font-size:17px;}"
                 + "th{background:#15803d;color:#fff;font-weight:700;}"
                 + "tr:nth-child(even) td{background:#fffaf0;}"
                 + "tfoot td{background:#0c0c0c;color:#fff;font-weight:700;}"
-
-                // Lists ------------------------------------------------------
                 + "ul,ol{margin:0;padding:0 0 0 22px;}"
                 + "li{margin:4px 0;}"
                 + "ul.checklist{list-style:none;padding:0;}"
                 + "ul.checklist li{padding-left:28px;position:relative;}"
                 + "ul.checklist li::before{content:'✓';position:absolute;left:0;top:0;"
                 +   "color:#15803d;font-weight:700;font-size:20px;}"
-
-                // Card grid (use .grid > .card) -----------------------------
                 + ".grid{display:grid;gap:8px;grid-template-columns:1fr 1fr;}"
                 + ".grid.cols-3{grid-template-columns:1fr 1fr 1fr;}"
                 + ".card{border:2px solid #0c0c0c;background:#fff;padding:12px;"
@@ -194,29 +170,20 @@ public final class AttachedHtmlRenderer {
                 + ".card .title{font-size:14px;font-weight:700;text-transform:uppercase;"
                 +   "letter-spacing:0.04em;color:#0c0c0c;margin-bottom:4px;}"
                 + ".card .body{font-size:16px;}"
-
-                // Big stat — one big number with a label below ---------------
                 + ".stat{text-align:center;padding:8px;}"
                 + ".stat .num{font-size:64px;font-weight:800;line-height:1;color:#15803d;}"
                 + ".stat .label{font-size:16px;text-transform:uppercase;letter-spacing:0.05em;"
                 +   "margin-top:6px;}"
-
-                // Key-value list (use <dl><dt>k</dt><dd>v</dd>...</dl>) ------
                 + "dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0;}"
                 + "dt{font-weight:700;color:#0c0c0c;}"
                 + "dd{margin:0;text-align:right;}"
-
-                // Callout / highlighted note --------------------------------
                 + ".callout{border:2px solid #0c0c0c;background:#fffaf0;padding:12px 14px;"
                 +   "border-left:8px solid #ff7a1a;}"
-
-                // Badge — inline pill (use <span class=\"badge\">) ------------
                 + ".badge{display:inline-block;padding:2px 8px;border:2px solid #0c0c0c;"
                 +   "background:#5b6cff;color:#fff;font-size:14px;font-weight:700;"
                 +   "border-radius:999px;}"
                 + ".badge.green{background:#15803d;}"
                 + ".badge.pink{background:#ff4fa3;}"
-
                 + "</style></head><body>" + inner + "</body></html>";
     }
 }

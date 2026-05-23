@@ -5,8 +5,7 @@ import android.os.Looper;
 
 import com.prince.turtlekeyboard.command.SlashCommand;
 
-/** Placeholder AI client. Echoes deterministic stand-ins so the pipeline can be exercised
- *  before the backend exists. Replace with a real HTTP client that calls /v1/command. */
+/** Placeholder AI client emitting deterministic stand-ins so the pipeline can be exercised offline. */
 public class StubAiClient implements AiClient {
 
     private final Handler main = new Handler(Looper.getMainLooper());

@@ -14,12 +14,8 @@ import android.os.Build;
 import androidx.core.app.NotificationCompat;
 
 /**
- * Surfaces the result of a fire-and-forget {@code /notion} dispatch via a system
- * notification — the keyboard never blocks waiting for the page to be created.
- *
- * <p>Tap → opens the page in Notion (or the user's browser).
- * "Copy link" action → copies the URL to the clipboard so the user can paste it back
- * into whichever app they were typing in when they fired the command.
+ * Surfaces the result of a {@code /notion} dispatch via a system notification.
+ * Tap opens the page; the "Copy link" action copies the URL to the clipboard.
  */
 public final class NotionResultNotifier {
 

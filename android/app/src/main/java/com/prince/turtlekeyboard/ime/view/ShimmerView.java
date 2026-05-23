@@ -13,15 +13,13 @@ import android.view.animation.LinearInterpolator;
 import androidx.annotation.Nullable;
 
 /**
- * Thin animated shimmer bar shown while a slash command is awaiting an AI result.
- * Lives just above the keys so the suggestion strip and any panels above it are
- * unaffected. Inactive by default — visibility flips to GONE when {@link #stop()}
- * is called so it consumes no layout space.
+ * Thin animated shimmer bar shown above the keys while a slash command awaits
+ * an AI result. {@link #stop()} sets visibility to GONE so it consumes no layout.
  */
 public class ShimmerView extends View {
 
-    private static final int BASE_COLOR = 0xFFD9E8DF;       // soft mint base
-    private static final int HIGHLIGHT_COLOR = 0xFF15803D;  // brand-green sheen
+    private static final int BASE_COLOR = 0xFFD9E8DF;
+    private static final int HIGHLIGHT_COLOR = 0xFF15803D;
     private static final long CYCLE_MS = 1100L;
 
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -64,7 +62,6 @@ public class ShimmerView extends View {
         paint.setColor(BASE_COLOR);
         canvas.drawRect(0, 0, w, h, paint);
 
-        // Sheen: a soft highlight band that sweeps from -bandW to w + bandW.
         float bandW = w * 0.35f;
         float cx = -bandW + (w + 2 * bandW) * progress;
         LinearGradient lg = new LinearGradient(

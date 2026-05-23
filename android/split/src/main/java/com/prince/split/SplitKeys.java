@@ -1,14 +1,6 @@
 package com.prince.split;
 
-/**
- * Keys the Split module persists into its scoped {@code ctx.store("split")} view.
- * Names are unprefixed — the scoping layer adds {@code split.} on disk.
- *
- * <p>Auth-related keys (signed-in flag, access token, expiry, account email) live in the
- * shared {@code google} namespace owned by {@link com.prince.kbd.core.GoogleAuthImpl},
- * so multiple modules can share one Google sign-in. See {@link SplitOAuthScopes} for the
- * scopes Split requests at authorization time.
- */
+/** Storage keys the Split module persists into its scoped {@code "split"} store view. */
 public final class SplitKeys {
 
     public static final String HISTORY = "history";

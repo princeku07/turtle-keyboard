@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Container chrome only — the per-page hero/title/copy lives in
+     item_onboarding_page.xml. Page indicator + Continue are persistent at the
+     bottom so the CTA position never shifts as the user swipes. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/onboarding_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/onboard_bg">
+
+    <androidx.viewpager2.widget.ViewPager2
+        android:id="@+id/pager"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <LinearLayout
+        android:id="@+id/dots"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:paddingBottom="@dimen/space_lg"
+        tools:ignore="UseCompoundDrawables" />
+
+    <Button
+        android:id="@+id/btn_continue"
+        android:layout_width="match_parent"
+        android:layout_height="58dp"
+        android:layout_marginStart="@dimen/space_xl"
+        android:layout_marginEnd="@dimen/space_xl"
+        android:layout_marginBottom="@dimen/space_2xl"
+        android:background="@drawable/bg_onboard_cta"
+        android:textAppearance="@style/TextAppearance.Token.Button"
+        android:textColor="@color/onboard_cta_text"
+        android:textAllCaps="false"
+        android:stateListAnimator="@null"
+        tools:text="Continue" />
+</LinearLayout>

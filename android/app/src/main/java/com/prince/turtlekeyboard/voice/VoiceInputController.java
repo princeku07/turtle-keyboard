@@ -18,31 +18,24 @@ import java.util.ArrayList;
 import java.util.Locale;
 
 /**
- * Wraps {@link SpeechRecognizer} so the IME can call {@link #toggle(Sink)} from
- * the mic key without caring about lifecycle. Streams partial transcripts to
- * {@link Sink#onPartial} for live banner updates and emits the locked-in
- * transcript via {@link Sink#onFinal} on stop / silence / done.
+ * Wraps {@link SpeechRecognizer} for the IME mic key. Streams partials via
+ * {@link Sink#onPartial} and final transcript via {@link Sink#onFinal}.
  *
- * <p>Permission is RECORD_AUDIO. IMEs can't request runtime permissions
- * directly — caller must check {@link #hasMicPermission} and route the user to
- * the host app to grant it before the first invocation.
+ * <p>IMEs cannot request runtime permissions, so callers must check
+ * {@link #hasMicPermission} and route the user to the host app to grant RECORD_AUDIO.
  */
 public class VoiceInputController {
 
     private static final String TAG = "VoiceInputController";
 
     public interface Sink {
-        /** Called repeatedly with the latest in-flight transcript guess. */
         void onPartial(String text);
-        /** Called once when recognition locks in. {@code text} may be empty. */
+        /** Called once when recognition locks in; {@code text} may be empty. */
         void onFinal(String text);
-        /** Recognition could not start or aborted with a fatal error. */
         void onError(String userVisibleMessage);
-        /** Lifecycle hooks for UI state (banner pulse etc.). */
         void onListeningStarted();
         void onListeningStopped();
-        /** Latest mic loudness in dB. Roughly -2..10 from the platform recognizer.
-         *  Default no-op so existing sinks don't need to implement it. */
+        /** Latest mic loudness in dB (roughly -2..10 from the platform recognizer). */
         default void onRms(float dB) {}
     }
 
@@ -93,8 +86,7 @@ public class VoiceInputController {
                 RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag());
         intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
-        // Privacy preference per the PRD: try offline first; the recognizer
-        // silently falls back to online if no offline pack is installed.
+        // Prefer offline; recognizer silently falls back to online if no offline pack is installed.
         intent.putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true);
         intent.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, appContext.getPackageName());
 
@@ -112,7 +104,7 @@ public class VoiceInputController {
     public void stop() {
         if (!listening) return;
         try { recognizer.stopListening(); } catch (Exception ignored) {}
-        // onResults / onError will fire and call finishListening().
+        // onResults / onError fires next and calls finishListening().
     }
 
     public void cancel() {

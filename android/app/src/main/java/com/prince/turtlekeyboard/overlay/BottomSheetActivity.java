@@ -32,31 +32,21 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Hosts a bottom-sheet overlay triggered by a Turtle App Link
- * ({@code https://www.turtlekeyboard.com/<routeKey>/<id>}). Routes only — no input, no keyboard.
- * Parses the incoming URL, looks up the registered {@link SheetViewFactory}, mounts the
- * resulting view inside a card pinned to the bottom of the screen with a dimmed
- * tap-to-dismiss backdrop.
+ * Hosts a bottom-sheet overlay triggered by a Turtle App Link. Parses the URL, looks
+ * up the registered {@link SheetViewFactory}, and mounts the view in a card with a
+ * dimmed tap-to-dismiss backdrop. Unknown or malformed routes finish silently.
  *
- * <p>Translucent theme + in-content animators (backdrop fades, card slides up)
- * give the perceived "overlay over the user's previous app" without needing
- * {@code SYSTEM_ALERT_WINDOW}: the activity is launched in its own task, sits on top
- * of the chat, and dismisses back to wherever the user was.
- *
- * <p>Unknown routes (no factory registered for the path's first segment) finish
- * silently. Malformed URLs (no id segment, wrong scheme) finish silently.
+ * <p>Translucent theme + in-content animators give an "overlay over previous app"
+ * feel without needing {@code SYSTEM_ALERT_WINDOW}.
  */
 public class BottomSheetActivity extends AppCompatActivity {
 
     private static final String TAG = "BottomSheetActivity";
 
     private static final int BACKDROP = 0x99000000;        // ~60% black
-    // Sheet chrome matches KeyboardTheme.turtleLight() — black surface so the
-    // WebView games (which render on a #000 background) merge seamlessly with
-    // the sheet edge, and the native PollSheetView's lifted cards still read
-    // clearly as cards floating on top.
+    // Black sheet fill so WebView games on a #000 canvas merge seamlessly with the sheet edge.
     private static final int SHEET_FILL = 0xFF000000;
-    private static final int SHEET_BORDER = 0xFF2E2E2E;    // border gray
+    private static final int SHEET_BORDER = 0xFF2E2E2E;
     private static final int SHEET_CORNER_RADIUS_DP = 18;
     private static final int ANIM_IN_MS = 220;
     private static final int ANIM_OUT_MS = 180;
@@ -70,10 +60,10 @@ public class BottomSheetActivity extends AppCompatActivity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // Window enter is instant; backdrop fades and card slides in via in-content animators.
+        // Window enter is instant; in-content animators handle fades and slide.
         overridePendingTransition(0, 0);
 
-        // Don't pop the soft keyboard up under us — the sheet has no input target.
+        // Sheet has no input target; suppress the soft keyboard.
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN);
 
         Intent intent = getIntent();
@@ -127,7 +117,6 @@ public class BottomSheetActivity extends AppCompatActivity {
             try { sheetView.onDismiss(); } catch (Throwable t) { Log.w(TAG, "onDismiss threw", t); }
             sheetView = null;
         }
-        // Skip animation when there's no sheet on screen (early-exit before setContentView).
         if (rootView == null || cardView == null || backdropDrawable == null) {
             super.finish();
             overridePendingTransition(0, 0);
@@ -152,7 +141,6 @@ public class BottomSheetActivity extends AppCompatActivity {
                 .start();
     }
 
-    /** Fades the backdrop in and slides the card up from off-screen. */
     private void playEnterAnimation() {
         if (rootView == null || cardView == null || backdropDrawable == null) return;
         ObjectAnimator.ofInt(backdropDrawable, "alpha", 0, 255)
@@ -172,13 +160,12 @@ public class BottomSheetActivity extends AppCompatActivity {
         });
     }
 
-    /** Builds: full-screen FrameLayout with a tap-to-dismiss backdrop + a bottom-anchored
-     *  card holding the SheetView's content. */
+    /** Full-screen FrameLayout with tap-to-dismiss backdrop and a bottom-anchored card. */
     private View buildSheetContainer(View content) {
         FrameLayout root = new FrameLayout(this);
         root.setLayoutParams(new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        // Use a mutable ColorDrawable so we can animate alpha for the fade-in/out.
+        // Mutable ColorDrawable so we can animate alpha for fade-in/out.
         ColorDrawable backdrop = new ColorDrawable(BACKDROP);
         backdrop.setAlpha(0);
         root.setBackground(backdrop);
@@ -198,7 +185,6 @@ public class BottomSheetActivity extends AppCompatActivity {
         FrameLayout.LayoutParams contentLp = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT);
-        // Inner padding keeps sheet content off the rounded corners + drag-affordance area.
         int padTop = dp(16), padH = dp(0), padBottom = dp(0);
         contentLp.setMargins(padH, padTop, padH, padBottom);
         card.addView(content, contentLp);
@@ -210,19 +196,17 @@ public class BottomSheetActivity extends AppCompatActivity {
         return root;
     }
 
-    /** Rounded-top white card with a thin ink border on top of the dimmed backdrop. */
     private GradientDrawable buildCardBackground() {
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(SHEET_FILL);
         bg.setStroke(dp(1), SHEET_BORDER);
         float r = dp(SHEET_CORNER_RADIUS_DP);
-        // Top-left, top-right rounded; bottom corners flush with screen edge.
+        // Top corners rounded; bottom flush with screen edge.
         bg.setCornerRadii(new float[]{r, r, r, r, 0, 0, 0, 0});
         return bg;
     }
 
-    /** Parses {@code https://www.turtlekeyboard.com/<routeKey>/<id>[?<query>]}. Returns null on
-     *  any malformed URL — caller finishes the activity in that case. */
+    /** Parses {@code .../<routeKey>/<id>[?<query>]}. Returns null on malformed URLs. */
     @Nullable
     private static ParsedRoute parseRoute(Uri uri) {
         List<String> segments = uri.getPathSegments();
@@ -237,7 +221,7 @@ public class BottomSheetActivity extends AppCompatActivity {
                 params.put(k, v == null ? "" : v);
             }
         } catch (UnsupportedOperationException ignored) {
-            // Opaque URI — no query params to parse, fine.
+            // Opaque URI: no query params to parse.
         }
         return new ParsedRoute(routeKey, id, Collections.unmodifiableMap(params));
     }

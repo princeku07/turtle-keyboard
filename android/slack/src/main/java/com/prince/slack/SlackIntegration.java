@@ -20,26 +20,12 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Pluggable Slack integration. Contributes {@code /slack} (and {@code /msg} as alias)
- * with the same fire-and-forget shape as Notion:
- *
- * <ol>
- *   <li>User taps Go on {@code /slack <message>}.</li>
- *   <li>Composer closes, banner flashes "Sending to Slack…" for ~1s.</li>
- *   <li>Background: POST chat.postMessage to the user's default channel.</li>
- *   <li>System notification surfaces the result with permalink.</li>
- * </ol>
- *
- * <p>No LLM call — Slack messages post as the user typed them. Polish is a separate
- * concern handled by existing {@code /fix} or {@code /tone} commands.
- *
- * <p>Channel override syntax: a leading {@code #channel-name} or {@code <#CHANNEL_ID>}
- * token routes the message to that channel instead of the default. Anything else after
- * the token is the message body.
+ * Slack integration. Contributes {@code /slack} (and {@code /msg} alias): posts the
+ * message verbatim to the user's default channel via {@code chat.postMessage}. A leading
+ * {@code #channel} or {@code <#CID>} token overrides the channel.
  */
 public final class SlackIntegration implements KeyboardIntegration {
 
-    /** Apps where "send this to Slack" feels most natural. Drives Quick Panel ranking. */
     private static final Set<String> AFFINITY = new HashSet<>(Arrays.asList(
             "com.notion.id",
             "com.google.android.gm",
@@ -72,7 +58,6 @@ public final class SlackIntegration implements KeyboardIntegration {
             return;
         }
 
-        // Channel override: "#general hello team" → #general; otherwise default channel.
         Resolved r = resolveChannel(prompt, store);
         if (r.channelId == null || r.channelId.isEmpty()) {
             ctx.showBanner("Pick a Slack channel in the Turtle app", 1800L);
@@ -110,14 +95,13 @@ public final class SlackIntegration implements KeyboardIntegration {
         }
     }
 
-    /** Pull a leading {@code #name} or {@code <#CID>} off {@code prompt}; if the name
-     *  matches a known channel, route there. Otherwise use the stored default. */
+    /** Strip a leading {@code #name} or {@code <#CID>} channel mention from {@code prompt}. */
     private static Resolved resolveChannel(String prompt, KeyValueStore store) {
         String defaultId = store.getString(SlackKeys.DEFAULT_CHANNEL, "");
         String defaultName = store.getString(SlackKeys.DEFAULT_CHANNEL_NAME, "");
         if (prompt == null) return new Resolved(defaultId, defaultName, "");
         String trimmed = prompt.trim();
-        // <#CID|name> form (used when Slack's UI inserts a channel mention)
+        // <#CID|name> form — Slack's UI inserts this when you pick a channel
         if (trimmed.startsWith("<#")) {
             int gt = trimmed.indexOf('>');
             if (gt > 2) {
@@ -129,15 +113,13 @@ public final class SlackIntegration implements KeyboardIntegration {
                 return new Resolved(cid, name, body);
             }
         }
-        // #channel-name form — only honored if we know the channel id from the cached map.
         if (trimmed.startsWith("#")) {
             int sp = indexOfWhitespace(trimmed);
             String name = (sp > 0 ? trimmed.substring(1, sp) : trimmed.substring(1)).toLowerCase();
             String body = sp > 0 ? trimmed.substring(sp + 1).trim() : "";
             String id = lookupChannelId(store, name);
             if (id != null) return new Resolved(id, name, body);
-            // Unknown channel name — fall through to default and keep the prefix as text
-            // so the user sees their typo round-trip into Slack.
+            // Unknown channel — fall back to default, keeping the typo visible to the user.
         }
         return new Resolved(defaultId, defaultName, trimmed);
     }
@@ -149,8 +131,7 @@ public final class SlackIntegration implements KeyboardIntegration {
         return -1;
     }
 
-    /** Look up a channel id by name from the cached map written by SlackConnectActivity
-     *  ({@code slack.channel_map.<name> -> id}). Returns null if not found. */
+    /** @return channel id for {@code name} from the cached map, or null if not present. */
     @Nullable
     private static String lookupChannelId(KeyValueStore store, String name) {
         String id = store.getString("channel_map." + name, "");

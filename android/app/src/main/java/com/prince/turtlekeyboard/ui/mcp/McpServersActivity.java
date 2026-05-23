@@ -19,11 +19,7 @@ import com.prince.turtlekeyboard.settings.Prefs;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Lists the user's MCP bindings (one row per binding, tap to delete) and launches
- * {@link McpAddBindingActivity} for the add flow. List rebuilds on every {@code onResume}
- * so a freshly-saved binding shows up without an explicit refresh.
- */
+/** Lists the user's MCP bindings (tap to delete) and launches {@link McpAddBindingActivity}. */
 public class McpServersActivity extends AppCompatActivity {
 
     private KeyValueStore store;
@@ -58,9 +54,6 @@ public class McpServersActivity extends AppCompatActivity {
     }
 
     private View buildRow(McpBinding b) {
-        // Plain LinearLayout row: emoji + "/<command>  — label" + delete affordance via
-        // long-press dialog. Keeps the screen dependency-free (no RecyclerView) while
-        // staying readable for the v1 scope.
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.VERTICAL);
         int pad = (int) (12 * getResources().getDisplayMetrics().density);
@@ -102,7 +95,7 @@ public class McpServersActivity extends AppCompatActivity {
             if (!b.id.equals(target.id)) remaining.add(b);
         }
         McpBinding.saveAll(store, remaining);
-        // Nuke the token under its dedicated key so credentials don't outlive the binding.
+        // Drop the bearer token so credentials don't outlive the binding.
         store.putString(McpBinding.tokenKey(target.id), "");
     }
 }

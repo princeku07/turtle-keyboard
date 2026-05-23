@@ -28,16 +28,8 @@ import com.prince.kbd.core.SharedPrefsKeyValueStore;
 import java.util.List;
 
 /**
- * Three-stage onboarding screen:
- *
- * <ol>
- *   <li>Initial — "Connect Notion" button launches the OAuth browser flow.</li>
- *   <li>OAuth callback — when Notion redirects back to {@code turtlekeyboard://notion-redirect},
- *       this Activity (singleTask + intent-filter) re-enters with the {@code ?code=}, exchanges
- *       it for an access token, then fetches granted top-level pages.</li>
- *   <li>Parent picker — user taps one page from the list; that becomes the default
- *       parent for every {@code /notion} dispatch from the keyboard.</li>
- * </ol>
+ * Notion onboarding: launches OAuth, handles the redirect, then lets the user pick a
+ * default parent page for every {@code /notion} dispatch.
  */
 public class NotionConnectActivity extends AppCompatActivity {
 
@@ -219,7 +211,6 @@ public class NotionConnectActivity extends AppCompatActivity {
         // Keep title + status; drop everything else so renders are idempotent.
         while (column.getChildCount() > 2) column.removeViewAt(2);
     }
-
     private TextView title(String s) {
         TextView t = new TextView(this);
         t.setText(s);
@@ -265,7 +256,6 @@ public class NotionConnectActivity extends AppCompatActivity {
         return (int) (v * getResources().getDisplayMetrics().density);
     }
 
-    /** Hold a posted runnable so we can cancel before finish() if needed. */
     @SuppressWarnings("unused")
     private static void postLater(long delayMs, Runnable r) {
         new Handler(Looper.getMainLooper()).postDelayed(r, delayMs);

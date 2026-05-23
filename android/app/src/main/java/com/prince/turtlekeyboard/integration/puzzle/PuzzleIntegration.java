@@ -73,6 +73,8 @@ public class PuzzleIntegration implements KeyboardIntegration {
 
     @Override public String id() { return "puzzle"; }
 
+    @Override public void destroy() { io.shutdown(); }
+
     @Override
     @Nullable
     public IntegrationSession activate(EditorInfo info, IntegrationContext ctx) {

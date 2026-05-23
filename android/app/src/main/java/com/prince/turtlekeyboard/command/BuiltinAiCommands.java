@@ -10,20 +10,11 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Built-in AI-backed slash commands. These have null handlers — the dispatcher routes
- * them to the AI backend instead of running locally. Lives in {@code :app} (not
- * {@code :core}) because adding/removing AI commands is a product concern, not part of
- * the SPI.
- *
- * <p>Each command carries a default {@link CommandSpec#affinityPkgs} set — the packages
- * where the command should float to the top of the Quick Panel + autocomplete strip.
- * These are starting heuristics; users can override them per-app via the Customize
- * Commands settings screen, which writes to {@code UserCommandPins}.
+ * Built-in AI-backed slash commands. Null handlers route to the AI backend; each carries
+ * a default {@link CommandSpec#affinityPkgs} set for Quick Panel ordering per host app.
  */
 public final class BuiltinAiCommands implements CommandProvider {
 
-    // Packages used in multiple affinity sets. Keep the literals in one spot so a typo
-    // in a package id only breaks one place.
     private static final String PKG_WHATSAPP   = "com.whatsapp";
     private static final String PKG_TELEGRAM   = "org.telegram.messenger";
     private static final String PKG_DISCORD    = "com.discord";
@@ -37,37 +28,22 @@ public final class BuiltinAiCommands implements CommandProvider {
     private static final String PKG_NOTION     = "com.notion.id";
     private static final String PKG_KEEP       = "com.google.android.keep";
 
-    /** Image gen — chat-style apps where you want to drop an image inline. */
     private static final Set<String> CHAT_AFFINITY = unmod(
             PKG_WHATSAPP, PKG_TELEGRAM, PKG_DISCORD, PKG_MESSENGER, PKG_INSTAGRAM);
-
-    /** Writing assistance — email + professional chat. */
     private static final Set<String> WRITING_AFFINITY = unmod(
             PKG_GMAIL, PKG_OUTLOOK, PKG_SLACK, PKG_LINKEDIN, PKG_DISCORD);
-
-    /** Reply drafting — email primarily; chat apps live in CHAT_AFFINITY. */
     private static final Set<String> EMAIL_AFFINITY = unmod(PKG_GMAIL, PKG_OUTLOOK);
-
-    /** Translation — places where cross-lingual messages happen most. */
     private static final Set<String> TRANSLATE_AFFINITY = unmod(
             PKG_WHATSAPP, PKG_TELEGRAM, PKG_CHROME, PKG_INSTAGRAM);
-
-    /** Note organizing — Notion, Keep, anywhere structured notes live. */
     private static final Set<String> NOTES_AFFINITY = unmod(PKG_NOTION, PKG_KEEP);
 
     @Override
     public List<CommandSpec> commands() {
         return Arrays.asList(
-                // Each command carries a per-action loading message — surfaced
-                // by the dispatcher into the GeneratingLoaderView while the AI
-                // request is in flight, so the user knows what's being made.
                 new CommandSpec("cap",     "Image",      "🎨", true,  null, CHAT_AFFINITY,      "Generating image"),
                 new CommandSpec("edit",    "Edit image", "🖼️", true,  null, CHAT_AFFINITY,      "Editing image"),
                 new CommandSpec("style",   "Style",      "✨", true,  null, CHAT_AFFINITY,      "Restyling image"),
-                // /sticker is registered by StickerIntegration so it can run
-                // through the two-pass difference-matte pipeline. Don't list
-                // it here too — duplicate registration is treated as an error
-                // by CommandRegistry.
+                // /sticker is registered by StickerIntegration for the two-pass difference-matte pipeline.
                 new CommandSpec("fix",     "Fix",        "✏️", false, null, WRITING_AFFINITY,   "Fixing text"),
                 new CommandSpec("tone",    "Tone",       "🎭", true,  null, WRITING_AFFINITY,   "Adjusting tone"),
                 new CommandSpec("reply",   "Reply",      "💬", false, null, EMAIL_AFFINITY,     "Drafting reply"),

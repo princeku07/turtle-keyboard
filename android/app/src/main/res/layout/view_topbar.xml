@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Standard top bar: back chevron + screen title. Included by every drill-in
+     activity (Commands, Integrations, Settings, etc.) so the bar reads
+     identically across the app.
+
+     Usage:
+       <include
+           android:id="@+id/topbar"
+           layout="@layout/view_topbar" />
+
+     After inflation, set the title via:
+       ((TextView) findViewById(R.id.topbar_title)).setText("Commands");
+       findViewById(R.id.topbar_back).setOnClickListener(v -> finish());
+
+     The root LinearLayout's layout_width/height come from the include site so it
+     can be slotted into any parent. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingStart="@dimen/topbar_margin"
+    android:paddingEnd="@dimen/topbar_margin"
+    android:paddingTop="@dimen/space_xl"
+    android:paddingBottom="@dimen/space_sm">
+
+    <TextView
+        android:id="@+id/topbar_back"
+        android:layout_width="@dimen/size_topbar_btn"
+        android:layout_height="@dimen/size_topbar_btn"
+        android:gravity="center"
+        android:text="‹"
+        android:textColor="@color/text_primary"
+        android:textSize="28sp"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:clickable="true"
+        android:focusable="true"
+        android:contentDescription="Back" />
+
+    <TextView
+        android:id="@+id/topbar_title"
+        style="@style/TextTitle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="@dimen/space_xs"
+        tools:text="Screen title" />
+</LinearLayout>

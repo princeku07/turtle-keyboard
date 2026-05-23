@@ -4,7 +4,6 @@ import android.content.Intent;
 import android.graphics.Outline;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
-import android.net.Uri;
 import android.os.Bundle;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -18,7 +17,6 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.content.FileProvider;
 
 import com.prince.turtlekeyboard.ai.ImageHistory;
 import com.prince.turtlekeyboard.ime.view.ThumbnailLoader;
@@ -26,16 +24,7 @@ import com.prince.turtlekeyboard.ime.view.ThumbnailLoader;
 import java.io.File;
 import java.util.List;
 
-/**
- * Grid of past {@code /cap}, {@code /edit}, {@code /style}, {@code /sticker},
- * {@code /gif} and {@code /gift} outputs. Tapping a tile opens a system share
- * sheet so the user can drop it into any app. Empty state shows a hint instead
- * of a blank screen.
- *
- * <p>Each tile carries a small bottom-right type tag ({@code GIF} for animated
- * outputs, {@code IMG} for stills) so the user can tell at a glance what kind
- * of media each entry is without opening it.
- */
+/** Grid of past image/GIF/sticker outputs; tapping a tile opens {@link HistoryPreviewActivity}. */
 public class HistoryActivity extends AppCompatActivity {
 
     private List<ImageHistory.Entry> entries;
@@ -44,7 +33,18 @@ public class HistoryActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setTitle("History");
-        entries = ImageHistory.list(this);
+        rebuild();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Re-scan on resume so deletions in HistoryPreviewActivity drop their tiles.
+        if (entries != null) rebuild();
+    }
+
+    private void rebuild() {
+        entries = HistoryPreviewActivity.filterDisplayable(ImageHistory.list(this));
 
         if (entries.isEmpty()) {
             TextView tv = new TextView(this);
@@ -64,23 +64,16 @@ public class HistoryActivity extends AppCompatActivity {
         int p = dp(12);
         grid.setPadding(p, p, p, p);
         grid.setAdapter(new HistoryAdapter());
-        grid.setOnItemClickListener((parent, view, position, id) -> shareEntry(position));
+        grid.setOnItemClickListener((parent, view, position, id) -> openPreview(position));
         setContentView(grid);
     }
 
-    private void shareEntry(int position) {
+    private void openPreview(int position) {
         ImageHistory.Entry e = entries.get(position);
-        Uri uri = FileProvider.getUriForFile(this,
-                getPackageName() + ".fileprovider", e.file);
-        // Pick mime by extension — ImageHistory now stores both .png and
-        // .gif under the same command tag, so a fixed image/png would let
-        // share targets refuse / mis-handle animated GIFs.
-        String mime = e.file.getName().endsWith(".gif") ? "image/gif" : "image/png";
-        Intent share = new Intent(Intent.ACTION_SEND);
-        share.setType(mime);
-        share.putExtra(Intent.EXTRA_STREAM, uri);
-        share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        startActivity(Intent.createChooser(share, "Share"));
+        Intent i = new Intent(this, HistoryPreviewActivity.class);
+        // Preview re-derives the filtered list and picks the page by timestamp.
+        i.putExtra(HistoryPreviewActivity.EXTRA_TIMESTAMP, e.ts);
+        startActivity(i);
     }
 
     private int dp(int v) {
@@ -107,10 +100,7 @@ public class HistoryActivity extends AppCompatActivity {
         }
     }
 
-    /** Single history cell — rounded thumbnail with a {@code GIF}/{@code IMG}
-     *  badge at the bottom-right corner. Uses the shared {@link ThumbnailLoader}
-     *  so this screen no longer decodes 100 PNGs on the main thread the way
-     *  the original sync {@code BitmapFactory.decodeFile} did. */
+    /** Rounded thumbnail tile with a GIF/IMG/STICKER badge; decoding is off-thread via {@link ThumbnailLoader}. */
     private class HistoryTile extends FrameLayout {
         private final ImageView image;
         private final TextView badge;
@@ -152,7 +142,12 @@ public class HistoryActivity extends AppCompatActivity {
 
         void bind(File file) {
             ThumbnailLoader.load(file, dp(112), image);
-            badge.setText(file.getName().endsWith(".gif") ? "GIF" : "IMG");
+            String name = file.getName();
+            String label;
+            if (name.endsWith(".gif")) label = "GIF";
+            else if (name.endsWith(".webp")) label = "STICKER";
+            else label = "IMG";
+            badge.setText(label);
         }
     }
 }
