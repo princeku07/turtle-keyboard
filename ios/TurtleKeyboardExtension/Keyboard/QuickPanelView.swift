@@ -133,10 +133,30 @@ final class QuickPanelView: UIView {
     }
 
     private func buildTile(for cmd: SlashCommand) -> UIView {
+        // Tile is a transparent UIControl that owns the touch / press
+        // animation. The visual fill is a sibling LiquidGlassBackingView
+        // pinned to the tile's bounds — same iOS 26 Liquid Glass tile
+        // shape as the keyboard keys. `interactive: true` opts into
+        // UIGlassEffect's built-in tap bounce on iOS 26.
         let tile = UIControl()
-        tile.backgroundColor = KeyboardPalette.keyNormal
-        tile.layer.cornerRadius = 8
+        tile.backgroundColor = .clear
         tile.translatesAutoresizingMaskIntoConstraints = false
+
+        let backing = LiquidGlassBackingView(
+            cornerRadius: 10,
+            tintColor: KeyboardPalette.keyNormal,
+            blurStyle: .systemThinMaterial,
+            translucent: true,
+            interactive: true
+        )
+        backing.translatesAutoresizingMaskIntoConstraints = false
+        tile.addSubview(backing)
+        NSLayoutConstraint.activate([
+            backing.topAnchor.constraint(equalTo: tile.topAnchor),
+            backing.leadingAnchor.constraint(equalTo: tile.leadingAnchor),
+            backing.trailingAnchor.constraint(equalTo: tile.trailingAnchor),
+            backing.bottomAnchor.constraint(equalTo: tile.bottomAnchor),
+        ])
 
         let emoji = UILabel()
         emoji.text = cmd.emoji
@@ -146,10 +166,8 @@ final class QuickPanelView: UIView {
         let name = UILabel()
         name.text = "/\(cmd.rawValue)"
         name.font = .monospacedSystemFont(ofSize: 11, weight: .medium)
-        // Tile background is `KeyboardPalette.keyNormal` (white in the
-        // Light theme), so a hardcoded white label is invisible there.
-        // `keyText` is the matching glyph colour — dark ink on light
-        // tiles, white on dark tiles.
+        // `keyText` is the theme's matching glyph colour — dark ink on
+        // light tiles, white on dark tiles.
         name.textColor = KeyboardPalette.keyText
         name.textAlignment = .center
 
@@ -165,7 +183,9 @@ final class QuickPanelView: UIView {
             stack.centerYAnchor.constraint(equalTo: tile.centerYAnchor),
         ])
 
-        // Cheap visual press feedback.
+        // Cheap visual press feedback (works on both iOS 15 fallback
+        // and iOS 26 native paths — UIGlassEffect's bounce supplements
+        // this on 26 rather than replacing it).
         tile.addAction(UIAction { [weak self, weak tile] _ in
             tile?.alpha = 0.6
             UIView.animate(withDuration: 0.15) { tile?.alpha = 1.0 }

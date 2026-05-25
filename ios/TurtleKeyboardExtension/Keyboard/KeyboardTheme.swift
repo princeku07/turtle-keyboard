@@ -91,30 +91,35 @@ struct KeyboardTheme: Equatable {
         barText:   .white
     )
 
-    /// Light keyboard — sampled from Apple's iOS light keyboard.
-    /// Backdrop: cool gray #D1D4DB. Letter keys: pure white. Special
-    /// keys: gray-blue #ABB0BD. Glyph: near-black.
+    /// Light keyboard — sampled from Apple's iOS 26 light keyboard.
+    /// Backdrop: fully clear (host content shows through the gaps and
+    /// the suggestion strip slot). Letter keys: near-solid white over
+    /// the blur, so they read as crisp opaque tiles with just a hint
+    /// of underlying refraction (matches the way Liquid Glass keys
+    /// look on iOS 26 — they're MOSTLY white, not heavily translucent).
+    /// Special keys: very subtle dark tint so they sit one notch
+    /// below letter keys in tone, blending toward the keyboard
+    /// backdrop the way native iOS does.
     static let light = KeyboardTheme(
         id: "light",
         displayName: "Light",
-        // Backdrop is fully clear — host content shows through the
-        // suggestion strip slot and the inter-key gaps. The blur
-        // material on each key (`.systemMaterialLight` via
-        // `blurMaterialForCurrentTheme`) gives the floating-glass
-        // light keyboard look. Letter keys use a white tint at high
-        // alpha so they pop on any host bg; special keys use a soft
-        // dark tint so they read as "modifier" keys.
         bg:        .clear,
         barBg:     .clear,
         bannerBg:  .clear,
-        keyNormal: UIColor(white: 1.0, alpha: 0.82),
-        keySpecial: UIColor(white: 0.0, alpha: 0.10),
+        // Was 0.82 — bumped to 0.95 so letter keys read as solid white
+        // (with only a faint show-through) instead of obviously
+        // translucent. Native iOS 26 letter keys look near-opaque.
+        keyNormal: UIColor(white: 1.0, alpha: 0.95),
+        // Was 0.10 black — softened to 0.07 so special keys (shift,
+        // ⌫, ?123, return) blend toward the backdrop rather than
+        // reading as darker rectangles. Native iOS makes these almost
+        // invisible against the keyboard surface.
+        keySpecial: UIColor(white: 0.0, alpha: 0.07),
         keyShiftOn: .white,
         keyText:    UIColor(red: 0.047, green: 0.047, blue: 0.047, alpha: 1.0),
         keyTextSpecial: UIColor(red: 0.047, green: 0.047, blue: 0.047, alpha: 1.0),
         keyTextShiftOn: UIColor(red: 0.047, green: 0.047, blue: 0.047, alpha: 1.0),
         accent:    UIColor(red: 0.082, green: 0.502, blue: 0.239, alpha: 1.0),
-        // Bumped from 0.08 — see dark-theme `chipBg` note.
         chipBg:    UIColor(white: 0.0, alpha: 0.14),
         chipText:  UIColor(red: 0.047, green: 0.047, blue: 0.047, alpha: 1.0),
         barText:   UIColor(red: 0.047, green: 0.047, blue: 0.047, alpha: 1.0)
@@ -144,13 +149,16 @@ struct KeyboardTheme: Equatable {
         bg:        .clear,
         barBg:     .clear,
         bannerBg:  .clear,
-        keyNormal: UIColor(white: 1.0, alpha: 0.18),
-        // Special keys (⇧, ⌫, ↵, ?123, etc.) sit a notch darker than
-        // letter keys but were previously at 0.08 alpha, which made
-        // them disappear into the blur on most host backgrounds.
-        // 0.12 keeps the two-tone read (lighter letters / darker
-        // specials) AND keeps the special keys clearly visible.
-        keySpecial: UIColor(white: 1.0, alpha: 0.12),
+        // Was 0.18 — bumped to 0.35 so letter keys actually read as
+        // raised tiles instead of nearly-invisible blur smears. Native
+        // iOS dark mode keys carry roughly this much white tint over
+        // the dark backdrop blur.
+        keyNormal: UIColor(white: 1.0, alpha: 0.35),
+        // Was 0.12 — bumped to 0.18 so special keys still sit one
+        // notch below letter keys (modifier-vs-letter hierarchy) but
+        // are clearly visible. The previous 0.12 disappeared on dark
+        // hosts; 0.18 holds up.
+        keySpecial: UIColor(white: 1.0, alpha: 0.18),
         keyShiftOn: UIColor(white: 1.0, alpha: 0.95),
         keyText:    UIColor(white: 1.0, alpha: 0.92),
         keyTextSpecial: UIColor(white: 1.0, alpha: 0.92),

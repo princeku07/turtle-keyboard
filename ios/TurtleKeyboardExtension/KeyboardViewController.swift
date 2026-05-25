@@ -14,8 +14,6 @@ class KeyboardViewController: UIInputViewController {
     private var lastSpaceTap: TimeInterval = 0
     private let doubleTapInterval: TimeInterval = 0.3
 
-    private let haptic = UIImpactFeedbackGenerator(style: .light)
-
     // MARK: - Slash command state
 
     // SlashCommand enum moved to Command/SlashCommand.swift
@@ -111,10 +109,13 @@ class KeyboardViewController: UIInputViewController {
     //          iOS only gives custom keyboards ~290pt portrait on smaller iPads
     //          (mini), so we size for that worst case. Command bar shrinks too.
     //          5*42 + 6*6 + 4 = 250 (rows) + 40 (commandBar) = 290pt total.
-    // iPhone numbers tuned to match the iOS system keyboard (≈291pt total
-    // portrait). Previously rowH=54, rowGap=12 made the keys look chunky
-    // and the keyboard too tall.
-    private var rowH:        CGFloat { isPad ? 44 : 45 }
+    // Tuned to match the iOS native keyboard's letters-view height of
+    // 216pt on iPhone portrait (4 rows + gaps). 42pt rows match the
+    // individual letter-key height Apple ships; previously 45 made our
+    // keys feel ~7% taller than native. iPad stays slightly shorter
+    // because the 5-row keyboard has to fit a tighter input-view
+    // height on iPad mini (~290pt portrait).
+    private var rowH:        CGFloat { isPad ? 44 : 42 }
     private var rowGap:      CGFloat { isPad ? 6  : 7 }
     private var commandBarH: CGFloat { isPad ? 46 : 50 }
     private var keyGap:      CGFloat { isPad ? 8  : 6 }
@@ -133,6 +134,13 @@ class KeyboardViewController: UIInputViewController {
     private var cmdMicW:          CGFloat { cmdMicH }
     private var cmdSendInsetH:    CGFloat { isPad ? 14 : 10 }
     private var cmdSendInsetV:    CGFloat { isPad ? 7  : 5 }
+
+    // Corner radius for keys, Quick Panel tiles, and any other glass
+    // surface in the keyboard. Tuned by side-by-side comparison with
+    // iOS 26's native keyboard at the same render scale — 6pt reads
+    // as the same "soft but not pillowy" curve. Was 8 (too rounded)
+    // and 7 (slightly too sharp on tall iPad keys).
+    private let keyCornerRadius: CGFloat = 6
 
     // Height of the four key rows (no command bar)
     private var rowsH: CGFloat {
@@ -314,8 +322,15 @@ class KeyboardViewController: UIInputViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        haptic.prepare()
         view.backgroundColor = .clear
+        // Multi-touch must be enabled at every level of the chain
+        // that touches traverse — root input view, container, and the
+        // rows themselves. UIView defaults this to `false`, which on
+        // a physical iPhone causes fast two-thumb typing to drop the
+        // second finger's taps entirely (the simulator masks this
+        // because mouse-driven taps are single-touch by definition,
+        // which is why the bug only shows on device).
+        view.isMultipleTouchEnabled = true
         refreshPersonalizationCache()
         resolveAndCacheTheme()
         setupContainers()
@@ -730,6 +745,9 @@ class KeyboardViewController: UIInputViewController {
         keyboardContainer = KeyboardContainerView()
         keyboardContainer.backgroundColor = bgColor
         keyboardContainer.translatesAutoresizingMaskIntoConstraints = false
+        // See `viewDidLoad` — every view in the touch-delivery chain
+        // needs multi-touch enabled or chord typing drops fingers.
+        keyboardContainer.isMultipleTouchEnabled = true
         view.addSubview(keyboardContainer)
 
         // Container is glued to all four sides of view; view drives the
@@ -1093,10 +1111,27 @@ class KeyboardViewController: UIInputViewController {
 
     private func buildRow(keys: [String], rowIndex: Int, totalRows: Int, y: CGFloat) -> UIView {
         let w         = kbWidth
-        // KeyRowView extends hit-testing into the keyGap dead zones so a
-        // tap that lands between two visible keys still registers on the
-        // nearest one — same way Apple's iOS keyboard treats the gap.
+        // `KeyRowView` owns touch dispatch for every in-row tap (and
+        // the inter-row gap touches that `KeyboardContainerView`
+        // forwards to it). Same model Apple's `UIKeyboardLayoutStar`
+        // uses: container intercepts, scores each key by distance,
+        // dispatches to the winner. Buttons are visual-only.
         let container = KeyRowView(frame: CGRect(x: 0, y: y, width: w, height: rowH))
+        container.onKeyDown      = { [weak self] btn in self?.keyTouchDown(btn) }
+        container.onKeyUp        = { [weak self] btn in self?.keyTapped(btn) }
+        container.onKeyHeld      = { [weak self] btn in
+            // Long-press currently means one thing: backspace repeat.
+            if btn.accessibilityLabel == "⌫" {
+                self?.startBackspaceRepeat()
+            }
+        }
+        container.onKeyHeldEnded = { [weak self] btn in
+            if btn.accessibilityLabel == "⌫" {
+                self?.stopBackspaceRepeat()
+            }
+            // Hide the magnifier popup the same way `onKeyUp` would.
+            self?.keyTapped(btn)
+        }
         let isBottom   = rowIndex == totalRows - 1
         let isModifier = rowIndex == totalRows - 2
         let isMiddle   = keys.count == 9 && !isBottom && !isModifier
@@ -1136,11 +1171,13 @@ class KeyboardViewController: UIInputViewController {
             xOffset = keyGap
         }
 
-        // When the active theme uses a transparent backdrop (dark mode
-        // matches native iOS — host content shows through), we render
-        // each key as a UIVisualEffectView blur material with a faint
-        // tint instead of a flat opaque color. Themes with an opaque
-        // backdrop (light, turtle) keep their solid keys.
+        // Every theme renders keys as Liquid Glass tiles (see
+        // Keyboard/LiquidGlass.swift). Translucent themes (dark / light)
+        // get a blur material under the tint — host content shows
+        // through, matching iOS 26's native keyboard. Solid themes
+        // (Turtle) get the same specular + rim finish over an opaque
+        // tinted fill so the brand colour is preserved while the keys
+        // still feel like raised glass tiles rather than flat rectangles.
         let translucentTheme = themeUsesTranslucentKeys()
 
         for (i, key) in keys.enumerated() {
@@ -1148,45 +1185,31 @@ class KeyboardViewController: UIInputViewController {
             let w = i < widths.count ? widths[i] : 44
             let frame = CGRect(x: xOffset, y: 0, width: w, height: rowH)
             btn.frame = frame
-            // Expand each button's hit area horizontally by half the
-            // surrounding `keyGap` so adjacent buttons exactly meet at
-            // the gap midpoint. Vertical expansion is intentionally
-            // zero — the button already fills its row's full height,
-            // and any inter-row gap is owned by `KeyboardContainerView`
-            // (which knows how to forward to the closer of two rows).
-            (btn as? FatFingerButton)?.hitInset = UIEdgeInsets(
-                top: 0, left: -keyGap / 2,
-                bottom: 0, right: -keyGap / 2
+            // Routing is owned entirely by `KeyRowView` (in-row
+            // nearest-centre) and `KeyboardContainerView` (nearest-row
+            // for inter-row gaps), mirroring how Apple's
+            // `UIKeyboardLayoutStar` partitions the keyplane.
+
+            // Mount the glass backing as a SIBLING of the button so the
+            // button's icon / title renders on top of the blur layers.
+            // Putting the UIVisualEffectView inside the UIButton
+            // hierarchy fights UIButton's managed imageView / titleLabel
+            // layout — that's the reason special-key glyphs (⇧, ⌫, ↵,
+            // 🌐) used to disappear in the dark theme.
+            let tint = btn.backgroundColor ?? KeyboardPalette.keyNormal
+            let backing = LiquidGlass.makeBacking(
+                frame: frame,
+                cornerRadius: keyCornerRadius,
+                tintColor: tint,
+                blurStyle: blurMaterialForCurrentTheme(),
+                translucent: translucentTheme
             )
-            if translucentTheme {
-                // Mount blur + tint as SIBLINGS of the button behind it
-                // (not as subviews of the button). Putting them inside
-                // the UIButton hierarchy interferes with how UIButton
-                // lays out its managed imageView / titleLabel — which
-                // was the reason special-key icons (⇧, ⌫, ↵, 🌐) were
-                // disappearing in the dark theme. With them as
-                // siblings, the button's icon/text always renders on
-                // top of the blur regardless of UIButton internals.
-                addTranslucentBacking(behind: btn, in: container,
-                                       frame: frame,
-                                       tintColor: btn.backgroundColor ?? KeyboardPalette.keyNormal)
-                btn.backgroundColor = .clear
-                btn.layer.shadowOpacity = 0
-            } else {
-                // Pin the shadow to the button's rounded rect so CALayer
-                // doesn't have to offscreen-rasterize the layer to compute
-                // shadow alpha on every frame. With ~30 buttons and a
-                // press-scale CATransform animation firing on every tap,
-                // the implicit shadow path was the dominant per-keystroke
-                // GPU/CPU cost — typing fast made every key re-rasterize.
-                btn.layer.shadowPath = CGPath(
-                    roundedRect: CGRect(x: 0, y: 0, width: w, height: rowH),
-                    cornerWidth: 7, cornerHeight: 7, transform: nil)
-                // Tell the rasterization cache that the shadow doesn't
-                // depend on the layer's bitmap contents either — a flat
-                // backgroundColor + cornerRadius is the entire visual.
-                btn.layer.shouldRasterize = false
-            }
+            container.addSubview(backing)
+            // The button is transparent in front of the glass — the
+            // glass owns the shadow / fill / specular, the button owns
+            // only the glyph + touch handling.
+            btn.backgroundColor = .clear
+            btn.layer.shadowOpacity = 0
             container.addSubview(btn)
             xOffset += w + keyGap
         }
@@ -1216,41 +1239,15 @@ class KeyboardViewController: UIInputViewController {
         return white > 0.5 ? .systemMaterialDark : .systemMaterialLight
     }
 
-    /// Mount a system blur + theme tint as siblings of `btn` inside
-    /// `container`, positioned at `frame` and stacked BEHIND the
-    /// button (so the button's icon / text stays visible on top).
-    /// Picks the blur material based on the active theme — dark
-    /// themes (white glyphs) use `.systemMaterialDark`, light themes
-    /// (dark glyphs) use `.systemMaterialLight` so the key always
-    /// reads with proper contrast against its glyph.
-    private func addTranslucentBacking(behind btn: UIButton,
-                                       in container: UIView,
-                                       frame: CGRect,
-                                       tintColor: UIColor) {
-        let blur = UIVisualEffectView(effect: UIBlurEffect(style: blurMaterialForCurrentTheme()))
-        blur.frame = frame
-        blur.isUserInteractionEnabled = false
-        blur.layer.cornerRadius = 7
-        blur.layer.masksToBounds = true
-        container.addSubview(blur)
-
-        // Tint overlay inside the blur's contentView so it inherits
-        // the blur's rounded clip. The theme's key color already
-        // carries the right alpha (letter keys at ~18% white, special
-        // keys at ~15% white) so it paints verbatim.
-        let tint = UIView(frame: blur.bounds)
-        tint.backgroundColor = tintColor
-        tint.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        tint.isUserInteractionEnabled = false
-        blur.contentView.addSubview(tint)
-    }
-
     private func makeKey(label: String) -> UIButton {
-        // FatFingerButton expands its `point(inside:)` past the visible
-        // frame by `hitInset` — set per-row in `buildRow` based on the
-        // live `keyGap` / `rowGap` — so taps that land in the gaps
-        // between visible keys still register on the nearest key.
-        let btn           = FatFingerButton(type: .custom)
+        // The button is a pure visual — `KeyRowView` owns all touch
+        // dispatch (mirrors how Apple's `UIKeyboardLayoutStar` handles
+        // the keyplane). `isUserInteractionEnabled = false` below
+        // disables UIControl tracking entirely, which is the only
+        // way to guarantee that a routed touch can't be silently
+        // dropped by an internal `point(inside:)` / `beginTracking`
+        // check or by a `UIVisualEffectView` sibling.
+        let btn           = UIButton(type: .custom)
         let isShiftActive = label == "⇧" && (isCapsLock || isShiftedOnce)
         let c16  = UIImage.SymbolConfiguration(pointSize: 16, weight: .medium)
         let c15  = UIImage.SymbolConfiguration(pointSize: 15, weight: .medium)
@@ -1301,56 +1298,36 @@ class KeyboardViewController: UIInputViewController {
             btn.backgroundColor = keyNormal
         }
 
-        btn.layer.cornerRadius  = 7; btn.layer.masksToBounds = false
-        // Apple's iOS keys have a barely-there 1pt bottom shadow with
-        // ~20% opacity — just enough to give the key a sense of being a
-        // raised tile. Our previous 0.45 opacity at 1.5pt was way too
-        // heavy: in dark mode it added a visible black fringe under
-        // every key that Apple's keyboard doesn't have.
-        btn.layer.shadowColor   = UIColor.black.cgColor
-        btn.layer.shadowOffset  = CGSize(width: 0, height: 1.0)
-        btn.layer.shadowOpacity = 0.20; btn.layer.shadowRadius = 0
+        // Visual chrome (corner radius, shadow, fill) is owned by the
+        // sibling `LiquidGlassBackingView` mounted behind the button in
+        // `buildRow`. The button itself only carries the glyph + the
+        // touch handlers — its background is cleared the moment the
+        // backing slides into place. `masksToBounds = false` lets the
+        // popup magnifier escape on long-press without clipping.
+        btn.layer.masksToBounds = false
         btn.accessibilityLabel  = label
-        // Character fires on touchDown (snappy, matches Apple's keyboard).
-        // touchUpInside / touchUpOutside / touchCancel only reset the
-        // press-scale visual so the key doesn't stay pinched if the
-        // finger lifts off-button or the gesture is cancelled (e.g. a
-        // long-press taking over).
-        btn.addTarget(self, action: #selector(keyTouchDown(_:)), for: .touchDown)
-        btn.addTarget(self, action: #selector(keyTapped(_:)),    for: .touchUpInside)
-        btn.addTarget(self, action: #selector(keyTapped(_:)),    for: .touchUpOutside)
-        btn.addTarget(self, action: #selector(keyTapped(_:)),    for: .touchCancel)
-
-        // Press-and-hold to repeatedly delete (matches native keyboard behaviour)
-        if label == "⌫" {
-            let lp = UILongPressGestureRecognizer(target: self,
-                                                  action: #selector(backspaceLongPress(_:)))
-            lp.minimumPressDuration = 0.4
-            btn.addGestureRecognizer(lp)
-        }
+        // Visual-only: touch dispatch happens at the row container
+        // (`KeyRowView`), which calls `keyTouchDown(_:)` / `keyTapped(_:)`
+        // / `startBackspaceRepeat()` / `stopBackspaceRepeat()` via its
+        // closures. The button has no `addTarget` and no gesture
+        // recognizer; `isUserInteractionEnabled = false` keeps UIKit
+        // from delivering touches to it at all.
+        btn.isUserInteractionEnabled = false
         return btn
     }
 
     // MARK: - Backspace repeat
-
-    @objc private func backspaceLongPress(_ gesture: UILongPressGestureRecognizer) {
-        switch gesture.state {
-        case .began:
-            startBackspaceRepeat()
-        case .ended, .cancelled, .failed:
-            stopBackspaceRepeat()
-            // No transform reset needed — `keyTouchDown` no longer
-            // applies a press-scale, so there's nothing to undo even
-            // when `cancelsTouchesInView=true` swallows `touchUpInside`.
-        default: break
-        }
-    }
+    //
+    // Triggered by `KeyRowView.onKeyHeld` 0.4s after a touch lands on
+    // ⌫. Stopped by `onKeyHeldEnded` (touch ends after long-press
+    // fired) or `onKeyUp` (touch ends before long-press fired — in
+    // which case `stopBackspaceRepeat` is a no-op since the timer
+    // never started).
 
     private func startBackspaceRepeat() {
         backspaceTimer?.invalidate()
         // Initial delete on press-and-hold start
         performBackspaceTick()
-        haptic.impactOccurred()
         // Repeat at ~12 deletes/sec until released
         backspaceTimer = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { [weak self] _ in
             guard let self = self else { return }
@@ -1393,9 +1370,7 @@ class KeyboardViewController: UIInputViewController {
 
     @objc private func keyTouchDown(_ sender: UIButton) {
         // Commit the keystroke FIRST — that's what the user is waiting
-        // for. The haptic runs after, so the character is in the host
-        // field by the time any visual feedback starts. Subjective
-        // responsiveness wins.
+        // for. Subjective responsiveness wins.
         guard let key = sender.accessibilityLabel else { return }
         // Snapshot the visible glyph BEFORE processKey runs — shift-once
         // letters get reset to lowercase by `updateKeyVisualsForShiftState`
@@ -1404,17 +1379,17 @@ class KeyboardViewController: UIInputViewController {
         let displayChar = sender.title(for: .normal) ?? key
         processKey(key)
         showKeyPopup(for: sender, label: key, displayChar: displayChar)
-        // Safety net: even if `keyTapped` never fires (rare, but
-        // happens when the visual-effect backing or gap-route hit
-        // testing interferes with UIControl's touch tracking), the
-        // popup must not be left visible. 0.45s matches Apple — feels
-        // instant for taps, allows hold-to-see for a beat.
+        // Safety net: even if `keyTapped` never fires, the popup must
+        // not be left visible. 0.45s matches Apple — feels instant for
+        // taps, allows hold-to-see for a beat.
         scheduleKeyPopupAutoHide()
-        haptic.impactOccurred()
+        // No haptic — Apple's native iOS keyboard doesn't haptic on
+        // key press either (the system "Keyboard Feedback → Haptic"
+        // setting is opt-in and off by default). Removing per-key
+        // haptics matches that and avoids the buzz-on-every-tap
+        // pattern the HIG warns against.
         // No press-scale UIView.animate — Apple's keyboard doesn't pinch
         // keys either; the magnified popup is the visual feedback.
-        // Per-keystroke Core Animation transactions were measurable
-        // overhead at fast typing speeds.
     }
 
     @objc private func keyTapped(_ sender: UIButton) {
@@ -4444,48 +4419,153 @@ fileprivate final class UserWordStore {
 /// to the side of a glyph still registers as a tap on that key. The
 /// previous plain `UIView` row left the gap as a dead zone, which is
 /// what made fast typing feel like characters got "swallowed."
-// MARK: - FatFingerButton
+// MARK: - KeyRowView
 //
-// `UIButton` subclass whose hit area extends past its visible frame by
-// `hitInset` (negative insets = expansion). Combined with the row-level
-// nearest-key-by-midX forwarding in `KeyRowView` and the container-level
-// inter-row forwarding in `KeyboardContainerView`, this gives a third
-// layer of forgiveness so any tap that lands within the keyboard's
-// key-grid region is claimed by *some* key. Set up so each button
-// expands by half the surrounding `keyGap` on each horizontal side and
-// half the `rowGap` on each vertical side — adjacent buttons meet at
-// the gap midpoint with no overlap, so the hit-test never has to break
-// a tie between two claimants.
-fileprivate final class FatFingerButton: UIButton {
-    /// Negative inset = expansion. Set per-button in `buildRow` based
-    /// on the live `keyGap` / `rowGap` constants.
-    var hitInset: UIEdgeInsets = .zero
-
-    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
-        return bounds.inset(by: hitInset).contains(point)
-    }
-}
+// Apple's iOS system keyboard (`UIKeyboardLayoutStar`) owns every
+// touch on the keyplane: it intercepts touches at the container level,
+// scores each candidate key by distance to the touch point, and
+// dispatches to the winning key. Individual key views are pure
+// visuals — they don't participate in touch tracking and have no
+// `UIControl` machinery to fight with. That's why the system keyboard
+// has zero dead zones: there's nothing per-key that can reject a
+// routed touch.
+//
+// `KeyRowView` mirrors that model. We claim every in-row touch by
+// returning `self` from `hitTest`, then in `touchesBegan` we find the
+// button whose horizontal centre is nearest and call the appropriate
+// closure. Buttons inside the row are configured with
+// `isUserInteractionEnabled = false` in `makeKey`, so they never
+// receive touches and never run UIControl tracking — eliminating
+// every previous failure mode where a routed touch was silently
+// dropped because `point(inside:)`, `beginTracking`, or a visual-
+// effect sibling decided otherwise. Multi-touch is handled natively
+// by tracking per-`UITouch` in `activeTouches`.
+//
+// Long-press (currently only `⌫` → repeat delete) is driven by a
+// per-touch `Timer` armed in `touchesBegan` and disarmed in
+// `touchesEnded` / `touchesCancelled`. We can't use the previous
+// `UILongPressGestureRecognizer` approach because the recognizer is
+// attached to the button, which no longer receives touches.
 
 fileprivate final class KeyRowView: UIView {
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        // The default (`false`) silently drops every touch after the
+        // first — so a user typing fast with two thumbs only registers
+        // one finger's keystrokes until they lift. Apple's system
+        // keyboard has multi-touch on, which is why chord-typing on
+        // device works. Without this, fast typing on a physical
+        // iPhone "feels laggy" (the second tap actually lands and is
+        // dropped, not delayed).
+        isMultipleTouchEnabled = true
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        isMultipleTouchEnabled = true
+    }
+
+    /// Fired the instant a finger touches down on a key — the one
+    /// whose horizontal centre is nearest the touch point. Mirrors
+    /// the previous `.touchDown` action on individual buttons.
+    var onKeyDown: ((UIButton) -> Void)?
+    /// Fired when a (non-held) touch ends.
+    var onKeyUp: ((UIButton) -> Void)?
+    /// Fired when a touch has been held continuously on the same
+    /// button for `longPressDuration`. Used by `⌫` to start the
+    /// delete-repeat loop. No-op for keys that don't long-press.
+    var onKeyHeld: ((UIButton) -> Void)?
+    /// Fired when a held touch ends.
+    var onKeyHeldEnded: ((UIButton) -> Void)?
+
+    /// Matches the previous `UILongPressGestureRecognizer.minimumPressDuration`
+    /// and Apple's own key-repeat onset.
+    private static let longPressDuration: TimeInterval = 0.4
+
+    /// Touch → button it was dispatched to. Entries removed in
+    /// `touchesEnded` / `touchesCancelled`.
+    private var activeTouches: [UITouch: UIButton] = [:]
+    /// Touches that have already crossed the long-press threshold.
+    private var heldTouches: Set<UITouch> = []
+    /// Per-touch long-press arming timers.
+    private var holdTimers: [UITouch: Timer] = [:]
+
+    // MARK: Hit testing
+
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
-        // Outside the row entirely → not ours.
-        guard bounds.contains(point) else { return nil }
-        // Normal hit test first — if the point lands directly on a key
-        // button, return it unchanged so things like long-press
-        // gesture recognizers attached to the button still fire.
-        if let view = super.hitTest(point, with: event), view !== self {
-            return view
+        // Claim every in-row touch ourselves. Out-of-bounds touches
+        // (inter-row gaps) are picked up by `KeyboardContainerView`,
+        // which forwards them back to this view with the touch's
+        // original location — we'll still match the right key on
+        // X-distance alone in `touchesBegan`.
+        return bounds.contains(point) ? self : nil
+    }
+
+    // MARK: Touch dispatch
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        super.touchesBegan(touches, with: event)
+        for touch in touches {
+            let point = touch.location(in: self)
+            guard let button = nearestButton(to: point) else { continue }
+            activeTouches[touch] = button
+            onKeyDown?(button)
+            armLongPressIfNeeded(for: touch, button: button)
         }
-        // Point is inside the row but landed in the inter-key gap.
-        // Forward it to the button whose horizontal midpoint is
-        // closest — that's the key the user was aiming for.
-        var nearest: UIView?
+    }
+
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        super.touchesEnded(touches, with: event)
+        endTouches(touches)
+    }
+
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+        super.touchesCancelled(touches, with: event)
+        endTouches(touches)
+    }
+
+    private func endTouches(_ touches: Set<UITouch>) {
+        for touch in touches {
+            holdTimers.removeValue(forKey: touch)?.invalidate()
+            guard let button = activeTouches.removeValue(forKey: touch) else { continue }
+            if heldTouches.remove(touch) != nil {
+                onKeyHeldEnded?(button)
+            } else {
+                onKeyUp?(button)
+            }
+        }
+    }
+
+    private func armLongPressIfNeeded(for touch: UITouch, button: UIButton) {
+        // Only `⌫` currently has long-press behaviour. Letters could
+        // grow accent pickers later — wire them through the same
+        // `onKeyHeld` callback when that happens.
+        guard button.accessibilityLabel == "⌫" else { return }
+        let timer = Timer.scheduledTimer(
+            withTimeInterval: Self.longPressDuration,
+            repeats: false
+        ) { [weak self] _ in
+            guard let self else { return }
+            // Touch must still be live and still mapped to the same key.
+            guard self.activeTouches[touch] === button else { return }
+            self.heldTouches.insert(touch)
+            self.onKeyHeld?(button)
+        }
+        holdTimers[touch] = timer
+    }
+
+    private func nearestButton(to point: CGPoint) -> UIButton? {
+        var nearest: UIButton?
         var bestDist: CGFloat = .greatestFiniteMagnitude
-        for sub in subviews where sub is UIButton {
-            let dist = abs(sub.frame.midX - point.x)
+        for case let key as UIButton in subviews where !key.isHidden {
+            // Pure X-distance: every key in a row shares the same
+            // height and y-origin, so a Y term would be constant
+            // across all candidates and wouldn't break ties.
+            let dist = abs(key.frame.midX - point.x)
             if dist < bestDist {
                 bestDist = dist
-                nearest = sub
+                nearest = key
             }
         }
         return nearest
