@@ -116,7 +116,13 @@ class KeyboardViewController: UIInputViewController {
     // because the 5-row keyboard has to fit a tighter input-view
     // height on iPad mini (~290pt portrait).
     private var rowH:        CGFloat { isPad ? 44 : 42 }
-    private var rowGap:      CGFloat { isPad ? 6  : 7 }
+    // iPhone inter-row gap matches Apple's portrait system keyboard
+    // (12pt). The previous 7pt made the rows ~15pt higher on screen by
+    // the bottom row than native, so muscle-memory taps for the lower
+    // letter rows and the spacebar landed below where the key actually
+    // was. iPad uses 6pt because its keys are larger and the extra
+    // gap looks loose at iPad density.
+    private var rowGap:      CGFloat { isPad ? 6  : 12 }
     private var commandBarH: CGFloat { isPad ? 46 : 50 }
     private var keyGap:      CGFloat { isPad ? 8  : 6 }
     private var bottomPad:   CGFloat { isPad ? 4  : 6 }
@@ -1148,7 +1154,18 @@ class KeyboardViewController: UIInputViewController {
             let props: [CGFloat]
             switch keys.count {
             case 5:  props = [9, 13, 48, 13, 17]                // iPad
-            case 4:  props = [15, 53, 12, 20]                   // iPhone [?123, space, /, ↵]
+            // iPhone [?123, space, /, ↵] — widths match Apple's
+            // native portrait bottom row:
+            //   ?123 = 17% (native "123" key width)
+            //   space = 60% (native space-bar width)
+            //   /    = 8% (slot occupied by native "." key — keeps
+            //              our slash-trigger one-tap reachable
+            //              without stealing space from the spacebar)
+            //   ↵    = 15% (native "return" key width)
+            // Previous [15, 53, 12, 20] shifted the spacebar centre
+            // ~22pt left of native, so thumb-typers hitting the right
+            // edge of where space "should" be were landing on /.
+            case 4:  props = [17, 60, 8, 15]                    // iPhone [?123, space, /, ↵]
             default: props = [8, 12, 7, 42, 7, 24]              // legacy 6-key fallback
             }
             let avail = w - keyGap * CGFloat(keys.count + 1)
