@@ -211,6 +211,11 @@ class KeyboardViewController: UIInputViewController {
     private var slashStrip:          CommandSuggestionStripView!
     private var slashStripHeight:    NSLayoutConstraint!
     private let slashStripH: CGFloat = 42
+    /// Preset chip strip lives in its own row stacked between the slash
+    /// strip and the command bar, NOT inside the prompt slot — so the
+    /// prompt label remains visible and writable while the chips are up.
+    private var presetStripHeight:   NSLayoutConstraint!
+    private let presetStripH: CGFloat = 36
     private var heightConstraint:    NSLayoutConstraint!
     private var hideBannerTimer:     Timer?
     private var backspaceTimer:      Timer?
@@ -824,13 +829,16 @@ class KeyboardViewController: UIInputViewController {
         promptTap.cancelsTouchesInView = false
         cmdPromptScrollView.addGestureRecognizer(promptTap)
 
-        // Preset chip strip — shares the prompt-label's slot. Visible only
-        // while a needsPrompt command is active, the user hasn't typed
-        // anything yet, AND the command has presets in PresetCatalog.
+        // Preset chip strip — its own row above the command bar. Visible
+        // only while a needsPrompt command is active, the user hasn't
+        // typed anything yet, AND the command has presets in
+        // PresetCatalog. Stays out of the prompt slot so the user can
+        // tell the prompt area is writable (chips above are
+        // optional shortcuts, not the only way to enter a value).
         cmdPresetStrip = PresetChipStripView()
         cmdPresetStrip.translatesAutoresizingMaskIntoConstraints = false
         cmdPresetStrip.isHidden = true
-        commandBar.addSubview(cmdPresetStrip)
+        keyboardContainer.addSubview(cmdPresetStrip)
 
         // Blinking text caret — visual cue that the prompt label is the
         // current write surface. Positioned via a dynamic leading constraint
@@ -951,6 +959,7 @@ class KeyboardViewController: UIInputViewController {
         }
         keyboardContainer.addSubview(slashStrip)
         slashStripHeight = slashStrip.heightAnchor.constraint(equalToConstant: 0)
+        presetStripHeight = cmdPresetStrip.heightAnchor.constraint(equalToConstant: 0)
 
         NSLayoutConstraint.activate([
             // Slash strip sits at the very top of the keyboardContainer,
@@ -962,16 +971,27 @@ class KeyboardViewController: UIInputViewController {
             slashStrip.trailingAnchor.constraint(equalTo: keyboardContainer.trailingAnchor),
             slashStripHeight,
 
-            // Command bar now hangs off the strip's bottom so it shifts
-            // down by `slashStripH` when the strip is visible.
-            commandBar.topAnchor.constraint(equalTo: slashStrip.bottomAnchor),
+            // Preset chip strip stacks directly below the slash strip and
+            // directly above the command bar. Height toggles 0 ↔
+            // `presetStripH` via `presetStripHeight`; when visible the
+            // command bar drops by that amount, keeping the prompt
+            // area unobstructed.
+            cmdPresetStrip.topAnchor.constraint(equalTo: slashStrip.bottomAnchor),
+            cmdPresetStrip.leadingAnchor.constraint(equalTo: keyboardContainer.leadingAnchor),
+            cmdPresetStrip.trailingAnchor.constraint(equalTo: keyboardContainer.trailingAnchor),
+            presetStripHeight,
+
+            // Command bar now hangs off the preset strip's bottom so it
+            // shifts down by `slashStripH + presetStripH` when both
+            // strips are visible.
+            commandBar.topAnchor.constraint(equalTo: cmdPresetStrip.bottomAnchor),
             commandBar.leadingAnchor.constraint(equalTo: keyboardContainer.leadingAnchor),
             commandBar.trailingAnchor.constraint(equalTo: keyboardContainer.trailingAnchor),
             commandBar.heightAnchor.constraint(equalToConstant: commandBarH),
 
             // Banner shares the command bar's slot (only one visible at
             // a time) so it follows the same anchor.
-            bannerContainer.topAnchor.constraint(equalTo: slashStrip.bottomAnchor),
+            bannerContainer.topAnchor.constraint(equalTo: cmdPresetStrip.bottomAnchor),
             bannerContainer.leadingAnchor.constraint(equalTo: keyboardContainer.leadingAnchor),
             bannerContainer.trailingAnchor.constraint(equalTo: keyboardContainer.trailingAnchor),
             bannerContainer.heightAnchor.constraint(equalToConstant: commandBarH),
@@ -1006,11 +1026,6 @@ class KeyboardViewController: UIInputViewController {
             cmdPromptLabel.leadingAnchor.constraint(equalTo: cmdPromptScrollView.contentLayoutGuide.leadingAnchor),
             cmdPromptLabel.trailingAnchor.constraint(equalTo: cmdPromptScrollView.contentLayoutGuide.trailingAnchor),
             cmdPromptLabel.heightAnchor.constraint(equalTo: cmdPromptScrollView.frameLayoutGuide.heightAnchor),
-
-            cmdPresetStrip.leadingAnchor.constraint(equalTo: cmdPill.trailingAnchor, constant: 6),
-            cmdPresetStrip.centerYAnchor.constraint(equalTo: commandBar.centerYAnchor),
-            cmdPresetStrip.trailingAnchor.constraint(equalTo: cmdMicButton.leadingAnchor, constant: -6),
-            cmdPresetStrip.heightAnchor.constraint(equalToConstant: 30),
 
             // Caret rides in the scroll view's content area (leading from
             // the label so it scrolls with the text) and centers vertically
@@ -1063,6 +1078,7 @@ class KeyboardViewController: UIInputViewController {
             .filter { $0 !== commandBar
                    && $0 !== bannerContainer
                    && $0 !== slashStrip
+                   && $0 !== cmdPresetStrip
                    && $0 !== previewOverlay
                    && $0 !== integrationPanelHost
                    && $0 !== quickPanelView
@@ -1080,6 +1096,9 @@ class KeyboardViewController: UIInputViewController {
         }
         if let strip = slashStrip {
             keyboardContainer.bringSubviewToFront(strip)
+        }
+        if let preset = cmdPresetStrip, !preset.isHidden {
+            keyboardContainer.bringSubviewToFront(preset)
         }
         // The command bar / banner share the chrome slot above the keys
         // and host the suggestion chips. After a rebuild they end up
@@ -2205,7 +2224,7 @@ class KeyboardViewController: UIInputViewController {
         // belongs in slash-command compose mode); show only the chips.
         [cmdPill, cmdPromptLabel, cmdSendButton, cmdMicButton]
             .forEach { $0.isHidden = true }
-        cmdPresetStrip?.isHidden = true
+        hidePresetStrip()
         cmdSuggestionsStack.isHidden = false
         // Lift the chip stack above any other command-bar subview that
         // might still be drawing on top of it (the pill / prompt /
@@ -2325,42 +2344,40 @@ class KeyboardViewController: UIInputViewController {
         cmdPill.text = "\(cmd.emoji) /\(cmd.rawValue)"
         cmdSendButton.setTitle(cmd.buttonTitle, for: .normal)
 
-        // Surface the preset chip strip only on a fresh, prompt-needing
-        // command when the catalog has presets for it. As soon as the
-        // user starts typing, the strip yields the slot back to the
-        // prompt label so the typed text is visible.
+        // Preset chip row stacks above the command bar. Visible on a
+        // fresh prompt-needing command with catalog presets; collapses
+        // once the user types anything so it doesn't dominate vertical
+        // space mid-edit. The prompt label always stays visible — the
+        // chips are an optional shortcut, not a replacement.
         let presets = PresetCatalog.presets(for: cmd.rawValue)
         let showPresets = cmd.needsPrompt && commandPromptText.isEmpty && !presets.isEmpty
         if showPresets {
-            cmdPresetStrip.setPresets(presets) { [weak self] value in
-                self?.handlePresetTap(value)
-            }
-            cmdPresetStrip.isHidden = false
-            cmdPromptLabel.isHidden = true
+            showPresetStrip(presets)
         } else {
-            cmdPresetStrip.isHidden = true
-            cmdPromptLabel.isHidden = false
-            if commandPromptText.isEmpty {
-                if cmd.needsReferenceImage && stagedEditImage != nil {
-                    // Keep these short — the caret is anchored to the END
-                    // of the placeholder text, and a long placeholder
-                    // pushes the caret past the scroll view's visible
-                    // frame so the user can't see it blinking. Examples
-                    // moved into the banner / docs instead.
-                    switch cmd {
-                    case .style:   cmdPromptLabel.text = "📎 pick a style…"
-                    case .sticker: cmdPromptLabel.text = "📎 describe the sticker…"
-                    case .gif:     cmdPromptLabel.text = "📎 describe the animation…"
-                    default:       cmdPromptLabel.text = "📎 describe the edit…"
-                    }
-                } else {
-                    cmdPromptLabel.text      = cmd.needsPrompt ? "type prompt above…" : "ready — tap \(cmd.buttonTitle)"
+            hidePresetStrip()
+        }
+
+        cmdPromptLabel.isHidden = false
+        if commandPromptText.isEmpty {
+            if cmd.needsReferenceImage && stagedEditImage != nil {
+                // Keep these short — the caret is anchored to the END
+                // of the placeholder text, and a long placeholder
+                // pushes the caret past the scroll view's visible
+                // frame so the user can't see it blinking. Examples
+                // moved into the banner / docs instead.
+                switch cmd {
+                case .style:   cmdPromptLabel.text = "📎 pick a style…"
+                case .sticker: cmdPromptLabel.text = "📎 describe the sticker…"
+                case .gif:     cmdPromptLabel.text = "📎 describe the animation…"
+                default:       cmdPromptLabel.text = "📎 describe the edit…"
                 }
-                cmdPromptLabel.textColor = KeyboardPalette.barText.withAlphaComponent(0.40)
             } else {
-                cmdPromptLabel.text      = commandPromptText
-                cmdPromptLabel.textColor = KeyboardPalette.barText.withAlphaComponent(0.90)
+                cmdPromptLabel.text      = cmd.needsPrompt ? "type prompt above…" : "ready — tap \(cmd.buttonTitle)"
             }
+            cmdPromptLabel.textColor = KeyboardPalette.barText.withAlphaComponent(0.40)
+        } else {
+            cmdPromptLabel.text      = commandPromptText
+            cmdPromptLabel.textColor = KeyboardPalette.barText.withAlphaComponent(0.90)
         }
 
         if commandBar.isHidden {
@@ -2378,11 +2395,11 @@ class KeyboardViewController: UIInputViewController {
     }
 
     // Shown while the buffer is `/` or `/xy` — i.e. the user is mid-typing a
-    // command name that doesn't yet match a known command. Renders the
-    // typed characters in white plus the rest of the best-matching command
-    // in dim gray as a ghost, terminal-style. Pressing space accepts the
-    // ghost (existing detection handles it); tapping the Send button —
-    // re-labelled `→ /name` — also accepts.
+    // command name that doesn't yet match a known command. The pill mirrors
+    // the typed characters verbatim; discovery of the full command name
+    // happens through the chip strip below the bar, not via ghost-completion
+    // inside the pill. Pressing space still commits on an exact match;
+    // tapping the Send button accepts the chip strip's top result.
     private func showDraftCommandBar(buffer: String) {
         activeCommand  = nil
         suggestionMode = .slashCommand
@@ -2397,7 +2414,7 @@ class KeyboardViewController: UIInputViewController {
         cmdPromptLabel.isHidden = true
         cmdSendButton.isHidden = false
         cmdMicButton.isHidden = !cachedVoiceEnabled
-        cmdPresetStrip?.isHidden = true
+        hidePresetStrip()
         cmdSpinner.stopAnimating()
         cmdSuggestionsStack.isHidden = true
 
@@ -2419,12 +2436,10 @@ class KeyboardViewController: UIInputViewController {
             hideSlashStrip()
         }
 
-        // Build the attributed pill content: "/" + typed (opaque) +
-        // ghost completion (dim). The pill grows from a single-character
-        // `/` up to "/cap" as the user types, anchored on the left of
-        // the bar — same slot the committed pill occupies, so the
-        // transition between draft and committed reads as the pill
-        // changing content rather than a layout jump.
+        // Pill shows exactly what the user typed — no ghost-completion
+        // of the best match. Discovery happens via the chip strip below;
+        // the pill stays a literal mirror of the buffer so the user
+        // isn't presented with a command name they didn't ask for.
         let font = cmdPill.font ?? .monospacedSystemFont(ofSize: 12, weight: .bold)
         let typedAttrs: [NSAttributedString.Key: Any] = [
             .foregroundColor: KeyboardPalette.barText,
@@ -2435,33 +2450,15 @@ class KeyboardViewController: UIInputViewController {
             .font: font,
         ]
 
-        if body.isEmpty {
-            // Just `/` — keep the pill compact rather than padding it
-            // out with a hint string (which inflates the pill width on
-            // every initial slash tap).
-            let attr = NSMutableAttributedString(string: "/", attributes: typedAttrs)
-            cmdPill.attributedText = attr
-            cmdSendButton.setTitle("Send", for: .normal)
-        } else if let match = topMatch {
-            let typed = body
-            let full = match.rawValue
-            let ghost = full.hasPrefix(typed)
-                ? String(full.dropFirst(typed.count))
-                : ""
-            let attr = NSMutableAttributedString(string: "/", attributes: typedAttrs)
-            attr.append(NSAttributedString(string: typed, attributes: typedAttrs))
-            if !ghost.isEmpty {
-                attr.append(NSAttributedString(string: ghost, attributes: ghostAttrs))
-            }
-            cmdPill.attributedText = attr
-            cmdSendButton.setTitle("Send", for: .normal)
-        } else {
-            let attr = NSMutableAttributedString(string: "/", attributes: typedAttrs)
+        let attr = NSMutableAttributedString(string: "/", attributes: typedAttrs)
+        if !body.isEmpty {
             attr.append(NSAttributedString(string: body, attributes: typedAttrs))
-            attr.append(NSAttributedString(string: " · no match", attributes: ghostAttrs))
-            cmdPill.attributedText = attr
-            cmdSendButton.setTitle("Send", for: .normal)
+            if topMatch == nil {
+                attr.append(NSAttributedString(string: " · no match", attributes: ghostAttrs))
+            }
         }
+        cmdPill.attributedText = attr
+        cmdSendButton.setTitle("Send", for: .normal)
         // Caret has no meaningful position in draft mode (the pill is the
         // indicator). `updateCaret` keys off `cmdPromptLabel.isHidden`,
         // which is now true, so it'll hide the caret on its own.
@@ -2512,6 +2509,26 @@ class KeyboardViewController: UIInputViewController {
         recomputeKeyboardHeight()
     }
 
+    /// Mount the preset chip row above the command bar. The presets are
+    /// applied here so the caller doesn't have to remember to also call
+    /// `setPresets` — keeps the visibility + content in lockstep.
+    private func showPresetStrip(_ presets: [String]) {
+        cmdPresetStrip.setPresets(presets) { [weak self] value in
+            self?.handlePresetTap(value)
+        }
+        cmdPresetStrip.isHidden = false
+        presetStripHeight.constant = presetStripH
+        keyboardContainer.bringSubviewToFront(cmdPresetStrip)
+        recomputeKeyboardHeight()
+    }
+
+    private func hidePresetStrip() {
+        guard cmdPresetStrip?.isHidden == false else { return }
+        cmdPresetStrip.isHidden = true
+        presetStripHeight.constant = 0
+        recomputeKeyboardHeight()
+    }
+
     /// Height of the chrome above the keys right now.
     ///
     /// - The command-bar slot (`commandBarH`) is **always** reserved at
@@ -2525,7 +2542,8 @@ class KeyboardViewController: UIInputViewController {
     private var effectiveChromeH: CGFloat {
         if isPreviewVisible { return previewH }
         let strip: CGFloat = (slashStrip?.isHidden == false) ? slashStripH : 0
-        return strip + commandBarH
+        let preset: CGFloat = (cmdPresetStrip?.isHidden == false) ? presetStripH : 0
+        return strip + preset + commandBarH
     }
 
     private var isPreviewVisible: Bool {
@@ -2591,6 +2609,10 @@ class KeyboardViewController: UIInputViewController {
         lastShownChipTitles = nil
         lastRefreshedContextHash = nil
         hideSlashStrip()
+        // Preset row is a sibling of the command bar (not a child), so
+        // it won't fade with the bar's alpha animation. Collapse it
+        // up front so it doesn't hover above the keys during the fade.
+        hidePresetStrip()
         // Drop any staged /edit or /style reference — the user backed out
         // before describing the edit/restyle. Re-entering either command
         // re-launches the picker.
@@ -2725,10 +2747,14 @@ class KeyboardViewController: UIInputViewController {
         // `showImagePreview` already drive the next visible state from
         // scratch on the success / failure paths.
         [cmdPill, cmdPromptScrollView, cmdSendButton, cmdMicButton,
-         cmdSpinner, cmdSuggestionsStack, cmdPresetStrip,
+         cmdSpinner, cmdSuggestionsStack,
          cmdPromptLabel, cmdCaret]
             .compactMap { $0 }
             .forEach { $0.isHidden = true }
+        // Preset row lives ABOVE the command bar now — `isHidden = true`
+        // alone leaves a 36pt gap above the wave. Route through the
+        // helper so the height constraint collapses to 0 too.
+        hidePresetStrip()
 
         wave.setMessage(message)
         wave.isHidden = false
@@ -2942,7 +2968,7 @@ class KeyboardViewController: UIInputViewController {
     private func resetCommandBarMode() {
         [cmdPill, cmdPromptLabel, cmdSendButton].forEach { $0.isHidden = false }
         cmdSuggestionsStack.isHidden = true
-        cmdPresetStrip?.isHidden = true
+        hidePresetStrip()
         updateCaret()
     }
 
@@ -3107,8 +3133,7 @@ class KeyboardViewController: UIInputViewController {
     private func handlePresetTap(_ value: String) {
         guard let cmd = activeCommand else { return }
         commandPromptText = value
-        cmdPresetStrip.isHidden = true
-        cmdPromptLabel.isHidden = false
+        hidePresetStrip()
         cmdPromptLabel.text = value
         cmdPromptLabel.textColor = KeyboardPalette.barText.withAlphaComponent(0.90)
         // Keep `slashBuffer` in sync so `handleSlashBufferKey` continues
