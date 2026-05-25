@@ -4980,10 +4980,14 @@ fileprivate final class AuroraRenderer: NSObject, MTKViewDelegate {
                 alpha = 1.0 - (1.0 - alpha) * (1.0 - intensity);
             }
 
-            // Metal's CAMetalLayer expects premultiplied alpha by
-            // default — multiply the RGB by alpha so the drawable
-            // composites correctly when the MTKView is non-opaque.
-            return float4(result * alpha, alpha);
+            // `result` is already attenuated by each wave's `intensity`
+            // (it's baked into the screen-blend `(1 - c * intensity)`),
+            // and `alpha` independently accumulates the same intensity.
+            // CAMetalLayer expects premultiplied alpha, but `result` is
+            // ALREADY premultiplied — multiplying by `alpha` again
+            // attenuated partial-coverage pixels by intensity² and
+            // showed up as black smearing around the soft ribbon edges.
+            return float4(result, alpha);
         }
         """
 
