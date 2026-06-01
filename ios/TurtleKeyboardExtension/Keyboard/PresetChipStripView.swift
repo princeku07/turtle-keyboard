@@ -94,6 +94,7 @@ final class PresetChipStripView: UIView {
         btn.setTitleColor(KeyboardPalette.chipText, for: .normal)
         btn.backgroundColor = KeyboardPalette.chipBg
         btn.layer.cornerRadius = 13
+        btn.layer.cornerCurve  = .continuous
         btn.contentEdgeInsets = UIEdgeInsets(top: 0, left: 10, bottom: 0, right: 10)
         btn.heightAnchor.constraint(equalToConstant: 26).isActive = true
         btn.addAction(UIAction { [weak self, weak btn] _ in

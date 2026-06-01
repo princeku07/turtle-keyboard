@@ -92,6 +92,7 @@ final class CommandSuggestionStripView: UIScrollView {
         // radius is exactly height/2 so the pill renders as a perfect
         // capsule rather than a rounded rectangle.
         pill.layer.cornerRadius = 16
+        pill.layer.cornerCurve  = .continuous
         pill.translatesAutoresizingMaskIntoConstraints = false
 
         let label = UILabel()

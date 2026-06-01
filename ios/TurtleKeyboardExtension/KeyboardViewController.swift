@@ -436,10 +436,14 @@ class KeyboardViewController: UIInputViewController {
         cmdSendButton?.setTitleColor(text, for: .normal)
         cmdSendButton?.backgroundColor = chipBg
         cmdCaret?.backgroundColor = text
+        cmdSpinner?.color = text
 
         for btn in cmdSuggestionBtns {
             btn.setTitleColor(text, for: .normal)
-            btn.backgroundColor = chipBg
+            // Word suggestions render as bare words separated by hairlines
+            // (native iOS suggestion bar) — keep them background-less on
+            // theme switches too, matching how `setupContainers` builds them.
+            btn.backgroundColor = .clear
         }
 
         bannerLabel?.textColor = text
@@ -555,6 +559,10 @@ class KeyboardViewController: UIInputViewController {
         // e.g. internal previews that aren't user-facing artifacts.
         if !command.isEmpty {
             ImageHistory.record(image: image, command: command, prompt: prompt)
+            // A fresh generation just completed — the canonical "async task
+            // finished" success haptic (§7.1). Gated on a non-empty command
+            // so internal / re-surfaced previews don't buzz.
+            KeyboardHaptics.success()
         }
     }
 
@@ -594,6 +602,7 @@ class KeyboardViewController: UIInputViewController {
         // showing in the user's chats.
         if variant == .gif, let raw = pendingPreviewSourceData, Self.isAnimatedGIF(raw) {
             UIPasteboard.general.setData(raw, forPasteboardType: UTType.gif.identifier)
+            KeyboardHaptics.lightImpact()   // confirms the copy-to-clipboard
             showBanner("📋 GIF copied — long-press field to paste")
             dismissPreview()
             return
@@ -604,6 +613,7 @@ class KeyboardViewController: UIInputViewController {
             return
         }
         UIPasteboard.general.setData(result.data, forPasteboardType: result.uti)
+        KeyboardHaptics.lightImpact()   // confirms the copy-to-clipboard
         showBanner("📋 \(result.bannerNoun) copied — long-press field to paste")
         dismissPreview()
     }
@@ -675,6 +685,7 @@ class KeyboardViewController: UIInputViewController {
         let imageView = UIImageView()
         imageView.contentMode = .scaleAspectFit
         imageView.layer.cornerRadius = 8
+        imageView.layer.cornerCurve  = .continuous   // §4.6 — always continuous
         imageView.clipsToBounds = true
         imageView.backgroundColor = .white
         imageView.translatesAutoresizingMaskIntoConstraints = false
@@ -694,6 +705,7 @@ class KeyboardViewController: UIInputViewController {
             b.backgroundColor = .white
             // Capsule — row height is 38pt, so 19 reads as fully rounded.
             b.layer.cornerRadius = 19
+            b.layer.cornerCurve  = .continuous
             b.addTarget(self, action: #selector(previewVariantTapped(_:)), for: .touchUpInside)
             return b
         }
@@ -707,6 +719,7 @@ class KeyboardViewController: UIInputViewController {
         closeBtn.titleLabel?.font = .systemFont(ofSize: 16, weight: .medium)
         closeBtn.backgroundColor = UIColor.white.withAlphaComponent(0.18)
         closeBtn.layer.cornerRadius = 19  // matches the variant pills
+        closeBtn.layer.cornerCurve  = .continuous
         closeBtn.addTarget(self, action: #selector(previewCloseTapped), for: .touchUpInside)
 
         let buttonRow = UIStackView(arrangedSubviews: [imageBtn, stickerBtn, gifBtn, closeBtn])
@@ -794,6 +807,7 @@ class KeyboardViewController: UIInputViewController {
         // Capsule — matches the pill height (locked to `cmdMicH` below)
         // so the pill + mic + send all share the same capsule shape.
         cmdPill.layer.cornerRadius = cmdMicH / 2
+        cmdPill.layer.cornerCurve  = .continuous
         cmdPill.clipsToBounds      = true
         cmdPill.textAlignment      = .center
         cmdPill.setContentHuggingPriority(.required, for: .horizontal)
@@ -856,7 +870,9 @@ class KeyboardViewController: UIInputViewController {
 
         // Spinner
         cmdSpinner = UIActivityIndicatorView(style: .medium)
-        cmdSpinner.color            = .white
+        // Theme-aware — was hardcoded white, which vanished on the Light
+        // theme. `barText` is the theme's matching glyph tone (§3.2).
+        cmdSpinner.color            = KeyboardPalette.barText
         cmdSpinner.hidesWhenStopped = true
         cmdSpinner.translatesAutoresizingMaskIntoConstraints = false
         commandBar.addSubview(cmdSpinner)
@@ -873,6 +889,7 @@ class KeyboardViewController: UIInputViewController {
         cmdMicButton.tintColor = KeyboardPalette.barText
         cmdMicButton.backgroundColor = KeyboardPalette.chipBg  // match Send weight
         cmdMicButton.layer.cornerRadius = cmdMicH / 2          // perfect circle
+        cmdMicButton.layer.cornerCurve  = .continuous
         cmdMicButton.setContentHuggingPriority(.required, for: .horizontal)
         cmdMicButton.addTarget(self, action: #selector(micTapped), for: .touchUpInside)
         cmdMicButton.translatesAutoresizingMaskIntoConstraints = false
@@ -884,6 +901,7 @@ class KeyboardViewController: UIInputViewController {
         cmdSendButton.setTitleColor(KeyboardPalette.barText, for: .normal)
         cmdSendButton.backgroundColor    = KeyboardPalette.chipBg
         cmdSendButton.layer.cornerRadius = cmdMicH / 2  // capsule, matches mic
+        cmdSendButton.layer.cornerCurve  = .continuous
         cmdSendButton.contentEdgeInsets  = UIEdgeInsets(top: cmdSendInsetV, left: cmdSendInsetH, bottom: cmdSendInsetV, right: cmdSendInsetH)
         cmdSendButton.setContentHuggingPriority(.required, for: .horizontal)
         cmdSendButton.addTarget(self, action: #selector(sendCommand), for: .touchUpInside)
@@ -1142,6 +1160,10 @@ class KeyboardViewController: UIInputViewController {
         // uses: container intercepts, scores each key by distance,
         // dispatches to the winner. Buttons are visual-only.
         let container = KeyRowView(frame: CGRect(x: 0, y: y, width: w, height: rowH))
+        // Claim half the inter-row gap on each edge so taps in the strips
+        // between rows land on the nearer row directly (no dead zones).
+        // +0.5 guarantees the two halves meet with no sub-pixel seam.
+        container.gapSlop = rowGap / 2 + 0.5
         container.onKeyDown      = { [weak self] btn in self?.keyTouchDown(btn) }
         container.onKeyUp        = { [weak self] btn in self?.keyTapped(btn) }
         container.onKeyHeld      = { [weak self] btn in
@@ -1450,6 +1472,7 @@ class KeyboardViewController: UIInputViewController {
         guard keyPopupView == nil else { return }
         let popup = UIView()
         popup.layer.cornerRadius = 8
+        popup.layer.cornerCurve  = .continuous
         popup.layer.shadowColor = UIColor.black.cgColor
         popup.layer.shadowOpacity = 0.30
         popup.layer.shadowOffset = CGSize(width: 0, height: 2)
@@ -1770,6 +1793,10 @@ class KeyboardViewController: UIInputViewController {
         let now = Date().timeIntervalSinceReferenceDate
         if now - lastShiftTap < doubleTapInterval {
             isCapsLock = !isCapsLock; isShiftedOnce = false; lastShiftTap = 0
+            // Caps lock is a latched state change (§7.1) — the one shift
+            // interaction that earns a haptic. Shift-once stays silent so
+            // ordinary capitalization doesn't buzz on every sentence.
+            KeyboardHaptics.selectionChanged()
         } else {
             isCapsLock = false; isShiftedOnce = !isShiftedOnce; lastShiftTap = now
         }
@@ -1797,6 +1824,9 @@ class KeyboardViewController: UIInputViewController {
     // MARK: - Quick Panel
 
     private func showQuickPanel() {
+        // Surfacing the panel is a deliberate gesture (double-tap space) —
+        // a light impact confirms it the way iOS confirms Control Center.
+        KeyboardHaptics.lightImpact()
         // Tear down any active command bar / integration panel first —
         // Quick Panel takes the whole overlay slot.
         //
@@ -2579,6 +2609,7 @@ class KeyboardViewController: UIInputViewController {
     /// its prompt state (with `/edit` firing the picker, presets
     /// surfacing for `/tone`, etc.).
     private func handleSlashSuggestionTap(_ name: String) {
+        KeyboardHaptics.selectionChanged()
         // No-prompt commands (`/history`, `/splits`, `/fix`, `/reply`,
         // `/wyr`) must skip the trailing space so `updateCommandDetection`
         // sees an exact-name match and routes through the auto-fire
@@ -3132,6 +3163,7 @@ class KeyboardViewController: UIInputViewController {
     /// other suggestion chip in the iOS keyboard already does.
     private func handlePresetTap(_ value: String) {
         guard let cmd = activeCommand else { return }
+        KeyboardHaptics.selectionChanged()
         commandPromptText = value
         hidePresetStrip()
         cmdPromptLabel.text = value
@@ -3154,6 +3186,12 @@ class KeyboardViewController: UIInputViewController {
     // MARK: - Banner
 
     private func showBanner(_ text: String) {
+        // Single sink for the warning haptic: every ⚠️ banner is a
+        // validation / not-allowed state, and routing the feedback here
+        // (rather than at each call site) guarantees exactly one buzz even
+        // when a `shake()` fires in the same frame — §7.2's "no two
+        // haptics within 150 ms" rule. `shake()` stays purely visual.
+        if text.hasPrefix("⚠️") { KeyboardHaptics.warning() }
         bannerLabel.text          = text
         bannerContainer.alpha     = 0
         bannerContainer.isHidden  = false
@@ -3522,6 +3560,8 @@ extension KeyboardViewController: PHPickerViewControllerDelegate {
 extension KeyboardViewController: QuickPanelDelegate {
 
     func quickPanelDidSelect(_ command: SlashCommand) {
+        // Picking from a grid of commands is a selection event (§7.1).
+        KeyboardHaptics.selectionChanged()
         // Defer the panel teardown + next-state mount to the next runloop
         // tick. We're currently inside the QuickPanel tile's UIAction
         // handler — synchronously removing the QuickPanel from its
@@ -4535,13 +4575,22 @@ fileprivate final class KeyRowView: UIView {
 
     // MARK: Hit testing
 
+    /// Half the inter-row gap, set by `buildRow`. The row claims this many
+    /// points above and below its own frame so the strips BETWEEN rows are
+    /// caught directly by the nearer row — adjacent rows meet exactly at the
+    /// gap midline (no overlap, no dead band). This is the primary fix for
+    /// "taps between rows do nothing": it no longer depends on the container
+    /// forwarding the touch, the row owns the gap outright.
+    var gapSlop: CGFloat = 0
+
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
-        // Claim every in-row touch ourselves. Out-of-bounds touches
-        // (inter-row gaps) are picked up by `KeyboardContainerView`,
-        // which forwards them back to this view with the touch's
-        // original location — we'll still match the right key on
-        // X-distance alone in `touchesBegan`.
-        return bounds.contains(point) ? self : nil
+        // Claim every in-row touch (including the horizontal gaps between
+        // keys, which are inside `bounds`) AND half the inter-row gap on
+        // each side. `touchesBegan` then snaps to the nearest key by
+        // horizontal midpoint, so any point over the key grid types the
+        // closest letter — exactly like Apple's keyboard.
+        let expanded = bounds.insetBy(dx: 0, dy: -gapSlop)
+        return expanded.contains(point) ? self : nil
     }
 
     // MARK: Touch dispatch
@@ -4644,28 +4693,45 @@ fileprivate final class KeyboardContainerView: UIView {
     private static let fatFingerTolerance: CGFloat = 18
 
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
-        // Standard hit test first — overlays (command bar, slash strip,
-        // preview, integration / quick / listening panels) and the
-        // KeyRowView's own horizontal-gap forwarding all run here. Use
-        // whatever it returns unless it bounced back to `self`, which
-        // means nothing claimed the touch.
-        if let view = super.hitTest(point, with: event), view !== self {
+        guard isUserInteractionEnabled, !isHidden, alpha > 0.01,
+              bounds.contains(point) else { return nil }
+
+        let rows = subviews.compactMap { $0 as? KeyRowView }.filter { !$0.isHidden }
+
+        // 1) Let genuine chrome win first — the command bar, slash / preset
+        //    strips, banner, image preview, integration / Quick Panel /
+        //    listening overlays, and their buttons all sit ABOVE the keys
+        //    and must claim their own touches.
+        //
+        //    BUT deliberately exclude the key rows AND anything inside a key
+        //    row (e.g. a key's Liquid-Glass backing `UIVisualEffectView`).
+        //    That exclusion is the actual fix: previously, a touch landing
+        //    in an inter-key / inter-row gap could resolve to a row's glass
+        //    backing — a non-interactive view that swallowed the touch and
+        //    produced no keypress (the dead zones the user hit on both
+        //    iPhone and iPad). Routing every in-grid touch through the
+        //    nearest-key snap below guarantees there are no dead gaps, the
+        //    same way Apple's `UIKeyboardLayoutStar` partitions the keyplane.
+        if let view = super.hitTest(point, with: event),
+           view !== self,
+           !(view is KeyRowView),
+           !rows.contains(where: { view.isDescendant(of: $0) }) {
             return view
         }
-        guard bounds.contains(point) else { return nil }
-        let rows = subviews.compactMap { $0 as? KeyRowView }
+
         guard !rows.isEmpty else { return nil }
 
-        // Restrict fat-fingering to the key-grid span (with a small
-        // tolerance above/below). A tap on the command bar slot
-        // above the keys, or on the system home indicator below, is
-        // intentional — don't snap it to a key.
+        // 2) Snap to the nearest key. Restrict to the key-grid span (plus a
+        //    small tolerance above/below) so a tap on the command-bar slot
+        //    or the home-indicator strip isn't yanked into a key.
         let topY    = rows.map { $0.frame.minY }.min()!
         let bottomY = rows.map { $0.frame.maxY }.max()!
         guard point.y >= topY    - Self.fatFingerTolerance,
               point.y <= bottomY + Self.fatFingerTolerance else { return nil }
 
-        // Closest row by vertical edge distance.
+        // Closest row by vertical edge distance (dy == 0 for the row whose
+        // band already contains the touch — a direct key tap or an in-row
+        // horizontal gap; dy > 0 only in the strips between rows).
         var nearestRow: KeyRowView?
         var bestDist: CGFloat = .greatestFiniteMagnitude
         for row in rows {
@@ -4675,7 +4741,7 @@ fileprivate final class KeyboardContainerView: UIView {
             } else if point.y > row.frame.maxY {
                 dy = point.y - row.frame.maxY
             } else {
-                dy = 0  // super.hitTest would normally catch this case
+                dy = 0
             }
             if dy < bestDist {
                 bestDist = dy
@@ -4683,10 +4749,10 @@ fileprivate final class KeyboardContainerView: UIView {
             }
         }
         guard let row = nearestRow else { return nil }
-        // Forward to the row's own hitTest with the touch's X but the
-        // row's vertical centre — that hands off to `KeyRowView`'s
-        // existing nearest-key-by-midX logic, so the same button the
-        // user would have hit had they been on the row gets the touch.
+        // Resolve to the row itself (its `hitTest` returns `self`); UIKit
+        // then delivers the touch with its real location, and the row's
+        // `touchesBegan` picks the nearest key by horizontal midpoint — so
+        // the user lands on whichever key they were closest to.
         let rowLocal = CGPoint(
             x: row.convert(point, from: self).x,
             y: row.bounds.midY

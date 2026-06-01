@@ -87,9 +87,12 @@ final class QuickPanelView: UIView {
             header.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
 
             dismiss.centerYAnchor.constraint(equalTo: header.centerYAnchor),
-            dismiss.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
-            dismiss.widthAnchor.constraint(equalToConstant: 28),
-            dismiss.heightAnchor.constraint(equalToConstant: 28),
+            // Trailing -2 keeps the 22pt glyph optically ~10pt from the
+            // edge while the 44×44 hit region satisfies §4.4's minimum
+            // touch target (the glyph stays small; only the tap area grows).
+            dismiss.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -2),
+            dismiss.widthAnchor.constraint(equalToConstant: 44),
+            dismiss.heightAnchor.constraint(equalToConstant: 44),
 
             scroll.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 6),
             scroll.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
