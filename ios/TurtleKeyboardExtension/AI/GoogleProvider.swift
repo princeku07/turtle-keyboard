@@ -69,7 +69,7 @@ final class GoogleProvider: AIProvider {
 
     private func userMessage(from p: CommandPayload) -> String {
         switch p.command {
-        case "fix", "tone", "reply", "tl":
+        case "fix", "proofread", "tone", "reply", "tl":
             return p.context.isEmpty ? p.prompt : p.context
         case "style":
             // The inline-image text part has to carry the full restyle

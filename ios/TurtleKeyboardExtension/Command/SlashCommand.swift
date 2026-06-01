@@ -11,6 +11,7 @@ enum SlashCommand: String, CaseIterable {
     case sticker = "sticker"
     case gif     = "gif"
     case fix    = "fix"
+    case proofread = "proofread"
     case tone   = "tone"
     case reply  = "reply"
     case tl     = "tl"
@@ -36,6 +37,7 @@ enum SlashCommand: String, CaseIterable {
         case .sticker:       return "🏷️"
         case .gif:           return "🎞️"
         case .fix:           return "✏️"
+        case .proofread:     return "📝"
         case .tone:          return "🎭"
         case .reply:         return "💬"
         case .tl:            return "🌐"
@@ -57,7 +59,7 @@ enum SlashCommand: String, CaseIterable {
         switch self {
         case .cap, .edit, .style, .sticker, .gif, .tone, .tl, .search, .ask, .org, .split,
              .notion, .note, .slack, .msg, .poll, .web:    return true
-        case .fix, .reply, .splits, .wyr, .history:        return false
+        case .fix, .reply, .splits, .wyr, .history, .proofread: return false
         }
     }
 
@@ -110,6 +112,7 @@ enum SlashCommand: String, CaseIterable {
         case .sticker:       return "Making sticker…"
         case .gif:           return "Animating…"
         case .fix:           return "Fixing text…"
+        case .proofread:     return "Proofreading…"
         case .tone:          return "Adjusting tone…"
         case .reply:         return "Drafting reply…"
         case .tl:            return "Translating…"
@@ -130,6 +133,7 @@ enum SlashCommand: String, CaseIterable {
         case .sticker:       return "🏷️ Sticker ready — long-press field to paste"
         case .gif:           return "🎞️ GIF ready — long-press field to paste"
         case .fix:           return "✏️ Grammar fixed"
+        case .proofread:     return "📝 Proofread — text cleaned up"
         case .tone:          return "🎭 Tone applied"
         case .reply:         return "💬 Reply inserted"
         case .tl:            return "🌐 Translated"

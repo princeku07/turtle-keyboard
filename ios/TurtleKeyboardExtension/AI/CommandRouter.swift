@@ -40,7 +40,8 @@ final class CommandRouter {
             "style":   img,
             "sticker": img,
             "gif":     ModelRegistry.geminiImagePro,
-            "fix":    txt,
+            "fix":       txt,
+            "proofread": txt,
             "tone":   txt,
             "reply":  txt,
             "tl":     txt,
@@ -108,7 +109,7 @@ final class CommandRouter {
     static func requiredCapability(for command: String) -> ModelCapability? {
         switch command {
         case "cap", "edit", "style", "sticker", "gif": return .imageGeneration
-        case "fix", "tone", "org":     return .textEdit
+        case "fix", "proofread", "tone", "org": return .textEdit
         case "reply", "ask", "search": return .chat
         case "tl":                     return .translation
         default:                       return nil
@@ -132,6 +133,14 @@ final class CommandRouter {
 
         case "fix":
             return "You are a grammar and spelling corrector. Fix the grammar, spelling, and punctuation of the given text. Return ONLY the corrected text — no explanation, no preamble."
+
+        case "proofread":
+            // Fuller pass than /fix — clarity + flow on top of mechanics —
+            // while strictly preserving the author's meaning, voice, tone,
+            // and language. No new ideas, no quotes, no notes.
+            return """
+            You are a meticulous proofreader. Correct spelling, grammar, punctuation, word choice, and awkward phrasing in the given text, and lightly improve clarity and flow. Preserve the author's original meaning, voice, tone, and language exactly — do not add new ideas, do not translate, do not change formatting or emoji. Return ONLY the corrected text — no preamble, no explanation, no surrounding quotes.
+            """
 
         case "tone":
             let style = prompt.isEmpty ? "professional" : prompt

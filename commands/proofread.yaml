@@ -1,0 +1,47 @@
+id: proofread
+name: /proofread
+summary: Proofread the current text — grammar, spelling, punctuation, and clarity
+description: |
+  A fuller pass than /fix. Replaces the user's text (or current selection) with a
+  proofread version: corrects spelling, grammar, punctuation, word choice, and
+  awkward phrasing, and lightly improves clarity and flow. Strictly preserves the
+  author's meaning, voice, tone, and language — no new ideas, no translation.
+
+owner: "@turtle-team"
+tags: [text, writing, polish]
+
+input:
+  modes: [text, selection]
+  required: [text]
+  example: "/proofread"
+
+output:
+  type: text
+  format: plain
+  example: "I will be there at 5 pm, and I'll bring the documents you asked for."
+
+contract:
+  endpoint: POST /v1/commands/proofread
+  request_schema: schemas/proofread.request.json
+  response_schema: schemas/proofread.response.json
+
+ux:
+  latency_budget_ms: 1500
+  loading_state: required
+  error_state: required
+  result_action: replace-selection
+  privacy_notice: not-required
+
+support:
+  android:
+    state: planned
+    since: null
+    impl: null
+  ios:
+    state: shipped
+    since: null
+    impl: TurtleKeyboardExtension/Command/SlashCommand.swift
+  backend:
+    state: planned
+    since: null
+    impl: null

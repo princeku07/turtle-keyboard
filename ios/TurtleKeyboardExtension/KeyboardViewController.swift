@@ -1872,7 +1872,7 @@ class KeyboardViewController: UIInputViewController {
     /// user's Personalization toggles are honoured — disabling Poll on
     /// the host strips it from the grid here.
     private func allCommandsForQuickPanel() -> [SlashCommand] {
-        let aiCommands: [SlashCommand] = [.cap, .edit, .style, .sticker, .gif, .fix, .tone, .reply, .tl, .search, .ask, .org]
+        let aiCommands: [SlashCommand] = [.cap, .edit, .style, .sticker, .gif, .fix, .proofread, .tone, .reply, .tl, .search, .ask, .org]
         // Walk the live registry so commands added later (poll, wyr,
         // web, …) flow through automatically without touching this list.
         let localCommands: [SlashCommand] = integrationRegistry.allCommands.compactMap {
@@ -2853,6 +2853,19 @@ class KeyboardViewController: UIInputViewController {
                         } else {
                             showBanner("⚠️ Layout render failed")
                         }
+                    } else if cmd == .proofread {
+                        // Proofread REPLACES the user's message in place
+                        // (not append) — delete the source text the command
+                        // read from `contextBeforeSlash()`, then drop in the
+                        // cleaned-up version. `context` is the trimmed field
+                        // text; delete the raw before-input so any trailing
+                        // space left by the double-tap-space Quick Panel
+                        // gesture goes too.
+                        let before = textDocumentProxy.documentContextBeforeInput ?? ""
+                        for _ in 0..<before.count { textDocumentProxy.deleteBackward() }
+                        textDocumentProxy.insertText(text)
+                        hideCommandBar()
+                        showBanner(completionBanner(for: cmd))
                     } else {
                         textDocumentProxy.insertText(text)
                         hideCommandBar()
