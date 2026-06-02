@@ -1817,6 +1817,16 @@ class KeyboardViewController: UIInputViewController {
         guard range.location != NSNotFound else { return }
         let word = context.substring(with: range)
         suggestionEngine.learn(word)
+        // Learn the bigram (previous word → this word) so the strip can predict
+        // the NEXT word from context, not just prefix-match the current one.
+        let pairRange = context.range(of: "(\\S+)\\s+(\\S+)$", options: .regularExpression)
+        if pairRange.location != NSNotFound {
+            let toks = context.substring(with: pairRange)
+                .split(whereSeparator: { $0 == " " || $0 == "\n" || $0 == "\t" }).map(String.init)
+            if toks.count >= 2 {
+                suggestionEngine.learnBigram(previous: toks[toks.count - 2], current: toks[toks.count - 1])
+            }
+        }
     }
 
     // MARK: - Autocorrect
@@ -2180,13 +2190,28 @@ class KeyboardViewController: UIInputViewController {
         // live word prediction while actively typing a word.
         if currentWord.isEmpty, showContextualCommandsIfApplicable() { return }
 
+        // The word immediately before the cursor's word — the bigram context.
+        // Read only the tail so this stays cheap on long fields.
+        let tail = String(contextString.suffix(64))
+        let tailTokens = tail.split(whereSeparator: { $0 == " " || $0 == "\n" || $0 == "\t" }).map(String.init)
+        let previousWord: String?
+        if currentWord.isEmpty {
+            previousWord = tailTokens.last                                  // just hit space
+        } else {
+            previousWord = tailTokens.count >= 2 ? tailTokens[tailTokens.count - 2] : nil
+        }
+
         var picks: [String] = []
         var step1Empty = true
 
-        // Step 1 — engine prefix lookup.
+        // Step 1 — prefix lookup, reranked by bigram context (likely
+        // next-words after `previousWord` float to the front).
         if currentWord.count >= 2 {
-            picks = suggestionEngine.suggest(prefix: currentWord, max: 3)
+            picks = suggestionEngine.suggest(prefix: currentWord, after: previousWord, max: 3)
             step1Empty = picks.isEmpty
+        } else if currentWord.isEmpty, let prev = previousWord {
+            // Between words → pure next-word prediction from the bigram model.
+            picks = suggestionEngine.nextWords(after: prev, max: 3)
         }
 
         // Step 2 — pad to three with top user words. The native iOS
@@ -4573,6 +4598,12 @@ fileprivate final class SuggestionEngine {
     /// backed by App Group UserDefaults under a single JSON key).
     let userStore: UserWordStore
 
+    /// Per-user bigram model: previous-word → likely next-words, learned
+    /// purely from the user's own typing (so it personalises and needs no
+    /// bundled data). Powers next-word prediction (between words) and
+    /// context-reranking of prefix matches (mid-word).
+    let bigrams: BigramStore
+
     /// Fires once the bundled dictionary becomes available so the
     /// keyboard can repaint the suggestion strip — without this, the
     /// strip stays empty after a cold launch until the next keystroke.
@@ -4580,6 +4611,7 @@ fileprivate final class SuggestionEngine {
 
     init() {
         self.userStore = UserWordStore()
+        self.bigrams = BigramStore()
     }
 
     /// Idempotent. Returns immediately; load runs on a background QoS.
@@ -4682,6 +4714,50 @@ fileprivate final class SuggestionEngine {
             }
         }
         userStore.bump(w)
+    }
+
+    // MARK: - Bigram (next-word) prediction
+
+    /// Record that `current` followed `previous`. Both are normalised; only
+    /// alpha words are kept (1-char allowed so "i → am", "a → lot" work).
+    func learnBigram(previous: String, current: String) {
+        let p = Self.norm(previous), c = Self.norm(current)
+        guard Self.learnable(p), Self.learnable(c) else { return }
+        bigrams.bump(previous: p, current: c)
+    }
+
+    /// Most likely next words after `previous`, by personal frequency.
+    func nextWords(after previous: String, max: Int = 3) -> [String] {
+        bigrams.nextWords(after: Self.norm(previous), max: max)
+    }
+
+    /// Prefix suggestions reranked by bigram context: prefix matches that are
+    /// also likely next-words after `after` float to the front.
+    func suggest(prefix: String, after: String?, max: Int = 3) -> [String] {
+        let base = suggest(prefix: prefix, max: max + 4)
+        guard let after = after, !after.isEmpty else { return Array(base.prefix(max)) }
+        let likely = Set(bigrams.nextWords(after: Self.norm(after), max: 25))
+        guard !likely.isEmpty else { return Array(base.prefix(max)) }
+        var out: [String] = []
+        var seen = Set<String>()
+        for w in base where likely.contains(w) && seen.insert(w).inserted {
+            out.append(w); if out.count >= max { return out }
+        }
+        for w in base where seen.insert(w).inserted {
+            out.append(w); if out.count >= max { break }
+        }
+        return out
+    }
+
+    private static func norm(_ w: String) -> String {
+        w.lowercased().trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+    }
+
+    private static func learnable(_ w: String) -> Bool {
+        guard !w.isEmpty else { return false }
+        return w.unicodeScalars.allSatisfy {
+            CharacterSet.letters.contains($0) || $0 == "'" || $0 == "-"
+        }
     }
 
     private func readPrefixIndex() -> [String: [String]]? {
@@ -4843,6 +4919,97 @@ fileprivate final class UserWordStore {
         let sorted = cache.sorted { $0.value < $1.value }
         for i in 0..<min(removeCount, sorted.count) {
             cache.removeValue(forKey: sorted[i].key)
+        }
+    }
+}
+
+// MARK: - BigramStore
+//
+// Persists per-user bigram counts (previous-word → {next-word: count}) in the
+// App Group UserDefaults under a single JSON key — same coalesced-write design
+// as `UserWordStore`. Bounded twice over: the fan-out per previous-word is
+// capped (drop the weakest next-word), and the number of previous-words is
+// capped (evict the lowest-total in batches), so the resident model stays well
+// under a few hundred KB even after heavy use.
+
+fileprivate final class BigramStore {
+
+    private static let storeKey = "TurtleKB.bigramCounts"
+    private static let maxPrev = 1500
+    private static let evictBatch = 150
+    private static let maxNextPerPrev = 12
+
+    private let defaults: UserDefaults
+    private var cache: [String: [String: Int]]
+    private let lock = NSLock()
+
+    init() {
+        let store = UserDefaults(suiteName: SplitContract.storageSuiteName) ?? .standard
+        self.defaults = store
+        if let data = store.data(forKey: Self.storeKey),
+           let decoded = try? JSONDecoder().decode([String: [String: Int]].self, from: data) {
+            self.cache = decoded
+        } else {
+            self.cache = [:]
+        }
+    }
+
+    func bump(previous: String, current: String) {
+        lock.lock()
+        var nexts = cache[previous] ?? [:]
+        nexts[current, default: 0] += 1
+        if nexts.count > Self.maxNextPerPrev,
+           let weakest = nexts.min(by: { $0.value < $1.value })?.key {
+            nexts.removeValue(forKey: weakest)
+        }
+        cache[previous] = nexts
+        if cache.count > Self.maxPrev { evictLocked() }
+        scheduleFlushLocked()
+        lock.unlock()
+    }
+
+    func nextWords(after previous: String, max: Int) -> [String] {
+        guard max > 0 else { return [] }
+        lock.lock(); defer { lock.unlock() }
+        guard let nexts = cache[previous] else { return [] }
+        return nexts.sorted { $0.value > $1.value }.prefix(max).map { $0.key }
+    }
+
+    func clear() {
+        lock.lock()
+        cache.removeAll()
+        defaults.removeObject(forKey: Self.storeKey)
+        lock.unlock()
+    }
+
+    // MARK: Persistence
+
+    private var pendingFlush = false
+
+    private func scheduleFlushLocked() {
+        guard !pendingFlush else { return }
+        pendingFlush = true
+        DispatchQueue.global(qos: .background).async { [weak self] in
+            guard let self = self else { return }
+            self.lock.lock()
+            self.pendingFlush = false
+            let snapshot = self.cache
+            self.lock.unlock()
+            if let data = try? JSONEncoder().encode(snapshot) {
+                self.defaults.set(data, forKey: Self.storeKey)
+            }
+        }
+    }
+
+    /// Evict the previous-words with the smallest total observation count.
+    private func evictLocked() {
+        let target = Self.maxPrev - Self.evictBatch
+        let removeCount = cache.count - target
+        guard removeCount > 0 else { return }
+        let totals = cache.map { (key: $0.key, total: $0.value.values.reduce(0, +)) }
+            .sorted { $0.total < $1.total }
+        for i in 0..<min(removeCount, totals.count) {
+            cache.removeValue(forKey: totals[i].key)
         }
     }
 }
