@@ -99,6 +99,16 @@
 				<string>turtleslackoauth</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.turtlekeyboard.githuboauth</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>turtlegithuboauth</string>
+			</array>
+		</dict>
 	</array>
 </dict>
 </plist>

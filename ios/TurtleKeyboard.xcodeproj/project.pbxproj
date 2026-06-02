@@ -10,6 +10,7 @@
 		CC000003CC000003CC000003 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000002CC000002CC000002 /* AppDelegate.swift */; };
 		CC000005CC000005CC000005 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000004CC000004CC000004 /* ViewController.swift */; };
 		EE000003EE000003EE000003 /* KeyboardViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000002EE000002EE000002 /* KeyboardViewController.swift */; };
+		FF000001FF000001FF000001 /* TurtleKeyboardExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = EE000005EE000005EE000005 /* TurtleKeyboardExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		HH000004HH000004HH000004 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000003HH000003HH000003 /* Models.swift */; };
 		HH000014HH000014HH000014 /* AITypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000006HH000006HH000006 /* AITypes.swift */; };
 		HH000015HH000015HH000015 /* KeyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000007HH000007HH000007 /* KeyStore.swift */; };
@@ -17,10 +18,6 @@
 		HH000017HH000017HH000017 /* CommandRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000009HH000009HH000009 /* CommandRouter.swift */; };
 		HH000020HH000020HH000020 /* GoogleProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000012HH000012HH000012 /* GoogleProvider.swift */; };
 		HH000025HH000025HH000025 /* PromptLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000024HH000024HH000024 /* PromptLoader.swift */; };
-		HH000441HH000441HH000441 /* StylePresets.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000440HH000440HH000440 /* StylePresets.swift */; };
-		HH000443HH000443HH000443 /* AlphaMatte.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000442HH000442HH000442 /* AlphaMatte.swift */; };
-		HH000445HH000445HH000445 /* MattePrompts.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000444HH000444HH000444 /* MattePrompts.swift */; };
-		HH000451HH000451HH000451 /* SpriteSheetSlicer.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000450HH000450HH000450 /* SpriteSheetSlicer.swift */; };
 		HH000034HH000034HH000034 /* OrgImageRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000033HH000033HH000033 /* OrgImageRenderer.swift */; };
 		HH000036HH000036HH000036 /* VoiceInputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000035HH000035HH000035 /* VoiceInputController.swift */; };
 		HH000040HH000040HH000040 /* IntegrationKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000041HH000041HH000041 /* IntegrationKit.swift */; };
@@ -36,29 +33,6 @@
 		HH000074HH000074HH000074 /* SplitSheetsClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000075HH000075HH000075 /* SplitSheetsClient.swift */; };
 		HH000076HH000076HH000076 /* SplitDriveClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000077HH000077HH000077 /* SplitDriveClient.swift */; };
 		HH000078HH000078HH000078 /* SplitCloudSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000079HH000079HH000079 /* SplitCloudSync.swift */; };
-		HH000331HH000331HH000331 /* SplitFreshTokenProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000330HH000330HH000330 /* SplitFreshTokenProvider.swift */; };
-		HH000332HH000332HH000332 /* SplitFreshTokenProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000330HH000330HH000330 /* SplitFreshTokenProvider.swift */; };
-		HH000334HH000334HH000334 /* SplitKeychainTokenProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000333HH000333HH000333 /* SplitKeychainTokenProvider.swift */; };
-		HH000335HH000335HH000335 /* SplitKeychainTokenProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000333HH000333HH000333 /* SplitKeychainTokenProvider.swift */; };
-		HH000337HH000337HH000337 /* SplitOAuthConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000336HH000336HH000336 /* SplitOAuthConstants.swift */; };
-		HH000338HH000338HH000338 /* SplitOAuthConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000336HH000336HH000336 /* SplitOAuthConstants.swift */; };
-		HH000340HH000340HH000340 /* SplitKeychain.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000071HH000071HH000071 /* SplitKeychain.swift */; };
-		HH000341HH000341HH000341 /* SplitSheetsClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000075HH000075HH000075 /* SplitSheetsClient.swift */; };
-		HH000342HH000342HH000342 /* SplitDriveClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000077HH000077HH000077 /* SplitDriveClient.swift */; };
-		HH000343HH000343HH000343 /* SplitCloudSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000079HH000079HH000079 /* SplitCloudSync.swift */; };
-		HH000350HH000350HH000350 /* ImageVariants.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000351HH000351HH000351 /* ImageVariants.swift */; };
-		HH000360HH000360HH000360 /* PollSheetViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000361HH000361HH000361 /* PollSheetViewController.swift */; };
-		HH000362HH000362HH000362 /* WyrSheetViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000363HH000363HH000363 /* WyrSheetViewController.swift */; };
-		HH000400HH000400HH000400 /* VoiceRecordingViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000401HH000401HH000401 /* VoiceRecordingViewController.swift */; };
-		HH000410HH000410HH000410 /* VoiceSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000411HH000411HH000411 /* VoiceSessionManager.swift */; };
-		HH000364HH000364HH000364 /* WorkerUrls.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000221HH000221HH000221 /* WorkerUrls.swift */; };
-		HH000365HH000365HH000365 /* PollClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000223HH000223HH000223 /* PollClient.swift */; };
-		HH000366HH000366HH000366 /* WyrClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000231HH000231HH000231 /* WyrClient.swift */; };
-		HH000370HH000370HH000370 /* ImageHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000371HH000371HH000371 /* ImageHistory.swift */; };
-		HH000372HH000372HH000372 /* ImageHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000371HH000371HH000371 /* ImageHistory.swift */; };
-		HH000373HH000373HH000373 /* HistoryViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000374HH000374HH000374 /* HistoryViewController.swift */; };
-		HH000375HH000375HH000375 /* PresetChipStripView.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000376HH000376HH000376 /* PresetChipStripView.swift */; };
-		HH000380HH000380HH000380 /* ImageDownsizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000381HH000381HH000381 /* ImageDownsizer.swift */; };
 		HH000090HH000090HH000090 /* NotionTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000091HH000091HH000091 /* NotionTypes.swift */; };
 		HH000092HH000092HH000092 /* NotionClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000093HH000093HH000093 /* NotionClient.swift */; };
 		HH000094HH000094HH000094 /* NotionLlmBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000095HH000095HH000095 /* NotionLlmBridge.swift */; };
@@ -78,14 +52,10 @@
 		HH000122HH000122HH000122 /* KeyboardPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000123HH000123HH000123 /* KeyboardPalette.swift */; };
 		HH000124HH000124HH000124 /* SlashCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000125HH000125HH000125 /* SlashCommand.swift */; };
 		HH000130HH000130HH000130 /* QuickPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000131HH000131HH000131 /* QuickPanelView.swift */; };
-		HH000460HH000460HH000460 /* LiquidGlass.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000461HH000461HH000461 /* LiquidGlass.swift */; };
-		HH000420HH000420HH000420 /* HistoryPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000421HH000421HH000421 /* HistoryPanelView.swift */; };
-		HH000430HH000430HH000430 /* CommandSuggestionStripView.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000431HH000431HH000431 /* CommandSuggestionStripView.swift */; };
 		HH000140HH000140HH000140 /* PersonalizationKeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000141HH000141HH000141 /* PersonalizationKeys.swift */; };
 		HH000142HH000142HH000142 /* PersonalizationViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000143HH000143HH000143 /* PersonalizationViewController.swift */; };
 		HH000144HH000144HH000144 /* PersonalizationKeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000141HH000141HH000141 /* PersonalizationKeys.swift */; };
 		HH000150HH000150HH000150 /* Secrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000151HH000151HH000151 /* Secrets.swift */; };
-		HH000240HH000240HH000240 /* Secrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000151HH000151HH000151 /* Secrets.swift */; };
 		HH000200HH000200HH000200 /* QrRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000201HH000201HH000201 /* QrRenderer.swift */; };
 		HH000202HH000202HH000202 /* JoinSplitViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000203HH000203HH000203 /* JoinSplitViewController.swift */; };
 		HH000220HH000220HH000220 /* WorkerUrls.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000221HH000221HH000221 /* WorkerUrls.swift */; };
@@ -93,6 +63,7 @@
 		HH000224HH000224HH000224 /* PollIntegration.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000225HH000225HH000225 /* PollIntegration.swift */; };
 		HH000230HH000230HH000230 /* WyrClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000231HH000231HH000231 /* WyrClient.swift */; };
 		HH000232HH000232HH000232 /* WyrIntegration.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000233HH000233HH000233 /* WyrIntegration.swift */; };
+		HH000240HH000240HH000240 /* Secrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000151HH000151HH000151 /* Secrets.swift */; };
 		HH000300HH000300HH000300 /* WebIntegration.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000301HH000301HH000301 /* WebIntegration.swift */; };
 		HH000302HH000302HH000302 /* WebPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000303HH000303HH000303 /* WebPanelView.swift */; };
 		HH000310HH000310HH000310 /* SuggestedShortcut.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000311HH000311HH000311 /* SuggestedShortcut.swift */; };
@@ -101,7 +72,39 @@
 		HH000322HH000322HH000322 /* KeyboardTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000320HH000320HH000320 /* KeyboardTheme.swift */; };
 		HH000324HH000324HH000324 /* KeyboardThemeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000323HH000323HH000323 /* KeyboardThemeManager.swift */; };
 		HH000325HH000325HH000325 /* KeyboardThemeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000323HH000323HH000323 /* KeyboardThemeManager.swift */; };
-		FF000001FF000001FF000001 /* TurtleKeyboardExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = EE000005EE000005EE000005 /* TurtleKeyboardExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		HH000331HH000331HH000331 /* SplitFreshTokenProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000330HH000330HH000330 /* SplitFreshTokenProvider.swift */; };
+		HH000332HH000332HH000332 /* SplitFreshTokenProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000330HH000330HH000330 /* SplitFreshTokenProvider.swift */; };
+		HH000334HH000334HH000334 /* SplitKeychainTokenProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000333HH000333HH000333 /* SplitKeychainTokenProvider.swift */; };
+		HH000335HH000335HH000335 /* SplitKeychainTokenProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000333HH000333HH000333 /* SplitKeychainTokenProvider.swift */; };
+		HH000337HH000337HH000337 /* SplitOAuthConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000336HH000336HH000336 /* SplitOAuthConstants.swift */; };
+		HH000338HH000338HH000338 /* SplitOAuthConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000336HH000336HH000336 /* SplitOAuthConstants.swift */; };
+		HH000340HH000340HH000340 /* SplitKeychain.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000071HH000071HH000071 /* SplitKeychain.swift */; };
+		HH000341HH000341HH000341 /* SplitSheetsClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000075HH000075HH000075 /* SplitSheetsClient.swift */; };
+		HH000342HH000342HH000342 /* SplitDriveClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000077HH000077HH000077 /* SplitDriveClient.swift */; };
+		HH000343HH000343HH000343 /* SplitCloudSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000079HH000079HH000079 /* SplitCloudSync.swift */; };
+		HH000350HH000350HH000350 /* ImageVariants.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000351HH000351HH000351 /* ImageVariants.swift */; };
+		HH000360HH000360HH000360 /* PollSheetViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000361HH000361HH000361 /* PollSheetViewController.swift */; };
+		HH000362HH000362HH000362 /* WyrSheetViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000363HH000363HH000363 /* WyrSheetViewController.swift */; };
+		HH000364HH000364HH000364 /* WorkerUrls.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000221HH000221HH000221 /* WorkerUrls.swift */; };
+		HH000365HH000365HH000365 /* PollClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000223HH000223HH000223 /* PollClient.swift */; };
+		HH000366HH000366HH000366 /* WyrClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000231HH000231HH000231 /* WyrClient.swift */; };
+		HH000370HH000370HH000370 /* ImageHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000371HH000371HH000371 /* ImageHistory.swift */; };
+		HH000372HH000372HH000372 /* ImageHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000371HH000371HH000371 /* ImageHistory.swift */; };
+		HH000373HH000373HH000373 /* HistoryViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000374HH000374HH000374 /* HistoryViewController.swift */; };
+		HH000375HH000375HH000375 /* PresetChipStripView.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000376HH000376HH000376 /* PresetChipStripView.swift */; };
+		HH000380HH000380HH000380 /* ImageDownsizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000381HH000381HH000381 /* ImageDownsizer.swift */; };
+		HH000400HH000400HH000400 /* VoiceRecordingViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000401HH000401HH000401 /* VoiceRecordingViewController.swift */; };
+		HH000410HH000410HH000410 /* VoiceSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000411HH000411HH000411 /* VoiceSessionManager.swift */; };
+		HH000420HH000420HH000420 /* HistoryPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000421HH000421HH000421 /* HistoryPanelView.swift */; };
+		HH000430HH000430HH000430 /* CommandSuggestionStripView.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000431HH000431HH000431 /* CommandSuggestionStripView.swift */; };
+		HH000441HH000441HH000441 /* StylePresets.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000440HH000440HH000440 /* StylePresets.swift */; };
+		HH000443HH000443HH000443 /* AlphaMatte.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000442HH000442HH000442 /* AlphaMatte.swift */; };
+		HH000445HH000445HH000445 /* MattePrompts.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000444HH000444HH000444 /* MattePrompts.swift */; };
+		HH000451HH000451HH000451 /* SpriteSheetSlicer.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000450HH000450HH000450 /* SpriteSheetSlicer.swift */; };
+		HH000460HH000460HH000460 /* LiquidGlass.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000461HH000461HH000461 /* LiquidGlass.swift */; };
+		HH000472HH000472HH000472 /* GitHubIntegration.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000471HH000471HH000471 /* GitHubIntegration.swift */; };
+		HH000476HH000476HH000476 /* GitHubAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000477HH000477HH000477 /* GitHubAuth.swift */; };
+		HH000478HH000478HH000478 /* GitHubConnectViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000479HH000479HH000479 /* GitHubConnectViewController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -134,6 +137,8 @@
 		CC000006CC000006CC000006 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		CC000007CC000007CC000007 /* TurtleKeyboard.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TurtleKeyboard.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		EE000002EE000002EE000002 /* KeyboardViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardViewController.swift; sourceTree = "<group>"; };
+		EE000004EE000004EE000004 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		EE000005EE000005EE000005 /* TurtleKeyboardExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = TurtleKeyboardExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		HH000003HH000003HH000003 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		HH000006HH000006HH000006 /* AITypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITypes.swift; sourceTree = "<group>"; };
 		HH000007HH000007HH000007 /* KeyStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyStore.swift; sourceTree = "<group>"; };
@@ -141,10 +146,6 @@
 		HH000009HH000009HH000009 /* CommandRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandRouter.swift; sourceTree = "<group>"; };
 		HH000012HH000012HH000012 /* GoogleProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleProvider.swift; sourceTree = "<group>"; };
 		HH000024HH000024HH000024 /* PromptLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptLoader.swift; sourceTree = "<group>"; };
-		HH000440HH000440HH000440 /* StylePresets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StylePresets.swift; sourceTree = "<group>"; };
-		HH000442HH000442HH000442 /* AlphaMatte.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlphaMatte.swift; sourceTree = "<group>"; };
-		HH000444HH000444HH000444 /* MattePrompts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MattePrompts.swift; sourceTree = "<group>"; };
-		HH000450HH000450HH000450 /* SpriteSheetSlicer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpriteSheetSlicer.swift; sourceTree = "<group>"; };
 		HH000033HH000033HH000033 /* OrgImageRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrgImageRenderer.swift; sourceTree = "<group>"; };
 		HH000035HH000035HH000035 /* VoiceInputController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceInputController.swift; sourceTree = "<group>"; };
 		HH000041HH000041HH000041 /* IntegrationKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntegrationKit.swift; sourceTree = "<group>"; };
@@ -159,18 +160,6 @@
 		HH000075HH000075HH000075 /* SplitSheetsClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitSheetsClient.swift; sourceTree = "<group>"; };
 		HH000077HH000077HH000077 /* SplitDriveClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitDriveClient.swift; sourceTree = "<group>"; };
 		HH000079HH000079HH000079 /* SplitCloudSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitCloudSync.swift; sourceTree = "<group>"; };
-		HH000330HH000330HH000330 /* SplitFreshTokenProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitFreshTokenProvider.swift; sourceTree = "<group>"; };
-		HH000333HH000333HH000333 /* SplitKeychainTokenProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitKeychainTokenProvider.swift; sourceTree = "<group>"; };
-		HH000336HH000336HH000336 /* SplitOAuthConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitOAuthConstants.swift; sourceTree = "<group>"; };
-		HH000351HH000351HH000351 /* ImageVariants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageVariants.swift; sourceTree = "<group>"; };
-		HH000361HH000361HH000361 /* PollSheetViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PollSheetViewController.swift; sourceTree = "<group>"; };
-		HH000363HH000363HH000363 /* WyrSheetViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WyrSheetViewController.swift; sourceTree = "<group>"; };
-		HH000401HH000401HH000401 /* VoiceRecordingViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceRecordingViewController.swift; sourceTree = "<group>"; };
-		HH000411HH000411HH000411 /* VoiceSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceSessionManager.swift; sourceTree = "<group>"; };
-		HH000371HH000371HH000371 /* ImageHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageHistory.swift; sourceTree = "<group>"; };
-		HH000374HH000374HH000374 /* HistoryViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryViewController.swift; sourceTree = "<group>"; };
-		HH000376HH000376HH000376 /* PresetChipStripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresetChipStripView.swift; sourceTree = "<group>"; };
-		HH000381HH000381HH000381 /* ImageDownsizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageDownsizer.swift; sourceTree = "<group>"; };
 		HH000091HH000091HH000091 /* NotionTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotionTypes.swift; sourceTree = "<group>"; };
 		HH000093HH000093HH000093 /* NotionClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotionClient.swift; sourceTree = "<group>"; };
 		HH000095HH000095HH000095 /* NotionLlmBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotionLlmBridge.swift; sourceTree = "<group>"; };
@@ -186,12 +175,9 @@
 		HH000123HH000123HH000123 /* KeyboardPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardPalette.swift; sourceTree = "<group>"; };
 		HH000125HH000125HH000125 /* SlashCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlashCommand.swift; sourceTree = "<group>"; };
 		HH000131HH000131HH000131 /* QuickPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickPanelView.swift; sourceTree = "<group>"; };
-		HH000461HH000461HH000461 /* LiquidGlass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiquidGlass.swift; sourceTree = "<group>"; };
-		HH000421HH000421HH000421 /* HistoryPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryPanelView.swift; sourceTree = "<group>"; };
-		HH000431HH000431HH000431 /* CommandSuggestionStripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandSuggestionStripView.swift; sourceTree = "<group>"; };
 		HH000141HH000141HH000141 /* PersonalizationKeys.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalizationKeys.swift; sourceTree = "<group>"; };
 		HH000143HH000143HH000143 /* PersonalizationViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalizationViewController.swift; sourceTree = "<group>"; };
-		HH000151HH000151HH000151 /* Secrets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Secrets.swift"; path = "../Generated/Secrets.swift"; sourceTree = "<group>"; };
+		HH000151HH000151HH000151 /* Secrets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Secrets.swift; path = ../Generated/Secrets.swift; sourceTree = "<group>"; };
 		HH000201HH000201HH000201 /* QrRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QrRenderer.swift; sourceTree = "<group>"; };
 		HH000203HH000203HH000203 /* JoinSplitViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoinSplitViewController.swift; sourceTree = "<group>"; };
 		HH000210HH000210HH000210 /* TurtleKeyboard.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TurtleKeyboard.entitlements; sourceTree = "<group>"; };
@@ -207,8 +193,28 @@
 		HH000313HH000313HH000313 /* SuggestedShortcutCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuggestedShortcutCatalog.swift; sourceTree = "<group>"; };
 		HH000320HH000320HH000320 /* KeyboardTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardTheme.swift; sourceTree = "<group>"; };
 		HH000323HH000323HH000323 /* KeyboardThemeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardThemeManager.swift; sourceTree = "<group>"; };
-		EE000004EE000004EE000004 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		EE000005EE000005EE000005 /* TurtleKeyboardExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = TurtleKeyboardExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		HH000330HH000330HH000330 /* SplitFreshTokenProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitFreshTokenProvider.swift; sourceTree = "<group>"; };
+		HH000333HH000333HH000333 /* SplitKeychainTokenProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitKeychainTokenProvider.swift; sourceTree = "<group>"; };
+		HH000336HH000336HH000336 /* SplitOAuthConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitOAuthConstants.swift; sourceTree = "<group>"; };
+		HH000351HH000351HH000351 /* ImageVariants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageVariants.swift; sourceTree = "<group>"; };
+		HH000361HH000361HH000361 /* PollSheetViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PollSheetViewController.swift; sourceTree = "<group>"; };
+		HH000363HH000363HH000363 /* WyrSheetViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WyrSheetViewController.swift; sourceTree = "<group>"; };
+		HH000371HH000371HH000371 /* ImageHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageHistory.swift; sourceTree = "<group>"; };
+		HH000374HH000374HH000374 /* HistoryViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryViewController.swift; sourceTree = "<group>"; };
+		HH000376HH000376HH000376 /* PresetChipStripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresetChipStripView.swift; sourceTree = "<group>"; };
+		HH000381HH000381HH000381 /* ImageDownsizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageDownsizer.swift; sourceTree = "<group>"; };
+		HH000401HH000401HH000401 /* VoiceRecordingViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceRecordingViewController.swift; sourceTree = "<group>"; };
+		HH000411HH000411HH000411 /* VoiceSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceSessionManager.swift; sourceTree = "<group>"; };
+		HH000421HH000421HH000421 /* HistoryPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryPanelView.swift; sourceTree = "<group>"; };
+		HH000431HH000431HH000431 /* CommandSuggestionStripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandSuggestionStripView.swift; sourceTree = "<group>"; };
+		HH000440HH000440HH000440 /* StylePresets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StylePresets.swift; sourceTree = "<group>"; };
+		HH000442HH000442HH000442 /* AlphaMatte.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlphaMatte.swift; sourceTree = "<group>"; };
+		HH000444HH000444HH000444 /* MattePrompts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MattePrompts.swift; sourceTree = "<group>"; };
+		HH000450HH000450HH000450 /* SpriteSheetSlicer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpriteSheetSlicer.swift; sourceTree = "<group>"; };
+		HH000461HH000461HH000461 /* LiquidGlass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiquidGlass.swift; sourceTree = "<group>"; };
+		HH000471HH000471HH000471 /* GitHubIntegration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubIntegration.swift; sourceTree = "<group>"; };
+		HH000477HH000477HH000477 /* GitHubAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubAuth.swift; sourceTree = "<group>"; };
+		HH000479HH000479HH000479 /* GitHubConnectViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubConnectViewController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -256,6 +262,7 @@
 				HH000203HH000203HH000203 /* JoinSplitViewController.swift */,
 				HH000109HH000109HH000109 /* NotionConnectViewController.swift */,
 				HH000111HH000111HH000111 /* SlackConnectViewController.swift */,
+				HH000479HH000479HH000479 /* GitHubConnectViewController.swift */,
 				HH000143HH000143HH000143 /* PersonalizationViewController.swift */,
 				HH000361HH000361HH000361 /* PollSheetViewController.swift */,
 				HH000363HH000363HH000363 /* WyrSheetViewController.swift */,
@@ -270,22 +277,20 @@
 			path = TurtleKeyboard;
 			sourceTree = "<group>";
 		};
-		HH000080HH000080HH000080 /* Cloud */ = {
+		EE000001EE000001EE000001 /* TurtleKeyboardExtension */ = {
 			isa = PBXGroup;
 			children = (
-				HH000071HH000071HH000071 /* SplitKeychain.swift */,
-				HH000073HH000073HH000073 /* SplitOAuth.swift */,
-				HH000075HH000075HH000075 /* SplitSheetsClient.swift */,
-				HH000077HH000077HH000077 /* SplitDriveClient.swift */,
-				HH000079HH000079HH000079 /* SplitCloudSync.swift */,
-				HH000330HH000330HH000330 /* SplitFreshTokenProvider.swift */,
-				HH000333HH000333HH000333 /* SplitKeychainTokenProvider.swift */,
-				HH000336HH000336HH000336 /* SplitOAuthConstants.swift */,
-				HH000201HH000201HH000201 /* QrRenderer.swift */,
-				HH000105HH000105HH000105 /* NotionAuth.swift */,
-				HH000107HH000107HH000107 /* SlackAuth.swift */,
+				EE000002EE000002EE000002 /* KeyboardViewController.swift */,
+				HH000003HH000003HH000003 /* Models.swift */,
+				HH000005HH000005HH000005 /* AI */,
+				HH000037HH000037HH000037 /* Voice */,
+				HH000038HH000038HH000038 /* Integration */,
+				HH000126HH000126HH000126 /* Keyboard */,
+				HH000127HH000127HH000127 /* Command */,
+				EE000004EE000004EE000004 /* Info.plist */,
+				HH000211HH000211HH000211 /* TurtleKeyboardExtension.entitlements */,
 			);
-			path = Cloud;
+			path = TurtleKeyboardExtension;
 			sourceTree = "<group>";
 		};
 		HH000005HH000005HH000005 /* AI */ = {
@@ -307,46 +312,6 @@
 				HH000381HH000381HH000381 /* ImageDownsizer.swift */,
 			);
 			path = AI;
-			sourceTree = "<group>";
-		};
-		EE000001EE000001EE000001 /* TurtleKeyboardExtension */ = {
-			isa = PBXGroup;
-			children = (
-				EE000002EE000002EE000002 /* KeyboardViewController.swift */,
-				HH000003HH000003HH000003 /* Models.swift */,
-				HH000005HH000005HH000005 /* AI */,
-				HH000037HH000037HH000037 /* Voice */,
-				HH000038HH000038HH000038 /* Integration */,
-				HH000126HH000126HH000126 /* Keyboard */,
-				HH000127HH000127HH000127 /* Command */,
-				EE000004EE000004EE000004 /* Info.plist */,
-				HH000211HH000211HH000211 /* TurtleKeyboardExtension.entitlements */,
-			);
-			path = TurtleKeyboardExtension;
-			sourceTree = "<group>";
-		};
-		HH000126HH000126HH000126 /* Keyboard */ = {
-			isa = PBXGroup;
-			children = (
-				HH000121HH000121HH000121 /* KeyRows.swift */,
-				HH000123HH000123HH000123 /* KeyboardPalette.swift */,
-				HH000131HH000131HH000131 /* QuickPanelView.swift */,
-				HH000421HH000421HH000421 /* HistoryPanelView.swift */,
-				HH000431HH000431HH000431 /* CommandSuggestionStripView.swift */,
-				HH000376HH000376HH000376 /* PresetChipStripView.swift */,
-				HH000320HH000320HH000320 /* KeyboardTheme.swift */,
-				HH000323HH000323HH000323 /* KeyboardThemeManager.swift */,
-				HH000461HH000461HH000461 /* LiquidGlass.swift */,
-			);
-			path = Keyboard;
-			sourceTree = "<group>";
-		};
-		HH000127HH000127HH000127 /* Command */ = {
-			isa = PBXGroup;
-			children = (
-				HH000125HH000125HH000125 /* SlashCommand.swift */,
-			);
-			path = Command;
 			sourceTree = "<group>";
 		};
 		HH000037HH000037HH000037 /* Voice */ = {
@@ -372,8 +337,84 @@
 				HH000226HH000226HH000226 /* Poll */,
 				HH000234HH000234HH000234 /* Wyr */,
 				HH000304HH000304HH000304 /* Web */,
+				HH000470HH000470HH000470 /* GitHub */,
 			);
 			path = Integration;
+			sourceTree = "<group>";
+		};
+		HH000039HH000039HH000039 /* Split */ = {
+			isa = PBXGroup;
+			children = (
+				HH000045HH000045HH000045 /* SplitTypes.swift */,
+				HH000047HH000047HH000047 /* SplitIntegration.swift */,
+				HH000049HH000049HH000049 /* SplitPanelView.swift */,
+				HH000051HH000051HH000051 /* SplitHistoryView.swift */,
+			);
+			path = Split;
+			sourceTree = "<group>";
+		};
+		HH000080HH000080HH000080 /* Cloud */ = {
+			isa = PBXGroup;
+			children = (
+				HH000071HH000071HH000071 /* SplitKeychain.swift */,
+				HH000073HH000073HH000073 /* SplitOAuth.swift */,
+				HH000075HH000075HH000075 /* SplitSheetsClient.swift */,
+				HH000077HH000077HH000077 /* SplitDriveClient.swift */,
+				HH000079HH000079HH000079 /* SplitCloudSync.swift */,
+				HH000330HH000330HH000330 /* SplitFreshTokenProvider.swift */,
+				HH000333HH000333HH000333 /* SplitKeychainTokenProvider.swift */,
+				HH000336HH000336HH000336 /* SplitOAuthConstants.swift */,
+				HH000201HH000201HH000201 /* QrRenderer.swift */,
+				HH000105HH000105HH000105 /* NotionAuth.swift */,
+				HH000107HH000107HH000107 /* SlackAuth.swift */,
+				HH000477HH000477HH000477 /* GitHubAuth.swift */,
+			);
+			path = Cloud;
+			sourceTree = "<group>";
+		};
+		HH000116HH000116HH000116 /* Notion */ = {
+			isa = PBXGroup;
+			children = (
+				HH000091HH000091HH000091 /* NotionTypes.swift */,
+				HH000093HH000093HH000093 /* NotionClient.swift */,
+				HH000095HH000095HH000095 /* NotionLlmBridge.swift */,
+				HH000097HH000097HH000097 /* NotionIntegration.swift */,
+			);
+			path = Notion;
+			sourceTree = "<group>";
+		};
+		HH000117HH000117HH000117 /* Slack */ = {
+			isa = PBXGroup;
+			children = (
+				HH000099HH000099HH000099 /* SlackTypes.swift */,
+				HH000101HH000101HH000101 /* SlackClient.swift */,
+				HH000103HH000103HH000103 /* SlackIntegration.swift */,
+			);
+			path = Slack;
+			sourceTree = "<group>";
+		};
+		HH000126HH000126HH000126 /* Keyboard */ = {
+			isa = PBXGroup;
+			children = (
+				HH000121HH000121HH000121 /* KeyRows.swift */,
+				HH000123HH000123HH000123 /* KeyboardPalette.swift */,
+				HH000131HH000131HH000131 /* QuickPanelView.swift */,
+				HH000421HH000421HH000421 /* HistoryPanelView.swift */,
+				HH000431HH000431HH000431 /* CommandSuggestionStripView.swift */,
+				HH000376HH000376HH000376 /* PresetChipStripView.swift */,
+				HH000320HH000320HH000320 /* KeyboardTheme.swift */,
+				HH000323HH000323HH000323 /* KeyboardThemeManager.swift */,
+				HH000461HH000461HH000461 /* LiquidGlass.swift */,
+			);
+			path = Keyboard;
+			sourceTree = "<group>";
+		};
+		HH000127HH000127HH000127 /* Command */ = {
+			isa = PBXGroup;
+			children = (
+				HH000125HH000125HH000125 /* SlashCommand.swift */,
+			);
+			path = Command;
 			sourceTree = "<group>";
 		};
 		HH000226HH000226HH000226 /* Poll */ = {
@@ -403,36 +444,12 @@
 			path = Web;
 			sourceTree = "<group>";
 		};
-		HH000039HH000039HH000039 /* Split */ = {
+		HH000470HH000470HH000470 /* GitHub */ = {
 			isa = PBXGroup;
 			children = (
-				HH000045HH000045HH000045 /* SplitTypes.swift */,
-				HH000047HH000047HH000047 /* SplitIntegration.swift */,
-				HH000049HH000049HH000049 /* SplitPanelView.swift */,
-				HH000051HH000051HH000051 /* SplitHistoryView.swift */,
+				HH000471HH000471HH000471 /* GitHubIntegration.swift */,
 			);
-			path = Split;
-			sourceTree = "<group>";
-		};
-		HH000116HH000116HH000116 /* Notion */ = {
-			isa = PBXGroup;
-			children = (
-				HH000091HH000091HH000091 /* NotionTypes.swift */,
-				HH000093HH000093HH000093 /* NotionClient.swift */,
-				HH000095HH000095HH000095 /* NotionLlmBridge.swift */,
-				HH000097HH000097HH000097 /* NotionIntegration.swift */,
-			);
-			path = Notion;
-			sourceTree = "<group>";
-		};
-		HH000117HH000117HH000117 /* Slack */ = {
-			isa = PBXGroup;
-			children = (
-				HH000099HH000099HH000099 /* SlackTypes.swift */,
-				HH000101HH000101HH000101 /* SlackClient.swift */,
-				HH000103HH000103HH000103 /* SlackIntegration.swift */,
-			);
-			path = Slack;
+			path = GitHub;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -585,6 +602,8 @@
 				HH000106HH000106HH000106 /* SlackAuth.swift in Sources */,
 				HH000108HH000108HH000108 /* NotionConnectViewController.swift in Sources */,
 				HH000110HH000110HH000110 /* SlackConnectViewController.swift in Sources */,
+				HH000476HH000476HH000476 /* GitHubAuth.swift in Sources */,
+				HH000478HH000478HH000478 /* GitHubConnectViewController.swift in Sources */,
 				HH000112HH000112HH000112 /* NotionTypes.swift in Sources */,
 				HH000113HH000113HH000113 /* SlackTypes.swift in Sources */,
 				HH000114HH000114HH000114 /* NotionClient.swift in Sources */,
@@ -653,6 +672,7 @@
 				HH000230HH000230HH000230 /* WyrClient.swift in Sources */,
 				HH000232HH000232HH000232 /* WyrIntegration.swift in Sources */,
 				HH000300HH000300HH000300 /* WebIntegration.swift in Sources */,
+				HH000472HH000472HH000472 /* GitHubIntegration.swift in Sources */,
 				HH000302HH000302HH000302 /* WebPanelView.swift in Sources */,
 				HH000310HH000310HH000310 /* SuggestedShortcut.swift in Sources */,
 				HH000312HH000312HH000312 /* SuggestedShortcutCatalog.swift in Sources */,

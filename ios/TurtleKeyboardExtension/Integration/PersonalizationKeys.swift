@@ -11,6 +11,7 @@ enum PersonalizationKeys {
     static let pollEnabled        = "personalization.poll.enabled"
     static let wyrEnabled         = "personalization.wyr.enabled"
     static let webEnabled         = "personalization.web.enabled"
+    static let githubEnabled      = "personalization.github.enabled"
     static let quickPanelEnabled  = "personalization.keyboard.quickpanel"
     static let voiceEnabled       = "personalization.keyboard.voice"
     /// Theme preference: "auto" | "turtle" | "light" | "dark". Source of truth
@@ -29,6 +30,7 @@ enum PersonalizationKeys {
         case "poll":   key = pollEnabled
         case "wyr":    key = wyrEnabled
         case "web":    key = webEnabled
+        case "github": key = githubEnabled
         default: return true
         }
         return store.int(forKey: key, fallback: 1) != 0

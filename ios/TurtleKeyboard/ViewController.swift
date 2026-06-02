@@ -29,8 +29,9 @@ class ViewController: UIViewController {
         let personalizeBtn = makeButton(title: "Personalize",        action: #selector(openPersonalize))
         let splitsBtn      = makeButton(title: "Saved splits",       action: #selector(openSplits))
         let historyBtn     = makeButton(title: "Image history",      action: #selector(openHistory))
+        let githubBtn      = makeButton(title: "Connect GitHub",     action: #selector(openGitHub))
 
-        let stack = UIStackView(arrangedSubviews: [titleLabel, subtitleLabel, enableBtn, chooseBtn, personalizeBtn, splitsBtn, historyBtn])
+        let stack = UIStackView(arrangedSubviews: [titleLabel, subtitleLabel, enableBtn, chooseBtn, personalizeBtn, splitsBtn, historyBtn, githubBtn])
         stack.axis = .vertical
         stack.spacing = 16
         stack.alignment = .fill
@@ -46,7 +47,13 @@ class ViewController: UIViewController {
             personalizeBtn.heightAnchor.constraint(equalToConstant: 50),
             splitsBtn.heightAnchor.constraint(equalToConstant: 50),
             historyBtn.heightAnchor.constraint(equalToConstant: 50),
+            githubBtn.heightAnchor.constraint(equalToConstant: 50),
         ])
+    }
+
+    @objc private func openGitHub() {
+        let nav = UINavigationController(rootViewController: GitHubConnectViewController())
+        present(nav, animated: true)
     }
 
     @objc private func openPersonalize() {

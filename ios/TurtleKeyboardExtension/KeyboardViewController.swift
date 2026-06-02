@@ -309,6 +309,7 @@ class KeyboardViewController: UIInputViewController {
         PollIntegration(),
         WyrIntegration(),
         WebIntegration(),
+        GitHubIntegration(),
     ], store: personalizationStore)
 
     // MARK: - Palette
@@ -2379,7 +2380,11 @@ class KeyboardViewController: UIInputViewController {
         // once the user types anything so it doesn't dominate vertical
         // space mid-edit. The prompt label always stays visible — the
         // chips are an optional shortcut, not a replacement.
-        let presets = PresetCatalog.presets(for: cmd.rawValue)
+        // `/github` chips are dynamic — the user's pinned + recently-used
+        // repos (set in the host app / auto-recorded), not a static catalog.
+        let presets = cmd == .github
+            ? GitHubIntegration.repoChips(personalizationStore)
+            : PresetCatalog.presets(for: cmd.rawValue)
         let showPresets = cmd.needsPrompt && commandPromptText.isEmpty && !presets.isEmpty
         if showPresets {
             showPresetStrip(presets)
@@ -2401,6 +2406,8 @@ class KeyboardViewController: UIInputViewController {
                 case .gif:     cmdPromptLabel.text = "📎 describe the animation…"
                 default:       cmdPromptLabel.text = "📎 describe the edit…"
                 }
+            } else if cmd == .github {
+                cmdPromptLabel.text      = "owner/repo — or tap a repo below"
             } else {
                 cmdPromptLabel.text      = cmd.needsPrompt ? "type prompt above…" : "ready — tap \(cmd.buttonTitle)"
             }
@@ -2733,7 +2740,10 @@ class KeyboardViewController: UIInputViewController {
             return
         }
         guard let cmd = activeCommand, !isGenerating else { return }
-        if cmd.needsPrompt && commandPromptText.trimmingCharacters(in: .whitespaces).isEmpty {
+        // `/github` is allowed through with an empty prompt — its handler
+        // falls back to the user's saved default repo (or shows a hint).
+        if cmd.needsPrompt && cmd != .github
+            && commandPromptText.trimmingCharacters(in: .whitespaces).isEmpty {
             shake(commandBar); showBanner("Type a prompt first ↑"); return
         }
 
@@ -3177,6 +3187,28 @@ class KeyboardViewController: UIInputViewController {
     private func handlePresetTap(_ value: String) {
         guard let cmd = activeCommand else { return }
         KeyboardHaptics.selectionChanged()
+
+        // `/github` runs a two-level chip flow: a repo chip selects the repo
+        // and reveals action chips; an action chip (prefixed "gh:") sets the
+        // final prompt and fires immediately.
+        if cmd == .github {
+            if value.hasPrefix("gh:") {
+                let action = String(value.dropFirst(3))   // overview|commit|issues|prs|release
+                // The repo lives in the first whitespace token of the prompt.
+                let repo = commandPromptText.split(separator: " ").first.map(String.init)
+                    ?? commandPromptText
+                let final = action == "overview" ? repo : "\(repo) \(action)"
+                setGitHubPrompt(final)
+                hidePresetStrip()
+                sendCommand()
+            } else {
+                // Repo chip → stage the repo, then show what you can fetch.
+                setGitHubPrompt(value)
+                showGitHubActionChips()
+            }
+            return
+        }
+
         commandPromptText = value
         hidePresetStrip()
         cmdPromptLabel.text = value
@@ -3194,6 +3226,38 @@ class KeyboardViewController: UIInputViewController {
         updateCaret()
         // No auto-execute — the user has to tap Generate.
         _ = cmd
+    }
+
+    /// Set the command-bar prompt to `value` for `/github` (keeps
+    /// `slashBuffer`, label, and caret in sync). Shared by the repo-chip and
+    /// action-chip taps in `handlePresetTap`.
+    private func setGitHubPrompt(_ value: String) {
+        commandPromptText = value
+        cmdPromptLabel.text = value
+        cmdPromptLabel.textColor = KeyboardPalette.barText.withAlphaComponent(0.90)
+        if let split = splitSlashBuffer() { slashBuffer = split.head + value }
+        promptCaretIndex = value.count
+        commandBar.layoutIfNeeded()
+        updateCaret()
+    }
+
+    /// After a `/github` repo is chosen, replace the repo chips with action
+    /// chips so the user can pick WHAT to fetch. Tapping one fires the command
+    /// (see `handlePresetTap`'s `gh:` branch); tapping Fetch with none chosen
+    /// defaults to the repo overview.
+    private func showGitHubActionChips() {
+        let chips: [PresetChipStripView.Chip] = [
+            .init(label: "📊 Overview", value: "gh:overview"),
+            .init(label: "🔨 Commit",   value: "gh:commit"),
+            .init(label: "🐛 Issues",   value: "gh:issues"),
+            .init(label: "🔀 PRs",      value: "gh:prs"),
+            .init(label: "🏷️ Release",  value: "gh:release"),
+        ]
+        cmdPresetStrip.setChips(chips) { [weak self] value in self?.handlePresetTap(value) }
+        cmdPresetStrip.isHidden = false
+        presetStripHeight.constant = presetStripH
+        keyboardContainer.bringSubviewToFront(cmdPresetStrip)
+        recomputeKeyboardHeight()
     }
 
     // MARK: - Banner
