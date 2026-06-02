@@ -57,7 +57,7 @@ class KeyboardViewController: UIInputViewController {
     private var slashBuffer: String?
 
     // commandBar can show one of three things at a time
-    private enum SuggestionMode { case none, slashCommand, replyResult, wordSuggestion, suggestedShortcuts }
+    private enum SuggestionMode { case none, slashCommand, replyResult, wordSuggestion, suggestedShortcuts, contextualCommand }
     private var suggestionMode: SuggestionMode = .none
     private var pendingShortcuts: [SuggestedShortcut] = []
 
@@ -2173,6 +2173,13 @@ class KeyboardViewController: UIInputViewController {
             return
         }
 
+        // Contextual command discovery — when the user is BETWEEN words (just
+        // hit space / at a clause break), surface a high-value command for
+        // what they've already written (e.g. "📝 Proofread" after a long
+        // message). Gated on `currentWord.isEmpty` so it never competes with
+        // live word prediction while actively typing a word.
+        if currentWord.isEmpty, showContextualCommandsIfApplicable() { return }
+
         var picks: [String] = []
         var step1Empty = true
 
@@ -2222,7 +2229,8 @@ class KeyboardViewController: UIInputViewController {
     /// owns it. Avoids fighting a slash-command bar that might also be
     /// up.
     private func hideSuggestionStripIfShown() {
-        if suggestionMode == .wordSuggestion || suggestionMode == .suggestedShortcuts {
+        if suggestionMode == .wordSuggestion || suggestionMode == .suggestedShortcuts
+            || suggestionMode == .contextualCommand {
             hideCommandBar()
         }
         suggestionWorkItem?.cancel()
@@ -2317,9 +2325,26 @@ class KeyboardViewController: UIInputViewController {
         }
     }
 
-    private func showSuggestedShortcuts(_ shortcuts: [SuggestedShortcut]) {
+    /// Surface contextual command chips (e.g. "📝 Proofread") for the current
+    /// field content. Returns true if any were shown. Tapping one opens that
+    /// command via the slash buffer (see `suggestionTapped`).
+    private func showContextualCommandsIfApplicable() -> Bool {
+        guard let proxy = textDocumentProxy as? (UITextDocumentProxy & UITextInputTraits) else {
+            return false
+        }
+        let kind = FieldKind.from(InputContext(proxy: proxy))
+        let text = textDocumentProxy.documentContextBeforeInput ?? ""
+        let cmds = ContextualSuggester.suggestions(fieldText: text, kind: kind)
+            .filter { SlashCommand(rawValue: $0.name) != nil }
+        guard !cmds.isEmpty else { return false }
+        showSuggestedShortcuts(cmds, mode: .contextualCommand)
+        return true
+    }
+
+    private func showSuggestedShortcuts(_ shortcuts: [SuggestedShortcut],
+                                        mode: SuggestionMode = .suggestedShortcuts) {
         guard !isIntegrationPanelShown else { return }
-        suggestionMode   = .suggestedShortcuts
+        suggestionMode   = mode
         pendingShortcuts = shortcuts
 
         for (i, btn) in cmdSuggestionBtns.enumerated() {
@@ -3131,6 +3156,22 @@ class KeyboardViewController: UIInputViewController {
     @objc private func suggestionTapped(_ sender: UIButton) {
         let i = sender.tag
 
+        // Contextual command chip → open that command's bar, carrying the
+        // text the user already drafted into the prompt (cut from the field)
+        // so they never retype it. E.g. "should we poll about lunch" → tap
+        // 📊 → /poll opens pre-filled with "lunch".
+        if suggestionMode == .contextualCommand {
+            guard i < pendingShortcuts.count else { return }
+            let name = pendingShortcuts[i].name
+            pendingShortcuts = []
+            suggestionMode = .none
+            let fieldText = textDocumentProxy.documentContextBeforeInput ?? ""
+            if let cmd = SlashCommand(rawValue: name) {
+                openContextualCommand(cmd, originalText: fieldText)
+            }
+            return
+        }
+
         if suggestionMode == .suggestedShortcuts {
             guard i < pendingShortcuts.count else { return }
             let shortcut = pendingShortcuts[i]
@@ -3170,6 +3211,77 @@ class KeyboardViewController: UIInputViewController {
         cmdSuggestionsStack.isHidden = true
         hidePresetStrip()
         updateCaret()
+    }
+
+    /// Open a contextual command, carrying the user's drafted text into the
+    /// prompt where it makes sense. For commands that take a typed prompt
+    /// (ask / poll / note / github), the drafted intent is CUT from the field
+    /// and pre-filled (cleaned of the trigger phrase), so the command's result
+    /// replaces the draft. For commands that operate on the field text itself
+    /// (proofread / tone / tl) or open a sheet (wyr / split), the text stays
+    /// and we just open the command.
+    private func openContextualCommand(_ command: SlashCommand, originalText: String) {
+        KeyboardHaptics.selectionChanged()
+        guard let extracted = contextualPrompt(for: command, fieldText: originalText) else {
+            handleSlashSuggestionTap(command.rawValue)
+            return
+        }
+        // Cut the drafted text from the field — the command produces the real
+        // content to replace it.
+        let before = textDocumentProxy.documentContextBeforeInput ?? ""
+        for _ in 0..<before.count { textDocumentProxy.deleteBackward() }
+        slashBuffer = command.needsPrompt ? "/\(command.rawValue) \(extracted)" : "/\(command.rawValue)"
+        commandPromptText = extracted
+        updateCommandDetection()
+    }
+
+    /// The prompt text to carry into `command` from the user's drafted message,
+    /// or `nil` if this command should just read the field as-is (no move).
+    private func contextualPrompt(for command: SlashCommand, fieldText: String) -> String? {
+        let text = fieldText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return nil }
+        switch command {
+        case .ask:
+            return text                                  // the whole question
+        case .poll:
+            return stripLeadingPhrases(text, [
+                "should we poll about", "should we poll on", "let's poll about",
+                "lets poll about", "do a poll about", "do a poll on",
+                "let's vote on", "lets vote on", "poll about", "poll on", "vote on",
+                "should we", "let's", "lets", "poll", "vote",
+            ])
+        case .note:
+            return stripLeadingPhrases(text, [
+                "remember to", "note:", "todo:", "to-do:", "note", "todo", "to-do", "remember",
+            ])
+        case .github:
+            return extractRepo(from: text) ?? text
+        default:
+            return nil                                   // proofread / tone / tl / wyr / split
+        }
+    }
+
+    /// Strip the first matching leading phrase (longest first) and return the
+    /// remainder; falls back to the full text if nothing's left.
+    private func stripLeadingPhrases(_ text: String, _ phrases: [String]) -> String {
+        let lower = text.lowercased()
+        for phrase in phrases.sorted(by: { $0.count > $1.count }) where lower.hasPrefix(phrase) {
+            let rest = String(text.dropFirst(phrase.count))
+                .trimmingCharacters(in: CharacterSet(charactersIn: " :,-—"))
+            return rest.isEmpty ? text : rest
+        }
+        return text
+    }
+
+    /// Pull `owner/repo` out of a `github.com/owner/repo…` reference.
+    private func extractRepo(from text: String) -> String? {
+        guard let r = text.range(of: "github.com/", options: .caseInsensitive) else { return nil }
+        let parts = text[r.upperBound...]
+            .split(whereSeparator: { $0 == "/" || $0 == " " || $0 == "\n" }).map(String.init)
+        guard parts.count >= 2 else { return nil }
+        var repo = parts[1]
+        if repo.hasSuffix(".git") { repo = String(repo.dropLast(4)) }
+        return "\(parts[0])/\(repo)"
     }
 
     // MARK: - Prompt caret
