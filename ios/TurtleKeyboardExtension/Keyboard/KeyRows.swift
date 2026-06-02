@@ -22,23 +22,28 @@ enum KeyRows {
     // of this keyboard, so it should be one tap away from qwerty without
     // hopping into symbols mode. Spacebar slides left into the gap the
     // globe used to occupy.
+    // Bottom row keeps the dedicated `/` (the slash-command trigger) AND the
+    // system globe (🌐). The globe is REQUIRED — it's the only in-keyboard way
+    // for the user to switch back to another keyboard, and Apple's review
+    // guidelines mandate a reachable next-keyboard control. Dropping it (as an
+    // earlier layout did) strands iPhone users on Turtle and risks rejection.
     static let iphoneQwerty: [[String]] = [
         ["q","w","e","r","t","y","u","i","o","p"],
         ["a","s","d","f","g","h","j","k","l"],
         ["⇧","z","x","c","v","b","n","m","⌫"],
-        ["?123","space","/","↵"]
+        ["?123","🌐","space","/","↵"]
     ]
     static let iphoneSymbols: [[String]] = [
         ["1","2","3","4","5","6","7","8","9","0"],
         ["-","/",":",";","(",")","$","&","@","\""],
         ["=\\<",".",",","?","!","'","⌫"],
-        ["ABC","space","/","↵"]
+        ["ABC","🌐","space","/","↵"]
     ]
     static let iphoneSymbolsShift: [[String]] = [
         ["[","]","{","}","#","%","^","*","+","="],
         ["_","\\","|","~","<",">","€","£","¥","•"],
         ["?123",".",",","?","!","'","⌫"],
-        ["ABC","space","/","↵"]
+        ["ABC","🌐","space","/","↵"]
     ]
 
     // iPad — 5 rows: number row + 3 letter rows + modifier row

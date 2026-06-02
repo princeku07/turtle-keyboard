@@ -94,6 +94,12 @@ class KeyboardViewController: UIInputViewController {
     /// on every key.
     private var lastShownChipTitles: [String]?
 
+    /// The most recent autocorrection, set when a word is fixed on space.
+    /// A backspace on the very next keystroke reverts to exactly what the user
+    /// typed (the iOS-standard undo); any other key accepts the correction.
+    /// Cleared at the top of `processKey`.
+    private var pendingAutocorrect: (original: String, corrected: String)?
+
     // MARK: - Layout
     //
     // keyboardContainer height = commandBarH + rowsH, always fixed.
@@ -205,6 +211,10 @@ class KeyboardViewController: UIInputViewController {
     private var bannerContainer:     UIView!
     private var bannerLabel:         UILabel!
     private var keyboardContainer:   UIView!
+    /// The mounted key-row views, in top-to-bottom order. Kept so a chrome
+    /// height change can reposition them (just shift each row's y) instead of
+    /// destroying + recreating every key button and its glass backing.
+    private var keyRowViews:         [KeyRowView] = []
     /// Strip of slash-command matches, mounted just below the command
     /// bar above the keys. Matches Android's `CommandSuggestionStripView`
     /// behaviour 1:1.
@@ -965,8 +975,19 @@ class KeyboardViewController: UIInputViewController {
         bannerLabel.textColor     = KeyboardPalette.barText
         bannerLabel.font          = .boldSystemFont(ofSize: 13)
         bannerLabel.textAlignment = .center
+        // Sticky banners (e.g. the Full Access CTA) carry a two-line message
+        // with the exact Settings path — allow wrapping + a little shrink so
+        // it fits the command-bar slot without truncating.
+        bannerLabel.numberOfLines = 2
+        bannerLabel.adjustsFontSizeToFitWidth = true
+        bannerLabel.minimumScaleFactor = 0.75
         bannerLabel.translatesAutoresizingMaskIntoConstraints = false
         bannerContainer.addSubview(bannerLabel)
+        // Tap the banner to dismiss it (used by the sticky Full Access CTA,
+        // which has no auto-hide timer).
+        bannerContainer.isUserInteractionEnabled = true
+        bannerContainer.addGestureRecognizer(
+            UITapGestureRecognizer(target: self, action: #selector(dismissBannerTapped)))
 
         // ── Slash autocomplete strip — sits between the command bar and
         // the keys, mirrors Android's `CommandSuggestionStripView`. Its
@@ -1109,9 +1130,15 @@ class KeyboardViewController: UIInputViewController {
         // y-origin tracks the dynamic top chrome: strip + prompt bar if
         // either is currently showing, zero otherwise (collapsed mode).
         let topOffset = effectiveChromeH
+        // Track the row views so chrome height changes can REPOSITION them
+        // (cheap) instead of tearing down + rebuilding all keys + glass
+        // backings (expensive — see `repositionKeyRows`).
+        keyRowViews.removeAll(keepingCapacity: true)
         for (i, keys) in rows.enumerated() {
             let y = topOffset + rowGap + CGFloat(i) * (rowH + rowGap)
-            keyboardContainer.addSubview(buildRow(keys: keys, rowIndex: i, totalRows: rows.count, y: y))
+            let row = buildRow(keys: keys, rowIndex: i, totalRows: rows.count, y: y)
+            keyboardContainer.addSubview(row)
+            keyRowViews.append(row)
         }
         if let strip = slashStrip {
             keyboardContainer.bringSubviewToFront(strip)
@@ -1153,7 +1180,7 @@ class KeyboardViewController: UIInputViewController {
         }
     }
 
-    private func buildRow(keys: [String], rowIndex: Int, totalRows: Int, y: CGFloat) -> UIView {
+    private func buildRow(keys: [String], rowIndex: Int, totalRows: Int, y: CGFloat) -> KeyRowView {
         let w         = kbWidth
         // `KeyRowView` owns touch dispatch for every in-row tap (and
         // the inter-row gap touches that `KeyboardContainerView`
@@ -1194,21 +1221,19 @@ class KeyboardViewController: UIInputViewController {
             // still sum to 100, with space dominant and `/` sized like a
             // compact special key.
             let props: [CGFloat]
-            switch keys.count {
-            case 5:  props = [9, 13, 48, 13, 17]                // iPad
-            // iPhone [?123, space, /, ↵] — widths match Apple's
-            // native portrait bottom row:
-            //   ?123 = 17% (native "123" key width)
-            //   space = 60% (native space-bar width)
-            //   /    = 8% (slot occupied by native "." key — keeps
-            //              our slash-trigger one-tap reachable
-            //              without stealing space from the spacebar)
-            //   ↵    = 15% (native "return" key width)
-            // Previous [15, 53, 12, 20] shifted the spacebar centre
-            // ~22pt left of native, so thumb-typers hitting the right
-            // edge of where space "should" be were landing on /.
-            case 4:  props = [17, 60, 8, 15]                    // iPhone [?123, space, /, ↵]
-            default: props = [8, 12, 7, 42, 7, 24]              // legacy 6-key fallback
+            if isPad {
+                props = [9, 13, 48, 13, 17]                     // iPad [🌐, ?123, space, ?123, ↵]
+            } else if keys.count == 5 {
+                // iPhone [?123, 🌐, space, /, ↵]. The two compact specials
+                // (globe + slash) flank the dominant spacebar; ?123 and ↵
+                // take the wider outer slots, matching Apple's portrait row
+                // proportions while keeping both the next-keyboard control
+                // and the slash-command trigger one tap away.
+                props = [15, 11, 47, 12, 15]
+            } else if keys.count == 4 {
+                props = [17, 60, 8, 15]                         // legacy iPhone [?123, space, /, ↵]
+            } else {
+                props = [8, 12, 7, 42, 7, 24]                  // legacy 6-key fallback
             }
             let avail = w - keyGap * CGFloat(keys.count + 1)
             widths = props.map { avail * $0 / 100 }
@@ -1556,6 +1581,17 @@ class KeyboardViewController: UIInputViewController {
     private func processKey(_ key: String) {
         let proxy = textDocumentProxy
 
+        // Autocorrect undo: a backspace on the keystroke right after an
+        // autocorrect reverts to exactly what the user typed (matches iOS).
+        // Any other key accepts the correction. Cleared either way.
+        if let pending = pendingAutocorrect {
+            pendingAutocorrect = nil
+            if slashBuffer == nil && key == "⌫" {
+                revertAutocorrect(pending)
+                return
+            }
+        }
+
         // Layout/mode keys always work, regardless of slash-buffer state.
         switch key {
         case "🌐":   advanceToNextInputMode(); return
@@ -1609,9 +1645,13 @@ class KeyboardViewController: UIInputViewController {
             // (e.g. user cleared the field entirely) — re-engage shift.
             autoEngageShiftIfNeeded()
         case "space":
-            // Space also commits the word — learn before inserting.
+            // Space commits the word: autocorrect an obvious typo first, then
+            // learn whatever now stands, then insert the space.
+            let correction = autocorrectWordBeforeCursorIfNeeded()
             learnWordBeforeCursor()
             proxy.insertText(" ")
+            // Arm the one-keystroke backspace-undo (checked at processKey top).
+            pendingAutocorrect = correction
             handleSpaceDoubleTap()
             updateCommandDetection()
             // Space after sentence-end punctuation kicks auto-shift on.
@@ -1777,6 +1817,90 @@ class KeyboardViewController: UIInputViewController {
         guard range.location != NSNotFound else { return }
         let word = context.substring(with: range)
         suggestionEngine.learn(word)
+    }
+
+    // MARK: - Autocorrect
+    //
+    // Conservative typo-fixing on the space commit. Deliberately narrow so it
+    // never "corrects" names, code, URLs, or words the user clearly meant:
+    // only all-lowercase letter words ≥3 chars, only when UITextChecker flags
+    // them misspelled AND its top guess is within a small edit distance. Any
+    // fix is one-keystroke-undoable (backspace), and reverting teaches the
+    // engine the original so it's never re-corrected.
+
+    /// If the word ending at the cursor is an obvious typo, replace it in
+    /// place and return `(original, corrected)`; otherwise `nil`.
+    private func autocorrectWordBeforeCursorIfNeeded() -> (original: String, corrected: String)? {
+        guard slashBuffer == nil else { return nil }
+        // Skip field types where autocorrect is harmful.
+        switch textDocumentProxy.keyboardType {
+        case .some(.emailAddress), .some(.URL), .some(.numberPad), .some(.phonePad),
+             .some(.decimalPad), .some(.namePhonePad), .some(.asciiCapableNumberPad):
+            return nil
+        default: break
+        }
+        let context = (textDocumentProxy.documentContextBeforeInput ?? "") as NSString
+        let range = context.range(of: "\\S+$", options: .regularExpression)
+        guard range.location != NSNotFound else { return nil }
+        let word = context.substring(with: range)
+        guard let fix = autocorrectionCandidate(for: word) else { return nil }
+        for _ in 0..<word.count { textDocumentProxy.deleteBackward() }
+        textDocumentProxy.insertText(fix)
+        return (word, fix)
+    }
+
+    /// The high-confidence correction for `word`, or `nil` to leave it alone.
+    private func autocorrectionCandidate(for word: String) -> String? {
+        guard word.count >= 3,
+              word.allSatisfy({ $0.isLetter }),         // no digits / punctuation / URLs
+              word == word.lowercased() else { return nil }   // skip names, acronyms, sentence starts
+        let ns = word as NSString
+        let full = NSRange(location: 0, length: ns.length)
+        let misspelled = textChecker.rangeOfMisspelledWord(
+            in: word, range: full, startingAt: 0, wrap: false, language: "en_US")
+        guard misspelled.location != NSNotFound else { return nil }   // already a valid word
+        guard let guesses = textChecker.guesses(forWordRange: full, in: word, language: "en_US"),
+              let top = guesses.first(where: { $0.allSatisfy { $0.isLetter } })?.lowercased(),
+              top != word else { return nil }
+        // Only fix near-misses (typos), never wholesale word swaps.
+        let limit = word.count <= 5 ? 1 : 2
+        guard levenshtein(word, top) <= limit else { return nil }
+        return top
+    }
+
+    /// Undo the last autocorrect: restore exactly what the user typed and
+    /// teach the engine the original so it isn't re-corrected.
+    private func revertAutocorrect(_ ac: (original: String, corrected: String)) {
+        let before = textDocumentProxy.documentContextBeforeInput ?? ""
+        let suffix = ac.corrected + " "
+        if before.hasSuffix(suffix) {
+            for _ in 0..<suffix.count { textDocumentProxy.deleteBackward() }
+            textDocumentProxy.insertText(ac.original)
+        } else {
+            // Field changed unexpectedly — fall back to a normal backspace.
+            handleBackspace()
+        }
+        suggestionEngine.learn(ac.original)
+        updateCommandDetection()
+        autoEngageShiftIfNeeded()
+    }
+
+    /// Classic Levenshtein edit distance — small words only, so O(n·m) is fine.
+    private func levenshtein(_ a: String, _ b: String) -> Int {
+        let a = Array(a), b = Array(b)
+        if a.isEmpty { return b.count }
+        if b.isEmpty { return a.count }
+        var prev = Array(0...b.count)
+        var cur = [Int](repeating: 0, count: b.count + 1)
+        for i in 1...a.count {
+            cur[0] = i
+            for j in 1...b.count {
+                cur[j] = a[i-1] == b[j-1] ? prev[j-1]
+                    : min(prev[j-1], prev[j], cur[j-1]) + 1
+            }
+            swap(&prev, &cur)
+        }
+        return prev[b.count]
     }
 
     private func handleBackspace() {
@@ -2607,7 +2731,27 @@ class KeyboardViewController: UIInputViewController {
         // beat while iOS is processing `preferredContentSize`.
         view.setNeedsLayout()
         view.layoutIfNeeded()
-        rebuildKeyboard()
+        // A chrome height change shifts every key row's y-origin but never
+        // changes which keys are shown — so just MOVE the existing rows
+        // instead of tearing down ~30 buttons + glass backings. Full rebuild
+        // stays the path for mode/shift/orientation changes.
+        repositionKeyRows()
+    }
+
+    /// Cheap counterpart to `rebuildKeyboard()`: slides the already-built key
+    /// rows to the current chrome offset. Falls back to a full rebuild if the
+    /// row set is stale (count mismatch) or the width changed (rotation), so
+    /// it can never leave the keys mispositioned.
+    private func repositionKeyRows() {
+        let w = kbWidth
+        guard keyRowViews.count == currentRows().count,
+              keyRowViews.allSatisfy({ abs($0.frame.width - w) < 0.5 }) else {
+            rebuildKeyboard(); return
+        }
+        let topOffset = effectiveChromeH
+        for (i, row) in keyRowViews.enumerated() {
+            row.frame.origin.y = topOffset + rowGap + CGFloat(i) * (rowH + rowGap)
+        }
     }
 
     /// Tap-to-accept handler invoked from the Send button while the bar
@@ -2683,7 +2827,8 @@ class KeyboardViewController: UIInputViewController {
     @objc private func micTapped() {
         guard hasFullAccess else {
             shake(commandBar)
-            showBanner("⚠️ Enable Full Access in Settings → Keyboard")
+            showBanner("⚠️ Turtle needs Full Access for voice.\nSettings ▸ General ▸ Keyboard ▸ Turtle ▸ Allow Full Access  ·  tap to dismiss",
+                       sticky: true)
             return
         }
         if voiceController.isListening {
@@ -2729,7 +2874,8 @@ class KeyboardViewController: UIInputViewController {
     @objc private func sendCommand() {
         guard hasFullAccess else {
             shake(commandBar)
-            showBanner("⚠️ Enable Full Access in Settings → Keyboard")
+            showBanner("⚠️ Turtle needs Full Access for AI commands.\nSettings ▸ General ▸ Keyboard ▸ Turtle ▸ Allow Full Access  ·  tap to dismiss",
+                       sticky: true)
             return
         }
         // Draft mode with a ghost completion: Send acts as
@@ -3262,7 +3408,22 @@ class KeyboardViewController: UIInputViewController {
 
     // MARK: - Banner
 
-    private func showBanner(_ text: String) {
+    /// Dismiss the banner (sticky banners have no auto-hide timer; the user
+    /// taps to clear them).
+    @objc private func dismissBannerTapped() {
+        hideBannerTimer?.invalidate()
+        hideBannerTimer = nil
+        guard bannerContainer != nil, !bannerContainer.isHidden else { return }
+        UIView.animate(withDuration: 0.2, animations: {
+            self.bannerContainer.alpha = 0
+        }, completion: { _ in
+            self.bannerContainer.isHidden = true
+            self.bannerContainer.alpha    = 1
+            self.recomputeKeyboardHeight()
+        })
+    }
+
+    private func showBanner(_ text: String, sticky: Bool = false) {
         // Single sink for the warning haptic: every ⚠️ banner is a
         // validation / not-allowed state, and routing the feedback here
         // (rather than at each call site) guarantees exactly one buzz even
@@ -3275,6 +3436,10 @@ class KeyboardViewController: UIInputViewController {
         recomputeKeyboardHeight()
         UIView.animate(withDuration: 0.15) { self.bannerContainer.alpha = 1 }
         hideBannerTimer?.invalidate()
+        // Sticky banners (the Full Access CTA) stay until the user taps to
+        // dismiss — a 2 s flash was too easy to miss for the keyboard's most
+        // common blocker.
+        if sticky { hideBannerTimer = nil; return }
         hideBannerTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: false) { [weak self] _ in
             UIView.animate(withDuration: 0.2, animations: {
                 self?.bannerContainer.alpha = 0
