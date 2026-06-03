@@ -73,6 +73,24 @@ enum CommandResult {
 protocol AIProvider {
     var id: ProviderID { get }
     func execute(_ payload: CommandPayload) async throws -> CommandResult
+
+    /// Streaming variant for text commands. `onDelta` is called with each
+    /// chunk of generated text as it arrives (off the main thread — the
+    /// caller marshals to the UI). The returned `CommandResult` carries the
+    /// full accumulated text for history/banner purposes.
+    ///
+    /// Providers that can't stream get the default below, which simply runs
+    /// the one-shot `execute` and never fires `onDelta` — callers fall back
+    /// to inserting the whole result at once.
+    func executeStreaming(_ payload: CommandPayload,
+                          onDelta: @escaping (String) -> Void) async throws -> CommandResult
+}
+
+extension AIProvider {
+    func executeStreaming(_ payload: CommandPayload,
+                          onDelta: @escaping (String) -> Void) async throws -> CommandResult {
+        try await execute(payload)
+    }
 }
 
 // MARK: - Provider errors

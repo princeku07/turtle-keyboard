@@ -9,10 +9,19 @@ import UIKit
 ///                              active and an empty prompt for the user
 ///                              to type or dictate.
 ///   - `needsPrompt == false` → fires the command immediately.
-final class QuickPanelView: UIView {
+///
+/// Long-press a tile and drag to reorder the grid; the new order is
+/// reported via `onReorder` so the controller can persist it.
+final class QuickPanelView: UIView,
+                            UICollectionViewDataSource,
+                            UICollectionViewDelegateFlowLayout {
 
     /// Notified when the user picks a command (or dismisses the panel).
     weak var onSelect: QuickPanelDelegate?
+
+    /// Fired after a drag-to-reorder settles, with the full command list
+    /// in its new order. The controller persists this to the App Group.
+    var onReorder: (([SlashCommand]) -> Void)?
 
     /// Opaque scrim that fills the entire panel. The light + dark themes
     /// set `KeyboardPalette.bg = .clear` (floating-glass keyboard look),
@@ -21,20 +30,34 @@ final class QuickPanelView: UIView {
     /// the integration-panel host. The blur material guarantees an
     /// opaque, theme-adapting backdrop that always intercepts touches.
     private let backdrop = UIVisualEffectView(effect: UIBlurEffect(style: .systemChromeMaterial))
-    private let scroll = UIScrollView()
-    private let grid = UIStackView()
+    private let collectionView: UICollectionView
+    private let header = UILabel()
 
     /// Number of tile columns. iPad gets a wider grid since there's room.
     private let columns: Int
+    /// Backing order, mutated live during drag-to-reorder.
+    private var commands: [SlashCommand] = []
+    /// Tracks the collection-view width the flow layout was sized for, so
+    /// `layoutSubviews` only invalidates when it actually changes.
+    private var lastLayoutWidth: CGFloat = 0
+
+    private static let interitem: CGFloat = 8
+    private static let tileHeight: CGFloat = 64
 
     init(columns: Int) {
         self.columns = columns
+        let layout = UICollectionViewFlowLayout()
+        layout.minimumInteritemSpacing = Self.interitem
+        layout.minimumLineSpacing = Self.interitem
+        self.collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
         super.init(frame: .zero)
         configure()
     }
 
     required init?(coder: NSCoder) {
         self.columns = 4
+        let layout = UICollectionViewFlowLayout()
+        self.collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
         super.init(coder: coder)
         configure()
     }
@@ -57,12 +80,15 @@ final class QuickPanelView: UIView {
             backdrop.bottomAnchor.constraint(equalTo: bottomAnchor),
         ])
 
-        let header = UILabel()
-        header.text = "Pick a command"
+        // "Hold & drag to reorder" doubles as the affordance hint for the
+        // new gesture — the panel was previously labelled "Pick a command".
+        header.text = "Pick a command · hold & drag to reorder"
         header.font = .systemFont(ofSize: 12, weight: .semibold)
         // Theme-aware — light theme uses dark ink, dark/turtle use white.
         header.textColor = KeyboardPalette.keyText.withAlphaComponent(0.7)
         header.translatesAutoresizingMaskIntoConstraints = false
+        header.adjustsFontSizeToFitWidth = true
+        header.minimumScaleFactor = 0.8
 
         let dismiss = UIButton(type: .system)
         dismiss.setImage(UIImage(systemName: "xmark"), for: .normal)
@@ -70,21 +96,31 @@ final class QuickPanelView: UIView {
         dismiss.addTarget(self, action: #selector(dismissTapped), for: .touchUpInside)
         dismiss.translatesAutoresizingMaskIntoConstraints = false
 
-        scroll.translatesAutoresizingMaskIntoConstraints = false
-        scroll.showsVerticalScrollIndicator = false
-        grid.axis = .vertical
-        grid.spacing = 8
-        grid.alignment = .fill
-        grid.translatesAutoresizingMaskIntoConstraints = false
+        collectionView.translatesAutoresizingMaskIntoConstraints = false
+        collectionView.backgroundColor = .clear
+        collectionView.showsVerticalScrollIndicator = false
+        collectionView.alwaysBounceVertical = true
+        collectionView.dataSource = self
+        collectionView.delegate = self
+        collectionView.register(QuickPanelCell.self,
+                                forCellWithReuseIdentifier: QuickPanelCell.reuseID)
+
+        // Long-press drives interactive reordering. 0.35s is snappy enough
+        // that the gesture feels intentional but doesn't fight a quick tap
+        // (which routes through `didSelectItemAt` instead).
+        let reorder = UILongPressGestureRecognizer(
+            target: self, action: #selector(handleReorderGesture(_:)))
+        reorder.minimumPressDuration = 0.35
+        collectionView.addGestureRecognizer(reorder)
 
         addSubview(header)
         addSubview(dismiss)
-        addSubview(scroll)
-        scroll.addSubview(grid)
+        addSubview(collectionView)
 
         NSLayoutConstraint.activate([
             header.topAnchor.constraint(equalTo: topAnchor, constant: 8),
             header.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
+            header.trailingAnchor.constraint(equalTo: dismiss.leadingAnchor, constant: -8),
 
             dismiss.centerYAnchor.constraint(equalTo: header.centerYAnchor),
             // Trailing -2 keeps the 22pt glyph optically ~10pt from the
@@ -94,57 +130,118 @@ final class QuickPanelView: UIView {
             dismiss.widthAnchor.constraint(equalToConstant: 44),
             dismiss.heightAnchor.constraint(equalToConstant: 44),
 
-            scroll.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 6),
-            scroll.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
-            scroll.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
-            scroll.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8),
-
-            grid.topAnchor.constraint(equalTo: scroll.topAnchor),
-            grid.leadingAnchor.constraint(equalTo: scroll.leadingAnchor),
-            grid.trailingAnchor.constraint(equalTo: scroll.trailingAnchor),
-            grid.bottomAnchor.constraint(equalTo: scroll.bottomAnchor),
-            grid.widthAnchor.constraint(equalTo: scroll.widthAnchor),
+            collectionView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 6),
+            collectionView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
+            collectionView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
+            collectionView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8),
         ])
     }
 
-    /// Replace the grid with `commands`. Lays them out left-to-right,
-    /// top-to-bottom in `columns`-wide rows, padding the last row with
-    /// invisible spacers so tile widths stay consistent.
+    /// Replace the grid with `commands`, laid out left-to-right,
+    /// top-to-bottom in `columns`-wide rows.
     func show(_ commands: [SlashCommand]) {
-        grid.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        var i = 0
-        while i < commands.count {
-            let row = UIStackView()
-            row.axis = .horizontal
-            row.spacing = 8
-            row.distribution = .fillEqually
-            row.alignment = .fill
-            for col in 0..<columns {
-                let idx = i + col
-                if idx < commands.count {
-                    row.addArrangedSubview(buildTile(for: commands[idx]))
-                } else {
-                    let spacer = UIView()
-                    spacer.translatesAutoresizingMaskIntoConstraints = false
-                    row.addArrangedSubview(spacer)
-                }
-            }
-            NSLayoutConstraint.activate([row.heightAnchor.constraint(equalToConstant: 64)])
-            grid.addArrangedSubview(row)
-            i += columns
+        self.commands = commands
+        collectionView.reloadData()
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        // Tile width is derived from the collection view's width; recompute
+        // the flow layout whenever that changes (first layout, rotation).
+        let w = collectionView.bounds.width
+        if abs(w - lastLayoutWidth) > 0.5 {
+            lastLayoutWidth = w
+            collectionView.collectionViewLayout.invalidateLayout()
         }
     }
 
-    private func buildTile(for cmd: SlashCommand) -> UIView {
-        // Tile is a transparent UIControl that owns the touch / press
-        // animation. The visual fill is a sibling LiquidGlassBackingView
-        // pinned to the tile's bounds — same iOS 26 Liquid Glass tile
-        // shape as the keyboard keys. `interactive: true` opts into
-        // UIGlassEffect's built-in tap bounce on iOS 26.
-        let tile = UIControl()
-        tile.backgroundColor = .clear
-        tile.translatesAutoresizingMaskIntoConstraints = false
+    // MARK: - Reorder gesture
 
+    @objc private func handleReorderGesture(_ g: UILongPressGestureRecognizer) {
+        switch g.state {
+        case .began:
+            guard let ip = collectionView.indexPathForItem(at: g.location(in: collectionView))
+            else { return }
+            KeyboardHaptics.lightImpact()
+            collectionView.beginInteractiveMovementForItem(at: ip)
+        case .changed:
+            collectionView.updateInteractiveMovementTargetPosition(g.location(in: collectionView))
+        case .ended:
+            collectionView.endInteractiveMovement()
+        default:
+            collectionView.cancelInteractiveMovement()
+        }
+    }
+
+    // MARK: - UICollectionViewDataSource
+
+    func collectionView(_ collectionView: UICollectionView,
+                        numberOfItemsInSection section: Int) -> Int {
+        commands.count
+    }
+
+    func collectionView(_ collectionView: UICollectionView,
+                        cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+        let cell = collectionView.dequeueReusableCell(
+            withReuseIdentifier: QuickPanelCell.reuseID, for: indexPath) as! QuickPanelCell
+        cell.configure(commands[indexPath.item])
+        return cell
+    }
+
+    func collectionView(_ collectionView: UICollectionView,
+                        moveItemAt sourceIndexPath: IndexPath,
+                        to destinationIndexPath: IndexPath) {
+        let moved = commands.remove(at: sourceIndexPath.item)
+        commands.insert(moved, at: destinationIndexPath.item)
+        KeyboardHaptics.selectionChanged()
+        onReorder?(commands)
+    }
+
+    // MARK: - UICollectionViewDelegateFlowLayout
+
+    func collectionView(_ collectionView: UICollectionView,
+                        layout collectionViewLayout: UICollectionViewLayout,
+                        sizeForItemAt indexPath: IndexPath) -> CGSize {
+        let available = collectionView.bounds.width
+        guard available > 0 else { return CGSize(width: 60, height: Self.tileHeight) }
+        let totalGap = Self.interitem * CGFloat(columns - 1)
+        let w = ((available - totalGap) / CGFloat(columns)).rounded(.down)
+        return CGSize(width: max(w, 1), height: Self.tileHeight)
+    }
+
+    func collectionView(_ collectionView: UICollectionView,
+                        didSelectItemAt indexPath: IndexPath) {
+        guard indexPath.item < commands.count else { return }
+        let cmd = commands[indexPath.item]
+        // Cheap press feedback mirroring the old tile bounce.
+        if let cell = collectionView.cellForItem(at: indexPath) {
+            cell.alpha = 0.6
+            UIView.animate(withDuration: 0.15) { cell.alpha = 1.0 }
+        }
+        onSelect?.quickPanelDidSelect(cmd)
+    }
+
+    @objc private func dismissTapped() {
+        onSelect?.quickPanelDidDismiss()
+    }
+}
+
+// MARK: - Cell
+
+/// One Quick Panel tile: the same iOS 26 Liquid Glass tile shape as the
+/// keyboard keys, with a centred emoji + `/command` label.
+private final class QuickPanelCell: UICollectionViewCell {
+    static let reuseID = "quickPanel.cell"
+
+    private let emoji = UILabel()
+    private let name = UILabel()
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+
+        // The visual fill is a LiquidGlassBackingView pinned to the cell
+        // bounds. `interactive: true` opts into UIGlassEffect's built-in
+        // tap bounce on iOS 26.
         let backing = LiquidGlassBackingView(
             cornerRadius: 10,
             tintColor: KeyboardPalette.keyNormal,
@@ -153,21 +250,17 @@ final class QuickPanelView: UIView {
             interactive: true
         )
         backing.translatesAutoresizingMaskIntoConstraints = false
-        tile.addSubview(backing)
+        backing.isUserInteractionEnabled = false
+        contentView.addSubview(backing)
         NSLayoutConstraint.activate([
-            backing.topAnchor.constraint(equalTo: tile.topAnchor),
-            backing.leadingAnchor.constraint(equalTo: tile.leadingAnchor),
-            backing.trailingAnchor.constraint(equalTo: tile.trailingAnchor),
-            backing.bottomAnchor.constraint(equalTo: tile.bottomAnchor),
+            backing.topAnchor.constraint(equalTo: contentView.topAnchor),
+            backing.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            backing.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            backing.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
         ])
 
-        let emoji = UILabel()
-        emoji.text = cmd.emoji
         emoji.font = .systemFont(ofSize: 22)
         emoji.textAlignment = .center
-
-        let name = UILabel()
-        name.text = "/\(cmd.rawValue)"
         name.font = .monospacedSystemFont(ofSize: 11, weight: .medium)
         // `keyText` is the theme's matching glyph colour — dark ink on
         // light tiles, white on dark tiles.
@@ -180,25 +273,18 @@ final class QuickPanelView: UIView {
         stack.spacing = 2
         stack.isUserInteractionEnabled = false
         stack.translatesAutoresizingMaskIntoConstraints = false
-        tile.addSubview(stack)
+        contentView.addSubview(stack)
         NSLayoutConstraint.activate([
-            stack.centerXAnchor.constraint(equalTo: tile.centerXAnchor),
-            stack.centerYAnchor.constraint(equalTo: tile.centerYAnchor),
+            stack.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            stack.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
         ])
-
-        // Cheap visual press feedback (works on both iOS 15 fallback
-        // and iOS 26 native paths — UIGlassEffect's bounce supplements
-        // this on 26 rather than replacing it).
-        tile.addAction(UIAction { [weak self, weak tile] _ in
-            tile?.alpha = 0.6
-            UIView.animate(withDuration: 0.15) { tile?.alpha = 1.0 }
-            self?.onSelect?.quickPanelDidSelect(cmd)
-        }, for: .touchUpInside)
-        return tile
     }
 
-    @objc private func dismissTapped() {
-        onSelect?.quickPanelDidDismiss()
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    func configure(_ cmd: SlashCommand) {
+        emoji.text = cmd.emoji
+        name.text = "/\(cmd.rawValue)"
     }
 }
 

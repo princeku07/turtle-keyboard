@@ -65,6 +65,29 @@ final class GoogleProvider: AIProvider {
         }
     }
 
+    func executeStreaming(_ payload: CommandPayload,
+                          onDelta: @escaping (String) -> Void) async throws -> CommandResult {
+        // Only plain text generation has a meaningful token stream. Image
+        // commands, the sticker/gif matte pipelines, `/reply` (returns a
+        // JSON suggestions array) and `/org` (returns JSON rendered to an
+        // image) have nothing useful to stream — fall back to one-shot.
+        guard !payload.model.supports(.imageGeneration),
+              payload.command != "reply",
+              payload.command != "org",
+              payload.command != "sticker",
+              payload.command != "gif" else {
+            return try await execute(payload)
+        }
+
+        let systemPrompt = CommandRouter.systemPrompt(for: payload.command, prompt: payload.prompt)
+        let userContent  = userMessage(from: payload)
+        let full = try await streamText(modelID: payload.model.id,
+                                        systemPrompt: systemPrompt,
+                                        userPrompt: userContent,
+                                        onDelta: onDelta)
+        return .text(full)
+    }
+
     // MARK: - Prompt construction
 
     private func userMessage(from p: CommandPayload) -> String {
@@ -98,6 +121,75 @@ final class GoogleProvider: AIProvider {
         }
         let text = parts.compactMap { $0["text"] as? String }.joined()
         return text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Streams text via `streamGenerateContent?alt=sse`. Each SSE `data:`
+    /// line carries a partial `generateContent` payload; we pull the text
+    /// part out, hand it to `onDelta`, and accumulate the full string to
+    /// return. Same request body as the one-shot call.
+    private func streamText(modelID: String, systemPrompt: String, userPrompt: String,
+                            onDelta: @escaping (String) -> Void) async throws -> String {
+        let key = try KeyStore.shared.requireKey(for: .google)
+        guard let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(modelID):streamGenerateContent?alt=sse") else {
+            throw ProviderError.badResponse("Invalid Gemini stream URL for model \(modelID)")
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+        request.setValue(key, forHTTPHeaderField: "X-goog-api-key")
+
+        var body: [String: Any] = ["contents": [["parts": [["text": userPrompt]]]]]
+        if !systemPrompt.isEmpty {
+            body["systemInstruction"] = ["parts": [["text": systemPrompt]]]
+        }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let bytes: URLSession.AsyncBytes
+        let response: URLResponse
+        do {
+            (bytes, response) = try await session.bytes(for: request)
+        } catch let e as URLError { throw ProviderError.network(e) }
+        catch { throw ProviderError.unknown(error) }
+
+        guard let http = response as? HTTPURLResponse else {
+            throw ProviderError.badResponse("No HTTP response")
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            throw ProviderError.http(http.statusCode)
+        }
+
+        var accumulated = ""
+        var isFirstChunk = true
+        for try await line in bytes.lines {
+            // SSE frames are `data: {json}`; blank lines separate events.
+            guard line.hasPrefix("data:") else { continue }
+            let payloadText = line.dropFirst(5).trimmingCharacters(in: .whitespaces)
+            if payloadText.isEmpty || payloadText == "[DONE]" { continue }
+            guard let data = payloadText.data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let candidates = json["candidates"] as? [[String: Any]],
+                  let content = candidates.first?["content"] as? [String: Any],
+                  let parts = content["parts"] as? [[String: Any]] else { continue }
+            var chunk = parts.compactMap { $0["text"] as? String }.joined()
+            // Strip leading whitespace on the very first emitted text so the
+            // field doesn't start with a stray space/newline (the one-shot
+            // path trims the whole result).
+            if isFirstChunk {
+                chunk = String(chunk.drop(while: { $0 == " " || $0 == "\n" || $0 == "\t" }))
+            }
+            guard !chunk.isEmpty else { continue }
+            isFirstChunk = false
+            accumulated += chunk
+            onDelta(chunk)
+        }
+
+        let trimmed = accumulated.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            throw ProviderError.badResponse("Empty stream from Gemini")
+        }
+        return trimmed
     }
 
     // MARK: - Image

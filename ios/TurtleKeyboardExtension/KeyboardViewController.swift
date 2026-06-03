@@ -23,6 +23,16 @@ class KeyboardViewController: UIInputViewController {
     private var isGenerating      = false
     private var pendingSuggestions: [String] = []
 
+    /// Text commands whose result is streamed token-by-token into the
+    /// field (perceived-latency win) rather than inserted in one shot.
+    /// Excludes `/proofread` (replace-in-place), `/reply` (suggestion
+    /// chips), `/org` (JSON → image) and image commands.
+    private static let streamableTextCommands: Set<SlashCommand> = [.fix, .tone, .tl, .ask, .search]
+    /// Set once the first streamed delta lands so the completion handler
+    /// knows the field is already being filled (vs. needing a one-shot
+    /// insert because the provider didn't stream).
+    private var streamInsertStarted = false
+
     /// PNG bytes of the image picked for the active `/edit` session, or
     /// `nil` when nothing is staged. Cleared after the command sends, when
     /// the command bar dismisses, or when the user picks again. Mirrors
@@ -2256,6 +2266,7 @@ class KeyboardViewController: UIInputViewController {
 
         let panel = QuickPanelView(columns: isPad ? 6 : 4)
         panel.onSelect = self
+        panel.onReorder = { [weak self] order in self?.saveQuickPanelOrder(order) }
         panel.show(allCommandsForQuickPanel())
         quickPanelView = panel
         mountIntegrationPanel(panel)
@@ -2271,7 +2282,22 @@ class KeyboardViewController: UIInputViewController {
     /// follow, sourced from `integrationRegistry.allCommands` so the
     /// user's Personalization toggles are honoured — disabling Poll on
     /// the host strips it from the grid here.
+    /// The grid shown in the Quick Panel: the user's drag-to-reorder
+    /// ordering applied over the default command set. Newly-available
+    /// commands (added in a build after the user last reordered) fall in
+    /// after the saved ones in their default position.
     private func allCommandsForQuickPanel() -> [SlashCommand] {
+        let base = defaultQuickPanelCommands()
+        let saved = loadQuickPanelOrder()
+        guard !saved.isEmpty else { return base }
+        let available = Set(base)
+        var ordered = saved.filter { available.contains($0) }
+        let placed = Set(ordered)
+        ordered += base.filter { !placed.contains($0) }
+        return ordered
+    }
+
+    private func defaultQuickPanelCommands() -> [SlashCommand] {
         let aiCommands: [SlashCommand] = [.cap, .edit, .style, .sticker, .gif, .fix, .proofread, .tone, .reply, .tl, .search, .ask, .org]
         // Walk the live registry so commands added later (poll, wyr,
         // web, …) flow through automatically without touching this list.
@@ -2282,6 +2308,19 @@ class KeyboardViewController: UIInputViewController {
         // browses past /cap and /org outputs. Pin it after the integration
         // commands so it sits at the end of the grid.
         return aiCommands + localCommands + [.history]
+    }
+
+    /// Reads the persisted drag-to-reorder ordering (CSV of raw values).
+    private func loadQuickPanelOrder() -> [SlashCommand] {
+        let csv = personalizationStore.string(
+            forKey: PersonalizationKeys.quickPanelOrder, fallback: "")
+        return csv.split(separator: ",").compactMap { SlashCommand(rawValue: String($0)) }
+    }
+
+    /// Persists the Quick Panel ordering after a drag settles.
+    private func saveQuickPanelOrder(_ order: [SlashCommand]) {
+        let csv = order.map { $0.rawValue }.joined(separator: ",")
+        personalizationStore.setString(csv, forKey: PersonalizationKeys.quickPanelOrder)
     }
 
     // MARK: - Draft state persistence
@@ -3276,6 +3315,51 @@ class KeyboardViewController: UIInputViewController {
 
     // MARK: - Command execution
 
+    /// Token-streaming path for text commands. Hides the generating wave
+    /// and command bar the instant the first chunk lands, then appends each
+    /// delta straight into the field so the result "types itself" in.
+    private func streamTextCommand(_ cmd: SlashCommand, prompt: String, context: String) {
+        streamInsertStarted = false
+        Task { @MainActor in
+            do {
+                let result = try await CommandRouter.shared.executeStreaming(
+                    command: cmd.rawValue,
+                    prompt: prompt,
+                    context: context,
+                    onDelta: { [weak self] delta in
+                        // onDelta fires off the main thread; `main.async`
+                        // both hops to the UI and preserves chunk order
+                        // (FIFO), which `Task {}` would not guarantee.
+                        DispatchQueue.main.async {
+                            guard let self = self else { return }
+                            if !self.streamInsertStarted {
+                                self.streamInsertStarted = true
+                                self.isGenerating = false
+                                self.hideGeneratingWave()
+                                self.hideCommandBar()
+                            }
+                            self.textDocumentProxy.insertText(delta)
+                        }
+                    })
+
+                isGenerating = false
+                hideGeneratingWave()
+                if case .text(let full) = result, !streamInsertStarted {
+                    // No delta ever arrived (provider fell back to one-shot,
+                    // or an empty stream) — insert the whole thing.
+                    hideCommandBar()
+                    textDocumentProxy.insertText(full)
+                }
+                showBanner(completionBanner(for: cmd))
+            } catch {
+                isGenerating = false
+                hideGeneratingWave()
+                hideCommandBar()
+                showBanner("⚠️ " + (error.localizedDescription))
+            }
+        }
+    }
+
     private func executeCommand(_ cmd: SlashCommand, prompt: String) {
         // Local commands handled by integrations — no AI hop, no overlay.
         if cmd.isLocal {
@@ -3304,6 +3388,14 @@ class KeyboardViewController: UIInputViewController {
         // request builds so a failed call doesn't trap the bytes in memory).
         let referenceImage: Data? = cmd.needsReferenceImage ? stagedEditImage : nil
         if cmd.needsReferenceImage { stagedEditImage = nil }
+
+        // Streamable text commands take the token-by-token path so the
+        // result appears in the field as it generates.
+        if Self.streamableTextCommands.contains(cmd) {
+            streamTextCommand(cmd, prompt: prompt, context: context)
+            return
+        }
+
         Task { @MainActor in
             do {
                 let result = try await CommandRouter.shared.execute(

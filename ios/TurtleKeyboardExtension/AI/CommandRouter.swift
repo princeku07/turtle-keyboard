@@ -104,6 +104,34 @@ final class CommandRouter {
         return try await provider.execute(payload)
     }
 
+    /// Streaming counterpart of `execute` — same routing, but the provider
+    /// emits text chunks through `onDelta` as they arrive. Providers that
+    /// don't stream fall back to one-shot via the `AIProvider` default.
+    func executeStreaming(command: String, prompt: String, context: String,
+                          referenceImage: Data? = nil,
+                          onDelta: @escaping (String) -> Void) async throws -> CommandResult {
+        let model = model(for: command)
+
+        guard let capability = Self.requiredCapability(for: command),
+              model.supports(capability) else {
+            throw ProviderError.unsupportedCommand(command)
+        }
+
+        guard let provider = providers[model.provider] else {
+            throw ProviderError.unsupportedCommand(command)
+        }
+
+        let payload = CommandPayload(
+            command: command,
+            model: model,
+            prompt: prompt,
+            context: context,
+            locale: Locale.current.identifier,
+            referenceImage: referenceImage
+        )
+        return try await provider.executeStreaming(payload, onDelta: onDelta)
+    }
+
     // MARK: - Capability map  (used by ModelRegistry.compatible(with:))
 
     static func requiredCapability(for command: String) -> ModelCapability? {

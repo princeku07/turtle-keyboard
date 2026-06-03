@@ -13,6 +13,11 @@ enum PersonalizationKeys {
     static let webEnabled         = "personalization.web.enabled"
     static let githubEnabled      = "personalization.github.enabled"
     static let quickPanelEnabled  = "personalization.keyboard.quickpanel"
+    /// User's drag-to-reorder ordering for the Quick Panel grid, stored as
+    /// a comma-separated list of `SlashCommand` raw values. Commands not
+    /// listed (e.g. ones added in a later build) fall in after the saved
+    /// ones in their default order.
+    static let quickPanelOrder    = "personalization.keyboard.quickpanel.order"
     static let voiceEnabled       = "personalization.keyboard.voice"
     /// Theme preference: "auto" | "turtle" | "light" | "dark". Source of truth
     /// owned by `KeyboardThemeManager.preferenceKey`; mirrored here so the
