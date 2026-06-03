@@ -301,6 +301,54 @@ class KeyboardViewController: UIInputViewController {
     /// keystroke — `CGPath(roundedRect:)` is not free at typing speed.
     private var keyPopupCachedShadowSize: CGSize?
 
+    // MARK: - Long-press accent picker
+    //
+    // Holding a letter with diacritic variants (a, e, n, o, …) pops a
+    // horizontal strip of accented forms above the key; sliding the
+    // finger highlights one and releasing inserts it. The base letter is
+    // already inserted on touch-down (the keyboard's insert-on-press
+    // model), so committing an accent swaps that character in place.
+
+    private var accentPickerView: UIView?
+    private var accentPickerLabels: [UILabel] = []
+    /// Variants shown left→right; index 0 is always the un-accented base
+    /// letter (releasing on it keeps what was already typed).
+    private var accentPickerVariants: [String] = []
+    private var accentPickerSelectedIndex = 0
+    private var accentPickerActive = false
+
+    /// Diacritic variants per (lowercase) base letter, in iOS-ish order.
+    private static let accentMap: [String: [String]] = [
+        "a": ["à", "á", "â", "ä", "æ", "ã", "å"],
+        "c": ["ç", "ć", "č"],
+        "e": ["è", "é", "ê", "ë", "ē", "ė", "ę"],
+        "i": ["î", "ï", "í", "ī", "į", "ì"],
+        "l": ["ł"],
+        "n": ["ñ", "ń"],
+        "o": ["ô", "ö", "ò", "ó", "œ", "ø", "õ"],
+        "s": ["ß", "ś", "š"],
+        "u": ["û", "ü", "ù", "ú", "ū"],
+        "y": ["ÿ"],
+        "z": ["ž", "ź", "ż"],
+    ]
+
+    // MARK: - Spacebar-swipe cursor control
+    //
+    // Pressing the spacebar and sliding horizontally moves the caret
+    // instead of typing a space (the iOS-standard gesture). To make this
+    // work the spacebar is the one key whose character is committed on
+    // touch-UP rather than touch-down — so a slide can cancel the space.
+
+    private var spaceTouchActive = false
+    private var spaceSwiping = false
+    /// Caret offset (in characters) already applied this swipe, so each
+    /// move only adjusts by the delta.
+    private var spaceCharsMoved = 0
+
+    /// The single letter most recently inserted by `processKey`, used to
+    /// match the accent picker's case to what the user actually typed.
+    private var lastTypedCharacter: String?
+
     /// Silence-detect auto-stop for voice dictation. Reset every time
     /// a partial transcript arrives; if the timer fires (no partials
     /// for `voiceSilenceTimeout` seconds) we request the host to stop
@@ -1123,7 +1171,8 @@ class KeyboardViewController: UIInputViewController {
                    && $0 !== integrationPanelHost
                    && $0 !== quickPanelView
                    && $0 !== listeningOverlay
-                   && $0 !== keyPopupView }
+                   && $0 !== keyPopupView
+                   && $0 !== accentPickerView }
             .forEach { $0.removeFromSuperview() }
 
         let rows = currentRows()
@@ -1178,6 +1227,10 @@ class KeyboardViewController: UIInputViewController {
         if let popup = keyPopupView, !popup.isHidden {
             keyboardContainer.bringSubviewToFront(popup)
         }
+        // Same for the accent picker if a rebuild fires while it's open.
+        if let picker = accentPickerView, !picker.isHidden {
+            keyboardContainer.bringSubviewToFront(picker)
+        }
     }
 
     private func buildRow(keys: [String], rowIndex: Int, totalRows: Int, y: CGFloat) -> KeyRowView {
@@ -1195,17 +1248,37 @@ class KeyboardViewController: UIInputViewController {
         container.onKeyDown      = { [weak self] btn in self?.keyTouchDown(btn) }
         container.onKeyUp        = { [weak self] btn in self?.keyTapped(btn) }
         container.onKeyHeld      = { [weak self] btn in
-            // Long-press currently means one thing: backspace repeat.
+            guard let self = self else { return }
+            // Long-press = backspace repeat for ⌫, accent picker for letters.
             if btn.accessibilityLabel == "⌫" {
-                self?.startBackspaceRepeat()
+                self.startBackspaceRepeat()
+            } else if self.slashBuffer == nil,
+                      self.keyHasAccents(btn.accessibilityLabel ?? "") {
+                self.showAccentPicker(for: btn)
             }
         }
         container.onKeyHeldEnded = { [weak self] btn in
+            guard let self = self else { return }
             if btn.accessibilityLabel == "⌫" {
-                self?.stopBackspaceRepeat()
+                self.stopBackspaceRepeat()
+            }
+            // Releasing over the accent picker commits the highlighted variant.
+            if self.accentPickerActive {
+                self.commitAccentSelection()
             }
             // Hide the magnifier popup the same way `onKeyUp` would.
-            self?.keyTapped(btn)
+            self.keyTapped(btn)
+        }
+        container.onTouchMoved   = { [weak self] btn, translation, location in
+            self?.handleTouchMoved(btn, translation: translation, location: location)
+        }
+        container.canLongPress   = { [weak self] btn in
+            guard let self = self else { return false }
+            let label = btn.accessibilityLabel ?? ""
+            if label == "⌫" { return true }
+            // Accent-bearing letters, but only during normal typing — in
+            // slash-command composition a held key would fight the buffer.
+            return self.slashBuffer == nil && self.keyHasAccents(label)
         }
         let isBottom   = rowIndex == totalRows - 1
         let isModifier = rowIndex == totalRows - 2
@@ -1456,6 +1529,14 @@ class KeyboardViewController: UIInputViewController {
         // Commit the keystroke FIRST — that's what the user is waiting
         // for. Subjective responsiveness wins.
         guard let key = sender.accessibilityLabel else { return }
+        // Spacebar is the one exception to insert-on-press: defer it to
+        // touch-up so a horizontal slide becomes caret control instead of
+        // typing a space. Only in normal typing — inside a slash command
+        // the buffer owns space (draft→prompt), so leave that path alone.
+        if key == "space" && slashBuffer == nil {
+            beginSpaceTracking()
+            return
+        }
         // Snapshot the visible glyph BEFORE processKey runs — shift-once
         // letters get reset to lowercase by `updateKeyVisualsForShiftState`
         // inside processKey, but the popup should still show the glyph
@@ -1477,6 +1558,12 @@ class KeyboardViewController: UIInputViewController {
     }
 
     @objc private func keyTapped(_ sender: UIButton) {
+        // Spacebar commits on touch-up (deferred in `keyTouchDown`) so a
+        // slide could have cancelled it — resolve that here.
+        if sender.accessibilityLabel == "space" && spaceTouchActive {
+            endSpaceTracking()
+            return
+        }
         // The character was inserted in `keyTouchDown`. Nothing to do on
         // touch-up except dismissing the popup — there's no press-scale
         // transform left to reset.
@@ -1572,6 +1659,181 @@ class KeyboardViewController: UIInputViewController {
         keyPopupView?.isHidden = true
     }
 
+    // MARK: - Touch tracking (spacebar swipe + accent picker)
+
+    /// Routed from `KeyRowView.onTouchMoved` for every live touch. Cheap
+    /// no-op unless a gesture that needs finger tracking is in progress.
+    private func handleTouchMoved(_ btn: UIButton, translation: CGPoint, location: CGPoint) {
+        if spaceTouchActive, btn.accessibilityLabel == "space" {
+            handleSpaceSwipe(translation: translation)
+        } else if accentPickerActive {
+            updateAccentSelection(at: location)
+        }
+    }
+
+    // MARK: - Spacebar-swipe cursor control
+
+    private func beginSpaceTracking() {
+        spaceTouchActive = true
+        spaceSwiping = false
+        spaceCharsMoved = 0
+    }
+
+    /// Once the finger has slid past a small threshold, the gesture is a
+    /// caret drag, not a space — move the cursor by whole characters
+    /// proportional to horizontal travel.
+    private func handleSpaceSwipe(translation: CGPoint) {
+        let enterThreshold: CGFloat = 8     // points before a slide "counts"
+        if !spaceSwiping {
+            guard abs(translation.x) > enterThreshold else { return }
+            spaceSwiping = true
+        }
+        // ~10pt of travel per character — roughly one narrow key width,
+        // matching the feel of Apple's spacebar trackpad.
+        let charStep: CGFloat = 10
+        let target = Int((translation.x / charStep).rounded())
+        let delta = target - spaceCharsMoved
+        if delta != 0 {
+            // `adjustTextPosition` clamps at the field's bounds itself, so
+            // over-shooting past either end is safe.
+            textDocumentProxy.adjustTextPosition(byCharacterOffset: delta)
+            spaceCharsMoved = target
+        }
+    }
+
+    private func endSpaceTracking() {
+        let wasSwiping = spaceSwiping
+        spaceTouchActive = false
+        spaceSwiping = false
+        spaceCharsMoved = 0
+        // A plain tap (no slide) types the space now — the insertion we
+        // deferred in `keyTouchDown`. A slide moved the caret instead, so
+        // there's nothing to type.
+        if !wasSwiping {
+            processKey("space")
+        }
+    }
+
+    // MARK: - Long-press accent picker
+
+    /// True when holding `label` should offer accented variants. Letters
+    /// only, QWERTY only.
+    private func keyHasAccents(_ label: String) -> Bool {
+        guard mode == .qwerty, label.count == 1,
+              label.first?.isLetter == true else { return false }
+        return Self.accentMap[label.lowercased()] != nil
+    }
+
+    private func ensureAccentPickerView() {
+        guard accentPickerView == nil else { return }
+        let v = UIView()
+        v.layer.cornerRadius = 8
+        v.layer.cornerCurve  = .continuous
+        v.layer.shadowColor   = UIColor.black.cgColor
+        v.layer.shadowOpacity = 0.30
+        v.layer.shadowOffset  = CGSize(width: 0, height: 2)
+        v.layer.shadowRadius  = 4
+        v.isUserInteractionEnabled = false   // touches stay with the key row
+        v.isHidden = true
+        keyboardContainer.addSubview(v)
+        accentPickerView = v
+    }
+
+    /// Build + show the accent strip above `btn`. The base letter was
+    /// already inserted on touch-down, so it's offered as index 0 (release
+    /// there = keep it); the diacritics follow.
+    private func showAccentPicker(for btn: UIButton) {
+        guard let base = btn.accessibilityLabel?.lowercased(),
+              let accents = Self.accentMap[base],
+              let row = btn.superview else { return }
+
+        // Match the case of what the user just typed.
+        let uppercase = (lastTypedCharacter?.first?.isUppercase ?? false)
+        let cased: (String) -> String = { uppercase ? $0.uppercased() : $0 }
+        accentPickerVariants = [cased(base)] + accents.map(cased)
+        accentPickerSelectedIndex = 0
+
+        // The magnifier and the picker shouldn't both be up.
+        hideKeyPopup()
+        KeyboardHaptics.lightImpact()
+
+        ensureAccentPickerView()
+        guard let picker = accentPickerView else { return }
+
+        let keyFrame = row.convert(btn.frame, to: keyboardContainer)
+        let cellW = max(keyFrame.width, 34)
+        let cellH = keyFrame.height * 1.15
+        let totalW = cellW * CGFloat(accentPickerVariants.count)
+        // Align the first (base) cell over the key, then clamp the whole
+        // strip inside the keyboard so edge letters don't run off-screen.
+        var x = keyFrame.midX - cellW / 2
+        let kbW = keyboardContainer.bounds.width
+        x = max(2, min(x, kbW - 2 - totalW))
+        let y = keyFrame.minY - cellH - 6
+
+        picker.frame = CGRect(x: x, y: y, width: totalW, height: cellH)
+        picker.backgroundColor = KeyboardPalette.keyNormal
+
+        // Rebuild the labels (long-press is rare — not a hot path).
+        accentPickerLabels.forEach { $0.removeFromSuperview() }
+        accentPickerLabels = accentPickerVariants.enumerated().map { i, ch in
+            let l = UILabel(frame: CGRect(x: cellW * CGFloat(i), y: 0,
+                                          width: cellW, height: cellH))
+            l.text = ch
+            l.font = .systemFont(ofSize: 22)
+            l.textAlignment = .center
+            l.layer.cornerRadius = 6
+            l.layer.masksToBounds = true
+            picker.addSubview(l)
+            return l
+        }
+        highlightAccent(at: 0)
+
+        keyboardContainer.bringSubviewToFront(picker)
+        picker.isHidden = false
+        accentPickerActive = true
+    }
+
+    private func highlightAccent(at index: Int) {
+        accentPickerSelectedIndex = index
+        for (i, l) in accentPickerLabels.enumerated() {
+            let on = (i == index)
+            l.backgroundColor = on ? KeyboardPalette.accent : .clear
+            l.textColor = on ? .white : KeyboardPalette.keyText
+        }
+    }
+
+    /// Map the finger's x-position to the nearest variant cell. Vertical
+    /// position is ignored so the user can select from below the strip
+    /// (their finger is covering the key), matching iOS.
+    private func updateAccentSelection(at location: CGPoint) {
+        guard accentPickerActive, let picker = accentPickerView,
+              !accentPickerVariants.isEmpty else { return }
+        let local = picker.convert(location, from: keyboardContainer)
+        let cellW = picker.bounds.width / CGFloat(accentPickerVariants.count)
+        let idx = max(0, min(Int(local.x / cellW), accentPickerVariants.count - 1))
+        if idx != accentPickerSelectedIndex {
+            highlightAccent(at: idx)
+        }
+    }
+
+    private func commitAccentSelection() {
+        defer { dismissAccentPicker() }
+        // Index 0 is the un-accented base letter — already typed, leave it.
+        guard accentPickerSelectedIndex > 0,
+              accentPickerSelectedIndex < accentPickerVariants.count else { return }
+        let accent = accentPickerVariants[accentPickerSelectedIndex]
+        // Swap the base letter inserted on touch-down for the accented form.
+        textDocumentProxy.deleteBackward()
+        textDocumentProxy.insertText(accent)
+        updateCommandDetection()
+    }
+
+    private func dismissAccentPicker() {
+        accentPickerView?.isHidden = true
+        accentPickerActive = false
+    }
+
     /// Carries the key's logical action. Routed from `keyTouchDown` so
     /// the response feels instant; the touchUp handlers below only reset
     /// the visual press state. Note: a few keys (`↵`, `⌫`, `space`,
@@ -1660,6 +1922,9 @@ class KeyboardViewController: UIInputViewController {
             var text = key
             if mode == .qwerty, key.count == 1, key.first?.isLetter == true {
                 text = (isCapsLock || isShiftedOnce) ? key.uppercased() : key
+                // Remember the cased letter so a follow-up long-press
+                // shows the accent picker in the matching case.
+                lastTypedCharacter = text
                 if isShiftedOnce && !isCapsLock {
                     isShiftedOnce = false
                     proxy.insertText(text)
@@ -5077,10 +5342,22 @@ fileprivate final class KeyRowView: UIView {
     var onKeyUp: ((UIButton) -> Void)?
     /// Fired when a touch has been held continuously on the same
     /// button for `longPressDuration`. Used by `⌫` to start the
-    /// delete-repeat loop. No-op for keys that don't long-press.
+    /// delete-repeat loop and by letter keys to open the accent picker.
     var onKeyHeld: ((UIButton) -> Void)?
     /// Fired when a held touch ends.
     var onKeyHeldEnded: ((UIButton) -> Void)?
+    /// Fired on every move of a live touch. `translation` is the offset
+    /// from the touch-down point (in this row's coords); `location` is
+    /// the current point converted into the superview (`keyboardContainer`)
+    /// so the controller can hit-test it against overlays it owns.
+    /// Drives the spacebar-swipe caret control and accent-picker
+    /// selection — both need finger tracking after the initial tap.
+    var onTouchMoved: ((UIButton, _ translation: CGPoint, _ location: CGPoint) -> Void)?
+    /// Decides whether a touch on `button` should arm the long-press
+    /// timer. Defaults to "only `⌫`" when unset. The controller sets
+    /// this so letters with accent variants also arm (and so the rule
+    /// can depend on live state like the slash buffer).
+    var canLongPress: ((UIButton) -> Bool)?
 
     /// Matches the previous `UILongPressGestureRecognizer.minimumPressDuration`
     /// and Apple's own key-repeat onset.
@@ -5093,6 +5370,10 @@ fileprivate final class KeyRowView: UIView {
     private var heldTouches: Set<UITouch> = []
     /// Per-touch long-press arming timers.
     private var holdTimers: [UITouch: Timer] = [:]
+    /// Touch → its down-location (this row's coords). Lets `touchesMoved`
+    /// report a translation without the controller tracking per-touch
+    /// origins itself. Removed alongside `activeTouches`.
+    private var touchStartLocations: [UITouch: CGPoint] = [:]
 
     // MARK: Hit testing
 
@@ -5122,8 +5403,24 @@ fileprivate final class KeyRowView: UIView {
             let point = touch.location(in: self)
             guard let button = nearestButton(to: point) else { continue }
             activeTouches[touch] = button
+            touchStartLocations[touch] = point
             onKeyDown?(button)
             armLongPressIfNeeded(for: touch, button: button)
+        }
+    }
+
+    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+        super.touchesMoved(touches, with: event)
+        guard onTouchMoved != nil else { return }
+        for touch in touches {
+            guard let button = activeTouches[touch],
+                  let start = touchStartLocations[touch] else { continue }
+            let cur = touch.location(in: self)
+            let translation = CGPoint(x: cur.x - start.x, y: cur.y - start.y)
+            // Convert to the superview (keyboardContainer) so the
+            // controller can hit-test against overlays it positions there.
+            let inSuper = superview.map { convert(cur, to: $0) } ?? cur
+            onTouchMoved?(button, translation, inSuper)
         }
     }
 
@@ -5140,6 +5437,7 @@ fileprivate final class KeyRowView: UIView {
     private func endTouches(_ touches: Set<UITouch>) {
         for touch in touches {
             holdTimers.removeValue(forKey: touch)?.invalidate()
+            touchStartLocations.removeValue(forKey: touch)
             guard let button = activeTouches.removeValue(forKey: touch) else { continue }
             if heldTouches.remove(touch) != nil {
                 onKeyHeldEnded?(button)
@@ -5150,10 +5448,11 @@ fileprivate final class KeyRowView: UIView {
     }
 
     private func armLongPressIfNeeded(for touch: UITouch, button: UIButton) {
-        // Only `⌫` currently has long-press behaviour. Letters could
-        // grow accent pickers later — wire them through the same
-        // `onKeyHeld` callback when that happens.
-        guard button.accessibilityLabel == "⌫" else { return }
+        // `⌫` (delete-repeat) and letters with accent variants long-press.
+        // The controller supplies the predicate via `canLongPress` so the
+        // rule can read live state (e.g. don't arm letters mid-slash-command).
+        let allowed = canLongPress?(button) ?? (button.accessibilityLabel == "⌫")
+        guard allowed else { return }
         let timer = Timer.scheduledTimer(
             withTimeInterval: Self.longPressDuration,
             repeats: false
