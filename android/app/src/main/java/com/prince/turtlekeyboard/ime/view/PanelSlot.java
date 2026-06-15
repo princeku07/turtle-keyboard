@@ -17,15 +17,30 @@ public final class PanelSlot {
 
     private final ViewGroup host;
     private final KeyboardView keys;
+    @Nullable private Runnable onUnmount;
 
     public PanelSlot(ViewGroup host, KeyboardView keys) {
         this.host = host;
         this.keys = keys;
+        // Empty slot = hidden host; enforce the invariant instead of relying on the
+        // layout XML's android:visibility attribute (drifts on view re-inflation).
+        this.host.setVisibility(View.GONE);
+    }
+
+    /** Fires whenever a mounted panel is removed (by replacement or hide), so the IME
+     *  can drop any input-target reference pinned to the outgoing panel. Panels that
+     *  exit input mode on their own already null the slot themselves; this covers the
+     *  external-teardown paths (panel-replaces-panel, IME view recreation) that would
+     *  otherwise leave {@code activeInputTarget} pointing at a removed view — the
+     *  symptom is delete/backspace silently routing to a dead panel. */
+    public void setOnUnmount(@Nullable Runnable r) {
+        this.onUnmount = r;
     }
 
     /** Replaces any existing child with {@code panel}, sizes to the key band, hides keys. */
     public void show(View panel) {
         int targetHeight = keys.getHeight();
+        if (host.getChildCount() > 0 && onUnmount != null) onUnmount.run();
         host.removeAllViews();
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
@@ -36,6 +51,7 @@ public final class PanelSlot {
     }
 
     public void hide() {
+        if (host.getChildCount() > 0 && onUnmount != null) onUnmount.run();
         host.removeAllViews();
         host.setVisibility(View.GONE);
         keys.setVisibility(View.VISIBLE);

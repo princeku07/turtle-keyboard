@@ -1,6 +1,7 @@
 package com.prince.turtlekeyboard.input;
 
 import android.text.TextUtils;
+import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
 import android.view.inputmethod.InputConnection;
 
@@ -26,12 +27,27 @@ public class InputCommitter {
 
     public void commitChar(char c) {
         InputConnection ic = connection();
-        if (ic != null) ic.commitText(String.valueOf(c), 1);
+        if (ic == null) return;
+        if (ic.commitText(String.valueOf(c), 1)) return;
+        // Battery Saver / Doze freezes the host editor's binder peer: commitText returns
+        // false and the keypress is lost. KeyEvents route via InputDispatcher and queue
+        // until the host thaws, so the character still lands.
+        sendCharsAsKeyEvents(ic, new char[]{c});
     }
 
     public void commitText(CharSequence text) {
         InputConnection ic = connection();
-        if (ic != null) ic.commitText(text, 1);
+        if (ic == null || text == null) return;
+        if (ic.commitText(text, 1)) return;
+        sendCharsAsKeyEvents(ic, text.toString().toCharArray());
+    }
+
+    private static void sendCharsAsKeyEvents(InputConnection ic, char[] chars) {
+        if (chars == null || chars.length == 0) return;
+        KeyEvent[] events = KeyCharacterMap
+                .load(KeyCharacterMap.VIRTUAL_KEYBOARD).getEvents(chars);
+        if (events == null) return;
+        for (KeyEvent e : events) ic.sendKeyEvent(e);
     }
 
     public void backspace() {
@@ -40,9 +56,18 @@ public class InputCommitter {
         CharSequence selected = ic.getSelectedText(0);
         if (!TextUtils.isEmpty(selected)) {
             ic.commitText("", 1);
-        } else {
-            ic.deleteSurroundingText(1, 0);
+            return;
         }
+        // deleteSurroundingText counts UTF-16 chars; a 1-char delete after an emoji leaves a
+        // broken surrogate that some hosts then treat as no-op (the visible "delete didn't
+        // work" symptom). deleteSurroundingTextInCodePoints (API 24+, our minSdk) deletes a
+        // whole grapheme cluster.
+        boolean deleted = ic.deleteSurroundingTextInCodePoints(1, 0);
+        if (deleted) return;
+        // Hosts that ignore deleteSurroundingText (WebView-based editors, some chat/code apps)
+        // still respect a KEYCODE_DEL event pair — fall back so the key is never a no-op.
+        ic.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL));
+        ic.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DEL));
     }
 
     public void sendEnter() {

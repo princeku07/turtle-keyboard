@@ -26,13 +26,23 @@ public class SlashCommandDetector {
         this.listener = listener;
     }
 
-    /** Call after every text mutation. */
-    public void onTextChanged() {
-        CharSequence before = committer.textBeforeCursor(LOOKBACK);
-        if (before.length() == 0) return;
-        char last = before.charAt(before.length() - 1);
-        if (last != ' ' && last != '\n') return;
+    /** Call after every text mutation, passing the last committed character.
+     *  Skips the host IPC on non-terminator chars (~95% of keystrokes), so the
+     *  detector pays a binder roundtrip only when a token could have ended. */
+    public void onTextChanged(char lastChar) {
+        if (lastChar != ' ' && lastChar != '\n') return;
+        consume(committer.textBeforeCursor(LOOKBACK));
+    }
 
+    /** Overload for the IME's emit hot path, where {@code before} has already
+     *  been fetched once and is shared with the learner / suggestion refresh. */
+    public void onTextChanged(char lastChar, CharSequence before) {
+        if (lastChar != ' ' && lastChar != '\n') return;
+        consume(before);
+    }
+
+    private void consume(CharSequence before) {
+        if (before == null || before.length() == 0) return;
         // Find the most recent '/' that begins a token (start-of-input or after whitespace).
         String s = before.toString();
         int slash = -1;

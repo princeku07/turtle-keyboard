@@ -12,13 +12,12 @@ import android.view.ViewGroup;
 
 import androidx.core.content.FileProvider;
 
+import com.prince.kbd.core.GeminiService;
 import com.prince.kbd.core.KeyValueStore;
 import com.prince.kbd.core.SharedPrefsKeyValueStore;
-import com.prince.turtlekeyboard.BuildConfig;
 import com.prince.turtlekeyboard.command.SlashCommand;
 import com.prince.turtlekeyboard.integration.drive.DriveKeys;
 
-import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
@@ -30,8 +29,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -47,14 +44,6 @@ import java.util.concurrent.Executors;
 public class TurtleAiClient implements AiClient {
 
     private static final String TAG = "TurtleAiClient";
-    private static final String GEMINI_URL =
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent";
-    /** Gemini 2.5 Flash Image ("Nano Banana"); same endpoint, inlineData PNG response. */
-    private static final String GEMINI_IMAGE_URL =
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent";
-    private static final String GEMINI_API_KEY = BuildConfig.GEMINI_API_KEY;
-    private static final int CONNECT_TIMEOUT_MS = 5_000;
-    private static final int READ_TIMEOUT_MS = 90_000;
 
     /** Supplies a window-attached ViewGroup the renderer can briefly add a WebView to. */
     public interface HostProvider {
@@ -70,13 +59,16 @@ public class TurtleAiClient implements AiClient {
     private final Context appContext;
     private final HostProvider hostProvider;
     private final StagingPipeline pipeline;
+    private final GeminiService gemini;
     private final Map<String, String> promptCache = new HashMap<>();
 
     public TurtleAiClient(Context context, HostProvider hostProvider,
-                          StagingPipeline pipeline, AiClient delegate) {
+                          StagingPipeline pipeline, GeminiService gemini,
+                          AiClient delegate) {
         this.appContext = context.getApplicationContext();
         this.hostProvider = hostProvider;
         this.pipeline = pipeline;
+        this.gemini = gemini;
         this.delegate = delegate;
     }
 
@@ -101,15 +93,14 @@ public class TurtleAiClient implements AiClient {
             main.post(() -> cb.onError("Field is empty"));
             return;
         }
-        io.execute(() -> {
-            try {
-                String result = callGemini(systemPrompt == null ? "" : systemPrompt, userText);
-                main.post(() -> cb.onSuccess(result));
-            } catch (Exception e) {
-                Log.w(TAG, "rewrite failed", e);
-                main.post(() -> cb.onError("Gemini unreachable"));
-            }
-        });
+        gemini.text(systemPrompt == null ? "" : systemPrompt, userText,
+                new GeminiService.TextCallback() {
+                    @Override public void onText(String text) { cb.onSuccess(text); }
+                    @Override public void onError(String reason) {
+                        Log.w(TAG, "rewrite failed: " + reason);
+                        cb.onError("Gemini unreachable");
+                    }
+                });
     }
 
     /** Synthetic command for raw text completions; caller embeds instructions in the user prompt. */
@@ -138,36 +129,45 @@ public class TurtleAiClient implements AiClient {
             return;
         }
         if (name.equals("cap")) {
-            io.execute(() -> {
-                try {
-                    byte[] png = callGeminiImage(prompt, systemPromptFor("cap"));
-                    // No input image; skip aspect-fix.
-                    main.post(() -> saveImageBytes(png, callback, 0f, "cap", prompt));
-                } catch (Exception e) {
-                    Log.w(TAG, "cap failed", e);
-                    main.post(() -> callback.onResult(AiResult.error("Gemini unreachable")));
+            // GeminiService callbacks fire on the main thread, so no io.execute
+            // wrapper is needed — saveImageBytes already runs on main today.
+            gemini.image(systemPromptFor("cap"), prompt, new GeminiService.ImageCallback() {
+                @Override public void onImage(byte[] png) {
+                    saveImageBytes(png, callback, 0f, "cap", prompt);
+                }
+                @Override public void onError(String reason) {
+                    Log.w(TAG, "cap failed: " + reason);
+                    callback.onResult(AiResult.error("Gemini unreachable"));
                 }
             });
             return;
         }
         if (name.equals("edit")) {
+            // Clipboard / picker read still hops to io because readClipboardImage
+            // touches the ContentResolver; the AI call itself is now async via
+            // GeminiService and runs from the main thread.
             io.execute(() -> {
-                // Picker is launched when the user enters /edit prompt mode; fall back
-                // to the clipboard if the user skipped it.
                 ClipImage src = pipeline.consumeEditImage();
                 if (src == null) src = readClipboardImage();
                 if (src == null) {
                     main.post(() -> callback.onResult(AiResult.error("Pick an image first")));
                     return;
                 }
-                try {
-                    byte[] png = callGeminiImageEdit(src.bytes, src.mime, prompt);
-                    float aspect = src.aspect();
-                    main.post(() -> saveImageBytes(png, callback, aspect, "edit", prompt));
-                } catch (Exception e) {
-                    Log.w(TAG, "edit failed", e);
-                    main.post(() -> callback.onResult(AiResult.error("Gemini unreachable")));
-                }
+                final ClipImage finalSrc = src;
+                final float aspect = src.aspect();
+                main.post(() -> gemini.imageEdit(
+                        systemPromptFor("edit"), prompt,
+                        java.util.Collections.singletonList(
+                                new GeminiService.InlineImage(finalSrc.bytes, finalSrc.mime)),
+                        new GeminiService.ImageCallback() {
+                            @Override public void onImage(byte[] png) {
+                                saveImageBytes(png, callback, aspect, "edit", prompt);
+                            }
+                            @Override public void onError(String reason) {
+                                Log.w(TAG, "edit failed: " + reason);
+                                callback.onResult(AiResult.error("Gemini unreachable"));
+                            }
+                        }));
             });
             return;
         }
@@ -179,16 +179,22 @@ public class TurtleAiClient implements AiClient {
                     main.post(() -> callback.onResult(AiResult.error("Pick an image first")));
                     return;
                 }
-                try {
-                    String userPrompt = stylePromptFor(prompt);
-                    byte[] png = callGeminiImageEdit(src.bytes, src.mime, userPrompt);
-                    float aspect = src.aspect();
-                    main.post(() -> saveImageBytes(
-                            png, callback, aspect, "style", prompt));
-                } catch (Exception e) {
-                    Log.w(TAG, "style failed", e);
-                    main.post(() -> callback.onResult(AiResult.error("Gemini unreachable")));
-                }
+                final ClipImage finalSrc = src;
+                final float aspect = src.aspect();
+                final String userPrompt = stylePromptFor(prompt);
+                main.post(() -> gemini.imageEdit(
+                        systemPromptFor("edit"), userPrompt,
+                        java.util.Collections.singletonList(
+                                new GeminiService.InlineImage(finalSrc.bytes, finalSrc.mime)),
+                        new GeminiService.ImageCallback() {
+                            @Override public void onImage(byte[] png) {
+                                saveImageBytes(png, callback, aspect, "style", prompt);
+                            }
+                            @Override public void onError(String reason) {
+                                Log.w(TAG, "style failed: " + reason);
+                                callback.onResult(AiResult.error("Gemini unreachable"));
+                            }
+                        }));
             });
             return;
         }
@@ -199,33 +205,40 @@ public class TurtleAiClient implements AiClient {
                     main.post(() -> callback.onResult(AiResult.error("Pick two photos first")));
                     return;
                 }
-                try {
-                    String userPrompt = usPromptFor(prompt);
-                    byte[] png = callGeminiImageUs(userPrompt, refs, systemPromptFor("us"));
-                    main.post(() -> saveImageBytes(png, callback, 0f, "us", prompt));
-                } catch (Exception e) {
-                    Log.w(TAG, "us failed", e);
-                    main.post(() -> callback.onResult(AiResult.error("Gemini unreachable")));
+                final String userPrompt = usPromptFor(prompt);
+                final List<GeminiService.InlineImage> inlineRefs = new ArrayList<>(refs.size());
+                for (ReferenceImage ref : refs) {
+                    inlineRefs.add(new GeminiService.InlineImage(ref.bytes, ref.mime));
                 }
+                main.post(() -> gemini.imageEdit(
+                        systemPromptFor("us"), userPrompt, inlineRefs,
+                        new GeminiService.ImageCallback() {
+                            @Override public void onImage(byte[] png) {
+                                saveImageBytes(png, callback, 0f, "us", prompt);
+                            }
+                            @Override public void onError(String reason) {
+                                Log.w(TAG, "us failed: " + reason);
+                                callback.onResult(AiResult.error("Gemini unreachable"));
+                            }
+                        }));
             });
             return;
         }
-        boolean isOrg = name.equals("org");
+        final boolean isOrg = name.equals("org");
+        final String commandName = name;
         // Raw completions skip the asset-loaded system prompt.
         String systemPrompt = name.equals(RAW_COMPLETION) ? "" : systemPromptFor(name);
-        io.execute(() -> {
-            try {
-                String content = callGemini(systemPrompt, prompt);
+        gemini.text(systemPrompt, prompt, new GeminiService.TextCallback() {
+            @Override public void onText(String content) {
                 if (isOrg) {
-                    String json = stripCodeFences(content);
-                    main.post(() -> renderJsonToImage(json, callback));
+                    renderJsonToImage(stripCodeFences(content), callback);
                 } else {
-                    AiResult done = AiResult.text(content);
-                    main.post(() -> callback.onResult(done));
+                    callback.onResult(AiResult.text(content));
                 }
-            } catch (Exception e) {
-                Log.w(TAG, name + " failed", e);
-                main.post(() -> callback.onResult(AiResult.error("Gemini unreachable")));
+            }
+            @Override public void onError(String reason) {
+                Log.w(TAG, commandName + " failed: " + reason);
+                callback.onResult(AiResult.error("Gemini unreachable"));
             }
         });
     }
@@ -360,61 +373,6 @@ public class TurtleAiClient implements AiClient {
         }
     }
 
-    private String callGemini(String systemPrompt, String prompt) throws Exception {
-        HttpURLConnection conn = (HttpURLConnection) new URL(GEMINI_URL).openConnection();
-        conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
-        conn.setReadTimeout(READ_TIMEOUT_MS);
-        conn.setRequestMethod("POST");
-        conn.setRequestProperty("Content-Type", "application/json");
-        conn.setRequestProperty("Accept", "application/json");
-        conn.setRequestProperty("X-goog-api-key", GEMINI_API_KEY);
-        conn.setDoOutput(true);
-
-        JSONObject body = new JSONObject();
-        if (systemPrompt != null && !systemPrompt.isEmpty()) {
-            JSONObject sysPart = new JSONObject().put("text", systemPrompt);
-            JSONObject sysInstruction = new JSONObject()
-                    .put("parts", new JSONArray().put(sysPart));
-            body.put("systemInstruction", sysInstruction);
-        }
-        JSONObject userPart = new JSONObject().put("text", prompt);
-        JSONObject userTurn = new JSONObject()
-                .put("parts", new JSONArray().put(userPart));
-        body.put("contents", new JSONArray().put(userTurn));
-
-        try (OutputStream os = conn.getOutputStream()) {
-            os.write(body.toString().getBytes(StandardCharsets.UTF_8));
-        }
-
-        int code = conn.getResponseCode();
-        if (code < 200 || code >= 300) {
-            String err = readStream(conn.getErrorStream());
-            throw new RuntimeException("HTTP " + code + (err.isEmpty() ? "" : ": " + err));
-        }
-
-        String raw = readStream(conn.getInputStream());
-        conn.disconnect();
-
-        JSONObject resp = new JSONObject(raw);
-        JSONArray candidates = resp.optJSONArray("candidates");
-        if (candidates == null || candidates.length() == 0) {
-            throw new RuntimeException("no candidates: " + raw);
-        }
-        JSONObject content = candidates.getJSONObject(0).optJSONObject("content");
-        if (content == null) throw new RuntimeException("no content: " + raw);
-        JSONArray parts = content.optJSONArray("parts");
-        StringBuilder contentBuf = new StringBuilder();
-        if (parts != null) {
-            for (int i = 0; i < parts.length(); i++) {
-                JSONObject part = parts.getJSONObject(i);
-                if (part.has("text")) contentBuf.append(part.getString("text"));
-            }
-        }
-        String text = contentBuf.toString();
-        Log.d(TAG, "raw Gemini content (" + text.length() + " chars): " + text);
-        return stripReasoning(text).trim();
-    }
-
     /** Cap on the longest side of saved output, preserving aspect. */
     private static final int MAX_OUTPUT_SIDE_PX = 512;
 
@@ -533,41 +491,6 @@ public class TurtleAiClient implements AiClient {
         return null;
     }
 
-    /** Returns the first {@code inlineData} part as PNG bytes. */
-    private byte[] callGeminiImage(String prompt, String systemPrompt) throws Exception {
-        HttpURLConnection conn = (HttpURLConnection) new URL(GEMINI_IMAGE_URL).openConnection();
-        conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
-        conn.setReadTimeout(READ_TIMEOUT_MS);
-        conn.setRequestMethod("POST");
-        conn.setRequestProperty("Content-Type", "application/json");
-        conn.setRequestProperty("Accept", "application/json");
-        conn.setRequestProperty("X-goog-api-key", GEMINI_API_KEY);
-        conn.setDoOutput(true);
-
-        JSONObject sysInstruction = new JSONObject().put("parts",
-                new JSONArray().put(new JSONObject().put("text", systemPrompt)));
-        JSONObject userPart = new JSONObject().put("text", prompt);
-        JSONObject userTurn = new JSONObject()
-                .put("parts", new JSONArray().put(userPart));
-        JSONObject body = new JSONObject()
-                .put("systemInstruction", sysInstruction)
-                .put("contents", new JSONArray().put(userTurn));
-
-        try (OutputStream os = conn.getOutputStream()) {
-            os.write(body.toString().getBytes(StandardCharsets.UTF_8));
-        }
-
-        int code = conn.getResponseCode();
-        if (code < 200 || code >= 300) {
-            String err = readStream(conn.getErrorStream());
-            throw new RuntimeException("HTTP " + code + (err.isEmpty() ? "" : ": " + err));
-        }
-
-        String raw = readStream(conn.getInputStream());
-        conn.disconnect();
-        return decodeImagePart(raw);
-    }
-
     /** Loads locally-cached reference selfies; drops entries whose file is gone. */
     private List<ReferenceImage> readDriveReferencePhotos() {
         KeyValueStore store = new SharedPrefsKeyValueStore(
@@ -607,123 +530,6 @@ public class TurtleAiClient implements AiClient {
         }
     }
 
-    /** Sends every reference selfie inline plus the scenario prompt; image parts precede the text part. */
-    private byte[] callGeminiImageUs(String prompt, List<ReferenceImage> refs, String systemPrompt) throws Exception {
-        HttpURLConnection conn = (HttpURLConnection) new URL(GEMINI_IMAGE_URL).openConnection();
-        conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
-        conn.setReadTimeout(READ_TIMEOUT_MS);
-        conn.setRequestMethod("POST");
-        conn.setRequestProperty("Content-Type", "application/json");
-        conn.setRequestProperty("Accept", "application/json");
-        conn.setRequestProperty("X-goog-api-key", GEMINI_API_KEY);
-        conn.setDoOutput(true);
-
-        JSONArray parts = new JSONArray();
-        for (ReferenceImage ref : refs) {
-            String b64 = android.util.Base64.encodeToString(ref.bytes, android.util.Base64.NO_WRAP);
-            JSONObject inline = new JSONObject().put("mimeType", ref.mime).put("data", b64);
-            parts.put(new JSONObject().put("inlineData", inline));
-        }
-        parts.put(new JSONObject().put("text", prompt));
-
-        JSONObject userTurn = new JSONObject().put("parts", parts);
-        JSONObject sysInstruction = new JSONObject().put("parts",
-                new JSONArray().put(new JSONObject().put("text", systemPrompt)));
-        JSONObject body = new JSONObject()
-                .put("systemInstruction", sysInstruction)
-                .put("contents", new JSONArray().put(userTurn));
-
-        try (OutputStream os = conn.getOutputStream()) {
-            os.write(body.toString().getBytes(StandardCharsets.UTF_8));
-        }
-
-        int code = conn.getResponseCode();
-        if (code < 200 || code >= 300) {
-            String err = readStream(conn.getErrorStream());
-            throw new RuntimeException("HTTP " + code + (err.isEmpty() ? "" : ": " + err));
-        }
-        String raw = readStream(conn.getInputStream());
-        conn.disconnect();
-        return decodeImagePart(raw);
-    }
-
-    /** Image-first edit request; the trailing text part is the edit instruction. */
-    private byte[] callGeminiImageEdit(byte[] imageBytes, String mime, String prompt)
-            throws Exception {
-        HttpURLConnection conn = (HttpURLConnection) new URL(GEMINI_IMAGE_URL).openConnection();
-        conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
-        conn.setReadTimeout(READ_TIMEOUT_MS);
-        conn.setRequestMethod("POST");
-        conn.setRequestProperty("Content-Type", "application/json");
-        conn.setRequestProperty("Accept", "application/json");
-        conn.setRequestProperty("X-goog-api-key", GEMINI_API_KEY);
-        conn.setDoOutput(true);
-
-        String b64 = android.util.Base64.encodeToString(imageBytes, android.util.Base64.NO_WRAP);
-        JSONObject inline = new JSONObject().put("mimeType", mime).put("data", b64);
-        JSONObject imagePart = new JSONObject().put("inlineData", inline);
-        JSONObject textPart = new JSONObject().put("text", prompt);
-        JSONObject userTurn = new JSONObject()
-                .put("parts", new JSONArray().put(imagePart).put(textPart));
-        JSONObject sysInstruction = new JSONObject().put("parts",
-                new JSONArray().put(new JSONObject().put("text", systemPromptFor("edit"))));
-        JSONObject body = new JSONObject()
-                .put("systemInstruction", sysInstruction)
-                .put("contents", new JSONArray().put(userTurn));
-
-        try (OutputStream os = conn.getOutputStream()) {
-            os.write(body.toString().getBytes(StandardCharsets.UTF_8));
-        }
-
-        int code = conn.getResponseCode();
-        if (code < 200 || code >= 300) {
-            String err = readStream(conn.getErrorStream());
-            throw new RuntimeException("HTTP " + code + (err.isEmpty() ? "" : ": " + err));
-        }
-        String raw = readStream(conn.getInputStream());
-        conn.disconnect();
-        return decodeImagePart(raw);
-    }
-
-    /** First inlineData entry (camelCase or snake_case) in {@code candidates[0].content.parts}. */
-    private static byte[] decodeImagePart(String raw) throws Exception {
-        JSONObject resp = new JSONObject(raw);
-        JSONArray candidates = resp.optJSONArray("candidates");
-        if (candidates == null || candidates.length() == 0) {
-            throw new RuntimeException("no candidates: " + raw);
-        }
-        JSONObject content = candidates.getJSONObject(0).optJSONObject("content");
-        if (content == null) throw new RuntimeException("no content: " + raw);
-        JSONArray parts = content.optJSONArray("parts");
-        if (parts == null) throw new RuntimeException("no parts: " + raw);
-        for (int i = 0; i < parts.length(); i++) {
-            JSONObject part = parts.getJSONObject(i);
-            JSONObject inline = part.optJSONObject("inlineData");
-            if (inline == null) inline = part.optJSONObject("inline_data");
-            if (inline != null && inline.has("data")) {
-                return android.util.Base64.decode(
-                        inline.getString("data"), android.util.Base64.DEFAULT);
-            }
-        }
-        throw new RuntimeException("no image part in response");
-    }
-
-    private static String readStream(InputStream in) throws IOException {
-        if (in == null) return "";
-        StringBuilder sb = new StringBuilder();
-        try (BufferedReader br = new BufferedReader(
-                new InputStreamReader(in, StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = br.readLine()) != null) sb.append(line);
-        }
-        return sb.toString();
-    }
-
-    /** Strips a leading {@code <think>…</think>} reasoning block if present. */
-    private static String stripReasoning(String s) {
-        int end = s.lastIndexOf("</think>");
-        return end >= 0 ? s.substring(end + "</think>".length()) : s;
-    }
 
     /** Strips ```html … ``` fences models often wrap output in. */
     private static String stripCodeFences(String s) {

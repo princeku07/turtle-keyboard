@@ -4,20 +4,19 @@ import android.content.Context;
 import android.os.SystemClock;
 import android.util.Log;
 
+import com.prince.turtlekeyboard.suggest.dafsa.DafsaDict;
 import com.prince.turtlekeyboard.suggest.symspell.SuggestItem;
 import com.prince.turtlekeyboard.suggest.symspell.SymSpell;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Facade over the vendored SymSpell engine and the per-user word store.
@@ -33,6 +32,7 @@ public final class SuggestionEngine {
 
     private static final String TAG = "TurtleSuggest";
     private static final String DICT_ASSET = "dict/en_unigrams.txt";
+    private static final String DAWG_ASSET = "dict/en.dawg";
 
     private static final int INITIAL_CAPACITY = 82_000;
     /** Distance 1 only — distance 2 over 82k words OOMs against the 256MB IME heap. */
@@ -43,12 +43,20 @@ public final class SuggestionEngine {
 
     private final UserWordStore userStore;
     private volatile SymSpell symSpell;
-    /** Dictionary words sorted by frequency descending, used for prefix completion. */
-    private volatile String[] sortedWords;
+    /** mmapped DAFSA used for prefix completion (best-first, O(prefix + K)). */
+    private volatile DafsaDict dafsa;
     private volatile boolean ready;
     private volatile boolean loading;
     /** Fired once when the bundled dictionary finishes loading. */
     private volatile Runnable onReadyListener;
+    /** Owns the load thread so {@link #shutdown()} can stop it cleanly when the
+     *  IME is destroyed mid-load (e.g. focus bounce during first-run onboarding). */
+    private final ExecutorService loadExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "TurtleSuggestLoad");
+        t.setPriority(Thread.MIN_PRIORITY);
+        t.setDaemon(true);
+        return t;
+    });
 
     public SuggestionEngine(Context ctx) {
         this.userStore = new UserWordStore(ctx);
@@ -73,20 +81,29 @@ public final class SuggestionEngine {
         if (ready || loading) return;
         loading = true;
         final Context appCtx = ctx.getApplicationContext();
-        Thread t = new Thread(() -> {
+        loadExecutor.execute(() -> {
             long t0 = SystemClock.elapsedRealtime();
             try {
-                // Phase 1: prefix completion ships first so the strip populates
-                // before the slower SymSpell index finishes.
-                sortedWords = loadSortedWords(appCtx);
-                ready = true;
-                Log.i(TAG, "prefix completion ready in "
-                        + (SystemClock.elapsedRealtime() - t0) + "ms");
-                Runnable cb = onReadyListener;
-                if (cb != null) cb.run();
+                // Phase 1: mmap the DAFSA — no parse, no allocation per word.
+                // Cold cost is the mmap call itself (~1ms) plus the OS paging in
+                // touched bytes on first lookup; the asset is uncompressed in the
+                // APK (aaptOptions { noCompress("dawg") }) so this maps directly.
+                dafsa = DafsaDict.openFromAsset(appCtx, DAWG_ASSET);
+                if (dafsa != null) {
+                    ready = true;
+                    Log.i(TAG, "dafsa ready in "
+                            + (SystemClock.elapsedRealtime() - t0) + "ms ("
+                            + dafsa.nodeCount() + " nodes)");
+                    Runnable cb = onReadyListener;
+                    if (cb != null) cb.run();
+                } else {
+                    Log.w(TAG, "dafsa missing — prefix completion will be empty");
+                }
 
-                // Phase 2: SymSpell edit-distance index. OOM here degrades to
-                // prefix-only instead of killing the IME.
+                // Phase 2: SymSpell edit-distance index for typo correction.
+                // Still reads the text unigrams asset; DAFSA replaces only the
+                // prefix-completion path. OOM here degrades to prefix-only
+                // instead of killing the IME.
                 try {
                     SymSpell s = new SymSpell(
                             INITIAL_CAPACITY, MAX_EDIT_DISTANCE,
@@ -106,9 +123,7 @@ public final class SuggestionEngine {
             } finally {
                 loading = false;
             }
-        }, "TurtleSuggestLoad");
-        t.setPriority(Thread.MIN_PRIORITY);
-        t.start();
+        });
     }
 
     /**
@@ -155,49 +170,11 @@ public final class SuggestionEngine {
         return new ArrayList<>(out);
     }
 
-    /** Linear scan of the frequency-sorted dictionary for entries starting with {@code prefix}. */
+    /** Top-K prefix completions via the DAFSA. Empty until the DAFSA is mmapped. */
     private List<String> prefixComplete(String prefix, int max) {
-        String[] dict = sortedWords;
-        if (dict == null || prefix.isEmpty() || max <= 0) {
-            return Collections.emptyList();
-        }
-        List<String> out = new ArrayList<>(max);
-        for (int i = 0; i < dict.length; i++) {
-            if (dict[i].startsWith(prefix)) {
-                out.add(dict[i]);
-                if (out.size() >= max) break;
-            }
-        }
-        return out;
-    }
-
-    /** Returns the bundled dictionary words sorted by frequency descending. */
-    private static String[] loadSortedWords(Context appCtx) throws IOException {
-        // Each line is "<word><space><frequency>".
-        ArrayList<String> words = new ArrayList<>(82_000);
-        ArrayList<Long> freqs = new ArrayList<>(82_000);
-        try (BufferedReader br = new BufferedReader(new InputStreamReader(
-                appCtx.getAssets().open(DICT_ASSET), StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = br.readLine()) != null) {
-                int sp = line.indexOf(' ');
-                if (sp <= 0 || sp >= line.length() - 1) continue;
-                long freq;
-                try {
-                    freq = Long.parseLong(line.substring(sp + 1));
-                } catch (NumberFormatException e) {
-                    continue;
-                }
-                words.add(line.substring(0, sp));
-                freqs.add(freq);
-            }
-        }
-        Integer[] idx = new Integer[words.size()];
-        for (int i = 0; i < idx.length; i++) idx[i] = i;
-        Arrays.sort(idx, (a, b) -> Long.compare(freqs.get(b), freqs.get(a)));
-        String[] sorted = new String[idx.length];
-        for (int i = 0; i < idx.length; i++) sorted[i] = words.get(idx[i]);
-        return sorted;
+        DafsaDict d = dafsa;
+        if (d == null) return Collections.emptyList();
+        return d.completions(prefix, max);
     }
 
     /**
@@ -219,5 +196,18 @@ public final class SuggestionEngine {
     /** Wipes personal vocabulary; the bundled dictionary is unaffected. */
     public void resetUserVocabulary() {
         userStore.clear();
+    }
+
+    /** Persist any in-memory bumps that haven't reached disk yet. Cheap when
+     *  there's nothing pending — safe to call on focus-out. */
+    public void flush() {
+        userStore.flush();
+    }
+
+    /** Flush + tear down both background executors (load thread + user-word IO).
+     *  Call from {@code InputMethodService.onDestroy}. */
+    public void shutdown() {
+        userStore.shutdown();
+        loadExecutor.shutdown();
     }
 }

@@ -12,6 +12,7 @@ import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.InputType;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.HapticFeedbackConstants;
 import android.view.View;
@@ -71,6 +72,7 @@ import com.prince.turtlekeyboard.voice.VoiceInputController;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 /**
  * Thin IME orchestrator. Wires the bound view to a {@link KeyboardController}, routes
@@ -101,6 +103,37 @@ public class TurtleInputMethodService extends InputMethodService
     private SuggestionEngine suggestionEngine;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final ExecutorService bitmapIo = Executors.newSingleThreadExecutor();
+    /** Background thread for the per-keystroke suggest pipeline. Daemon + MIN_PRIORITY
+     *  so it never preempts the IME's input dispatch. */
+    private final ExecutorService suggestionExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "TurtleSuggest");
+        t.setPriority(Thread.MIN_PRIORITY);
+        t.setDaemon(true);
+        return t;
+    });
+    /** Incremented on every refresh request; the background callback drops its result
+     *  if the value moved on while it was computing — keeps the strip in sync with
+     *  the latest keystroke under fast typing without a queue blowout. */
+    private int suggestionVersion;
+    @Nullable private Future<?> pendingSuggestionFuture;
+    /** Cached InputType flags (CAP_SENTENCES / CAP_WORDS / CAP_CHARACTERS) for the
+     *  currently-bound editor. Drives the auto-cap shift decision in
+     *  {@link #updateAutoCap(CharSequence)}. */
+    private int autoCapMode;
+    /** Active editor action (IME_ACTION_SEARCH / SEND / GO / NEXT / DONE / PREVIOUS),
+     *  or 0 when the field expects a plain newline. Set on every onStartInputView. */
+    private int editorAction;
+    /** Tracks consecutive DELETE keys during a single hold. Past
+     *  {@link #DELETE_CHARS_BEFORE_WORD_MODE} repeats we switch from char-delete
+     *  to whole-word delete so long backspaces don't crawl character-by-character.
+     *  Reset on every fresh DELETE press in {@link #onPress(int)}. */
+    private int deleteRepeatCount;
+    private static final int DELETE_CHARS_BEFORE_WORD_MODE = 5;
+    /** Per-package Drawable cache. {@link android.content.pm.PackageManager#getApplicationIcon}
+     *  is 5–15ms; we'd previously pay that on every focus change for enrolled apps and on
+     *  every enrollment-banner consideration for unknown apps. */
+    private final java.util.Map<String, android.graphics.drawable.Drawable> iconCache =
+            new java.util.HashMap<>();
     // SPI image-pick routing: each pickImage() allocates an id and parks its callback here.
     private final java.util.concurrent.atomic.AtomicInteger pickerReqIds =
             new java.util.concurrent.atomic.AtomicInteger(0);
@@ -108,6 +141,11 @@ public class TurtleInputMethodService extends InputMethodService
             pickerCallbacks = new java.util.concurrent.ConcurrentHashMap<>();
     private ThemeManager themes;
     private AudioManager audio;
+    /** Single Prefs instance held by the service so onPress and friends don't allocate
+     *  a fresh wrapper on each access. The underlying SharedPreferences read is a
+     *  HashMap lookup — cheap enough that toggling sound/haptics in settings takes
+     *  effect on the next keypress, no focus bounce required. */
+    private Prefs prefs;
     private KeyPreviewPopup preview;
     private KeyboardView keyboardView;
     private VoiceInputController voice;
@@ -159,6 +197,7 @@ public class TurtleInputMethodService extends InputMethodService
     @Override
     public void onCreate() {
         super.onCreate();
+        prefs = new Prefs(this);
         // Start dictionary load on service create (not view inflate) for a populated first strip.
         suggestionEngine = new SuggestionEngine(this);
         suggestionEngine.loadAsync(this);
@@ -173,8 +212,15 @@ public class TurtleInputMethodService extends InputMethodService
         root = (KeyboardRootView) View.inflate(this, R.layout.keyboard_view, null);
 
         KeyboardView kv = root.keyboardView();
+        // Stale activeInputTarget from a prior view tree would silently swallow DELETE.
+        activeInputTarget = null;
+        activeEmojiPanel = null;
+        aiAssistPanel = null;
         keyAreaPanel = new com.prince.turtlekeyboard.ime.view.PanelSlot(
                 root.quickPanelHost(), kv);
+        // Panels removed by replacement (or hide) don't run their own exit-input-mode
+        // path, so their input target reference would leak — clear it on every unmount.
+        keyAreaPanel.setOnUnmount(() -> activeInputTarget = null);
         keyboard = new KeyboardController(this);
         keyboard.attach(kv);
         shift = new ShiftController();
@@ -190,7 +236,9 @@ public class TurtleInputMethodService extends InputMethodService
                         ? KeyboardController.Layout.QWERTY
                         : KeyboardController.Layout.DIALPAD;
                 keyboard.setLayout(target);
-                kv.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+                if (prefs == null || prefs.getBool(Prefs.KEY_HAPTICS, true)) {
+                    kv.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+                }
             });
         }
         keyboardView = kv;
@@ -288,16 +336,24 @@ public class TurtleInputMethodService extends InputMethodService
         root.cmdSuggestions().setOnPickListener(this::onCommandSuggestionPicked);
         root.cmdSuggestions().setOnDismissListener(this::dismissCommandSuggestions);
 
-        Prefs prefs = new Prefs(this);
         appProfiles = new PersistentAppProfileRegistry(getApplicationContext(), prefs.root());
         // User pins outrank built-in affinity defaults in the registry ranker.
         registry.setPins(new UserCommandPins(prefs.root().scoped("pins")));
         if (integrations != null) { integrations.shutdown(); integrations = null; }
         if (aiClient != null) { aiClient.destroy(); aiClient = null; }
-        TurtleAiClient ai = new TurtleAiClient(this, hostProvider, stagingPipeline(), new StubAiClient());
+        // GeminiService is the single AI seam; MOCK_AI swaps the live client
+        // for MockGeminiService so /sticker, /gif, /gift, /cap and /edit all
+        // hit the bundled gg.png fixture without burning Gemini quota. Same
+        // instance flows into both the integrations (via IntegrationContext)
+        // and TurtleAiClient (constructor) so one toggle covers every path.
+        com.prince.kbd.core.GeminiService gemini =
+                com.prince.turtlekeyboard.BuildConfig.MOCK_AI
+                        ? new com.prince.turtlekeyboard.ai.MockGeminiService(this)
+                        : new com.prince.ai.GeminiClient(
+                                com.prince.turtlekeyboard.BuildConfig.GEMINI_API_KEY);
+        TurtleAiClient ai = new TurtleAiClient(
+                this, hostProvider, stagingPipeline(), gemini, new StubAiClient());
         aiClient = ai;
-        com.prince.kbd.core.GeminiService gemini = new com.prince.ai.GeminiClient(
-                com.prince.turtlekeyboard.BuildConfig.GEMINI_API_KEY);
         com.prince.kbd.core.McpService mcp = new com.prince.ai.McpClient();
         com.prince.kbd.core.GoogleAuth googleAuth = new com.prince.kbd.core.GoogleAuthImpl(
                 getApplicationContext(), prefs.root().scoped("google"));
@@ -411,9 +467,27 @@ public class TurtleInputMethodService extends InputMethodService
         inputViewVisible = true;
         keyboard.setLayout(KeyboardController.Layout.QWERTY);
         shift.reset();
+        syncCapsLockIndicator();
         root.banner().clear();
         root.preview().hide();
+        // Re-opening the keyboard always lands on the keys. The IME service reuses
+        // the inflated view across focus cycles, so any panel the user left open
+        // (Quick / Emoji / History / MoreActions / AI assist) persists into the
+        // next editor unless we explicitly dismiss it here.
+        if (isAiAssistPanelVisible()) hideAiAssistPanel();
+        if (keyAreaPanel != null) keyAreaPanel.hide();
+        activeEmojiPanel = null;
+        activeInputTarget = null;
         currentPkg = info == null ? null : info.packageName;
+        autoCapMode = info == null ? 0 : (info.inputType
+                & (InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+                | InputType.TYPE_TEXT_FLAG_CAP_WORDS
+                | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS));
+        editorAction = computeEditorAction(info);
+        if (keyboardView instanceof TurtleKeyboardView) {
+            ((TurtleKeyboardView) keyboardView).setEditorAction(editorAction);
+        }
+        updateAutoCapFromHost();
         logHostContext(info);
         if (integrations != null) {
             integrations.onInputStart(info);
@@ -498,7 +572,6 @@ public class TurtleInputMethodService extends InputMethodService
 
     /** Round-robin through the available themes; re-applies immediately. */
     private void cycleTheme() {
-        Prefs prefs = new Prefs(this);
         String current = prefs.getString(Prefs.KEY_THEME,
                 com.prince.turtlekeyboard.theme.ThemeManager.AUTO);
         String next;
@@ -522,6 +595,8 @@ public class TurtleInputMethodService extends InputMethodService
         hideEnrollmentBanner();
         if (root != null && root.hostAppBadge() != null) root.hostAppBadge().hide();
         if (isAiAssistPanelVisible()) hideAiAssistPanel();
+        // Persist accrued user-word bumps before the IME backgrounds.
+        if (suggestionEngine != null) suggestionEngine.flush();
     }
 
     // onWindowShown/Hidden is the ground truth for keyboard-on-screen; onFinishInputView misses some app-switch cases.
@@ -546,24 +621,68 @@ public class TurtleInputMethodService extends InputMethodService
             integrations.onTextChanged(committer.textBeforeCursor(16), committer.textAfterCursor(16));
         }
         refreshSparkleVisibility();
+        // Cursor moved (tap-to-position, host-side edit, paste) — re-evaluate auto-cap
+        // against the new context. getCapsMode + 64-char IPC is sub-ms, no need to debounce.
+        updateAutoCapFromHost();
     }
 
-    /** Shows the ✨ AI-assist trigger when the field has >1 word. Visibility is purely
-     *  field-driven so opening/closing the assist panel never re-lays out the strip. */
+    /** Debounce for the cursor-driven sparkle visibility check. 200 ms is below user
+     *  perception for a static icon and collapses bursty {@code onUpdateSelection}
+     *  storms (cursor scrubbing, IME-driven recompositions) into one IPC. */
+    private static final long SPARKLE_DEBOUNCE_MS = 200L;
+    private final Runnable sparkleRunnable = this::applySparkleVisibility;
+
+    /** Shows the ✨ AI-assist trigger when the field has >1 word. Debounced — fires
+     *  one IPC after the cursor has been still for {@link #SPARKLE_DEBOUNCE_MS}. */
     private void refreshSparkleVisibility() {
+        mainHandler.removeCallbacks(sparkleRunnable);
+        mainHandler.postDelayed(sparkleRunnable, SPARKLE_DEBOUNCE_MS);
+    }
+
+    private void applySparkleVisibility() {
         if (root == null || committer == null) return;
-        CharSequence before = committer.textBeforeCursor(200);
-        CharSequence after = committer.textAfterCursor(200);
-        String combined = (before == null ? "" : before.toString())
-                + (after == null ? "" : after.toString());
-        String trimmed = combined.trim();
-        boolean hasMultipleWords = !trimmed.isEmpty() && trimmed.split("\\s+").length > 1;
-        root.strip().setSparkleVisible(hasMultipleWords);
+        CharSequence before = committer.textBeforeCursor(64);
+        CharSequence after = committer.textAfterCursor(64);
+        root.strip().setSparkleVisible(hasTwoWords(before, after));
+    }
+
+    /** True once a second word-character is found across {@code before + after}.
+     *  Short-circuits on the second boundary so a long field doesn't pay for a
+     *  full scan. Cheaper than {@code String.split("\\s+")} which allocates a
+     *  regex, an array, and walks the whole string. */
+    private static boolean hasTwoWords(CharSequence before, CharSequence after) {
+        int words = 0;
+        boolean inWord = false;
+        if (before != null) {
+            for (int i = 0; i < before.length(); i++) {
+                char c = before.charAt(i);
+                if (Character.isWhitespace(c)) {
+                    if (inWord) { words++; if (words >= 2) return true; inWord = false; }
+                } else {
+                    inWord = true;
+                }
+            }
+        }
+        if (after != null) {
+            for (int i = 0; i < after.length(); i++) {
+                char c = after.charAt(i);
+                if (Character.isWhitespace(c)) {
+                    if (inWord) { words++; if (words >= 2) return true; inWord = false; }
+                } else {
+                    inWord = true;
+                }
+            }
+        }
+        if (inWord) words++;
+        return words >= 2;
     }
 
     @Override
     public void onKey(int primaryCode, int[] keyCodes) {
-        if (committer.connection() == null) return;
+        // Don't early-return on a null InputConnection: SHIFT, MODE_CHANGE, MIC, EMOJI
+        // and the composer/active-input-target paths are all IC-independent, and the
+        // IC-using paths (commit/backspace/sendEnter) already null-guard internally.
+        // The old early return silently dropped panel toggles during focus transitions.
 
         // Whatever component currently owns the input (AI prompt field, emoji search, …)
         // gets printable keys + DELETE + DONE. SHIFT/MODE_CHANGE fall through so the user
@@ -596,19 +715,43 @@ public class TurtleInputMethodService extends InputMethodService
 
         switch (primaryCode) {
             case Keycodes.DELETE:
-                committer.backspace();
+                deleteRepeatCount++;
+                if (deleteRepeatCount > DELETE_CHARS_BEFORE_WORD_MODE) {
+                    deletePreviousWord();
+                } else {
+                    committer.backspace();
+                }
                 refreshSuggestions();
+                // Deleting back across ". " or to start of input changes the auto-cap context.
+                updateAutoCapFromHost();
                 break;
             case Keycodes.SHIFT:
-                if (keyboard.isQwerty()) shift.onShiftPress();
-                else keyboard.toggleSymbolShift();
+                if (keyboard.isQwerty()) {
+                    shift.onShiftPress();
+                    syncCapsLockIndicator();
+                } else keyboard.toggleSymbolShift();
                 break;
             case Keycodes.DONE:
-                committer.sendEnter();
+                if (editorAction != 0) {
+                    // Field declared a specific action (Search / Send / Go / etc.) — submit
+                    // through the proper API instead of synthesizing KEYCODE_ENTER. Some
+                    // editors (Hinge, login forms) ignore the synthesized key.
+                    InputConnection ic = getCurrentInputConnection();
+                    if (ic != null) ic.performEditorAction(editorAction);
+                    else committer.sendEnter();
+                } else {
+                    committer.sendEnter();
+                }
                 break;
             case Keycodes.MODE_CHANGE:
                 keyboard.toggleLetterSymbol();
-                if (keyboard.isQwerty()) shift.reapply();
+                if (keyboard.isQwerty()) {
+                    shift.reapply();
+                    // Coming back to QWERTY at a sentence start (e.g. user typed a
+                    // digit, switched back) should re-shift, since shift.reapply()
+                    // only restores caps-lock.
+                    updateAutoCapFromHost();
+                }
                 break;
             case Keycodes.SLASH:
                 if (!composer.isActive() && atWordBoundary()) {
@@ -1019,17 +1162,77 @@ public class TurtleInputMethodService extends InputMethodService
         // No auto-correction on space; suggestions only apply on chip tap.
         committer.commitChar(c);
         if (code == Keycodes.SPACE) spaceGesture.onSpacePressed();
-        if (!Character.isLetter(c)) maybeLearnLastWord();
+        // Single IPC shared between learner, slash detector, and suggestion refresh.
+        // 200 chars is the slash-detector window (largest of the three); learner and
+        // refresh only consult the trailing portion so the extra bytes cost nothing.
+        final CharSequence before = committer.textBeforeCursor(200);
+        if (!Character.isLetter(c)) maybeLearnLastWord(before);
         shift.onCharCommitted();
-        slashDetector.onTextChanged();
-        refreshSuggestions();
+        slashDetector.onTextChanged(c, before);
+        refreshSuggestions(before);
+        // After a sentence terminator + space we want the next letter shifted.
+        // shift.onCharCommitted() already unshifted; auto-cap re-shifts if the new
+        // text-before-cursor is at a sentence/word/document start.
+        updateAutoCap(before);
+    }
+
+    /** Returns the action ID the Enter key should perform, or 0 if the field
+     *  expects a plain newline (multi-line text, no declared action, or the
+     *  editor explicitly opted out via {@link EditorInfo#IME_FLAG_NO_ENTER_ACTION}). */
+    private static int computeEditorAction(@Nullable EditorInfo info) {
+        if (info == null) return 0;
+        if ((info.imeOptions & EditorInfo.IME_FLAG_NO_ENTER_ACTION) != 0) return 0;
+        int a = info.imeOptions & EditorInfo.IME_MASK_ACTION;
+        if (a == EditorInfo.IME_ACTION_UNSPECIFIED || a == EditorInfo.IME_ACTION_NONE) return 0;
+        return a;
+    }
+
+    /** Honours the editor's CAP_SENTENCES / CAP_WORDS / CAP_CHARACTERS flag by
+     *  shifting the keyboard at sentence/word/document starts. Never toggles
+     *  shift off — that's left to manual shift presses and the natural
+     *  per-letter unshift in {@link ShiftController#onCharCommitted()} — so
+     *  manual case overrides are preserved. */
+    private void updateAutoCap(@Nullable CharSequence before) {
+        if (autoCapMode == 0 || shift == null || shift.isCapsLock() || keyboardView == null) return;
+        if (!keyboard.isQwerty()) return;
+        if (before == null) return;
+        int caps = TextUtils.getCapsMode(before, before.length(), autoCapMode);
+        if (caps != 0 && !keyboardView.isShifted()) {
+            keyboardView.setShifted(true);
+        }
+    }
+
+    /** Mirrors {@link ShiftController}'s caps-lock state into the view so the
+     *  shift glyph swaps between ⇧ (sticky-off / shift-once) and ⇪ (sticky-on). */
+    private void syncCapsLockIndicator() {
+        if (shift != null && keyboardView instanceof TurtleKeyboardView) {
+            ((TurtleKeyboardView) keyboardView).setCapsLocked(shift.isCapsLock());
+        }
+    }
+
+    /** Deletes the run of whitespace immediately before the cursor (if any) plus
+     *  the word that precedes it. Single binder call. Matches Gboard's long-press
+     *  backspace cadence — eats "world|" → "" and "hello world |" → "hello ". */
+    private void deletePreviousWord() {
+        if (committer == null) return;
+        CharSequence before = committer.textBeforeCursor(64);
+        if (before == null || before.length() == 0) return;
+        int end = before.length();
+        while (end > 0 && Character.isWhitespace(before.charAt(end - 1))) end--;
+        while (end > 0 && !Character.isWhitespace(before.charAt(end - 1))) end--;
+        int n = before.length() - end;
+        if (n > 0) committer.deleteBeforeCursor(n);
+    }
+
+    /** Convenience for paths that haven't already snapshotted text-before-cursor. */
+    private void updateAutoCapFromHost() {
+        if (committer == null) return;
+        updateAutoCap(committer.textBeforeCursor(64));
     }
 
     /** Walks back from the cursor to the preceding word and feeds it to the suggestion engine. */
-    private void maybeLearnLastWord() {
-        if (suggestionEngine == null || committer == null) return;
-        CharSequence before = committer.textBeforeCursor(64);
-        if (before == null || before.length() == 0) return;
+    private void maybeLearnLastWord(CharSequence before) {
+        if (suggestionEngine == null || before == null || before.length() == 0) return;
         int end = before.length();
         while (end > 0 && Character.isWhitespace(before.charAt(end - 1))) end--;
         int start = end;
@@ -1103,7 +1306,7 @@ public class TurtleInputMethodService extends InputMethodService
                 for (int i = 0; i < text.length(); i++) composer.appendChar(text.charAt(i));
             } else {
                 committer.commitText(text);
-                slashDetector.onTextChanged();
+                slashDetector.onTextChanged(text.charAt(text.length() - 1));
                 refreshSuggestions();
             }
         }
@@ -1123,25 +1326,49 @@ public class TurtleInputMethodService extends InputMethodService
         stagingPipeline().setEditListener(null);
         stagingPipeline().setUsListener(null);
         com.prince.turtlekeyboard.ai.PickerResultBus.setListener(null);
-        if (suggestionEngine != null) suggestionEngine.setOnReadyListener(null);
+        if (suggestionEngine != null) {
+            suggestionEngine.setOnReadyListener(null);
+            suggestionEngine.shutdown();
+        }
         if (voice != null) { voice.destroy(); voice = null; }
         if (integrations != null) { integrations.shutdown(); integrations = null; }
         if (aiClient != null) { aiClient.destroy(); aiClient = null; }
         if (onDeviceAi != null) { onDeviceAi.destroy(); onDeviceAi = null; }
         bitmapIo.shutdown();
+        suggestionExecutor.shutdown();
         super.onDestroy();
     }
 
     private void refreshSuggestions() {
+        refreshSuggestions(null);
+    }
+
+    /** Overload for emitChar's path where the IPC has already been done — passes
+     *  {@code before} through so we don't pay a second binder roundtrip. Callers
+     *  outside the emit hot path can call the no-arg variant and we'll fetch. */
+    private void refreshSuggestions(@Nullable CharSequence before) {
         // Prompt buffer never reaches the host; use the prompt-context path so suggestions track the panel.
+        // Prompt path stays synchronous — input is local, no IPC, and the panel is already in compose mode.
         if (composer != null && composer.isActive()
                 && composer.mode() == com.prince.turtlekeyboard.command.CommandComposer.Mode.PROMPT) {
             refreshPromptSuggestions(composer.query(), composer.promptCursor());
             return;
         }
         if (suggestionProvider == null || committer == null || root == null) return;
-        List<String> list = suggestionProvider.suggest(committer.textBeforeCursor(64));
-        root.strip().setSuggestions(list);
+        // IPC stays on main thread (InputConnection is owned here); the suggest pipeline
+        // (DAFSA walk + SymSpell lookup) moves to a background executor so the key path
+        // doesn't pay 2–7ms per keystroke at sustained typing speed.
+        final int version = ++suggestionVersion;
+        final CharSequence snapshot = before != null ? before : committer.textBeforeCursor(64);
+        final SuggestionProvider provider = suggestionProvider;
+        if (pendingSuggestionFuture != null) pendingSuggestionFuture.cancel(false);
+        pendingSuggestionFuture = suggestionExecutor.submit(() -> {
+            final List<String> list = provider.suggest(snapshot);
+            mainHandler.post(() -> {
+                if (version != suggestionVersion || root == null) return;
+                root.strip().setSuggestions(list);
+            });
+        });
     }
 
     /** Sibling of refreshSuggestions that reads from the composer buffer instead of the host editor. */
@@ -1213,12 +1440,7 @@ public class TurtleInputMethodService extends InputMethodService
         com.prince.kbd.core.AppProfile profile = appProfiles.get(pkg);
         if (profile == null) { hideEnrollmentBanner(); return; }
 
-        android.graphics.drawable.Drawable icon;
-        try {
-            icon = getApplicationContext().getPackageManager().getApplicationIcon(pkg);
-        } catch (android.content.pm.PackageManager.NameNotFoundException e) {
-            icon = null;
-        }
+        android.graphics.drawable.Drawable icon = appIcon(pkg);
         com.prince.turtlekeyboard.ime.view.AppEnrollmentBannerView b = root.enrollmentBanner();
         b.applyTheme(themes.current());
         b.show(icon, profile.displayName, new com.prince.turtlekeyboard.ime.view.AppEnrollmentBannerView.Listener() {
@@ -1252,14 +1474,26 @@ public class TurtleInputMethodService extends InputMethodService
             root.hostAppBadge().hide();
             return;
         }
+        android.graphics.drawable.Drawable icon = appIcon(pkg);
+        if (icon == null) { root.hostAppBadge().hide(); return; }
+        root.hostAppBadge().show(icon);
+    }
+
+    /** Cached PackageManager lookup. Result is held by package name for the IME
+     *  lifetime — drawables are bitmap-backed and a handful of enrolled apps
+     *  fits easily in memory. Returns null when the package isn't installed. */
+    @Nullable
+    private android.graphics.drawable.Drawable appIcon(String pkg) {
+        if (pkg == null) return null;
+        if (iconCache.containsKey(pkg)) return iconCache.get(pkg);
         android.graphics.drawable.Drawable icon;
         try {
             icon = getApplicationContext().getPackageManager().getApplicationIcon(pkg);
         } catch (android.content.pm.PackageManager.NameNotFoundException e) {
             icon = null;
         }
-        if (icon == null) { root.hostAppBadge().hide(); return; }
-        root.hostAppBadge().show(icon);
+        iconCache.put(pkg, icon);
+        return icon;
     }
 
     private static boolean isSystemPackage(String pkg) {
@@ -1277,7 +1511,10 @@ public class TurtleInputMethodService extends InputMethodService
     private void onDoubleTapSpace() {
         // emitChar already committed the two space chars; undo them.
         committer.deleteBeforeCursor(2);
-        slashDetector.onTextChanged();
+        CharSequence last = committer.textBeforeCursor(1);
+        if (last != null && last.length() > 0) {
+            slashDetector.onTextChanged(last.charAt(0));
+        }
         refreshSuggestions();
         if (isQuickPanelVisible()) {
             hideQuickPanel();
@@ -1705,11 +1942,16 @@ public class TurtleInputMethodService extends InputMethodService
     // ===== KeyboardView.OnKeyboardActionListener stubs =====
 
     @Override public void onPress(int primaryCode) {
-        if (root != null) {
+        // Reset on every fresh press so a single backspace tap can never inherit
+        // word-delete mode from a prior hold.
+        if (primaryCode == Keycodes.DELETE) deleteRepeatCount = 0;
+        boolean haptics = prefs == null || prefs.getBool(Prefs.KEY_HAPTICS, true);
+        boolean sound = prefs == null || prefs.getBool(Prefs.KEY_KEY_SOUND, true);
+        if (root != null && haptics) {
             root.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP,
                     HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
         }
-        if (audio != null) {
+        if (audio != null && sound) {
             int sfx;
             switch (primaryCode) {
                 case Keycodes.DELETE: sfx = AudioManager.FX_KEYPRESS_DELETE; break;

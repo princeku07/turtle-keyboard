@@ -13,7 +13,11 @@ public class Prefs {
 
     public static final String KEY_THEME = "theme";
     public static final String KEY_QUICK_PANEL_ENABLED = "quick_panel_enabled";
-    public static final String KEY_NUMBER_ROW = "number_row_enabled";
+    /** Keyboard tap sound on/off. Independent of the OS "touch sounds" toggle. */
+    public static final String KEY_KEY_SOUND = "key_sound_enabled";
+    /** Keyboard tap haptic on/off. Overrides the OS "touch feedback" toggle since
+     *  per-key feedback is fired with FLAG_IGNORE_GLOBAL_SETTING. */
+    public static final String KEY_HAPTICS = "haptics_enabled";
     public static final String KEY_AI_ENDPOINT = "ai_endpoint";
     public static final String KEY_AUTH_TOKEN = "auth_token";
     public static final String KEY_FEATURE_ONBOARDING_SHOWN = "feature_onboarding_shown";

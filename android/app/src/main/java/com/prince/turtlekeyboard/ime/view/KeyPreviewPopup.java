@@ -7,6 +7,8 @@ import android.inputmethodservice.Keyboard;
 import android.inputmethodservice.KeyboardView;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.SparseArray;
+import android.util.SparseIntArray;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
@@ -14,8 +16,6 @@ import android.widget.PopupWindow;
 import android.widget.TextView;
 
 import com.prince.turtlekeyboard.R;
-
-import java.util.List;
 
 /**
  * Custom key preview floating above the pressed key. Anchored in window
@@ -33,6 +33,12 @@ public class KeyPreviewPopup {
     private static final long LINGER_MS = 40L;
     private int shownPrimaryCode = Integer.MIN_VALUE;
     private final Handler main = new Handler(Looper.getMainLooper());
+    // Cache the active Keyboard's key-by-code lookup and per-code measured preview
+    // width so each press doesn't pay an O(n) scan + a TextView.measure() call.
+    // Rebuilt on Keyboard identity change (qwerty/symbols/dialpad swap).
+    private Keyboard cachedFor;
+    private final SparseArray<Keyboard.Key> keyByCode = new SparseArray<>();
+    private final SparseIntArray previewWidthByCode = new SparseIntArray();
     private final Runnable dismissRunnable = new Runnable() {
         @Override public void run() {
             if (window.isShowing()) window.dismiss();
@@ -66,8 +72,11 @@ public class KeyPreviewPopup {
     }
 
     public void show(KeyboardView kv, int primaryCode) {
-        if (kv == null || kv.getKeyboard() == null) return;
-        Keyboard.Key key = findKey(kv.getKeyboard().getKeys(), primaryCode);
+        if (kv == null) return;
+        Keyboard kb = kv.getKeyboard();
+        if (kb == null) return;
+        if (kb != cachedFor) rebuildCache(kb);
+        Keyboard.Key key = keyByCode.get(primaryCode);
         if (key == null || key.label == null) {
             dismissNow();
             return;
@@ -80,10 +89,14 @@ public class KeyPreviewPopup {
         }
 
         label.setText(key.label);
-        int wSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
-        int hSpec = View.MeasureSpec.makeMeasureSpec(previewHeightPx, View.MeasureSpec.EXACTLY);
-        label.measure(wSpec, hSpec);
-        int previewW = Math.max(label.getMeasuredWidth(), Math.max(minPreviewWidthPx, key.width));
+        int previewW = previewWidthByCode.get(primaryCode);
+        if (previewW <= 0) {
+            int wSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
+            int hSpec = View.MeasureSpec.makeMeasureSpec(previewHeightPx, View.MeasureSpec.EXACTLY);
+            label.measure(wSpec, hSpec);
+            previewW = Math.max(label.getMeasuredWidth(), Math.max(minPreviewWidthPx, key.width));
+            previewWidthByCode.put(primaryCode, previewW);
+        }
 
         int[] loc = new int[2];
         kv.getLocationInWindow(loc);
@@ -102,6 +115,15 @@ public class KeyPreviewPopup {
         shownPrimaryCode = primaryCode;
     }
 
+    private void rebuildCache(Keyboard kb) {
+        keyByCode.clear();
+        previewWidthByCode.clear();
+        for (Keyboard.Key k : kb.getKeys()) {
+            if (k.codes != null && k.codes.length > 0) keyByCode.put(k.codes[0], k);
+        }
+        cachedFor = kb;
+    }
+
     public void dismiss() {
         main.removeCallbacks(dismissRunnable);
         main.postDelayed(dismissRunnable, LINGER_MS);
@@ -111,13 +133,6 @@ public class KeyPreviewPopup {
         main.removeCallbacks(dismissRunnable);
         if (window.isShowing()) window.dismiss();
         shownPrimaryCode = Integer.MIN_VALUE;
-    }
-
-    private static Keyboard.Key findKey(List<Keyboard.Key> keys, int primaryCode) {
-        for (Keyboard.Key k : keys) {
-            if (k.codes != null && k.codes.length > 0 && k.codes[0] == primaryCode) return k;
-        }
-        return null;
     }
 
     private int dp(int v) {

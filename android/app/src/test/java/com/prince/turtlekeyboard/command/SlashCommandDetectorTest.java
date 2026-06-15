@@ -35,14 +35,14 @@ public class SlashCommandDetectorTest {
     @Test
     public void fires_on_known_command_terminated_by_space() {
         committer.before = "/cap ";
-        detector.onTextChanged();
+        detector.onTextChanged(' ');
         assertEquals("cap", fired.name);
     }
 
     @Test
     public void fires_when_command_is_mid_sentence_after_whitespace() {
         committer.before = "hey /cap ";
-        detector.onTextChanged();
+        detector.onTextChanged(' ');
         assertEquals("cap", fired.name);
     }
 
@@ -50,21 +50,21 @@ public class SlashCommandDetectorTest {
     public void does_not_fire_on_mid_word_slash() {
         // Slash glued to preceding text (e.g. "http://") is not a command.
         committer.before = "http://cap ";
-        detector.onTextChanged();
+        detector.onTextChanged(' ');
         assertNull(fired);
     }
 
     @Test
     public void does_not_fire_for_unregistered_command() {
         committer.before = "/unknown ";
-        detector.onTextChanged();
+        detector.onTextChanged(' ');
         assertNull(fired);
     }
 
     @Test
     public void does_not_fire_without_terminator() {
         committer.before = "/cap";
-        detector.onTextChanged();
+        detector.onTextChanged('p');
         assertNull(fired);
     }
 
@@ -72,14 +72,14 @@ public class SlashCommandDetectorTest {
     public void does_not_fire_when_terminator_separated_by_newline() {
         // Newline between '/' and command breaks the token.
         committer.before = "/\ncap ";
-        detector.onTextChanged();
+        detector.onTextChanged(' ');
         assertNull(fired);
     }
 
     @Test
     public void empty_buffer_is_safe() {
         committer.before = "";
-        detector.onTextChanged();
+        detector.onTextChanged(' ');
         assertNull(fired);
     }
 }

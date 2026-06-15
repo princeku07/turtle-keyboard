@@ -14,11 +14,16 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
+import org.robolectric.annotation.Config;
 
 import java.util.ArrayList;
 import java.util.List;
 
+// Robolectric's default API level is 18; deleteSurroundingTextInCodePoints (API 24+)
+// isn't on the stub BaseInputConnection so the call throws NoSuchMethodError. Pin
+// to our minSdk so the method is present at runtime.
 @RunWith(RobolectricTestRunner.class)
+@Config(sdk = 24)
 public class InputCommitterTest {
 
     /** Recording IC that captures call sequence + lets tests seed text-around-cursor. */
@@ -47,6 +52,12 @@ public class InputCommitterTest {
             return true;
         }
         @Override public boolean deleteSurroundingText(int b, int a) {
+            calls.add("delete:" + b + "," + a);
+            return true;
+        }
+        @Override public boolean deleteSurroundingTextInCodePoints(int b, int a) {
+            // backspace() now prefers the codepoint variant (API 24+) so emoji-aware
+            // hosts delete a whole grapheme; mirror the same call format.
             calls.add("delete:" + b + "," + a);
             return true;
         }

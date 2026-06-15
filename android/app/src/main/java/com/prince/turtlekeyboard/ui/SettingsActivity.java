@@ -91,8 +91,27 @@ public class SettingsActivity extends AppCompatActivity {
     private void bindTyping() {
         configRow(R.id.row_autocorrect, "Autocorrect", "On", true);
         configRow(R.id.row_gesture, "Gesture typing", "Off", true);
-        configRow(R.id.row_sound, "Sound on keypress", "Off", true);
-        configRow(R.id.row_haptics, "Haptic feedback", "On", true);
+        boolRow(R.id.row_sound, "Sound on keypress", Prefs.KEY_KEY_SOUND, true);
+        boolRow(R.id.row_haptics, "Haptic feedback", Prefs.KEY_HAPTICS, true);
+    }
+
+    /** Live On/Off row backed by a boolean pref. Tap toggles and re-renders inline. */
+    private void boolRow(int id, String title, String prefKey, boolean defaultOn) {
+        View row = findViewById(id);
+        if (row == null) return;
+        ((TextView) row.findViewById(R.id.row_title)).setText(title);
+        row.findViewById(R.id.row_badge).setVisibility(View.GONE);
+        row.setAlpha(1f);
+        renderBoolRow(row, prefs.getBool(prefKey, defaultOn));
+        row.setOnClickListener(v -> {
+            boolean next = !prefs.getBool(prefKey, defaultOn);
+            prefs.putBool(prefKey, next);
+            renderBoolRow(row, next);
+        });
+    }
+
+    private static void renderBoolRow(View row, boolean on) {
+        ((TextView) row.findViewById(R.id.row_sub)).setText(on ? "On" : "Off");
     }
 
     private void bindVoice() {

@@ -11,6 +11,8 @@ import android.inputmethodservice.KeyboardView;
 import android.util.AttributeSet;
 import android.util.TypedValue;
 import android.view.HapticFeedbackConstants;
+import android.view.MotionEvent;
+import android.view.inputmethod.EditorInfo;
 
 import com.prince.turtlekeyboard.theme.KeyboardTheme;
 
@@ -41,7 +43,20 @@ public class TurtleKeyboardView extends KeyboardView {
     private final Paint hintPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint enterFillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint enterIconPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    /** Separate text paint for the Enter button's action label (Send / Search / etc.) —
+     *  keeps state isolated from {@link #labelPaint} so per-key painting doesn't have
+     *  to save/restore color and size around the action key. */
+    private final Paint enterLabelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF tmp = new RectF();
+    /** Active editor action (EditorInfo.IME_ACTION_*), or 0 for the default ↵ glyph. */
+    private int editorAction;
+    /** True when shift is sticky (double-tap caps-lock). Drives the ⇧ → ⇪ glyph swap
+     *  so the user can tell whether they're in shift-once or caps-lock at a glance. */
+    private boolean capsLocked;
+    /** Cached space key for {@link #biasSpaceHitZone(MotionEvent)} — refreshed on
+     *  Keyboard identity change. */
+    private Keyboard.Key cachedSpace;
+    private Keyboard cachedSpaceFor;
 
     private int keyFace = 0xFFFFFFFF;
     private int functionFace = 0xFFC8E8D5;
@@ -56,6 +71,12 @@ public class TurtleKeyboardView extends KeyboardView {
 
     public TurtleKeyboardView(Context context, AttributeSet attrs) {
         super(context, attrs);
+        // Framework default: getKeyIndices returns NOT_A_KEY for touches in row gaps,
+        // so onPress fires on DOWN (edge-of-key tolerance) but the UP no-ops — haptic
+        // without commit. Enabling proximity correction makes the framework fall back
+        // to the nearest key on UP, so taps "between n and space" land on whichever
+        // is closer instead of being dropped.
+        setProximityCorrectionEnabled(true);
         keyCornerPx = dp(8);
         keyInsetPx = dp(3);
         labelTextPx = sp(26);
@@ -75,6 +96,68 @@ public class TurtleKeyboardView extends KeyboardView {
         enterIconPaint.setStrokeCap(Paint.Cap.ROUND);
         enterIconPaint.setStrokeJoin(Paint.Join.ROUND);
         enterIconPaint.setStrokeWidth(dp(2.2f));
+
+        enterLabelPaint.setTextAlign(Paint.Align.CENTER);
+        enterLabelPaint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
+    }
+
+    /** Updates the glyph drawn on the Enter button. Pass an
+     *  {@code EditorInfo.IME_ACTION_*} value or 0 for the default ↵. */
+    public void setEditorAction(int actionId) {
+        if (editorAction == actionId) return;
+        editorAction = actionId;
+        invalidate();
+    }
+
+    /** Sets caps-lock state so the shift key shows ⇪ instead of ⇧. */
+    public void setCapsLocked(boolean locked) {
+        if (capsLocked == locked) return;
+        capsLocked = locked;
+        invalidate();
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent ev) {
+        int action = ev.getActionMasked();
+        if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_UP
+                || action == MotionEvent.ACTION_MOVE) {
+            biasSpaceHitZone(ev);
+        }
+        return super.onTouchEvent(ev);
+    }
+
+    /** Snaps touches in the small band directly above the space bar into space.
+     *  Framework proximity correction uses distance-to-center, which loses to row-3
+     *  keys whose centers are vertically closer than space's (deeper) center even
+     *  when the user clearly meant to hit the space bar. Bias band is slightly
+     *  wider than the row gap so thumbs that land 1–2 px inside the row above are
+     *  still forgiven. Only applied to space — other keys keep the default rule. */
+    private void biasSpaceHitZone(MotionEvent ev) {
+        Keyboard kb = getKeyboard();
+        if (kb == null) return;
+        if (kb != cachedSpaceFor) {
+            cachedSpace = null;
+            for (Keyboard.Key k : kb.getKeys()) {
+                if (k.codes != null && k.codes.length > 0 && k.codes[0] == CODE_SPACE) {
+                    cachedSpace = k;
+                    break;
+                }
+            }
+            cachedSpaceFor = kb;
+        }
+        if (cachedSpace == null) return;
+        Keyboard.Key space = cachedSpace;
+        float px = ev.getX() - getPaddingLeft();
+        float py = ev.getY() - getPaddingTop();
+        // Already inside space — nothing to do.
+        if (px >= space.x && px < space.x + space.width
+                && py >= space.y && py < space.y + space.height) return;
+        // In the band above space and horizontally within space's bounds — snap down.
+        float band = dp(8);
+        if (px >= space.x && px < space.x + space.width
+                && py < space.y && py >= space.y - band) {
+            ev.setLocation(ev.getX(), space.y + getPaddingTop() + 1);
+        }
     }
 
     public TurtleKeyboardView(Context context, AttributeSet attrs, int defStyle) {
@@ -102,6 +185,11 @@ public class TurtleKeyboardView extends KeyboardView {
             if (l != null) {
                 performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
                 l.onKey(alt, new int[]{ alt });
+                // Returning true makes the framework set mAbortKey, which skips the
+                // UP-path detectAndSendKey — so onRelease never fires for the original
+                // key and the IME's KeyPreviewPopup stays visible (the "stuck preview"
+                // symptom). Fire onRelease explicitly so the popup is dismissed.
+                l.onRelease(alt);
                 return true;
             }
         }
@@ -159,7 +247,10 @@ public class TurtleKeyboardView extends KeyboardView {
         CharSequence label = key.label;
         if (label != null && label.length() > 0) {
             CharSequence drawLabel = label;
-            if (shifted && label.length() == 1) {
+            // ⇪ (CAPS LOCK arrow with bar) when sticky, ⇧ when shift-once.
+            if (isShiftKey && capsLocked) {
+                drawLabel = "⇪";
+            } else if (shifted && label.length() == 1) {
                 char ch = label.charAt(0);
                 if (Character.isLowerCase(ch)) {
                     drawLabel = String.valueOf(Character.toUpperCase(ch));
@@ -192,6 +283,23 @@ public class TurtleKeyboardView extends KeyboardView {
         enterFillPaint.setColor(pressed ? darken(enterFill) : enterFill);
         c.drawCircle(cx, cy, r, enterFillPaint);
 
+        String label = labelForAction(editorAction);
+        if (label != null) {
+            // Action-bearing field (search / send / go / etc.) — short label inside the disc.
+            enterLabelPaint.setColor(enterIcon);
+            enterLabelPaint.setTextSize(hintTextPx * 1.4f);
+            // Shrink until it fits inside the disc, with a floor so we never go invisible.
+            float maxWidth = r * 1.6f;
+            float minSize = dp(8);
+            while (enterLabelPaint.measureText(label) > maxWidth
+                    && enterLabelPaint.getTextSize() > minSize) {
+                enterLabelPaint.setTextSize(enterLabelPaint.getTextSize() - dp(1));
+            }
+            float baseline = cy - (enterLabelPaint.descent() + enterLabelPaint.ascent()) / 2f;
+            c.drawText(label, cx, baseline, enterLabelPaint);
+            return;
+        }
+
         // Hand-drawn ↵ glyph reads better than the unicode character at this size.
         float arm = Math.min(right - left, bottom - top) * 0.18f;
         enterIconPaint.setColor(enterIcon);
@@ -201,14 +309,28 @@ public class TurtleKeyboardView extends KeyboardView {
         c.drawLine(cx - arm, cy + arm * 0.2f, cx - arm * 0.4f, cy + arm * 0.7f, enterIconPaint);
     }
 
+    private static String labelForAction(int action) {
+        switch (action) {
+            case EditorInfo.IME_ACTION_GO:       return "Go";
+            case EditorInfo.IME_ACTION_SEARCH:   return "Search";
+            case EditorInfo.IME_ACTION_SEND:     return "Send";
+            case EditorInfo.IME_ACTION_NEXT:     return "Next";
+            case EditorInfo.IME_ACTION_DONE:     return "Done";
+            case EditorInfo.IME_ACTION_PREVIOUS: return "Prev";
+            default: return null;
+        }
+    }
+
     private boolean isFunctionKey(Keyboard.Key key) {
+        // PERIOD is no longer flagged: in qwerty.xml it carries a popupCharacters=","
+        // hint and accepts long-press to commit ',', so it needs the regular-key paint
+        // (for the corner hint) and the non-function long-press path (for the alt commit).
         switch (codeOf(key)) {
             case CODE_SHIFT:
             case CODE_MODE:
             case CODE_BACKSPACE:
             case CODE_EMOJI:
             case CODE_COMMA:
-            case CODE_PERIOD:
                 return true;
             default:
                 return false;
