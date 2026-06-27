@@ -345,6 +345,9 @@ public class GifGridView extends FrameLayout {
 
         /** Idempotent; safe to call from both bind() and the scroll callback. */
         void ensurePlaying() {
+            // animatedDrawable is only ever set on API 28+ (see bind()), but lint
+            // can't infer that — guard the AnimatedImageDrawable reference explicitly.
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return;
             if (animatedDrawable instanceof AnimatedImageDrawable) {
                 AnimatedImageDrawable aid = (AnimatedImageDrawable) animatedDrawable;
                 if (!aid.isRunning()) aid.start();
@@ -352,6 +355,9 @@ public class GifGridView extends FrameLayout {
         }
 
         private void stopAnimation() {
+            // Called unconditionally from bind()/onDetachedFromWindow(); on pre-28
+            // devices animatedDrawable is null, so guard before touching the API-28 type.
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return;
             if (animatedDrawable instanceof AnimatedImageDrawable) {
                 AnimatedImageDrawable aid = (AnimatedImageDrawable) animatedDrawable;
                 if (aid.isRunning()) aid.stop();

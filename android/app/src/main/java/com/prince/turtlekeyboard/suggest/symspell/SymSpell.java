@@ -25,13 +25,12 @@ import android.util.Log;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -179,7 +178,8 @@ public class SymSpell {
 
         BufferedReader br = null;
         try {
-            br = Files.newBufferedReader(Paths.get(corpus), StandardCharsets.UTF_8);
+            // Plain FileInputStream instead of java.nio.file (API 26) so we work on minSdk 24.
+            br = new BufferedReader(new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8));
         } catch (IOException ex) {
             Log.w("SymSpell", "dictionary load failed", ex);
         }
@@ -244,7 +244,9 @@ public class SymSpell {
         if (!file.exists()) return false;
 
         SuggestionStage staging = new SuggestionStage(16384);
-        try (BufferedReader br = Files.newBufferedReader(Paths.get(corpus))) {
+        // Plain FileInputStream instead of java.nio.file (API 26) so we work on minSdk 24.
+        try (BufferedReader br = new BufferedReader(
+                new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8))) {
             for (String line; (line = br.readLine()) != null; ) {
                 Arrays.stream(parseWords(line)).forEach(key -> createDictionaryEntry(key, 1, staging));
             }

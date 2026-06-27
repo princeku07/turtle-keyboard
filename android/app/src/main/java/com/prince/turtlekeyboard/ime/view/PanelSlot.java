@@ -21,6 +21,10 @@ public final class PanelSlot {
     public PanelSlot(ViewGroup host, KeyboardView keys) {
         this.host = host;
         this.keys = keys;
+        // Establish the empty/hidden initial state ourselves rather than relying on the
+        // host's inflated visibility — show()/hide() own this property, so the constructor
+        // should too. No-op in production where the layout already marks the host GONE.
+        host.setVisibility(View.GONE);
     }
 
     /** Replaces any existing child with {@code panel}, sizes to the key band, hides keys. */

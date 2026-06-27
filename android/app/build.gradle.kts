@@ -82,9 +82,15 @@ val copySharedPrompts = tasks.register<Copy>("copySharedPrompts") {
     }
     into(layout.buildDirectory.dir("generated/sharedPrompts/prompts"))
 }
-android.sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("generated/sharedPrompts"))
-tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }
-    .configureEach { dependsOn(copySharedPrompts) }
+// Register the generated assets dir with builtBy so Gradle wires the
+// copySharedPrompts dependency onto *every* consumer of the asset source set
+// (merge*Assets, lint, lintVitalReportModel, package…) automatically. Pinning
+// the dependency only on merge*Assets left other consumers (e.g. the release
+// lint-vital report task) reading the dir without an explicit dependency,
+// which fails Gradle 8.7's input/output validation.
+android.sourceSets["main"].assets.srcDir(
+    files(layout.buildDirectory.dir("generated/sharedPrompts")).builtBy(copySharedPrompts)
+)
 
 // Copy the built WebView games (../../games/dist/<name>/index.html) into the
 // APK's merged assets so WebGameSheetView can load them at
@@ -98,9 +104,11 @@ val copyGamesHtml = tasks.register<Copy>("copyGamesHtml") {
     }
     into(layout.buildDirectory.dir("generated/gamesAssets/games"))
 }
-android.sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("generated/gamesAssets"))
-tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }
-    .configureEach { dependsOn(copyGamesHtml) }
+// Same builtBy wiring as copySharedPrompts above — carry the producer
+// dependency to all asset-source-set consumers, not just merge*Assets.
+android.sourceSets["main"].assets.srcDir(
+    files(layout.buildDirectory.dir("generated/gamesAssets")).builtBy(copyGamesHtml)
+)
 
 configurations.all {
     resolutionStrategy {

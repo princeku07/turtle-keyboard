@@ -5,12 +5,12 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.AttributeSet;
 import android.view.View;
-import android.widget.TextView;
 
 import androidx.annotation.Nullable;
+import androidx.appcompat.widget.AppCompatTextView;
 
 /** Transient status banner (slash command status, double-tap detected, errors). */
-public class BannerView extends TextView {
+public class BannerView extends AppCompatTextView {
 
     private final Handler main = new Handler(Looper.getMainLooper());
     private final Runnable hide = () -> setVisibility(GONE);
