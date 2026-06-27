@@ -524,7 +524,7 @@ public class EmojiPanelView extends LinearLayout implements InputTarget {
                 getResources().getDisplayMetrics());
     }
 
-    private static class TabView extends TextView {
+    private static class TabView extends androidx.appcompat.widget.AppCompatTextView {
         final EmojiData.Category category;
 
         TabView(Context ctx, EmojiData.Category c) {

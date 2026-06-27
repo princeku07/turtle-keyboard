@@ -350,7 +350,7 @@ public class TurtleInputMethodService extends InputMethodService
                             + " bytes=" + (bytes == null ? "null" : bytes.length));
 
                     // Try once immediately; the helper covers the case where input isn't ready yet.
-                    requestShowSelf(0);
+                    requestShowSelfCompat();
                     requestShowSelfAfterPick();
 
                     // Defer the callback so ctx.showPanel lands on a settled view tree.
@@ -918,7 +918,7 @@ public class TurtleInputMethodService extends InputMethodService
         super.onStartInput(info, restarting);
         if (pendingShowAfterPick) {
             pendingShowAfterPick = false;
-            mainHandler.post(() -> requestShowSelf(0));
+            mainHandler.post(() -> requestShowSelfCompat());
         }
     }
 
@@ -934,9 +934,18 @@ public class TurtleInputMethodService extends InputMethodService
         mainHandler.postDelayed(() -> {
             if (pendingShowAfterPick) {
                 pendingShowAfterPick = false;
-                requestShowSelf(0);
+                requestShowSelfCompat();
             }
         }, 300L);
+    }
+
+    /** {@link android.inputmethodservice.InputMethodService#requestShowSelf(int)} was
+     *  added in API 28; on older devices there is no equivalent, so this no-ops and we
+     *  rely on the normal onStartInput re-show path when focus returns to our IME. */
+    private void requestShowSelfCompat() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            requestShowSelf(0);
+        }
     }
 
     /** SPI variant of {@link #launchEditImagePicker}; routes the result to the in-flight ctx.pickImage callback. */
