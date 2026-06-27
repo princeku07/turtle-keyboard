@@ -3,8 +3,11 @@ package com.prince.turtlekeyboard.ui;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.text.InputType;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -37,10 +40,111 @@ public class SettingsActivity extends AppCompatActivity {
         findViewById(R.id.topbar_back).setOnClickListener(v -> finish());
 
         bindAccount();
+        bindAi();
         bindAppearance();
         bindTyping();
         bindVoice();
         bindPrivacy();
+    }
+
+    // ---- AI providers ----
+
+    private void bindAi() {
+        findViewById(R.id.row_image_provider).setOnClickListener(v ->
+                Toast.makeText(this,
+                        "Gemini is the only image provider — LM Studio can't generate images.",
+                        Toast.LENGTH_LONG).show());
+        findViewById(R.id.row_text_provider).setOnClickListener(v -> chooseTextProvider());
+        findViewById(R.id.row_lmstudio_url).setOnClickListener(v -> editLmStudioUrl());
+        findViewById(R.id.row_lmstudio_model).setOnClickListener(v -> editLmStudioModel());
+        refreshAiRows();
+    }
+
+    private void refreshAiRows() {
+        setRow(R.id.row_image_provider, "Image generation", "Gemini");
+        TextView imgBadge = findViewById(R.id.row_image_provider).findViewById(R.id.row_badge);
+        imgBadge.setVisibility(View.VISIBLE);
+        imgBadge.setText("LOCKED");
+
+        boolean local = Prefs.PROVIDER_LMSTUDIO.equals(
+                prefs.getString(Prefs.KEY_TEXT_PROVIDER, Prefs.PROVIDER_GEMINI));
+        setRow(R.id.row_text_provider, "Basic questions",
+                local ? "Local · LM Studio" : "Gemini (cloud)");
+
+        String url = prefs.getString(Prefs.KEY_LMSTUDIO_URL, Prefs.DEFAULT_LMSTUDIO_URL);
+        String model = prefs.getString(Prefs.KEY_LMSTUDIO_MODEL, Prefs.DEFAULT_LMSTUDIO_MODEL);
+        setRow(R.id.row_lmstudio_url, "LM Studio server", url);
+        setRow(R.id.row_lmstudio_model, "LM Studio model",
+                model.isEmpty() ? "Auto · loaded model" : model);
+
+        // Dim the LM Studio config rows when Gemini is active; still tappable to pre-configure.
+        float a = local ? 1f : 0.55f;
+        findViewById(R.id.row_lmstudio_url).setAlpha(a);
+        findViewById(R.id.row_lmstudio_model).setAlpha(a);
+    }
+
+    private void setRow(int id, String title, String sub) {
+        View row = findViewById(id);
+        ((TextView) row.findViewById(R.id.row_title)).setText(title);
+        ((TextView) row.findViewById(R.id.row_sub)).setText(sub);
+    }
+
+    private void chooseTextProvider() {
+        boolean local = Prefs.PROVIDER_LMSTUDIO.equals(
+                prefs.getString(Prefs.KEY_TEXT_PROVIDER, Prefs.PROVIDER_GEMINI));
+        final String[] labels = {"Gemini (cloud)", "Local · LM Studio"};
+        new AlertDialog.Builder(this)
+                .setTitle("Basic questions")
+                .setSingleChoiceItems(labels, local ? 1 : 0, (d, which) -> {
+                    prefs.putString(Prefs.KEY_TEXT_PROVIDER,
+                            which == 1 ? Prefs.PROVIDER_LMSTUDIO : Prefs.PROVIDER_GEMINI);
+                    d.dismiss();
+                    refreshAiRows();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void editLmStudioUrl() {
+        String cur = prefs.getString(Prefs.KEY_LMSTUDIO_URL, Prefs.DEFAULT_LMSTUDIO_URL);
+        promptText("LM Studio server URL",
+                "http://10.0.2.2:1234/v1 (emulator) or http://<LAN-IP>:1234/v1",
+                cur, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI, value -> {
+                    String v = value.trim();
+                    prefs.putString(Prefs.KEY_LMSTUDIO_URL, v.isEmpty() ? Prefs.DEFAULT_LMSTUDIO_URL : v);
+                    refreshAiRows();
+                });
+    }
+
+    private void editLmStudioModel() {
+        String cur = prefs.getString(Prefs.KEY_LMSTUDIO_MODEL, Prefs.DEFAULT_LMSTUDIO_MODEL);
+        promptText("LM Studio model",
+                "Model id, or leave blank to use the loaded model",
+                cur, InputType.TYPE_CLASS_TEXT, value -> {
+                    prefs.putString(Prefs.KEY_LMSTUDIO_MODEL, value.trim());
+                    refreshAiRows();
+                });
+    }
+
+    /** Callback for {@link #promptText}; saves the entered value. */
+    private interface OnText { void accept(String value); }
+
+    private void promptText(String title, String hint, String current, int inputType, OnText cb) {
+        EditText input = new EditText(this);
+        input.setInputType(inputType);
+        input.setText(current);
+        input.setHint(hint);
+        input.setSingleLine(true);
+        int pad = Math.round(20 * getResources().getDisplayMetrics().density);
+        FrameLayout wrap = new FrameLayout(this);
+        wrap.setPadding(pad, pad / 2, pad, 0);
+        wrap.addView(input);
+        new AlertDialog.Builder(this)
+                .setTitle(title)
+                .setView(wrap)
+                .setPositiveButton("Save", (d, w) -> cb.accept(input.getText().toString()))
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     // ---- Account ----

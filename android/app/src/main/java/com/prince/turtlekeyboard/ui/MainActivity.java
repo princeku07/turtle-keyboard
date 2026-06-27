@@ -162,7 +162,7 @@ public class MainActivity extends AppCompatActivity {
 
         renderIntegrationDots();
 
-        binding.settingsSummary.setText("Account · Appearance · Privacy");
+        binding.settingsSummary.setText("Account · AI · Privacy");
     }
 
     private void renderIntegrationDots() {

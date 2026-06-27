@@ -76,6 +76,46 @@
                 </LinearLayout>
             </LinearLayout>
 
+            <!-- ===== AI ===== -->
+
+            <TextView
+                style="@style/SectionHeader"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_xl"
+                android:text="AI" />
+
+            <LinearLayout
+                style="@style/Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <include layout="@layout/item_settings_row"
+                    android:id="@+id/row_image_provider" />
+
+                <View android:layout_width="match_parent"
+                    android:layout_height="@dimen/border_hairline"
+                    android:background="@color/border_subtle" />
+
+                <include layout="@layout/item_settings_row"
+                    android:id="@+id/row_text_provider" />
+
+                <View android:layout_width="match_parent"
+                    android:layout_height="@dimen/border_hairline"
+                    android:background="@color/border_subtle" />
+
+                <include layout="@layout/item_settings_row"
+                    android:id="@+id/row_lmstudio_url" />
+
+                <View android:layout_width="match_parent"
+                    android:layout_height="@dimen/border_hairline"
+                    android:background="@color/border_subtle" />
+
+                <include layout="@layout/item_settings_row"
+                    android:id="@+id/row_lmstudio_model" />
+            </LinearLayout>
+
             <!-- ===== Appearance ===== -->
 
             <TextView

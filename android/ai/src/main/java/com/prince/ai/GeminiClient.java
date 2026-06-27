@@ -54,6 +54,7 @@ public final class GeminiClient implements GeminiService {
     private static final int READ_TIMEOUT_MS = 90_000;
 
     private final String apiKey;
+    private final TextRoute textRoute;
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private final Handler main = new Handler(Looper.getMainLooper());
 
@@ -61,12 +62,22 @@ public final class GeminiClient implements GeminiService {
      *               by the host. Empty/null short-circuits every call to
      *               {@code ai_no_api_key}, which surfaces to the user as a clear error. */
     public GeminiClient(String apiKey) {
+        this(apiKey, null);
+    }
+
+    /** @param textRoute optional live provider toggle; when {@link TextRoute#useLocal()} is
+     *               true, {@link #text} routes to LM Studio instead of Gemini. Image methods
+     *               always use Gemini. Null behaves as Gemini-only. */
+    public GeminiClient(String apiKey, TextRoute textRoute) {
         this.apiKey = apiKey == null ? "" : apiKey;
+        this.textRoute = textRoute;
     }
 
     @Override
     public void text(String systemPrompt, String userPrompt, TextCallback cb) {
-        if (apiKey.isEmpty()) {
+        // Local LM Studio needs no Gemini key; only guard the cloud path.
+        boolean local = textRoute != null && textRoute.useLocal();
+        if (!local && apiKey.isEmpty()) {
             main.post(() -> cb.onError("ai_no_api_key"));
             return;
         }
@@ -139,6 +150,11 @@ public final class GeminiClient implements GeminiService {
     // -- blocking HTTP -------------------------------------------------------
 
     private String doText(String systemPrompt, String userPrompt) throws Exception {
+        if (textRoute != null && textRoute.useLocal()) {
+            String raw = LmStudioClient.complete(
+                    textRoute.baseUrl(), textRoute.model(), systemPrompt, userPrompt);
+            return stripReasoning(raw).trim();
+        }
         HttpURLConnection conn = openConn(GEMINI_TEXT_URL);
         try {
             JSONObject body = new JSONObject();

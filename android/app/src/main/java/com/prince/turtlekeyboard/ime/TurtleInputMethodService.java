@@ -114,6 +114,8 @@ public class TurtleInputMethodService extends InputMethodService
     private IntegrationRegistry integrations;
     private TurtleAiClient aiClient;
     private OnDeviceAiClient onDeviceAi;
+    /** Live text-provider toggle (Gemini ↔ LM Studio); reads prefs per call. */
+    private com.prince.ai.TextRoute textRoute;
     /** True between onStartInputView and onFinishInputView; results route to a notification when false. */
     private boolean inputViewVisible;
 
@@ -292,12 +294,27 @@ public class TurtleInputMethodService extends InputMethodService
         appProfiles = new PersistentAppProfileRegistry(getApplicationContext(), prefs.root());
         // User pins outrank built-in affinity defaults in the registry ranker.
         registry.setPins(new UserCommandPins(prefs.root().scoped("pins")));
+        // Live text-provider toggle: re-reads prefs on every call so flipping the
+        // provider in Settings takes effect without re-creating the keyboard.
+        textRoute = new com.prince.ai.TextRoute() {
+            @Override public boolean useLocal() {
+                return Prefs.PROVIDER_LMSTUDIO.equals(
+                        prefs.getString(Prefs.KEY_TEXT_PROVIDER, Prefs.PROVIDER_GEMINI));
+            }
+            @Override public String baseUrl() {
+                return prefs.getString(Prefs.KEY_LMSTUDIO_URL, Prefs.DEFAULT_LMSTUDIO_URL);
+            }
+            @Override public String model() {
+                return prefs.getString(Prefs.KEY_LMSTUDIO_MODEL, Prefs.DEFAULT_LMSTUDIO_MODEL);
+            }
+        };
         if (integrations != null) { integrations.shutdown(); integrations = null; }
         if (aiClient != null) { aiClient.destroy(); aiClient = null; }
         TurtleAiClient ai = new TurtleAiClient(this, hostProvider, stagingPipeline(), new StubAiClient());
+        ai.setTextRoute(textRoute);
         aiClient = ai;
         com.prince.kbd.core.GeminiService gemini = new com.prince.ai.GeminiClient(
-                com.prince.turtlekeyboard.BuildConfig.GEMINI_API_KEY);
+                com.prince.turtlekeyboard.BuildConfig.GEMINI_API_KEY, textRoute);
         com.prince.kbd.core.McpService mcp = new com.prince.ai.McpClient();
         com.prince.kbd.core.GoogleAuth googleAuth = new com.prince.kbd.core.GoogleAuthImpl(
                 getApplicationContext(), prefs.root().scoped("google"));
@@ -1442,9 +1459,12 @@ public class TurtleInputMethodService extends InputMethodService
         OnDeviceAiClient.Availability avail = onDeviceAi == null
                 ? OnDeviceAiClient.Availability.UNAVAILABLE
                 : onDeviceAi.availability();
-        boolean onDevice = avail == OnDeviceAiClient.Availability.AVAILABLE;
+        // Explicitly choosing Local (LM Studio) overrides on-device Nano so the rewrite
+        // always hits the configured server; aiClient.rewrite() routes there via TextRoute.
+        boolean useLocal = textRoute != null && textRoute.useLocal();
+        boolean onDevice = !useLocal && avail == OnDeviceAiClient.Availability.AVAILABLE;
         android.util.Log.i("TurtleIME",
-                "assist route=" + (onDevice ? "on-device" : "cloud")
+                "assist route=" + (onDevice ? "on-device" : useLocal ? "lmstudio" : "cloud")
                         + " nanoState=" + avail);
         if (onDevice) {
             onDeviceAi.rewrite(systemPrompt, text, new TurtleAiClient.RewriteCallback() {

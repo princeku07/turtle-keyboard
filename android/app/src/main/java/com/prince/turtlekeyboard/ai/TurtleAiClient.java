@@ -72,12 +72,21 @@ public class TurtleAiClient implements AiClient {
     private final StagingPipeline pipeline;
     private final Map<String, String> promptCache = new HashMap<>();
 
+    /** Live text-provider toggle; null = Gemini only. Affects text commands
+     *  (/ask, /org, raw completions) and {@link #rewrite}, not image commands. */
+    private com.prince.ai.TextRoute textRoute;
+
     public TurtleAiClient(Context context, HostProvider hostProvider,
                           StagingPipeline pipeline, AiClient delegate) {
         this.appContext = context.getApplicationContext();
         this.hostProvider = hostProvider;
         this.pipeline = pipeline;
         this.delegate = delegate;
+    }
+
+    /** Sets the live text-provider toggle. */
+    public void setTextRoute(com.prince.ai.TextRoute textRoute) {
+        this.textRoute = textRoute;
     }
 
     public void destroy() {
@@ -361,6 +370,13 @@ public class TurtleAiClient implements AiClient {
     }
 
     private String callGemini(String systemPrompt, String prompt) throws Exception {
+        // Local LM Studio path for text ("basic questions"): /ask, /org, raw completions, rewrite.
+        if (textRoute != null && textRoute.useLocal()) {
+            String raw = com.prince.ai.LmStudioClient.complete(
+                    textRoute.baseUrl(), textRoute.model(), systemPrompt, prompt);
+            Log.d(TAG, "raw LM Studio content (" + raw.length() + " chars): " + raw);
+            return stripReasoning(raw).trim();
+        }
         HttpURLConnection conn = (HttpURLConnection) new URL(GEMINI_URL).openConnection();
         conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
         conn.setReadTimeout(READ_TIMEOUT_MS);
