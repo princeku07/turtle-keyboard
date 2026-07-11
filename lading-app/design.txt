@@ -1,0 +1,163 @@
+Design & Product Brief: Turtle Keyboard (turtlekeyboard.com)
+1. Deep-Dive Product Context (What We Are Building)
+The Core Problem: Mobile Context-Switching Fatigue
+On desktop, users have terminal command lines, Raycast, Alfred, and browser extensions to navigate work and AI without friction. On mobile, the workflow is fundamentally broken. To schedule a task, look up a fact, generate an image, or create a poll during a chat, a user must leave their active app, open a separate AI or utility app, copy the output, switch back to the chat, and paste it. This constantly interrupts human flow and conversation.
+
+The Solution: Turtle Keyboard
+Turtle Keyboard is an open-source (MIT licensed), cross-platform (iOS + Android) smart keyboard that turns the mobile text field into a universal command line and interactive application platform.
+
+The Slash Trigger (/): By typing a / in any app (WhatsApp, Slack, Gmail, Tinder, iMessage), Turtle intercepts the input and displays a sleek, floating menu of tools and AI actions right above the keyboard.
+
+Interactive Outputs (MCP Apps): Instead of just dumping blocks of text, Turtle leverages the Model Context Protocol (MCP) to generate live, shareable micro-apps. If a user types /poll Where should we go for dinner?, Turtle generates a lightweight, interactive web widget link directly in the chat. Recipients tap it to vote in real-time within a beautiful, sandboxed viewer.
+
+The Privacy Moat (Local-First): Keyboards are inherently sensitive real estate. Users rightfully fear third-party keyboards acting as keyloggers. Turtle solves this by utilizing on-device local AI inference. Standard processing happens directly on the user's hardware—meaning private chats and passwords never hit a cloud server.
+
+2. Target Audience & User Personas
+Our messaging balances mainstream, relatable emotional utility with deep technical trust. We are targeting three distinct archetypes:
+
+Persona 1: The Group Chat Connector (Mainstream Social)
+Who they are: Students, young professionals, and social planners who spend hours daily in group chats (WhatsApp, iMessage, Instagram DM).
+
+Their Pain Point: Group chats easily devolve into chaos when planning a trip, picking a movie, or making decisions. Or conversations stall out and need a spark.
+
+Why they care about Turtle: Turtle turns them into the "Group Chat Hero." They don't care about the underlying tech; they care that typing /quiz or /poll instantly drops a beautiful, fun, interactive widget into the chat without anyone needing to download a separate party game or survey app.
+
+Persona 2: The Flow-State Pragmatist (Founders, Creators & Professionals)
+Who they are: Busy individuals juggling emails, Slack, Notion, and messaging apps on the go.
+
+Their Pain Point: Copying meeting notes from Notion to paste into an email, or switching apps to draft a quick summary while walking down the street, is slow and frustrating on a touchscreen.
+
+Why they care about Turtle: Speed and uninterrupted workflow. They can type /notion add task or /summarize directly inside their email draft or Slack thread. Turtle acts as their mobile command line.
+
+Persona 3: The Privacy-Conscious Developer (The Vanguard)
+Who they are: Software engineers, open-source advocates, and productivity enthusiasts.
+
+Their Pain Point: They hate Big Tech walled gardens (Apple Intelligence locking down iOS; Google locking down Android). They refuse to install third-party keyboards due to security and keylogging risks.
+
+Why they care about Turtle: It is MIT-licensed open-source software built on the Model Context Protocol (MCP). They trust the local on-device inference architecture, and they want to build custom MCP servers to connect their own internal tools to their keyboard.
+
+3. Global Brand & Aesthetic Guidelines
+Vibe: Coastal Minimalism. Calm, fluid, reliable, and tactile. Opening this page should feel like stepping away from the chaotic tech noise and taking a breath of fresh ocean air.
+
+Color Palette:
+
+Sea-Foam Base (Background): Very pale, warm off-white, resembling dry white sand.
+
+Bioluminescent Turquoise (Primary Action): A vibrant, glowing teal used for the / symbol, buttons, and interactive highlights.
+
+Abyssal Navy (Text & Deep Section): A rich, dark slate/navy for typography, avoiding the harsh contrast of pure black.
+
+Sea Glass (UI Components): Semi-transparent white with a strong background blur (backdrop-filter: blur(12px)), giving UI elements a frosted glass look.
+
+Typography:
+
+Headings & Copy: A clean, geometric sans-serif (Inter, Geist, or SF Pro) in Abyssal Navy.
+
+Commands/Code: A crisp monospace font (Fira Code or JetBrains Mono) for /commands to anchor the technical precision.
+
+Motion (The Tide): Slow, deliberate, fluid transitions. Elements float gently on scroll.
+
+4. Page Structure & Detailed Copy
+Section 1: The Surface (Hero)
+Primary Audience: All Personas.
+Goal: Immediate visual comprehension and email capture.
+
+Background: Sea-Foam Base with soft, slow-moving light refractions of Bioluminescent Turquoise.
+
+Visual (Right): A phone mockup showing an active WhatsApp/iMessage thread. The text box reads / in glowing turquoise. Floating above the keyboard is a frosted Sea Glass menu showing customizable slash commands.
+
+Content (Left):
+
+Eyebrow: THE OPEN INTERFACE FOR YOUR DIGITAL LIFE
+
+Headline: slash is the new hey siri.
+
+Subheadline: Don't leave your chat. Don't break your flow. Type a slash to bring interactive polls, AI, and your favorite tools directly into any conversation.
+
+Call to Action:
+
+Input: [ enter email ]
+
+Button: [ grab my spot → ] (Turquoise background, white text).
+
+Micro-copy: beta · ios + android · open source
+
+Section 2: The Current (Use Case Carousel)
+Primary Audience: Personas 1 & 2 (Connectors & Pragmatists).
+Goal: Show, don't tell. Focus on emotional relief and everyday utility.
+
+Background: Solid Sea-Foam Base.
+
+Header: Don't fight the current. / Switching apps breaks your conversation. Let Turtle bring the tools to you.
+
+Card 1: Settle the Debate (Targeting Connectors)
+
+Visual: A group chat arguing about Friday plans. User types /poll Movie, Bowling, or Drinks?. A sleek Sea Glass poll widget appears right in the chat flow.
+
+Caption: Create shareable live polls and decisions in seconds.
+
+Card 2: Never Leave the App (Targeting Pragmatists)
+
+Visual: An email reply to a client. User types /notion pull quote from project brief. The text appears instantly inside the email compose box.
+
+Caption: Connect Notion, Slack, and your workflow directly to your keyboard.
+
+Card 3: Spark the Room (Targeting Connectors)
+
+Visual: A quiet group chat. User types /quiz 90s Music Trivia. An interactive game link drops in, allowing friends to play in a web view without installing an app.
+
+Caption: Bring instant interactive games to any chat.
+
+Section 3: The Deep (Privacy & Architecture Moat)
+Primary Audience: Persona 3 (Developers & Privacy Advocates).
+Goal: Prove why a third-party keyboard is safe by explaining the on-device local architecture.
+
+Transition: Background smoothly deepens into Abyssal Navy. Text turns crisp white.
+
+Visual: A glowing, minimalist turquoise outline of a turtle shell protecting a localized neural core icon.
+
+Content:
+
+Headline: Safe in the deep.
+
+Paragraph: Cloud AI wrappers send every keystroke to external servers. Turtle doesn't. Powered by local on-device inference, your AI commands and processing happen right on your phone's hardware. It’s lightning-fast, works offline, and ensures your personal chats never leave your device.
+
+Tagline: Your data stays inside the shell.
+
+Section 4: The Horizon (Developer & MCP Ecosystem)
+Primary Audience: Persona 3 (Developers).
+Goal: Seed the open-source community and invite MCP tool builders.
+
+Transition: Background lifts back to light Sea-Foam Base.
+
+Layout: 50/50 Split.
+
+Left Side (Copy):
+
+Headline: An ocean of possibilities.
+
+Paragraph: Turtle is engineered around the Model Context Protocol (MCP). If an app or service has an API, you can write a lightweight local MCP server for it. Build your own slash commands and shape the future of mobile interfaces.
+
+Right Side (Visual): A clean, dark IDE code block showing how simple it is to register a custom tool (/notion-sync) using the Turtle MCP SDK.
+
+Section 5: The Footer
+Goal: Final conversion catch and community links.
+
+Content (Centered):
+
+Icon: Minimalist line-art turtle.
+
+Slogan: Slow and steady. Wins the race.
+
+Final Form: [ enter email ] [ grab my spot → ]
+
+Links: github ↗ · documentation ↗ · waitlist · privacy policy
+
+Copyright: 🐢 turtle © 2026 · MIT
+
+5. Micro-Interactions & Technical Handoff
+Input Glow: When clicking any email input field, border transitions from subtle grey to glowing Bioluminescent Turquoise over 200ms.
+
+Waitlist Feedback: Upon submitting an email, replace button text with an animated walking turtle icon for 1.5 seconds before displaying: "You're on the list 🐢".
+
+Performance Target: To align with our technical SEO goals, image assets in the use-case cards must be WebP/AVIF format with lazy loading enabled, ensuring a near-instant Largest Contentful Paint (LCP) and zero layout shift.

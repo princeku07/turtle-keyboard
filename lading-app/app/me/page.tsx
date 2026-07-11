@@ -164,8 +164,8 @@ function StepInstall() {
             third-party trackers, zero analytics sdks.
           </p>
           <p>
-            the keyboard, the host app, the on-device suggestion engine — all
-            bundled. nothing else gets pulled at install time.
+            the keyboard, the host app, the command engine — all bundled.
+            nothing else gets pulled at install time.
           </p>
         </>
       }

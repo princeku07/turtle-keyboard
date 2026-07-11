@@ -102,6 +102,11 @@ public class TurtleKeyboardView extends KeyboardView {
             if (l != null) {
                 performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
                 l.onKey(alt, new int[]{ alt });
+                // Returning true sets KeyboardView's mAbortKey, so the UP event skips
+                // detectAndSendKey() — the only place the framework calls onRelease. Without
+                // it the IME never dismisses the key-preview popup shown on onPress, so the
+                // bubble sticks. Fire onRelease ourselves to dismiss it.
+                l.onRelease(code);
                 return true;
             }
         }
@@ -176,8 +181,11 @@ public class TurtleKeyboardView extends KeyboardView {
             labelPaint.setColor(prevColor);
         }
 
+        // Skip the corner hint when the label already shows a secondary glyph (e.g. the
+        // ". ," punctuation key), otherwise the alternate would render twice.
+        boolean labelHasSecondary = key.label != null && key.label.length() > 1;
         if (key.popupCharacters != null && key.popupCharacters.length() > 0
-                && !isFunctionKey(key)) {
+                && !isFunctionKey(key) && !labelHasSecondary) {
             char hint = key.popupCharacters.charAt(0);
             float x = right - dp(6);
             float y = top + dp(13);
