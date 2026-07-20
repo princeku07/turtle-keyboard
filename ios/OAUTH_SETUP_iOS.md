@@ -146,19 +146,50 @@ the shared store.
 1. Go to https://www.notion.so/my-integrations → **+ New integration**.
 2. Type: **Public** (Internal won't work — only Public supports OAuth).
 3. App name + workspace, capabilities = "Read content, Insert content, Update content".
-4. **OAuth Domain & URIs** → Redirect URIs → add `turtleknotionoauth://oauth-callback`.
+4. **OAuth Domain & URIs** → Redirect URIs → add the **HTTPS bounce URL**
+   `https://turtle-worker.trtlk.workers.dev/oauth/notion`.
+
+   > ⚠️ **Notion does NOT accept custom URL schemes** like
+   > `turtleknotionoauth://oauth-callback` — it silently prepends `https://` and
+   > the authorize request then fails with *"Missing or invalid redirect_uri."*
+   > This is why, unlike Slack, Notion needs the HTTPS → custom-scheme bounce
+   > described in step 2b.
 5. **Save**. Then **Show** the OAuth client ID and OAuth client secret — copy both.
 
 ## 2. Wire into the app
 
-`ios/TurtleKeyboard/Cloud/NotionAuth.swift`:
-```swift
-static let clientID = "your-notion-client-id"
-static let clientSecret = "your-notion-client-secret"
-```
+### 2a. Credentials + redirect URI (`.env`)
 
-`Info.plist` already has the `turtleknotionoauth` URL scheme registered — no edit needed
-unless you change `redirectScheme` in code.
+Set these in the repo-root `.env` (regenerates `Secrets.swift` on next build):
+```
+NOTION_OAUTH_CLIENT_ID=your-notion-client-id
+NOTION_OAUTH_CLIENT_SECRET=your-notion-client-secret
+NOTION_OAUTH_REDIRECT_URI=https://turtle-worker.trtlk.workers.dev/oauth/notion
+```
+`NOTION_OAUTH_REDIRECT_URI` **must exactly match** the Redirect URI registered in
+step 4 — it is sent unchanged at both authorize and token-exchange time.
+
+`Info.plist` already has the `turtleknotionoauth` URL scheme registered — no edit
+needed unless you change `redirectScheme` in code.
+
+### 2b. Deploy the HTTPS → custom-scheme bounce (Worker)
+
+`ASWebAuthenticationSession` can only catch a custom scheme; Notion can only
+redirect to HTTPS. Bridge them with a Worker route at the URL from step 4 that
+redirects the auth code back into the app's scheme (client-side JS — a server 302
+to a custom scheme is unreliable inside `ASWebAuthenticationSession`):
+
+```js
+// GET /oauth/notion?code=...&error=...  → hand the query back to the app
+if (url.pathname === "/oauth/notion") {
+  const qs = url.searchParams.toString();
+  return new Response(
+    `<!doctype html><meta charset=utf-8>
+     <script>location.replace("turtleknotionoauth://oauth-callback?${qs}");</script>
+     <p>Return to Turtle Keyboard…</p>`,
+    { headers: { "content-type": "text/html; charset=utf-8" } });
+}
+```
 
 ## 3. Test
 
@@ -185,7 +216,13 @@ Xcode → Signing & Capabilities for both targets and the token becomes shared.
 1. Go to https://api.slack.com/apps → **Create New App** → From scratch.
 2. App name + pick a workspace to develop in.
 3. **OAuth & Permissions**:
-   - Redirect URLs → add `turtleslackoauth://oauth-callback` and **Save URLs**.
+   - Redirect URLs → add the **HTTPS bounce URL**
+     `https://turtle-worker.trtlk.workers.dev/oauth/slack` and **Save URLs**.
+
+     > ⚠️ **Slack does NOT accept custom URL schemes** like
+     > `turtleslackoauth://oauth-callback` — Redirect URLs must be HTTPS, or the
+     > authorize step fails with *"redirect_uri did not match any configured
+     > URIs."* Same HTTPS → custom-scheme bounce as Notion (step 2b below).
    - **User Token Scopes** (NOT Bot Token Scopes) → add:
      - `chat:write`
      - `channels:read`
@@ -195,13 +232,34 @@ Xcode → Signing & Capabilities for both targets and the token becomes shared.
 
 ## 2. Wire into the app
 
-`ios/TurtleKeyboard/Cloud/SlackAuth.swift`:
-```swift
-static let clientID = "your-slack-client-id"
-static let clientSecret = "your-slack-client-secret"
+### 2a. Credentials + redirect URI (`.env`)
+
 ```
+SLACK_OAUTH_CLIENT_ID=your-slack-client-id
+SLACK_OAUTH_CLIENT_SECRET=your-slack-client-secret
+SLACK_OAUTH_REDIRECT_URI=https://turtle-worker.trtlk.workers.dev/oauth/slack
+```
+`SLACK_OAUTH_REDIRECT_URI` **must exactly match** the Redirect URL registered in
+step 3 — it is sent unchanged at both authorize and token-exchange time.
 
 `Info.plist` already has the `turtleslackoauth` URL scheme registered.
+
+### 2b. Deploy the HTTPS → custom-scheme bounce (Worker)
+
+Same pattern as Notion §2b — add a Worker route at the URL from step 3 that hands
+the auth code back into the app's scheme:
+
+```js
+// GET /oauth/slack?code=...&error=...  → hand the query back to the app
+if (url.pathname === "/oauth/slack") {
+  const qs = url.searchParams.toString();
+  return new Response(
+    `<!doctype html><meta charset=utf-8>
+     <script>location.replace("turtleslackoauth://oauth-callback?${qs}");</script>
+     <p>Return to Turtle Keyboard…</p>`,
+    { headers: { "content-type": "text/html; charset=utf-8" } });
+}
+```
 
 ## 3. Test
 
@@ -216,7 +274,8 @@ static let clientSecret = "your-slack-client-secret"
 
 | Symptom | Likely cause |
 |---|---|
-| "Sign-in cancelled" right after browser opens | Redirect URL mismatch — must be EXACTLY `turtleslackoauth://oauth-callback` in both Slack dashboard and `Info.plist` |
+| `redirect_uri did not match any configured URIs` | The HTTPS bounce URL sent (`SLACK_OAUTH_REDIRECT_URI`) isn't registered verbatim in the Slack dashboard Redirect URLs — they must match exactly. Slack does **not** accept custom schemes. |
+| "Sign-in cancelled" right after browser opens | The Worker bounce route isn't redirecting to `turtleslackoauth://oauth-callback`, or that scheme isn't in `Info.plist` |
 | `Slack: invalid_auth` on post | Token revoked — sign out and back in |
 | `Slack: not_in_channel` | Pick a different channel; you're not a member of the one you tried |
 | Channel picker is empty | Token has wrong scopes — re-create the Slack app with `channels:read` + `groups:read` as **User** scopes (not Bot) |

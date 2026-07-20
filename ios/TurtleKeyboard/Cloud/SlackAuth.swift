@@ -21,11 +21,19 @@ final class SlackAuth: NSObject {
     static var clientID: String { Secrets.slackOauthClientId }
     static var clientSecret: String { Secrets.slackOauthClientSecret }
 
-    /// Custom URL scheme registered as an additional Redirect URL on the
-    /// Slack app. The HTTPS one in .env stays for Android/web — iOS
-    /// keyboards can only catch custom-scheme callbacks.
+    /// Custom URL scheme the OAuth flow finally lands on. `ASWebAuthenticationSession`
+    /// can only catch a custom scheme (iOS 15), so this is what the session listens
+    /// for. Must be registered as a URL scheme in the host app's Info.plist.
     static let redirectScheme = "turtleslackoauth"
-    static var redirectURI: String { "\(redirectScheme)://oauth-callback" }
+    static let callbackURL = "\(redirectScheme)://oauth-callback"
+
+    /// The `redirect_uri` actually sent to Slack. **Slack rejects custom schemes**
+    /// (Redirect URLs must be HTTPS → "redirect_uri did not match any configured
+    /// URIs"), so this is an HTTPS bounce page (a Worker route) that immediately
+    /// redirects the auth code to `callbackURL`. This exact value must (a) be
+    /// registered as a Redirect URL in the Slack app dashboard and (b) be sent
+    /// unchanged at both authorize and token-exchange time. See OAUTH_SETUP_iOS.md.
+    static var redirectURI: String { Secrets.slackOauthRedirectUri }
 
     /// Per-user scopes — `chat:write` to post; `channels:read` +
     /// `groups:read` so the channel picker can list rooms the user is in.

@@ -21,12 +21,19 @@ final class NotionAuth: NSObject {
     static var clientID: String { Secrets.notionOauthClientId }
     static var clientSecret: String { Secrets.notionOauthClientSecret }
 
-    /// Custom URL scheme registered as an additional redirect URI on the
-    /// Notion integration. The HTTPS one in .env stays for Android/web —
-    /// iOS keyboards can only catch custom-scheme callbacks. Must also be
-    /// registered as a URL scheme in the host app's Info.plist.
+    /// Custom URL scheme the OAuth flow finally lands on. `ASWebAuthenticationSession`
+    /// can only catch a custom scheme (iOS 15), so this is what the session listens
+    /// for. Must be registered as a URL scheme in the host app's Info.plist.
     static let redirectScheme = "turtleknotionoauth"
-    static var redirectURI: String { "\(redirectScheme)://oauth-callback" }
+    static let callbackURL = "\(redirectScheme)://oauth-callback"
+
+    /// The `redirect_uri` actually sent to Notion. **Notion rejects custom
+    /// schemes** ("Missing or invalid redirect_uri") and forces HTTPS, so this
+    /// is an HTTPS bounce page (a Worker route) that immediately redirects the
+    /// auth code to `callbackURL`. This exact value must (a) be registered as a
+    /// Redirect URI in the Notion integration dashboard and (b) be sent
+    /// unchanged at both authorize and token-exchange time. See OAUTH_SETUP_iOS.md.
+    static var redirectURI: String { Secrets.notionOauthRedirectUri }
 
     private static let authorizeURL = URL(string: "https://api.notion.com/v1/oauth/authorize")!
     private static let tokenURL = URL(string: "https://api.notion.com/v1/oauth/token")!
