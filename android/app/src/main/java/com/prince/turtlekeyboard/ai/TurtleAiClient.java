@@ -10,7 +10,6 @@ import android.os.Looper;
 import android.util.Log;
 import android.view.ViewGroup;
 
-import androidx.annotation.Nullable;
 import androidx.core.content.FileProvider;
 
 import com.prince.kbd.core.KeyValueStore;
@@ -40,15 +39,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * AI client routing built-in commands to Gemini. Unhandled commands fall through
  * to the supplied delegate (typically {@link StubAiClient}).
  */
-public class LmStudioAiClient implements AiClient {
+public class TurtleAiClient implements AiClient {
 
-    private static final String TAG = "LmStudioAiClient";
+    private static final String TAG = "TurtleAiClient";
     private static final String GEMINI_URL =
             "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent";
     /** Gemini 2.5 Flash Image ("Nano Banana"); same endpoint, inlineData PNG response. */
@@ -71,16 +69,56 @@ public class LmStudioAiClient implements AiClient {
     private final AiClient delegate;
     private final Context appContext;
     private final HostProvider hostProvider;
+    private final StagingPipeline pipeline;
     private final Map<String, String> promptCache = new HashMap<>();
 
-    public LmStudioAiClient(Context context, HostProvider hostProvider, AiClient delegate) {
+    /** Live text-provider toggle; null = Gemini only. Affects text commands
+     *  (/ask, /org, raw completions) and {@link #rewrite}, not image commands. */
+    private com.prince.ai.TextRoute textRoute;
+
+    public TurtleAiClient(Context context, HostProvider hostProvider,
+                          StagingPipeline pipeline, AiClient delegate) {
         this.appContext = context.getApplicationContext();
         this.hostProvider = hostProvider;
+        this.pipeline = pipeline;
         this.delegate = delegate;
+    }
+
+    /** Sets the live text-provider toggle. */
+    public void setTextRoute(com.prince.ai.TextRoute textRoute) {
+        this.textRoute = textRoute;
     }
 
     public void destroy() {
         io.shutdown();
+    }
+
+    /** Simple text-rewrite callback for the in-keyboard AI assist panel. */
+    public interface RewriteCallback {
+        void onSuccess(String rewritten);
+        void onError(String message);
+    }
+
+    /**
+     * Text-only transform: sends {@code systemPrompt} + {@code userText} to Gemini and
+     * delivers the trimmed completion on the main thread. Used by the AI assist panel,
+     * which feeds the field's whole text as the user turn.
+     */
+    public void rewrite(String systemPrompt, String userText, RewriteCallback cb) {
+        if (cb == null) return;
+        if (userText == null || userText.isEmpty()) {
+            main.post(() -> cb.onError("Field is empty"));
+            return;
+        }
+        io.execute(() -> {
+            try {
+                String result = callGemini(systemPrompt == null ? "" : systemPrompt, userText);
+                main.post(() -> cb.onSuccess(result));
+            } catch (Exception e) {
+                Log.w(TAG, "rewrite failed", e);
+                main.post(() -> cb.onError("Gemini unreachable"));
+            }
+        });
     }
 
     /** Synthetic command for raw text completions; caller embeds instructions in the user prompt. */
@@ -125,7 +163,7 @@ public class LmStudioAiClient implements AiClient {
             io.execute(() -> {
                 // Picker is launched when the user enters /edit prompt mode; fall back
                 // to the clipboard if the user skipped it.
-                ClipImage src = stagedEditImage.getAndSet(null);
+                ClipImage src = pipeline.consumeEditImage();
                 if (src == null) src = readClipboardImage();
                 if (src == null) {
                     main.post(() -> callback.onResult(AiResult.error("Pick an image first")));
@@ -144,7 +182,7 @@ public class LmStudioAiClient implements AiClient {
         }
         if (name.equals("style")) {
             io.execute(() -> {
-                ClipImage src = stagedEditImage.getAndSet(null);
+                ClipImage src = pipeline.consumeEditImage();
                 if (src == null) src = readClipboardImage();
                 if (src == null) {
                     main.post(() -> callback.onResult(AiResult.error("Pick an image first")));
@@ -165,10 +203,9 @@ public class LmStudioAiClient implements AiClient {
         }
         if (name.equals("us")) {
             io.execute(() -> {
-                List<ReferenceImage> refs = readDriveReferencePhotos();
-                if (refs.isEmpty()) {
-                    main.post(() -> callback.onResult(AiResult.error(
-                            "Add reference photos in Settings → Connect Google Drive")));
+                List<ReferenceImage> refs = pipeline.consumeUsImages();
+                if (refs == null || refs.size() < 2) {
+                    main.post(() -> callback.onResult(AiResult.error("Pick two photos first")));
                     return;
                 }
                 try {
@@ -333,6 +370,13 @@ public class LmStudioAiClient implements AiClient {
     }
 
     private String callGemini(String systemPrompt, String prompt) throws Exception {
+        // Local LM Studio path for text ("basic questions"): /ask, /org, raw completions, rewrite.
+        if (textRoute != null && textRoute.useLocal()) {
+            String raw = com.prince.ai.LmStudioClient.complete(
+                    textRoute.baseUrl(), textRoute.model(), systemPrompt, prompt);
+            Log.d(TAG, "raw LM Studio content (" + raw.length() + " chars): " + raw);
+            return stripReasoning(raw).trim();
+        }
         HttpURLConnection conn = (HttpURLConnection) new URL(GEMINI_URL).openConnection();
         conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
         conn.setReadTimeout(READ_TIMEOUT_MS);
@@ -464,62 +508,15 @@ public class LmStudioAiClient implements AiClient {
         return request == null ? "" : request;
     }
 
-    /** Bytes + mime + decoded dimensions for an image from clipboard or picker. */
-    private static class ClipImage {
-        final byte[] bytes;
-        final String mime;
-        final int width;
-        final int height;
-        ClipImage(byte[] b, String m, int w, int h) {
-            this.bytes = b; this.mime = m; this.width = w; this.height = h;
-        }
-        float aspect() {
-            return (width > 0 && height > 0) ? (float) width / height : 0f;
-        }
-    }
+    // ClipImage, ReferenceImage, and the staging slots live on StagingPipeline now —
+    // see com.prince.turtlekeyboard.ai.StagingPipeline (held by TurtleApp).
 
+    /** Width/height of {@code bytes} without decoding the pixels. Used by {@link #readClipboardImage}. */
     private static int[] decodeBounds(byte[] bytes) {
         android.graphics.BitmapFactory.Options opts = new android.graphics.BitmapFactory.Options();
         opts.inJustDecodeBounds = true;
         android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.length, opts);
         return new int[]{opts.outWidth, opts.outHeight};
-    }
-
-    /** Image staged by the picker for the next {@code /edit} dispatch. */
-    private static final AtomicReference<ClipImage> stagedEditImage = new AtomicReference<>();
-
-    /** Notified when the staged slot changes so the IME can refresh its UI. */
-    public interface OnImageStagedListener {
-        /** {@code bytes} null means the staged image was cleared. */
-        void onImageStaged(@Nullable byte[] bytes, @Nullable String mime);
-    }
-
-    private static final AtomicReference<OnImageStagedListener> stageListener =
-            new AtomicReference<>();
-
-    public static void setOnImageStagedListener(@Nullable OnImageStagedListener l) {
-        stageListener.set(l);
-    }
-
-    /** Read-and-clear accessor for SPI integrations; returns the SPI-typed
-     *  {@link com.prince.kbd.core.IntegrationContext.PickedImage}. */
-    @Nullable
-    public static com.prince.kbd.core.IntegrationContext.PickedImage consumeStagedEditImage() {
-        ClipImage src = stagedEditImage.getAndSet(null);
-        if (src == null) return null;
-        return new com.prince.kbd.core.IntegrationContext.PickedImage(src.bytes, src.mime);
-    }
-
-    public static void stageEditImage(byte[] bytes, String mime) {
-        if (bytes == null) {
-            stagedEditImage.set(null);
-        } else {
-            int[] dims = decodeBounds(bytes);
-            stagedEditImage.set(new ClipImage(
-                    bytes, mime != null ? mime : "image/png", dims[0], dims[1]));
-        }
-        OnImageStagedListener l = stageListener.get();
-        if (l != null) l.onImageStaged(bytes, mime);
     }
 
     /** First image-typed item on the primary clip, or null. */
@@ -585,13 +582,6 @@ public class LmStudioAiClient implements AiClient {
         String raw = readStream(conn.getInputStream());
         conn.disconnect();
         return decodeImagePart(raw);
-    }
-
-    /** Reference photo for /us — bytes + mime, read from the local cache. */
-    private static final class ReferenceImage {
-        final byte[] bytes;
-        final String mime;
-        ReferenceImage(byte[] b, String m) { bytes = b; mime = m; }
     }
 
     /** Loads locally-cached reference selfies; drops entries whose file is gone. */

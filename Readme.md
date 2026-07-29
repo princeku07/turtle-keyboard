@@ -2,9 +2,18 @@
 
 > The Universal AI Input Layer — an open-source AI keyboard for iOS and Android that puts every model one slash command away, inside any app you already use.
 
-Type `/cap`, `/fix`, `/reply` (or any custom command) inside any text field to trigger an AI action and paste the result back into the conversation you are already in. The keyboard clients are open source; the routing, premium models, and custom commands live in a closed-source backend.
+Type `/poll`, `/quiz`, `/cap`, `/summarize`, `/github` (or any custom command) inside any text field to trigger an action and drop the result straight into the conversation you're already in — no app-switching. The keyboard clients are open source (MIT); the routing, premium models, image generation, and custom commands live in a closed-source backend.
 
-See [`Prd.md`](./Prd.md) for the full product spec.
+### What you can do
+
+- **`/poll`, `/quiz`** — drop a live, anonymous poll or a prompted quiz into any chat, even a mixed iPhone + Android group. Players just tap a link; nothing to install.
+- **`/cap`, `/sticker`** — generate an image, sticker, or meme from a prompt and send it in line.
+- **`/summarize`, `/fix`, `/reply`** — condense a thread or rewrite a draft, in place.
+- **`/github`, `/notion`, `/linear`** — connected apps built right into the keyboard via the Model Context Protocol (MCP). Add your own tool in ~30 lines.
+
+**Privacy invariant:** the keyboard only ever acts on the text you type _after_ a slash command — ordinary typing is never captured, logged, or transmitted. Because the clients are open source, that's something you can verify rather than take on trust.
+
+See [`Prd.md`](./Prd.md) for the full product spec, or [turtlekeyboard.com/open-source-ai-keyboard](https://www.turtlekeyboard.com/open-source-ai-keyboard) for the overview.
 
 ---
 

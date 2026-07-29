@@ -6,6 +6,7 @@ import com.prince.kbd.core.CommandSpec;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -56,10 +57,56 @@ public class CommandRegistry {
     }
 
     private final Map<String, Entry> entries = new LinkedHashMap<>();
+    private final Map<String, PromptSuggestionSource> suggestionSources = new HashMap<>();
+    private final Map<String, ImagePickerKind> imagePickers = new HashMap<>();
+    private final Map<String, PromptDecorator> promptDecorators = new HashMap<>();
     @Nullable private UserCommandPins pins;
 
     public void setPins(@Nullable UserCommandPins pins) {
         this.pins = pins;
+    }
+
+    /** Overrides what the suggestion strip shows while this command is in prompt mode.
+     *  Pass {@code null} to remove the override and fall back to the global dictionary. */
+    public void setSuggestionSource(String commandName, @Nullable PromptSuggestionSource source) {
+        if (commandName == null) return;
+        String key = commandName.toLowerCase();
+        if (source == null) suggestionSources.remove(key);
+        else suggestionSources.put(key, source);
+    }
+
+    /** Returns the registered override for {@code commandName}, or null if none. */
+    @Nullable
+    public PromptSuggestionSource suggestionSourceFor(@Nullable String commandName) {
+        return commandName == null ? null : suggestionSources.get(commandName.toLowerCase());
+    }
+
+    /** Declares whether the IME should pre-launch an image picker on prompt start. */
+    public void setImagePicker(String commandName, @Nullable ImagePickerKind kind) {
+        if (commandName == null) return;
+        String key = commandName.toLowerCase();
+        if (kind == null || kind == ImagePickerKind.NONE) imagePickers.remove(key);
+        else imagePickers.put(key, kind);
+    }
+
+    /** Returns the picker kind for {@code commandName}; {@link ImagePickerKind#NONE} if unset. */
+    public ImagePickerKind imagePickerFor(@Nullable String commandName) {
+        if (commandName == null) return ImagePickerKind.NONE;
+        ImagePickerKind k = imagePickers.get(commandName.toLowerCase());
+        return k == null ? ImagePickerKind.NONE : k;
+    }
+
+    /** Per-command prompt-mode UI extras (preset chips, etc.). Pass null to remove. */
+    public void setPromptDecorator(String commandName, @Nullable PromptDecorator decorator) {
+        if (commandName == null) return;
+        String key = commandName.toLowerCase();
+        if (decorator == null) promptDecorators.remove(key);
+        else promptDecorators.put(key, decorator);
+    }
+
+    @Nullable
+    public PromptDecorator promptDecoratorFor(@Nullable String commandName) {
+        return commandName == null ? null : promptDecorators.get(commandName.toLowerCase());
     }
 
     /** Register a command. Last writer wins on name collision. */

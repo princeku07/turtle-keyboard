@@ -13,6 +13,7 @@ import com.prince.kbd.core.SheetRouter;
 import com.prince.notion.NotionIntegration;
 import com.prince.slack.SlackIntegration;
 import com.prince.split.SplitIntegration;
+import com.prince.turtlekeyboard.ai.StagingPipeline;
 import com.prince.turtlekeyboard.integration.drive.DriveIntegration;
 import com.prince.turtlekeyboard.integration.poll.PollIntegration;
 import com.prince.turtlekeyboard.integration.puzzle.PuzzleIntegration;
@@ -43,6 +44,7 @@ public class TurtleApp extends Application {
     private static final String TAG = "TurtleApp";
 
     private SheetRouterImpl sheetRouter;
+    private final StagingPipeline stagingPipeline = new StagingPipeline();
 
     @Override
     public void onCreate() {
@@ -104,6 +106,9 @@ public class TurtleApp extends Application {
     }
 
     public SheetRouter sheetRouter() { return sheetRouter; }
+
+    /** Cross-component image-staging bus (picker → IME / integrations). */
+    public StagingPipeline stagingPipeline() { return stagingPipeline; }
 
     public static TurtleApp from(Context ctx) {
         return (TurtleApp) ctx.getApplicationContext();

@@ -7,35 +7,182 @@ on:
       - "android/**"
       - "commands/**"
       - ".github/workflows/android.yml"
+  push:
+    branches: [main]
+    paths:
+      - "android/**"
+      - "commands/**"
+      - ".github/workflows/android.yml"
+  # Allow manual runs for testing the workflow itself.
+  workflow_dispatch:
+
+# Cancel superseded runs on the same ref so PR pushes don't queue forever.
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build:
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: android
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup JDK 17
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
+      - uses: gradle/actions/setup-gradle@v3
+      - run: chmod +x ./gradlew
+      - run: ./gradlew lint --stacktrace
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-report
+          path: android/app/build/reports/lint-results-*.html
+          if-no-files-found: warn
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+  unit-test:
+    name: Unit tests (JVM + Robolectric)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v3
+      - run: chmod +x ./gradlew
+      - run: ./gradlew test --stacktrace
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-report
+          path: |
+            android/app/build/reports/tests/
+            android/app/build/test-results/
+          if-no-files-found: warn
 
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
-
-      - name: Lint, test, assemble debug
-        run: ./gradlew lint test assembleDebug
-
+  assemble-debug:
+    name: Assemble debug
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v3
+      - run: chmod +x ./gradlew
+      - run: ./gradlew assembleDebug --stacktrace
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug-${{ github.event.pull_request.number }}
+          name: app-debug-${{ github.event.pull_request.number || github.sha }}
           path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: warn
+
+  assemble-release:
+    name: Assemble release (R8 / ProGuard check)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v3
+      - run: chmod +x ./gradlew
+      # Release build catches R8/ProGuard surprises that debug misses.
+      # Empty GEMINI_API_KEY is fine — the build warns but succeeds.
+      - run: ./gradlew assembleRelease --stacktrace
+      - name: Upload release mapping
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r8-mapping
+          path: android/app/build/outputs/mapping/release/mapping.txt
+          if-no-files-found: warn
+
+  instrumented-test:
+    name: Instrumented tests (emulator)
+    # Heavy job — only runs on PR + manual; skipped on push to main to keep merges fast.
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [30]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v3
+      - run: chmod +x ./gradlew
+        working-directory: android
+
+      # KVM is required for fast x86_64 emulators on GitHub-hosted runners.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: AVD cache
+        uses: actions/cache@v4
+        id: avd-cache
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-${{ matrix.api-level }}
+
+      - name: Prime AVD cache (cold boot, snapshot saved)
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          arch: x86_64
+          profile: pixel_4
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot-load -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: echo "Generated AVD snapshot for caching"
+
+      - name: Run instrumented tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          arch: x86_64
+          profile: pixel_4
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          working-directory: android
+          script: ./gradlew connectedDebugAndroidTest --stacktrace
+
+      - name: Upload instrumented test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: instrumented-test-report-api${{ matrix.api-level }}
+          path: |
+            android/app/build/reports/androidTests/
+            android/app/build/outputs/androidTest-results/
           if-no-files-found: warn

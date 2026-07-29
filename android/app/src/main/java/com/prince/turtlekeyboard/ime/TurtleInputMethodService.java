@@ -23,15 +23,16 @@ import androidx.core.view.inputmethod.InputContentInfoCompat;
 
 import com.prince.turtlekeyboard.R;
 import com.prince.turtlekeyboard.ai.AiClient;
-import com.prince.turtlekeyboard.ai.LmStudioAiClient;
+import com.prince.turtlekeyboard.ai.OnDeviceAiClient;
+import com.prince.turtlekeyboard.ai.TurtleAiClient;
 import com.prince.turtlekeyboard.ai.StubAiClient;
+import com.prince.turtlekeyboard.input.InputTarget;
 import com.prince.turtlekeyboard.command.CommandComposer;
 import com.prince.turtlekeyboard.command.CommandDispatcher;
 import com.prince.turtlekeyboard.command.CommandRegistry;
 import com.prince.turtlekeyboard.command.SlashCommand;
 import com.prince.turtlekeyboard.command.SlashCommandDetector;
 import com.prince.turtlekeyboard.gesture.SpaceGestureHandler;
-import com.prince.turtlekeyboard.ime.view.BackspaceMenuPopup;
 import com.prince.turtlekeyboard.ime.view.KeyPreviewPopup;
 import com.prince.turtlekeyboard.ime.view.KeyboardRootView;
 import com.prince.turtlekeyboard.ime.view.TurtleKeyboardView;
@@ -109,12 +110,12 @@ public class TurtleInputMethodService extends InputMethodService
     private AudioManager audio;
     private KeyPreviewPopup preview;
     private KeyboardView keyboardView;
-    private BackspaceMenuPopup deleteMenu;
-    /** Latched on backspace long-press; while true, DELETE keycodes are swallowed so a still-held finger can't shred text. */
-    private boolean backspaceHoldConsumed;
     private VoiceInputController voice;
     private IntegrationRegistry integrations;
-    private LmStudioAiClient aiClient;
+    private TurtleAiClient aiClient;
+    private OnDeviceAiClient onDeviceAi;
+    /** Live text-provider toggle (Gemini ↔ LM Studio); reads prefs per call. */
+    private com.prince.ai.TextRoute textRoute;
     /** True between onStartInputView and onFinishInputView; results route to a notification when false. */
     private boolean inputViewVisible;
 
@@ -126,9 +127,36 @@ public class TurtleInputMethodService extends InputMethodService
     @Nullable private String pendingInsertMime;
 
     @Nullable private com.prince.turtlekeyboard.ime.view.EmojiPanelView activeEmojiPanel;
+    /** Lazy-constructed; reused across show/hide cycles. Mounted into {@link KeyboardRootView#panelHost()}. */
+    @Nullable private com.prince.turtlekeyboard.ime.view.AiAssistPanelView aiAssistPanel;
+    /** Single slot for the four key-band panels (Quick / Emoji / History / MoreActions). */
+    @Nullable private com.prince.turtlekeyboard.ime.view.PanelSlot keyAreaPanel;
+    /** Single slot for the focused input-owning component (AI prompt field, emoji search, …).
+     *  Updated by {@link #inputTargetWatcher}; consulted in onKey + voiceSink.onFinal. */
+    @Nullable private InputTarget activeInputTarget;
+    /** Wired to every InputTarget panel — swaps the slot when any panel enters/exits its input mode. */
+    private final InputTarget.ActiveChangeListener inputTargetWatcher =
+            (target, active) -> activeInputTarget = active ? target : null;
 
-    /** True after the user tapped the host editor during a prompt: panel stays visible but keystrokes route to host. */
-    private boolean composePaused;
+    /** Façade handed to {@link com.prince.turtlekeyboard.command.PromptDecorator}s so they can
+     *  drive the preset strips without depending on view internals. */
+    private final com.prince.turtlekeyboard.command.PromptDecorator.Ui promptUi =
+            new com.prince.turtlekeyboard.command.PromptDecorator.Ui() {
+                @Override public void showTextPresets(
+                        List<String> presets, java.util.function.Consumer<String> onPick) {
+                    root.stylePreviewStrip().hide();
+                    root.presetStrip().setPresets(presets, onPick::accept);
+                }
+                @Override public void showImagePreviewPresets(
+                        List<String> presets, java.util.function.Consumer<String> onPick) {
+                    root.presetStrip().hide();
+                    root.stylePreviewStrip().setPresets(presets, onPick::accept);
+                }
+                @Override public void hidePresets() {
+                    root.presetStrip().hide();
+                    root.stylePreviewStrip().hide();
+                }
+            };
 
     @Override
     public void onCreate() {
@@ -136,6 +164,9 @@ public class TurtleInputMethodService extends InputMethodService
         // Start dictionary load on service create (not view inflate) for a populated first strip.
         suggestionEngine = new SuggestionEngine(this);
         suggestionEngine.loadAsync(this);
+        // Page Gemini Nano in early so the first /assist tap doesn't pay the cold-start.
+        onDeviceAi = new OnDeviceAiClient(this);
+        onDeviceAi.warmup();
     }
 
     @Override
@@ -144,6 +175,8 @@ public class TurtleInputMethodService extends InputMethodService
         root = (KeyboardRootView) View.inflate(this, R.layout.keyboard_view, null);
 
         KeyboardView kv = root.keyboardView();
+        keyAreaPanel = new com.prince.turtlekeyboard.ime.view.PanelSlot(
+                root.quickPanelHost(), kv);
         keyboard = new KeyboardController(this);
         keyboard.attach(kv);
         shift = new ShiftController();
@@ -161,87 +194,70 @@ public class TurtleInputMethodService extends InputMethodService
                 keyboard.setLayout(target);
                 kv.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
             });
-            tkv.setBackspaceLongPressListener(() -> {
-                backspaceHoldConsumed = true;
-                if (deleteMenu != null && hasInputText()) {
-                    deleteMenu.showAbove(kv, Keycodes.DELETE);
-                    kv.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
-                }
-            });
         }
         keyboardView = kv;
         preview = new KeyPreviewPopup(this);
         audio = (AudioManager) getSystemService(AUDIO_SERVICE);
 
         committer = new InputCommitter(this::getCurrentInputConnection);
-        deleteMenu = new BackspaceMenuPopup(this);
-        deleteMenu.setActionListener(new BackspaceMenuPopup.ActionListener() {
-            @Override public void onClearAll() { committer.clearAll(); refreshSuggestions(); }
-            @Override public void onDeleteWord() { committer.deleteWord(); refreshSuggestions(); }
-            @Override public void onDeleteSentence() { committer.deleteSentence(); refreshSuggestions(); }
-        });
         spaceGesture = new SpaceGestureHandler(this::onDoubleTapSpace);
         registry = new CommandRegistry();
         slashDetector = new SlashCommandDetector(committer, registry, this::onSlashCommand);
         composer = new CommandComposer(new CommandComposer.Ui() {
             @Override public void onNameChanged(String displayed) {
-                composePaused = false;
                 root.panel().hide();
                 root.banner().show(displayed);
                 refreshCommandSuggestions(displayed);
             }
             @Override public void onPromptStart(String commandName) {
-                composePaused = false;
                 root.banner().clear();
                 root.cmdSuggestions().hide();
                 CommandRegistry.Entry e = registry.get(commandName);
                 String label = (e != null ? e.emoji + " " + e.label : "/" + commandName);
                 root.panel().show(label, hintFor(commandName), "", 0);
-                // Hide the strip's paste pill so word predictions can show; the panel grows its own 📋 button.
-                root.strip().setPasteText(null);
+                // Strip paste chip stays visible in prompt mode; pasteFromClipboard routes to the composer.
                 root.panel().setPasteAvailable(readClipboardText());
                 refreshPromptSuggestions("", 0);
-                // Image-consuming commands share a single staging slot; launch the picker up-front.
-                if ("edit".equals(commandName) || "style".equals(commandName)
-                        || "gif".equals(commandName) || "gift".equals(commandName)
-                        || "sticker".equals(commandName)) {
-                    root.panel().setUploadAction(
-                            TurtleInputMethodService.this::launchEditImagePicker);
-                    launchEditImagePicker();
+
+                switch (registry.imagePickerFor(commandName)) {
+                    case EDIT:
+                        root.panel().setUploadAction(
+                                TurtleInputMethodService.this::launchEditImagePicker);
+                        launchEditImagePicker();
+                        break;
+                    case US:
+                        root.panel().setUploadAction(
+                                TurtleInputMethodService.this::launchUsImagePicker);
+                        launchUsImagePicker();
+                        break;
+                    case NONE:
+                        break;
                 }
-                if ("style".equals(commandName)) {
-                    root.presetStrip().hide();
-                    root.stylePreviewStrip().setPresets(
-                            LmStudioAiClient.stylePresetNames(),
-                            TurtleInputMethodService.this::dispatchStylePreset);
-                } else if ("us".equals(commandName)) {
-                    root.stylePreviewStrip().hide();
-                    root.presetStrip().setPresets(
-                            LmStudioAiClient.usPresetNames(),
-                            TurtleInputMethodService.this::dispatchUsPreset);
-                } else {
-                    root.presetStrip().hide();
-                    root.stylePreviewStrip().hide();
-                }
+
+                com.prince.turtlekeyboard.command.PromptDecorator dec =
+                        registry.promptDecoratorFor(commandName);
+                if (dec != null) dec.onStart(promptUi);
+                else promptUi.hidePresets();
             }
             @Override public void onPromptChanged(String commandName, String query, int cursorPos) {
                 root.panel().update(query, cursorPos);
                 refreshPromptSuggestions(query, cursorPos);
+                com.prince.turtlekeyboard.command.PromptDecorator dec =
+                        registry.promptDecoratorFor(commandName);
+                if (dec != null) dec.onQueryChanged(promptUi, query);
             }
             @Override public void onComposeEnd() {
-                composePaused = false;
                 root.banner().clear();
                 root.cmdSuggestions().hide();
                 root.panel().hide();
-                root.presetStrip().hide();
-                root.stylePreviewStrip().hide();
+                promptUi.hidePresets();
                 root.strip().setPasteText(readClipboardText());
                 refreshSuggestions();
                 // Don't clear the staged image here — onComposeEnd fires before dispatch sees it.
             }
         });
         // HostProvider hands the IME's decor to the HTML→image renderer so the WebView attaches to a real window.
-        LmStudioAiClient.HostProvider hostProvider = () -> {
+        TurtleAiClient.HostProvider hostProvider = () -> {
             android.view.Window w = getWindow() == null ? null : getWindow().getWindow();
             View decor = w == null ? null : w.getDecorView();
             return decor instanceof android.view.ViewGroup ? (android.view.ViewGroup) decor : null;
@@ -259,22 +275,18 @@ public class TurtleInputMethodService extends InputMethodService
 
         root.panel().setOnGoListener(this::dispatchPromptPanel);
         root.panel().setOnPasteListener(text -> composer.appendString(text));
-        // Tap/drag in the query positions the caret and also resumes a paused compose.
         root.panel().setOnCursorMoveListener(pos -> {
-            if (composePaused) {
-                composePaused = false;
-                root.panel().setPaused(false);
-                refreshSuggestions();
-            }
             composer.setPromptCursor(pos);
         });
         // Picker activity stole focus; we re-show the IME and reflect the staged image in the panel.
-        LmStudioAiClient.setOnImageStagedListener(this::onEditImageStaged);
+        stagingPipeline().setEditListener(this::onEditImageStaged);
+        stagingPipeline().setUsListener(this::onUsImagesStaged);
         root.strip().setOnPickListener(this::onSuggestionPicked);
         root.strip().setOnMicTapListener(this::toggleVoiceInput);
         root.strip().setOnPasteTapListener(this::pasteFromClipboard);
         root.strip().setOnSettingsTapListener(this::openHostDetailView);
         root.strip().setOnEmojiTapListener(this::toggleEmojiPanel);
+        root.strip().setOnSparkleTapListener(this::showAiAssistPanel);
         root.cmdSuggestions().setOnPickListener(this::onCommandSuggestionPicked);
         root.cmdSuggestions().setOnDismissListener(this::dismissCommandSuggestions);
 
@@ -282,12 +294,27 @@ public class TurtleInputMethodService extends InputMethodService
         appProfiles = new PersistentAppProfileRegistry(getApplicationContext(), prefs.root());
         // User pins outrank built-in affinity defaults in the registry ranker.
         registry.setPins(new UserCommandPins(prefs.root().scoped("pins")));
+        // Live text-provider toggle: re-reads prefs on every call so flipping the
+        // provider in Settings takes effect without re-creating the keyboard.
+        textRoute = new com.prince.ai.TextRoute() {
+            @Override public boolean useLocal() {
+                return Prefs.PROVIDER_LMSTUDIO.equals(
+                        prefs.getString(Prefs.KEY_TEXT_PROVIDER, Prefs.PROVIDER_GEMINI));
+            }
+            @Override public String baseUrl() {
+                return prefs.getString(Prefs.KEY_LMSTUDIO_URL, Prefs.DEFAULT_LMSTUDIO_URL);
+            }
+            @Override public String model() {
+                return prefs.getString(Prefs.KEY_LMSTUDIO_MODEL, Prefs.DEFAULT_LMSTUDIO_MODEL);
+            }
+        };
         if (integrations != null) { integrations.shutdown(); integrations = null; }
         if (aiClient != null) { aiClient.destroy(); aiClient = null; }
-        LmStudioAiClient ai = new LmStudioAiClient(this, hostProvider, new StubAiClient());
+        TurtleAiClient ai = new TurtleAiClient(this, hostProvider, stagingPipeline(), new StubAiClient());
+        ai.setTextRoute(textRoute);
         aiClient = ai;
         com.prince.kbd.core.GeminiService gemini = new com.prince.ai.GeminiClient(
-                com.prince.turtlekeyboard.BuildConfig.GEMINI_API_KEY);
+                com.prince.turtlekeyboard.BuildConfig.GEMINI_API_KEY, textRoute);
         com.prince.kbd.core.McpService mcp = new com.prince.ai.McpClient();
         com.prince.kbd.core.GoogleAuth googleAuth = new com.prince.kbd.core.GoogleAuthImpl(
                 getApplicationContext(), prefs.root().scoped("google"));
@@ -322,15 +349,9 @@ public class TurtleInputMethodService extends InputMethodService
                     android.util.Log.i("TurtleIME", "SPI picker delivery: reqId=" + reqId
                             + " bytes=" + (bytes == null ? "null" : bytes.length));
 
-                    // Show now + delayed fallback in case input isn't ready yet.
-                    pendingShowAfterPick = true;
-                    requestShowSelf(0);
-                    mainHandler.postDelayed(() -> {
-                        if (pendingShowAfterPick) {
-                            pendingShowAfterPick = false;
-                            requestShowSelf(0);
-                        }
-                    }, 250);
+                    // Try once immediately; the helper covers the case where input isn't ready yet.
+                    requestShowSelfCompat();
+                    requestShowSelfAfterPick();
 
                     // Defer the callback so ctx.showPanel lands on a settled view tree.
                     root.post(() -> {
@@ -375,6 +396,9 @@ public class TurtleInputMethodService extends InputMethodService
                 "history", "History", "🗂️", false,
                 (prompt, ctx) -> showHistoryPanel()));
 
+        com.prince.turtlekeyboard.command.BuiltinPromptUi.register(
+                registry, this::dispatchStylePreset, this::dispatchUsPreset);
+
         dispatcher = new CommandDispatcher(
                 ai, committer, this, registry, () -> integrationCtx);
 
@@ -418,18 +442,18 @@ public class TurtleInputMethodService extends InputMethodService
         refreshSuggestions();
         root.strip().setVisibility(View.VISIBLE);
         root.strip().setPasteText(readClipboardText());
-    }
-
-    private boolean hasInputText() {
-        if (committer == null) return false;
-        return committer.textBeforeCursor(1).length() > 0
-                || committer.textAfterCursor(1).length() > 0;
+        refreshSparkleVisibility();
     }
 
     private void pasteFromClipboard() {
         String text = readClipboardText();
         if (text == null) return;
-        committer.commitText(text);
+        if (composer != null && composer.isActive()
+                && composer.mode() == com.prince.turtlekeyboard.command.CommandComposer.Mode.PROMPT) {
+            composer.appendString(text);
+        } else {
+            committer.commitText(text);
+        }
         root.strip().setPasteText(null);
     }
 
@@ -438,7 +462,6 @@ public class TurtleInputMethodService extends InputMethodService
     }
 
     private void showMoreActionsPanel() {
-        android.view.ViewGroup host = root.quickPanelHost();
         com.prince.turtlekeyboard.ime.view.MoreActionsPanelView panel =
                 new com.prince.turtlekeyboard.ime.view.MoreActionsPanelView(this);
         panel.applyTheme(themes.current());
@@ -446,17 +469,7 @@ public class TurtleInputMethodService extends InputMethodService
             @Override public void onClose() { hideQuickPanel(); }
             @Override public void onAction(int actionId) { onMoreActionPicked(actionId); }
         });
-
-        // Match the keyboard's measured height so the panel sits in the same band as the keys.
-        android.inputmethodservice.KeyboardView keys = root.keyboardView();
-        int targetHeight = keys.getHeight();
-        host.removeAllViews();
-        android.widget.FrameLayout.LayoutParams lp = new android.widget.FrameLayout.LayoutParams(
-                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
-                targetHeight > 0 ? targetHeight : android.widget.FrameLayout.LayoutParams.WRAP_CONTENT);
-        host.addView(panel, lp);
-        host.setVisibility(View.VISIBLE);
-        keys.setVisibility(View.GONE);
+        keyAreaPanel.show(panel);
     }
 
     private void onMoreActionPicked(int actionId) {
@@ -525,6 +538,7 @@ public class TurtleInputMethodService extends InputMethodService
         if (integrations != null) integrations.onInputEnd();
         hideEnrollmentBanner();
         if (root != null && root.hostAppBadge() != null) root.hostAppBadge().hide();
+        if (isAiAssistPanelVisible()) hideAiAssistPanel();
     }
 
     // onWindowShown/Hidden is the ground truth for keyboard-on-screen; onFinishInputView misses some app-switch cases.
@@ -545,42 +559,45 @@ public class TurtleInputMethodService extends InputMethodService
                                   int newSelStart, int newSelEnd,
                                   int candStart, int candEnd) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candStart, candEnd);
-        // Any selection change mid-compose is user-initiated (composer never writes to host); pause so typing routes to host.
-        pauseComposeForHostFocus();
         if (integrations != null && committer != null) {
             integrations.onTextChanged(committer.textBeforeCursor(16), committer.textAfterCursor(16));
         }
+        refreshSparkleVisibility();
     }
 
-    /** Tap on the host editor: covers the cases onUpdateSelection misses (empty field, tap at current caret). */
-    @Override
-    public void onViewClicked(boolean focusChanged) {
-        super.onViewClicked(focusChanged);
-        pauseComposeForHostFocus();
-    }
-
-    private void pauseComposeForHostFocus() {
-        if (composer == null || !composer.isActive() || composePaused) return;
-        composePaused = true;
-        if (root != null && root.panel() != null) root.panel().setPaused(true);
-        refreshSuggestions();
+    /** Shows the ✨ AI-assist trigger when the field has >1 word. Visibility is purely
+     *  field-driven so opening/closing the assist panel never re-lays out the strip. */
+    private void refreshSparkleVisibility() {
+        if (root == null || committer == null) return;
+        CharSequence before = committer.textBeforeCursor(200);
+        CharSequence after = committer.textAfterCursor(200);
+        String combined = (before == null ? "" : before.toString())
+                + (after == null ? "" : after.toString());
+        String trimmed = combined.trim();
+        boolean hasMultipleWords = !trimmed.isEmpty() && trimmed.split("\\s+").length > 1;
+        root.strip().setSparkleVisible(hasMultipleWords);
     }
 
     @Override
     public void onKey(int primaryCode, int[] keyCodes) {
         if (committer.connection() == null) return;
 
-        // Emoji search owns every keystroke; function keys swallowed so SHIFT doesn't leak to host.
-        if (activeEmojiPanel != null && activeEmojiPanel.isInSearchMode()) {
+        // Whatever component currently owns the input (AI prompt field, emoji search, …)
+        // gets printable keys + DELETE + DONE. SHIFT/MODE_CHANGE fall through so the user
+        // can capitalise / switch layouts mid-typing.
+        if (activeInputTarget != null) {
             if (primaryCode == Keycodes.DELETE) {
-                activeEmojiPanel.backspaceQuery();
+                activeInputTarget.onBackspace();
+                return;
+            }
+            if (primaryCode == Keycodes.DONE) {
+                activeInputTarget.onDone();
                 return;
             }
             if (primaryCode > 0) {
-                activeEmojiPanel.appendQueryChar((char) primaryCode);
+                activeInputTarget.appendChar((char) primaryCode);
                 return;
             }
-            return;
         }
 
         if (primaryCode == Keycodes.MIC) {
@@ -592,12 +609,10 @@ public class TurtleInputMethodService extends InputMethodService
             return;
         }
 
-        if (composer.isActive() && !composePaused && handleComposingKey(primaryCode)) return;
+        if (composer.isActive() && handleComposingKey(primaryCode)) return;
 
         switch (primaryCode) {
             case Keycodes.DELETE:
-                // Swallow MSG_REPEAT DELETEs from a still-held finger after the long-press menu fired.
-                if (backspaceHoldConsumed) break;
                 committer.backspace();
                 refreshSuggestions();
                 break;
@@ -613,7 +628,6 @@ public class TurtleInputMethodService extends InputMethodService
                 if (keyboard.isQwerty()) shift.reapply();
                 break;
             case Keycodes.SLASH:
-                // Don't start a new compose over a paused prompt — that would clobber the staged buffer.
                 if (!composer.isActive() && atWordBoundary()) {
                     composer.startName();
                 } else {
@@ -826,6 +840,62 @@ public class TurtleInputMethodService extends InputMethodService
         }
     }
 
+    /** Stages a side-by-side thumbnail of the picked /us photos and re-shows the IME. */
+    private void onUsImagesStaged(
+            @Nullable java.util.List<byte[]> images, @Nullable java.util.List<String> mimes) {
+        if (images == null || images.isEmpty()) {
+            root.post(() -> root.panel().setStagedImage(null, null));
+            return;
+        }
+        final java.util.List<byte[]> snapshot = new java.util.ArrayList<>(images);
+        bitmapIo.execute(() -> {
+            android.graphics.BitmapFactory.Options opts = new android.graphics.BitmapFactory.Options();
+            opts.inSampleSize = 4;
+            android.graphics.Bitmap first = snapshot.size() > 0
+                    ? android.graphics.BitmapFactory.decodeByteArray(
+                            snapshot.get(0), 0, snapshot.get(0).length, opts) : null;
+            android.graphics.Bitmap second = snapshot.size() > 1
+                    ? android.graphics.BitmapFactory.decodeByteArray(
+                            snapshot.get(1), 0, snapshot.get(1).length, opts) : null;
+            final android.graphics.Bitmap composite = composeSideBySide(first, second);
+            root.post(() -> root.panel().setStagedImage(composite, () ->
+                    stagingPipeline().stageUsImages(null, null)));
+        });
+        requestShowSelfAfterPick();
+    }
+
+    /** Returns a square-tile side-by-side bitmap of {@code a} and {@code b}; null inputs render blank. */
+    @Nullable
+    private android.graphics.Bitmap composeSideBySide(
+            @Nullable android.graphics.Bitmap a, @Nullable android.graphics.Bitmap b) {
+        if (a == null && b == null) return null;
+        int tile = 96;
+        int gap = 4;
+        android.graphics.Bitmap out = android.graphics.Bitmap.createBitmap(
+                tile * 2 + gap, tile, android.graphics.Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas c = new android.graphics.Canvas(out);
+        drawCenterCropped(c, a, 0, 0, tile, tile);
+        drawCenterCropped(c, b, tile + gap, 0, tile, tile);
+        return out;
+    }
+
+    private void drawCenterCropped(android.graphics.Canvas c, @Nullable android.graphics.Bitmap src,
+                                   int dx, int dy, int dw, int dh) {
+        if (src == null) return;
+        int sw = src.getWidth();
+        int sh = src.getHeight();
+        float scale = Math.max((float) dw / sw, (float) dh / sh);
+        int outW = Math.round(sw * scale);
+        int outH = Math.round(sh * scale);
+        int x = dx + (dw - outW) / 2;
+        int y = dy + (dh - outH) / 2;
+        android.graphics.Rect dst = new android.graphics.Rect(x, y, x + outW, y + outH);
+        c.save();
+        c.clipRect(dx, dy, dx + dw, dy + dh);
+        c.drawBitmap(src, null, dst, null);
+        c.restore();
+    }
+
     /** Stages the picked image into the panel and re-shows the IME (picker shim stole focus). */
     private void onEditImageStaged(@Nullable byte[] bytes, @Nullable String mime) {
         if (bytes == null) {
@@ -838,29 +908,43 @@ public class TurtleInputMethodService extends InputMethodService
             final android.graphics.Bitmap thumb =
                     android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.length, opts);
             root.post(() -> root.panel().setStagedImage(thumb, () ->
-                    LmStudioAiClient.stageEditImage(null, null)));
+                    stagingPipeline().stageEditImage(null, null)));
         });
-        // requestShowSelf is a no-op until the shim activity finishes; use a flag + delayed fallback.
-        pendingShowAfterPick = true;
-        mainHandler.postDelayed(() -> {
-            if (pendingShowAfterPick) {
-                pendingShowAfterPick = false;
-                requestShowSelf(0);
-            }
-        }, 300);
+        requestShowSelfAfterPick();
     }
 
     @Override
     public void onStartInput(EditorInfo info, boolean restarting) {
         super.onStartInput(info, restarting);
-        // Editor swap mid-compose: pause so keystrokes route to the new host (onUpdateSelection misses this).
-        if (!restarting && composer != null && composer.isActive() && !composePaused) {
-            composePaused = true;
-            if (root != null && root.panel() != null) root.panel().setPaused(true);
-        }
         if (pendingShowAfterPick) {
             pendingShowAfterPick = false;
-            mainHandler.post(() -> requestShowSelf(0));
+            mainHandler.post(() -> requestShowSelfCompat());
+        }
+    }
+
+    /** Process-wide image-staging pipeline (held by {@link TurtleApp}). */
+    private com.prince.turtlekeyboard.ai.StagingPipeline stagingPipeline() {
+        return com.prince.turtlekeyboard.TurtleApp.from(this).stagingPipeline();
+    }
+
+    /** Picker fallback: the shim activity tears down our IME; the next onStartInput
+     *  consumes the flag, but if it never fires (e.g., user backs out), this re-shows us. */
+    private void requestShowSelfAfterPick() {
+        pendingShowAfterPick = true;
+        mainHandler.postDelayed(() -> {
+            if (pendingShowAfterPick) {
+                pendingShowAfterPick = false;
+                requestShowSelfCompat();
+            }
+        }, 300L);
+    }
+
+    /** {@link android.inputmethodservice.InputMethodService#requestShowSelf(int)} was
+     *  added in API 28; on older devices there is no equivalent, so this no-ops and we
+     *  rely on the normal onStartInput re-show path when focus returns to our IME. */
+    private void requestShowSelfCompat() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            requestShowSelf(0);
         }
     }
 
@@ -879,10 +963,10 @@ public class TurtleInputMethodService extends InputMethodService
         }
     }
 
-    /** Launches the picker shim and stages the bytes into {@link LmStudioAiClient} for the next dispatch. */
+    /** Launches the picker shim; bytes flow back via {@link StagingPipeline} for the next dispatch. */
     private void launchEditImagePicker() {
         // Clear any leftover staged image so cancelling the picker doesn't resurrect an old one.
-        LmStudioAiClient.stageEditImage(null, null);
+        stagingPipeline().stageEditImage(null, null);
         android.content.Intent i = new android.content.Intent(this,
                 com.prince.turtlekeyboard.ai.ImagePickerActivity.class);
         i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -890,6 +974,21 @@ public class TurtleInputMethodService extends InputMethodService
             startActivity(i);
         } catch (Exception e) {
             android.util.Log.w("TurtleIME", "edit picker launch failed", e);
+            root.banner().showAndAutoHide("Picker unavailable", 2000L);
+        }
+    }
+
+    /** Launches the multi-image picker (exactly 2); bytes flow back via {@link StagingPipeline}. */
+    private void launchUsImagePicker() {
+        stagingPipeline().stageUsImages(null, null);
+        android.content.Intent i = new android.content.Intent(this,
+                com.prince.turtlekeyboard.ai.ImagePickerActivity.class);
+        i.putExtra(com.prince.turtlekeyboard.ai.ImagePickerActivity.EXTRA_PICK_COUNT, 2);
+        i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+            startActivity(i);
+        } catch (Exception e) {
+            android.util.Log.w("TurtleIME", "us picker launch failed", e);
             root.banner().showAndAutoHide("Picker unavailable", 2000L);
         }
     }
@@ -1020,7 +1119,12 @@ public class TurtleInputMethodService extends InputMethodService
         }
         @Override public void onFinal(String text) {
             if (text == null || text.isEmpty()) return;
-            if (composer.isActive() && !composePaused) {
+            // Whichever component owns the input takes precedence — same routing rule as typed keys.
+            if (activeInputTarget != null) {
+                activeInputTarget.appendText(text);
+                return;
+            }
+            if (composer.isActive()) {
                 // Route into whichever phase the composer is in (NAME / PROMPT).
                 for (int i = 0; i < text.length(); i++) composer.appendChar(text.charAt(i));
             } else {
@@ -1040,16 +1144,23 @@ public class TurtleInputMethodService extends InputMethodService
 
     @Override
     public void onDestroy() {
+        // Listeners would otherwise fire into this dead instance's view tree after the next
+        // IME (re)creation registers fresh refs onto the same pipeline.
+        stagingPipeline().setEditListener(null);
+        stagingPipeline().setUsListener(null);
+        com.prince.turtlekeyboard.ai.PickerResultBus.setListener(null);
+        if (suggestionEngine != null) suggestionEngine.setOnReadyListener(null);
         if (voice != null) { voice.destroy(); voice = null; }
         if (integrations != null) { integrations.shutdown(); integrations = null; }
         if (aiClient != null) { aiClient.destroy(); aiClient = null; }
+        if (onDeviceAi != null) { onDeviceAi.destroy(); onDeviceAi = null; }
         bitmapIo.shutdown();
         super.onDestroy();
     }
 
     private void refreshSuggestions() {
         // Prompt buffer never reaches the host; use the prompt-context path so suggestions track the panel.
-        if (composer != null && composer.isActive() && !composePaused
+        if (composer != null && composer.isActive()
                 && composer.mode() == com.prince.turtlekeyboard.command.CommandComposer.Mode.PROMPT) {
             refreshPromptSuggestions(composer.query(), composer.promptCursor());
             return;
@@ -1061,20 +1172,32 @@ public class TurtleInputMethodService extends InputMethodService
 
     /** Sibling of refreshSuggestions that reads from the composer buffer instead of the host editor. */
     private void refreshPromptSuggestions(String query, int cursorPos) {
-        if (suggestionProvider == null || root == null) return;
-        String q = query == null ? "" : query;
-        int safeCursor = Math.max(0, Math.min(q.length(), cursorPos));
-        String context = q.substring(0, safeCursor);
-        if (context.length() > 64) {
-            context = context.substring(context.length() - 64);
+        if (root == null || composer == null) return;
+        String context = slicePromptContext(query, cursorPos);
+        com.prince.turtlekeyboard.command.PromptSuggestionSource override =
+                registry.suggestionSourceFor(composer.commandName());
+        List<String> list;
+        if (override != null) {
+            list = override.suggest(context);
+        } else if (suggestionProvider != null) {
+            list = suggestionProvider.suggest(context);
+        } else {
+            return;
         }
-        List<String> list = suggestionProvider.suggest(context);
-        root.strip().setSuggestions(list);
+        root.strip().setSuggestions(list == null ? java.util.Collections.emptyList() : list);
+    }
+
+    /** Trailing 64 chars before the cursor — the context window suggestion sources see. */
+    private static String slicePromptContext(String query, int cursorPos) {
+        String q = query == null ? "" : query;
+        int safe = Math.max(0, Math.min(q.length(), cursorPos));
+        String ctx = q.substring(0, safe);
+        return ctx.length() > 64 ? ctx.substring(ctx.length() - 64) : ctx;
     }
 
     private void onSuggestionPicked(String suggestion) {
         // PROMPT mode: route through the composer so the panel updates and the host doesn't see the suggestion.
-        if (composer != null && composer.isActive() && !composePaused
+        if (composer != null && composer.isActive()
                 && composer.mode() == com.prince.turtlekeyboard.command.CommandComposer.Mode.PROMPT) {
             String q = composer.query();
             int cursor = composer.promptCursor();
@@ -1190,11 +1313,10 @@ public class TurtleInputMethodService extends InputMethodService
     }
 
     private boolean isQuickPanelVisible() {
-        return root.quickPanelHost().getVisibility() == View.VISIBLE;
+        return keyAreaPanel != null && keyAreaPanel.isVisible();
     }
 
     private void showQuickPanel() {
-        android.view.ViewGroup host = root.quickPanelHost();
         com.prince.turtlekeyboard.ime.view.QuickPanelView panel =
                 new com.prince.turtlekeyboard.ime.view.QuickPanelView(this);
         panel.applyTheme(themes.current());
@@ -1202,23 +1324,11 @@ public class TurtleInputMethodService extends InputMethodService
         EditorInfo liveInfo = getCurrentInputEditorInfo();
         if (liveInfo != null && liveInfo.packageName != null) currentPkg = liveInfo.packageName;
         panel.show(registry.allSortedFor(currentPkg), this::onQuickPanelPick, this::hideQuickPanel);
-
-        // Match the keyboard's measured height so toggling doesn't jump IME height.
-        android.inputmethodservice.KeyboardView keys = root.keyboardView();
-        int targetHeight = keys.getHeight();
-        host.removeAllViews();
-        android.widget.FrameLayout.LayoutParams lp = new android.widget.FrameLayout.LayoutParams(
-                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
-                targetHeight > 0 ? targetHeight : android.widget.FrameLayout.LayoutParams.WRAP_CONTENT);
-        host.addView(panel, lp);
-        host.setVisibility(View.VISIBLE);
-        keys.setVisibility(View.GONE);
+        keyAreaPanel.show(panel);
     }
 
     private void hideQuickPanel() {
-        root.quickPanelHost().removeAllViews();
-        root.quickPanelHost().setVisibility(View.GONE);
-        root.keyboardView().setVisibility(View.VISIBLE);
+        if (keyAreaPanel != null) keyAreaPanel.hide();
     }
 
     /** Emoji panel and Quick Panel share the quickPanelHost slot. */
@@ -1232,43 +1342,150 @@ public class TurtleInputMethodService extends InputMethodService
     }
 
     private boolean isEmojiPanelVisible() {
-        android.view.ViewGroup host = root.quickPanelHost();
-        if (host.getVisibility() != View.VISIBLE || host.getChildCount() == 0) return false;
-        return host.getChildAt(0) instanceof com.prince.turtlekeyboard.ime.view.EmojiPanelView;
+        return keyAreaPanel != null
+                && keyAreaPanel.currentChild() instanceof com.prince.turtlekeyboard.ime.view.EmojiPanelView;
     }
 
     private void showEmojiPanel() {
-        android.view.ViewGroup host = root.quickPanelHost();
         final com.prince.turtlekeyboard.ime.view.EmojiPanelView panel =
                 new com.prince.turtlekeyboard.ime.view.EmojiPanelView(this);
         panel.applyTheme(themes.current());
+        panel.setOnInputActiveChangedListener(inputTargetWatcher);
         panel.show(this::commitEmoji, this::hideEmojiPanel);
         panel.setOnGifPickListener(this::insertHistoryGif);
+        panel.setOnGifAddListener(() -> composer.enterPromptMode("gif"));
 
         final android.inputmethodservice.KeyboardView keys = root.keyboardView();
         int targetHeight = keys.getHeight();
         if (targetHeight <= 0) targetHeight = android.widget.FrameLayout.LayoutParams.WRAP_CONTENT;
-        // Without this the panel stays at the shrunken search-mode size after exiting search.
+        // Lock browse height so search mode can shrink + restore without the panel collapsing.
         panel.setBrowseHeightPx(targetHeight);
-        // Re-show keys while the search bar is open; collapse on exit.
+        // Search mode re-shows keys behind the search bar; exit hides them in the same frame
+        // the panel snaps back to browse height (fade would leave a 68dp jump).
         panel.setOnSearchStateListener(new com.prince.turtlekeyboard.ime.view.EmojiPanelView.OnSearchStateListener() {
-            @Override public void onEnterSearch() { keys.setVisibility(View.VISIBLE); }
-            @Override public void onExitSearch()  { keys.setVisibility(View.GONE);    }
+            @Override public void onEnterSearch() {
+                keys.animate().cancel();
+                keys.setAlpha(0f);
+                keys.setVisibility(View.VISIBLE);
+                keys.animate().alpha(1f).setDuration(180).start();
+            }
+            @Override public void onExitSearch() {
+                keys.animate().cancel();
+                keys.setAlpha(1f);
+                keys.setVisibility(View.GONE);
+            }
         });
 
-        host.removeAllViews();
-        android.widget.FrameLayout.LayoutParams lp = new android.widget.FrameLayout.LayoutParams(
-                android.widget.FrameLayout.LayoutParams.MATCH_PARENT, targetHeight);
-        host.addView(panel, lp);
-        host.setVisibility(View.VISIBLE);
-        keys.setVisibility(View.GONE);
+        keyAreaPanel.show(panel);
         activeEmojiPanel = panel;
     }
 
     private void hideEmojiPanel() {
+        // Search mode never gets an exit fire on this teardown path (view is removed directly),
+        // so drop any input slot the panel was holding before nulling it out.
+        if (activeInputTarget == activeEmojiPanel) activeInputTarget = null;
         activeEmojiPanel = null;
         // Same teardown as the Quick Panel — they share the slot.
         hideQuickPanel();
+    }
+
+    private boolean isAiAssistPanelVisible() {
+        return keyAreaPanel != null
+                && keyAreaPanel.currentChild() == aiAssistPanel
+                && aiAssistPanel != null;
+    }
+
+    /** Mounts the AI assist panel via {@link com.prince.turtlekeyboard.ime.view.PanelSlot}
+     *  — same slot/pattern as Emoji / Quick / History panels. Browse mode replaces the
+     *  keys (no IME size change at all). Compose mode (user taps the custom prompt
+     *  field) shrinks the panel and re-shows the keys below — same UX as emoji search. */
+    private void showAiAssistPanel() {
+        if (isAiAssistPanelVisible()) {
+            hideAiAssistPanel();
+            return;
+        }
+        if (aiAssistPanel == null) {
+            aiAssistPanel = new com.prince.turtlekeyboard.ime.view.AiAssistPanelView(this);
+            aiAssistPanel.setOnInputActiveChangedListener(inputTargetWatcher);
+        }
+        final com.prince.turtlekeyboard.ime.view.AiAssistPanelView panel = aiAssistPanel;
+        final android.inputmethodservice.KeyboardView keys = root.keyboardView();
+        // Lock browse height so re-entering browse from compose restores correctly.
+        int browseHeight = keys.getHeight();
+        panel.setBrowseHeightPx(browseHeight > 0
+                ? browseHeight
+                : android.widget.FrameLayout.LayoutParams.WRAP_CONTENT);
+        panel.applyTheme(themes.current());
+        panel.show(this::runAiAssist, this::hideAiAssistPanel);
+        // AutoTransition inside the panel handles the fade — we just flip visibility.
+        panel.setOnComposeStateListener(new com.prince.turtlekeyboard.ime.view.AiAssistPanelView.OnComposeStateListener() {
+            @Override public void onEnterCompose() {
+                keys.setVisibility(View.VISIBLE);
+            }
+            @Override public void onExitCompose() {
+                keys.setVisibility(View.GONE);
+            }
+        });
+        keyAreaPanel.show(panel);
+    }
+
+    private void hideAiAssistPanel() {
+        if (aiAssistPanel != null) {
+            // Synchronous state reset (no animation now that PanelSlot handles teardown).
+            aiAssistPanel.hide();
+        }
+        if (keyAreaPanel != null) keyAreaPanel.hide();
+    }
+
+    /** Snapshots the field, runs the rewrite (on-device when Nano is ready, else cloud Gemini),
+     *  silently replaces on success, banners on error. */
+    private void runAiAssist(String systemPrompt) {
+        if (aiClient == null || committer == null || aiAssistPanel == null) return;
+        CharSequence current = committer.getAllText();
+        String text = current == null ? "" : current.toString();
+        if (text.trim().isEmpty()) {
+            root.banner().showAndAutoHide("Field is empty", 1200L);
+            return;
+        }
+        final com.prince.turtlekeyboard.ime.view.AiAssistPanelView panel = aiAssistPanel;
+        panel.setInflight(true);
+        root.banner().show("Rewriting…");
+
+        TurtleAiClient.RewriteCallback callback = new TurtleAiClient.RewriteCallback() {
+            @Override public void onSuccess(String rewritten) {
+                root.banner().clear();
+                if (committer != null && rewritten != null && !rewritten.isEmpty()) {
+                    committer.replaceAll(rewritten);
+                }
+                hideAiAssistPanel();
+            }
+            @Override public void onError(String message) {
+                panel.setInflight(false);
+                root.banner().showAndAutoHide(message, 1500L);
+            }
+        };
+
+        OnDeviceAiClient.Availability avail = onDeviceAi == null
+                ? OnDeviceAiClient.Availability.UNAVAILABLE
+                : onDeviceAi.availability();
+        // Explicitly choosing Local (LM Studio) overrides on-device Nano so the rewrite
+        // always hits the configured server; aiClient.rewrite() routes there via TextRoute.
+        boolean useLocal = textRoute != null && textRoute.useLocal();
+        boolean onDevice = !useLocal && avail == OnDeviceAiClient.Availability.AVAILABLE;
+        android.util.Log.i("TurtleIME",
+                "assist route=" + (onDevice ? "on-device" : useLocal ? "lmstudio" : "cloud")
+                        + " nanoState=" + avail);
+        if (onDevice) {
+            onDeviceAi.rewrite(systemPrompt, text, new TurtleAiClient.RewriteCallback() {
+                @Override public void onSuccess(String rewritten) { callback.onSuccess(rewritten); }
+                @Override public void onError(String message) {
+                    // Nano failed mid-flight (rare, but possible) — quietly fall back to cloud.
+                    aiClient.rewrite(systemPrompt, text, callback);
+                }
+            });
+        } else {
+            aiClient.rewrite(systemPrompt, text, callback);
+        }
     }
 
     /** Goes straight to the IC so EmojiCompat-rendered text lands on hosts that filter custom spans. */
@@ -1279,23 +1496,13 @@ public class TurtleInputMethodService extends InputMethodService
     }
 
     private void showHistoryPanel() {
-        android.view.ViewGroup host = root.quickPanelHost();
         com.prince.turtlekeyboard.ime.view.HistoryPanelView panel =
                 new com.prince.turtlekeyboard.ime.view.HistoryPanelView(this);
         panel.applyTheme(themes.current());
         panel.show(com.prince.turtlekeyboard.ai.ImageHistory.list(this),
                 this::insertHistoryImage,
                 this::hideQuickPanel);
-
-        android.inputmethodservice.KeyboardView keys = root.keyboardView();
-        int targetHeight = keys.getHeight();
-        host.removeAllViews();
-        android.widget.FrameLayout.LayoutParams lp = new android.widget.FrameLayout.LayoutParams(
-                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
-                targetHeight > 0 ? targetHeight : android.widget.FrameLayout.LayoutParams.WRAP_CONTENT);
-        host.addView(panel, lp);
-        host.setVisibility(View.VISIBLE);
-        keys.setVisibility(View.GONE);
+        keyAreaPanel.show(panel);
     }
 
     private void insertHistoryImage(java.io.File file) {
@@ -1368,6 +1575,15 @@ public class TurtleInputMethodService extends InputMethodService
     private void applyTheme() {
         KeyboardTheme t = themes.current();
         root.applyTheme(t);
+    }
+
+    /** Repaints the keyboard when the OS night-mode bit flips so AUTO theme tracks system live. */
+    @Override
+    public void onConfigurationChanged(android.content.res.Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        if (themes != null && root != null) {
+            applyTheme();
+        }
     }
 
     // ===== CommandDispatcher.ResultUi =====
@@ -1535,13 +1751,6 @@ public class TurtleInputMethodService extends InputMethodService
         if (shouldPreview(primaryCode) && preview != null) {
             preview.show(keyboardView, primaryCode);
         }
-        if (primaryCode == Keycodes.DELETE) {
-            // Fresh ACTION_DOWN on ⌫ — release any suppression latched by the prior hold.
-            backspaceHoldConsumed = false;
-        } else if (deleteMenu != null && deleteMenu.isShowing()) {
-            // Pressing any non-delete key dismisses an open delete menu.
-            deleteMenu.dismiss();
-        }
     }
     @Override public void onRelease(int primaryCode) {
         if (preview != null) preview.dismiss();
@@ -1554,7 +1763,7 @@ public class TurtleInputMethodService extends InputMethodService
         return true;
     }
     @Override public void onText(CharSequence text) {
-        if (composer.isActive() && !composePaused) {
+        if (composer.isActive()) {
             for (int i = 0; i < text.length(); i++) composer.appendChar(text.charAt(i));
         } else {
             committer.commitText(text);

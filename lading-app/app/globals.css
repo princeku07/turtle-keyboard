@@ -1,60 +1,444 @@
 @import "tailwindcss";
 
 /* ────────────────────────────────────────────────────────────────
-   palette — six tokens, one job each.
+   COASTAL MINIMALISM — the turtle design system.
+   (see design.txt: calm, fluid, tactile. ocean air, not tech noise.)
 
-   abyss     deepest navy. footer floor, dark glass cards, text on foam.
-   ocean     hero background base — what the reef glow sits on top of.
-   reef      mid teal. accent borders, focus rings, hover edges only.
-             DELIBERATELY NOT a gradient stop — keeps the background
-             from competing with the reef photo for attention.
-   cyan      single bright accent. links, primary buttons, the only
-             color allowed to "pop" on the page.
-   foam      primary text — warm cream so it never reads cold against
-             the deep ocean blue.
-   foam-dim  secondary text. same family, lower energy.
-
-   the gradient between ocean → abyss is the entire visual depth story.
-   no extra hues in the descent — that's what created bands before.
+   sand         sea-foam base. very pale warm off-white — dry white sand.
+   sand-2       one shade deeper. wells, keyboards, alternating surfaces.
+   white-warm   near-white for phone screens & cards that sit ON sand.
+   navy         abyssal navy. all body text + the deep section floor.
+   navy-2       lifted navy for gradients / the code editor window.
+   slate        secondary text on light surfaces. same family, lower energy.
+   turq         bioluminescent turquoise. THE accent: /, buttons, links.
+   turq-deep    pressed/hover state of turq.
+   turq-bright  glow highlights on navy (bioluminescence at depth).
+   mist         pale turquoise tint for scene backgrounds.
    ──────────────────────────────────────────────────────────────── */
 :root {
-  --abyss:    #08182a;
-  --ocean:    #0e2e44;
-  --reef:     #1d5d72;
-  --cyan:     #7ec5cc;
-  --foam:     #ece6d4;
-  --foam-dim: #a89e8a;
-  --ink:      #08182a;   /* alias of abyss — used for text on cream */
+  /* ── COASTAL EDITORIAL ─────────────────────────────────────────────
+     Magazine-grade: warm paper, espresso ink, ONE deep sea-teal accent.
+     Restrained, tactile, unhurried. Token names kept so the whole site
+     (landing + blog + tools) shifts together.                           */
+  --sand:        #f4efe3;   /* warm paper stock — the page */
+  --sand-2:      #e9e0cf;   /* deeper paper — alt surfaces */
+  --white-warm:  #fbf8f1;   /* warm card white */
+  --navy:        #221d15;   /* espresso ink — headings & body */
+  --navy-2:      #3b3327;   /* softer ink */
+  --slate:       #6f6553;   /* warm taupe — secondary text */
+  --iris:        #1c6b60;   /* deep sea teal — THE accent */
+  --iris-deep:   #124f47;
+  --violet:      #1c6b60;   /* folded into the single accent */
+  --aqua:        #2f8f81;   /* lighter teal */
+  --turq:        #1c6b60;   /* legacy alias → teal */
+  --turq-deep:   #124f47;
+  --turq-bright: #8ab8b0;   /* muted seafoam for tints */
+  --mist:        #dfeae4;   /* pale teal tint */
+
+  /* legacy aliases — /mock, /poll, /me, /blog and older components
+     reference these token names. keep them mapped so those routes stay styled. */
+  --cream:  var(--sand);
+  --ink:    var(--navy);
+  --foam:   #ece6d4;
+  --cyan:   var(--turq);
+  --pink:   #f0739c;
+  --lime:   #a8d97f;
+  --blue:   #6b9bff;
+  --orange: #ffab5e;
 }
 
 @theme inline {
-  --color-abyss:    var(--abyss);
-  --color-ocean:    var(--ocean);
-  --color-reef:     var(--reef);
-  --color-cyan:     var(--cyan);
-  --color-foam:     var(--foam);
-  --color-foam-dim: var(--foam-dim);
-  --color-ink:      var(--ink);
+  --color-sand:        var(--sand);
+  --color-sand-2:      var(--sand-2);
+  --color-white-warm:  var(--white-warm);
+  --color-navy:        var(--navy);
+  --color-navy-2:      var(--navy-2);
+  --color-slate:       var(--slate);
+  --color-iris:        var(--iris);
+  --color-iris-deep:   var(--iris-deep);
+  --color-violet:      var(--violet);
+  --color-aqua:        var(--aqua);
+  --color-turq:        var(--turq);
+  --color-turq-deep:   var(--turq-deep);
+  --color-turq-bright: var(--turq-bright);
+  --color-mist:        var(--mist);
 
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* legacy color utilities */
+  --color-cream:  var(--cream);
+  --color-ink:    var(--ink);
+  --color-foam:   var(--foam);
+  --color-cyan:   var(--cyan);
+  --color-pink:   var(--pink);
+  --color-lime:   var(--lime);
+  --color-blue:   var(--blue);
+  --color-orange: var(--orange);
+
+  --font-sans: var(--font-geist);
+  --font-mono: var(--font-jetbrains);
+  --font-display: var(--font-fraunces);
 }
 
-/* one gradient, two stops. anchored to the body — scrolls with content,
-   so the descent feels physical, not like staring at a fixed wallpaper. */
+html {
+  scroll-behavior: smooth;
+}
+
+/* ── editorial signatures ─────────────────────────────────────────── */
+
+/* Fraunces headings: oldstyle figures + ligatures, optical tightening */
+.font-display {
+  font-feature-settings: "onum" 1, "liga" 1, "dlig" 1;
+  letter-spacing: -0.012em;
+}
+
+/* a hairline ink rule — the magazine's connective tissue */
+.rule { border-top: 1px solid rgba(34, 29, 21, 0.16); }
+
+/* mono small-caps eyebrow / kicker */
+.kicker {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: var(--slate);
+}
+
+/* section numeral — big, quiet, in the margin */
+.folio {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--iris);
+}
+
+/* duotone coastal imagery — a moody deep-teal ocean, legible under white
+   type. Darken the (very light) source, map it to teal with a `color`
+   blend, then deepen so highlights don't wash out the text. */
+.duotone { position: relative; overflow: hidden; background: #0e433c; }
+.duotone > img {
+  filter: grayscale(1) contrast(1.12) brightness(0.5);
+  width: 100%; height: 100%; object-fit: cover; display: block;
+}
+.duotone::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: var(--iris); mix-blend-mode: color; opacity: 1;
+}
+.duotone::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(180deg, rgba(14,67,60,0.35) 0%, rgba(11,52,47,0.72) 100%);
+}
+
+/* paper grain — a faint, warm tooth on the whole page */
+body::after {
+  content: ""; position: fixed; inset: 0; z-index: 1; pointer-events: none;
+  opacity: 0.4; mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.13  0 0 0 0 0.11  0 0 0 0 0.08  0 0 0 0.5 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  background-size: 200px 200px;
+}
+
 html, body {
-  background: linear-gradient(180deg, var(--ocean) 0%, var(--abyss) 100%);
-  color: var(--foam);
+  /* clean, neutral page base — the hero image carries the colour; everything
+     below sits on calm near-white so cards and type do the talking. */
+  background: var(--sand);
+  color: var(--navy);
   -webkit-font-smoothing: antialiased;
 }
 
-::selection { background: var(--cyan); color: var(--ink); }
+::selection {
+  background: var(--iris);
+  color: #fff;
+}
 
 /* ────────────────────────────────────────────────────────────────
-   reef overlay — the coral-reef photo as an atmospheric glow.
-   blurred + feathered via a radial mask so it has no hard edges
-   and dissolves into the ocean gradient.
+   the primary action — a flat, editorial ink/teal button. no gloss.
    ──────────────────────────────────────────────────────────────── */
+.btn-grad {
+  background: var(--iris);
+  color: var(--sand);
+  box-shadow: 0 1px 0 rgba(18, 79, 71, 0.4), 0 12px 26px -16px rgba(18, 79, 71, 0.7);
+  transition: background-color 0.35s ease, transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.btn-grad:hover {
+  background: var(--iris-deep);
+  transform: translateY(-1px);
+}
+
+/* the quiet counterpart — an underlined editorial text link/button */
+.btn-ghost {
+  color: var(--ink);
+  border-bottom: 1.5px solid var(--ink);
+  padding-bottom: 2px;
+  transition: color 0.3s ease, border-color 0.3s ease;
+}
+.btn-ghost:hover { color: var(--iris); border-color: var(--iris); }
+
+/* ────────────────────────────────────────────────────────────────
+   sea glass — the signature surface. frosted, luminous, tactile.
+   ──────────────────────────────────────────────────────────────── */
+/* editorial paper card — warm stock, hairline ink border, soft lift.
+   (was frosted glass; flattened site-wide for the magazine look.) */
+.sea-glass {
+  background: var(--white-warm);
+  border: 1px solid rgba(34, 29, 21, 0.12);
+  box-shadow:
+    0 1px 2px rgba(34, 29, 21, 0.04),
+    0 20px 44px -30px rgba(34, 29, 21, 0.30);
+}
+
+/* sea glass at depth — for UI floating on abyssal navy */
+.sea-glass-dark {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(62, 232, 217, 0.16);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 24px 48px -24px rgba(0, 0, 0, 0.5);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   caustics — slow-moving turquoise light refractions on the hero.
+   two layers drifting against each other, like sun through water.
+   ──────────────────────────────────────────────────────────────── */
+.caustics {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.caustics::before,
+.caustics::after {
+  content: "";
+  position: absolute;
+  inset: -30%;
+}
+.caustics::before {
+  background:
+    radial-gradient(38% 32% at 24% 28%, rgba(13, 179, 165, 0.14), transparent 70%),
+    radial-gradient(30% 26% at 80% 16%, rgba(62, 232, 217, 0.12), transparent 70%),
+    radial-gradient(44% 38% at 64% 78%, rgba(13, 179, 165, 0.09), transparent 72%);
+  animation: drift-a 46s ease-in-out infinite alternate;
+}
+.caustics::after {
+  background:
+    radial-gradient(30% 26% at 68% 42%, rgba(62, 232, 217, 0.09), transparent 70%),
+    radial-gradient(26% 22% at 16% 72%, rgba(13, 179, 165, 0.11), transparent 70%);
+  animation: drift-b 62s ease-in-out infinite alternate;
+}
+@keyframes drift-a {
+  from { transform: translate3d(-2%, -1%, 0) scale(1); }
+  to   { transform: translate3d(3%, 2.5%, 0) scale(1.06); }
+}
+@keyframes drift-b {
+  from { transform: translate3d(2%, 1.5%, 0) scale(1.05); }
+  to   { transform: translate3d(-3%, -2%, 0) scale(1); }
+}
+
+/* ────────────────────────────────────────────────────────────────
+   the glowing slash — bioluminescent turquoise with light bloom.
+   used on the hero headline + the phone composer's typed "/".
+   ──────────────────────────────────────────────────────────────── */
+.slash-glow {
+  color: var(--iris);
+}
+.slash-glow-bright {
+  color: var(--turq-bright);
+  text-shadow:
+    0 0 14px rgba(62, 232, 217, 0.65),
+    0 0 40px rgba(62, 232, 217, 0.35);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   email capture — border glows turquoise over 200ms on focus.
+   (micro-interaction spec: design.txt §5)
+   ──────────────────────────────────────────────────────────────── */
+.input-glow {
+  border: 1px solid rgba(12, 34, 51, 0.16);
+  background: rgba(255, 255, 255, 0.72);
+  transition: border-color 200ms ease, box-shadow 200ms ease, background-color 200ms ease;
+}
+.input-glow:focus {
+  outline: none;
+  border-color: var(--iris);
+  background: #fff;
+  box-shadow:
+    0 0 0 4px rgba(28, 107, 96, 0.16),
+    0 0 26px rgba(28, 107, 96, 0.26);
+}
+.input-glow::placeholder { color: rgba(85, 105, 122, 0.55); }
+
+/* dark variant for forms sitting on navy */
+.input-glow-dark {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.07);
+  color: #fff;
+  transition: border-color 200ms ease, box-shadow 200ms ease, background-color 200ms ease;
+}
+.input-glow-dark:focus {
+  outline: none;
+  border-color: var(--turq-bright);
+  background: rgba(255, 255, 255, 0.10);
+  box-shadow:
+    0 0 0 4px rgba(62, 232, 217, 0.12),
+    0 0 28px rgba(62, 232, 217, 0.28);
+}
+.input-glow-dark::placeholder { color: rgba(236, 230, 212, 0.4); }
+
+/* ────────────────────────────────────────────────────────────────
+   the walking turtle — waitlist submit feedback (1.5s crossing).
+   lane clips the overflow; the turtle waddles as it crosses.
+   ──────────────────────────────────────────────────────────────── */
+.turtle-lane {
+  display: inline-flex;
+  overflow: hidden;
+  width: 100%;
+  justify-content: center;
+}
+.turtle-walk {
+  display: inline-block;
+  animation: turtle-cross 1.5s linear forwards;
+}
+.turtle-walk > span {
+  display: inline-block;
+  animation: waddle 0.3s ease-in-out infinite;
+}
+@keyframes turtle-cross {
+  from { transform: translateX(-380%); }
+  to   { transform: translateX(380%); }
+}
+@keyframes waddle {
+  0%, 100% { transform: rotate(-9deg); }
+  50%      { transform: rotate(9deg) translateY(-1px); }
+}
+
+/* ────────────────────────────────────────────────────────────────
+   the tide — slow, deliberate float-in on scroll.
+   Reveal.tsx toggles `.in` via IntersectionObserver.
+   ──────────────────────────────────────────────────────────────── */
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition:
+    opacity 1s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 1s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, transform;
+}
+.reveal.in {
+  opacity: 1;
+  transform: none;
+}
+
+/* gentle vertical bob — the floating command menu, chips */
+.bob { animation: bob 6s ease-in-out infinite; }
+.bob-slow { animation: bob 8.5s ease-in-out infinite; }
+@keyframes bob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
+}
+
+/* poll result bars grow from the left when they enter view */
+.poll-bar {
+  transform-origin: left center;
+  transform: scaleX(0);
+  transition: transform 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.in .poll-bar { transform: scaleX(1); }
+
+/* poll bars inside freshly-unfolded widgets grow on mount */
+.poll-fill {
+  transform-origin: left center;
+  animation: fill-grow 1.1s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes fill-grow {
+  from { transform: scaleX(0); }
+}
+
+/* shell glow pulse — the deep section's protective shell */
+.shell-pulse { animation: shell-pulse 5s ease-in-out infinite; }
+@keyframes shell-pulse {
+  0%, 100% { filter: drop-shadow(0 0 12px rgba(28, 107, 96, 0.4)); opacity: 0.9; }
+  50%      { filter: drop-shadow(0 0 26px rgba(28, 107, 96, 0.6)); opacity: 1; }
+}
+
+/* bioluminescent particles at depth */
+.plankton { animation: twinkle 4s ease-in-out infinite; }
+@keyframes twinkle {
+  0%, 100% { opacity: 0.08; }
+  50%      { opacity: 0.65; }
+}
+
+/* typing caret — phone composer + legacy /mock page */
+.caret { animation: caret-blink 1.1s steps(1) infinite; }
+@keyframes caret-blink { 50% { opacity: 0; } }
+
+/* ────────────────────────────────────────────────────────────────
+   the blinking cursor effect — hero demo (emotion.txt §3).
+   rests at ~60bpm, like a calm heartbeat. when the "/" lands,
+   the water ripples outward from the input.
+   ──────────────────────────────────────────────────────────────── */
+.cursor-rest { animation: caret-blink 1s steps(1) infinite; }
+
+.ripple {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  border: 2px solid rgba(62, 232, 217, 0.55);
+  pointer-events: none;
+  animation: ripple-out 1.8s cubic-bezier(0.16, 0.6, 0.4, 1) forwards;
+}
+.ripple-late { animation-delay: 0.35s; opacity: 0; animation-fill-mode: forwards; }
+@keyframes ripple-out {
+  0%   { transform: scale(1); opacity: 0.9; }
+  100% { transform: scale(38); opacity: 0; }
+}
+
+/* widgets don't snap into place — they unfold, buoyed by water */
+.unfold {
+  animation: unfold 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes unfold {
+  from { opacity: 0; transform: translateY(16px) scale(0.95); }
+  to   { opacity: 1; transform: none; }
+}
+.fold-away {
+  animation: fold-away 0.45s ease-in both;
+}
+@keyframes fold-away {
+  to { opacity: 0; transform: translateY(8px) scale(0.97); }
+}
+
+/* ────────────────────────────────────────────────────────────────
+   film grain — barely-there paper texture on sand surfaces.
+   ──────────────────────────────────────────────────────────────── */
+.grain { position: relative; }
+.grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.6 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  background-size: 220px 220px;
+  opacity: 0.05;
+  mix-blend-mode: multiply;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   legacy utilities — still referenced by /mock, /poll and /me.
+   ──────────────────────────────────────────────────────────────── */
+.glass {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.08) inset,
+    0 12px 40px -12px rgba(0, 0, 0, 0.45);
+}
+
+.hairline { border: 1px solid rgba(255, 255, 255, 0.14); }
+
 .reef-overlay {
   position: absolute;
   inset: 0;
@@ -64,50 +448,19 @@ html, body {
   filter: blur(28px) saturate(1.1) brightness(0.95);
   opacity: 0.6;
   pointer-events: none;
-  mask-image:
-    radial-gradient(ellipse 110% 75% at 50% 30%,
-      #000 0%,
-      #000 35%,
-      rgba(0,0,0,0.5) 70%,
-      transparent 95%);
-  -webkit-mask-image:
-    radial-gradient(ellipse 110% 75% at 50% 30%,
-      #000 0%,
-      #000 35%,
-      rgba(0,0,0,0.5) 70%,
-      transparent 95%);
+  mask-image: radial-gradient(ellipse 110% 75% at 50% 30%, #000 0%, #000 35%, rgba(0,0,0,0.5) 70%, transparent 95%);
+  -webkit-mask-image: radial-gradient(ellipse 110% 75% at 50% 30%, #000 0%, #000 35%, rgba(0,0,0,0.5) 70%, transparent 95%);
 }
 
-/* film grain — fractal noise, monochrome. very subtle on the dark ocean. */
-.grain { position: relative; }
-.grain::after {
-  content: "";
+.blob {
   position: absolute;
-  inset: 0;
+  border-radius: 9999px;
+  filter: blur(60px);
+  opacity: 0.5;
   pointer-events: none;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.6 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
-  background-size: 220px 220px;
-  opacity: 0.06;
-  mix-blend-mode: overlay;
 }
+.blob-md { width: 280px; height: 280px; }
 
-/* glass — translucent ocean tile with a top highlight + drop shadow */
-.glass {
-  background: rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow:
-    0 1px 0 rgba(255,255,255,0.08) inset,
-    0 12px 40px -12px rgba(0,0,0,0.45);
-}
-
-/* hairline — 1px white-tinted border for chrome */
-.hairline { border: 1px solid rgba(255, 255, 255, 0.14); }
-
-/* ────────────────────────────────────────────────────────────────
-   animations — kept minimal.
-   ──────────────────────────────────────────────────────────────── */
 @keyframes bounce-soft {
   0%, 100% { transform: translateY(0); }
   50%      { transform: translateY(3px); }
@@ -116,3 +469,30 @@ html, body {
 
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ────────────────────────────────────────────────────────────────
+   calm by default — the tide goes still for reduced motion.
+   ──────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .caustics::before,
+  .caustics::after,
+  .bob,
+  .bob-slow,
+  .turtle-walk,
+  .turtle-walk > span,
+  .shell-pulse,
+  .plankton,
+  .ripple,
+  .animate-bounce-soft {
+    animation: none;
+  }
+  .unfold, .fold-away { animation: none; opacity: 1; transform: none; }
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .poll-bar { transform: scaleX(1); transition: none; }
+  .poll-fill { animation: none; }
+  html { scroll-behavior: auto; }
+}

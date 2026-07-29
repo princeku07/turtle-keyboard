@@ -46,6 +46,7 @@ public class SuggestionStripView extends LinearLayout {
     private final IconButton emojiButton;
     private final IconButton settingsButton;
     private final IconButton micButton;
+    private final IconButton sparkleButton;
     private final FrameLayout centerHost;
     private final LinearLayout slotsRow;
     private final PastePreviewChip pasteChip;
@@ -57,6 +58,7 @@ public class SuggestionStripView extends LinearLayout {
     @Nullable private OnIconTapListener pasteListener;
     @Nullable private OnIconTapListener settingsListener;
     @Nullable private OnIconTapListener emojiListener;
+    @Nullable private OnIconTapListener sparkleListener;
     private KeyboardTheme theme;
 
     public SuggestionStripView(Context context) {
@@ -64,6 +66,7 @@ public class SuggestionStripView extends LinearLayout {
         emojiButton = new IconButton(context, IconButton.GLYPH_EMOJI);
         settingsButton = new IconButton(context, IconButton.GLYPH_MENU);
         micButton = new IconButton(context, IconButton.GLYPH_MIC);
+        sparkleButton = new IconButton(context, IconButton.GLYPH_SPARKLE);
         centerHost = new FrameLayout(context);
         slotsRow = new LinearLayout(context);
         pasteChip = new PastePreviewChip(context);
@@ -75,6 +78,7 @@ public class SuggestionStripView extends LinearLayout {
         emojiButton = new IconButton(context, IconButton.GLYPH_EMOJI);
         settingsButton = new IconButton(context, IconButton.GLYPH_MENU);
         micButton = new IconButton(context, IconButton.GLYPH_MIC);
+        sparkleButton = new IconButton(context, IconButton.GLYPH_SPARKLE);
         centerHost = new FrameLayout(context);
         slotsRow = new LinearLayout(context);
         pasteChip = new PastePreviewChip(context);
@@ -142,6 +146,8 @@ public class SuggestionStripView extends LinearLayout {
         FrameLayout.LayoutParams chipLp = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT, dp(34));
         chipLp.gravity = Gravity.CENTER;
+        // Left icons (emoji+settings = 80dp) outweigh right (mic = 40dp); shift to true keyboard center.
+        pasteChip.setTranslationX(-dp(20));
         centerHost.addView(pasteChip, chipLp);
         pasteChip.setOnClickListener(v -> {
             v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
@@ -150,6 +156,14 @@ public class SuggestionStripView extends LinearLayout {
         pasteChip.setVisibility(GONE);
 
         addView(centerHost, new LayoutParams(0, LayoutParams.MATCH_PARENT, 1f));
+
+        // ✨ trigger sits between center and mic, hidden until the IME enables it.
+        sparkleButton.setVisibility(GONE);
+        addView(sparkleButton, new LayoutParams(dp(40), dp(40)));
+        sparkleButton.setOnClickListener(v -> {
+            v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+            if (sparkleListener != null) sparkleListener.onTap();
+        });
 
         addView(micButton, new LayoutParams(dp(40), dp(40)));
         micButton.setOnClickListener(v -> {
@@ -163,6 +177,12 @@ public class SuggestionStripView extends LinearLayout {
     public void setOnPasteTapListener(@Nullable OnIconTapListener l) { this.pasteListener = l; }
     public void setOnSettingsTapListener(@Nullable OnIconTapListener l) { this.settingsListener = l; }
     public void setOnEmojiTapListener(@Nullable OnIconTapListener l) { this.emojiListener = l; }
+    public void setOnSparkleTapListener(@Nullable OnIconTapListener l) { this.sparkleListener = l; }
+
+    /** Show/hide the ✨ AI-assist trigger. IME toggles this based on field word count. */
+    public void setSparkleVisible(boolean visible) {
+        sparkleButton.setVisibility(visible ? VISIBLE : GONE);
+    }
 
     /**
      * Shows the paste preview pill with the given clipboard text, or hides it
@@ -195,6 +215,7 @@ public class SuggestionStripView extends LinearLayout {
         emojiButton.applyTheme(theme);
         settingsButton.applyTheme(theme);
         micButton.applyTheme(theme);
+        sparkleButton.applyTheme(theme);
         pasteChip.applyTheme(theme);
         for (int i = 0; i < slotsRow.getChildCount(); i++) {
             View v = slotsRow.getChildAt(i);
@@ -296,6 +317,7 @@ public class SuggestionStripView extends LinearLayout {
         static final int GLYPH_PASTE = 1;
         static final int GLYPH_MENU = 2;
         static final int GLYPH_EMOJI = 3;
+        static final int GLYPH_SPARKLE = 4;
 
         private final Paint backgroundPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final int glyphKind;
@@ -323,11 +345,12 @@ public class SuggestionStripView extends LinearLayout {
 
         private static int drawableFor(int glyphKind) {
             switch (glyphKind) {
-                case GLYPH_MIC:   return R.drawable.baseline_mic_24;
-                case GLYPH_PASTE: return R.drawable.baseline_paste_24;
-                case GLYPH_MENU:  return R.drawable.baseline_menu_24;
-                case GLYPH_EMOJI: return R.drawable.baseline_mood_24;
-                default:          return 0;
+                case GLYPH_MIC:     return R.drawable.baseline_mic_24;
+                case GLYPH_PASTE:   return R.drawable.baseline_paste_24;
+                case GLYPH_MENU:    return R.drawable.baseline_menu_24;
+                case GLYPH_EMOJI:   return R.drawable.baseline_mood_24;
+                case GLYPH_SPARKLE: return R.drawable.baseline_auto_awesome_24;
+                default:            return 0;
             }
         }
 

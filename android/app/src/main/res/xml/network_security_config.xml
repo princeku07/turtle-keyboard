@@ -7,6 +7,8 @@
         <!-- Real-device dev: dev-machine LAN IPs. Add yours here if it's not listed. -->
         <domain includeSubdomains="false">192.168.1.5</domain>
         <domain includeSubdomains="false">192.168.1.10</domain>
+        <!-- LM Studio test server (Settings → AI → Basic questions → Local). -->
+        <domain includeSubdomains="false">192.168.1.13</domain>
         <domain includeSubdomains="false">192.168.0.43</domain>
         <domain includeSubdomains="false">192.168.0.106</domain>
     </domain-config>

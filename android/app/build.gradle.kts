@@ -64,6 +64,13 @@ android {
         dataBinding = true
         buildConfig = true
     }
+
+    testOptions {
+        // No isIncludeAndroidResources — none of the unit tests reference app
+        // resources; enabling it pulls AAPT into the test classpath path and
+        // has caused link failures with our resource set.
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 // Copy the repo-shared system prompts (../../commands/prompts/) into the app's
@@ -75,9 +82,15 @@ val copySharedPrompts = tasks.register<Copy>("copySharedPrompts") {
     }
     into(layout.buildDirectory.dir("generated/sharedPrompts/prompts"))
 }
-android.sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("generated/sharedPrompts"))
-tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }
-    .configureEach { dependsOn(copySharedPrompts) }
+// Register the generated assets dir with builtBy so Gradle wires the
+// copySharedPrompts dependency onto *every* consumer of the asset source set
+// (merge*Assets, lint, lintVitalReportModel, package…) automatically. Pinning
+// the dependency only on merge*Assets left other consumers (e.g. the release
+// lint-vital report task) reading the dir without an explicit dependency,
+// which fails Gradle 8.7's input/output validation.
+android.sourceSets["main"].assets.srcDir(
+    files(layout.buildDirectory.dir("generated/sharedPrompts")).builtBy(copySharedPrompts)
+)
 
 // Copy the built WebView games (../../games/dist/<name>/index.html) into the
 // APK's merged assets so WebGameSheetView can load them at
@@ -91,9 +104,11 @@ val copyGamesHtml = tasks.register<Copy>("copyGamesHtml") {
     }
     into(layout.buildDirectory.dir("generated/gamesAssets/games"))
 }
-android.sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("generated/gamesAssets"))
-tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }
-    .configureEach { dependsOn(copyGamesHtml) }
+// Same builtBy wiring as copySharedPrompts above — carry the producer
+// dependency to all asset-source-set consumers, not just merge*Assets.
+android.sourceSets["main"].assets.srcDir(
+    files(layout.buildDirectory.dir("generated/gamesAssets")).builtBy(copyGamesHtml)
+)
 
 configurations.all {
     resolutionStrategy {
@@ -121,7 +136,12 @@ dependencies {
     implementation(libs.firebase.auth)
     implementation(libs.firebase.database)
     implementation(libs.revenuecat.purchases)
+    implementation(libs.ai.edge.aicore)
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.test.core)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
+    androidTestImplementation(libs.test.runner)
+    androidTestImplementation(libs.test.rules)
 }

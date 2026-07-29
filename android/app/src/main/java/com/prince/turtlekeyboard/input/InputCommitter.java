@@ -73,53 +73,33 @@ public class InputCommitter {
         if (ic != null) ic.deleteSurroundingText(n, 0);
     }
 
-    /** Delete one word before the cursor: trailing whitespace, then back to the next whitespace. */
-    public void deleteWord() {
+    /** Concatenation of text-before-cursor + selected + text-after-cursor. Capped at 8K chars. */
+    public CharSequence getAllText() {
         InputConnection ic = connection();
-        if (ic == null) return;
-        CharSequence before = ic.getTextBeforeCursor(2048, 0);
-        if (before == null || before.length() == 0) return;
-        int i = before.length();
-        while (i > 0 && Character.isWhitespace(before.charAt(i - 1))) i--;
-        while (i > 0 && !Character.isWhitespace(before.charAt(i - 1))) i--;
-        int toDelete = before.length() - i;
-        if (toDelete > 0) ic.deleteSurroundingText(toDelete, 0);
+        if (ic == null) return "";
+        CharSequence before = ic.getTextBeforeCursor(4000, 0);
+        CharSequence sel = ic.getSelectedText(0);
+        CharSequence after = ic.getTextAfterCursor(4000, 0);
+        StringBuilder sb = new StringBuilder();
+        if (before != null) sb.append(before);
+        if (sel != null) sb.append(sel);
+        if (after != null) sb.append(after);
+        return sb;
     }
 
-    /**
-     * Delete one sentence before the cursor: trailing whitespace, then back to the last
-     * sentence-ending punctuation or line break (or the lookback boundary).
-     */
-    public void deleteSentence() {
+    /** Deletes everything around the cursor then commits {@code text}. Silent overwrite. */
+    public void replaceAll(CharSequence text) {
         InputConnection ic = connection();
         if (ic == null) return;
-        CharSequence before = ic.getTextBeforeCursor(8192, 0);
-        if (before == null || before.length() == 0) return;
-        int i = before.length();
-        while (i > 0 && Character.isWhitespace(before.charAt(i - 1))) i--;
-        while (i > 0) {
-            char c = before.charAt(i - 1);
-            if (c == '.' || c == '!' || c == '?' || c == '\n') break;
-            i--;
-        }
-        int toDelete = before.length() - i;
-        if (toDelete > 0) ic.deleteSurroundingText(toDelete, 0);
-    }
-
-    /**
-     * Delete every character on both sides of the cursor. Uses explicit deletion
-     * because {@code performContextMenuAction(selectAll)} + commitText races in some editors.
-     */
-    public void clearAll() {
-        InputConnection ic = connection();
-        if (ic == null) return;
-        ic.finishComposingText();
-        CharSequence before = ic.getTextBeforeCursor(Integer.MAX_VALUE, 0);
-        CharSequence after = ic.getTextAfterCursor(Integer.MAX_VALUE, 0);
-        int beforeLen = before == null ? 0 : before.length();
-        int afterLen = after == null ? 0 : after.length();
-        if (beforeLen > 0 || afterLen > 0) {
-            ic.deleteSurroundingText(beforeLen, afterLen);
+        ic.beginBatchEdit();
+        try {
+            // Clear selection first so deleteSurroundingText covers a clean cursor.
+            CharSequence sel = ic.getSelectedText(0);
+            if (!TextUtils.isEmpty(sel)) ic.commitText("", 1);
+            ic.deleteSurroundingText(4000, 4000);
+            ic.commitText(text == null ? "" : text, 1);
+        } finally {
+            ic.endBatchEdit();
         }
     }
 }

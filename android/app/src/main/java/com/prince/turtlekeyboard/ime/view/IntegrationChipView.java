@@ -7,15 +7,15 @@ import android.util.AttributeSet;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
-import android.widget.TextView;
 
 import androidx.annotation.Nullable;
+import androidx.appcompat.widget.AppCompatTextView;
 
 /**
  * Persistent chip that surfaces a contextual integration above the keys. Sticks
  * as long as the host context is valid (unlike the transient {@link BannerView}).
  */
-public class IntegrationChipView extends TextView {
+public class IntegrationChipView extends AppCompatTextView {
 
     public interface OnTapListener { void onTap(); }
 

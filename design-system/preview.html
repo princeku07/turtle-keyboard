@@ -5,259 +5,1819 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Turtle Keyboard · Design Tokens</title>
 <style>
-  /* AUTO-GENERATED — page chrome dogfoods the tokens it documents */
+  /* AUTO-GENERATED — chrome uses tokens from this very set:
+     section-fg = Main Brand, rules = Grey 07, muted = Grey 01, etc. */
   :root {
-  --brand-green: #008658;
-  --brand-green-deep: #0E5C2C;
-  --brand-dot-gold: #D9CBA0;
-  --onboard-bg: #F1F5E8;
-  --onboard-hero-top: #DDE7F4;
-  --onboard-hero-mid: #F3EAF6;
-  --onboard-hero-bottom: #E8F0E2;
-  --onboard-title: #0C0C0C;
-  --onboard-subtitle: #6B6B6B;
-  --onboard-cta-bg: #0C0C0C;
-  --onboard-cta-text: #FFFFFF;
-  --onboard-dot-active: #0C0C0C;
-  --onboard-dot-inactive: #CDD3C2;
-  --space-xs: 4px;
-  --space-sm: 8px;
-  --space-md: 12px;
-  --space-lg: 16px;
-  --space-xl: 20px;
-  --space-2xl: 24px;
-  --space-3xl: 32px;
-  --space-4xl: 40px;
-    --bg: #0c0c0c;
-    --bg-card: #161616;
-    --bg-card-hover: #1c1c1c;
-    --border: #262626;
-    --text: #f5f5f5;
-    --text-muted: #9a9a9a;
+    --page-bg:      #F7FFF1;   /* Low green / 02 */
+    --page-fg:      #222222;   /* Black / 02 */
+    --page-muted:   #979C9E;   /* Grey / 01 */
+    --page-rule:    #DCDFDD;   /* Grey / 07 */
+    --section-fg:   #009F69;   /* Main Brand */
+    --card-bg:      #FFFFFF;
+    --card-shadow:  0 1px 2px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(0, 159, 105, 0.06);
     --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
-    --sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
   }
+  /* Skip painting/layout for off-screen sections — biggest win at ~1500 nodes. */
+  section { content-visibility: auto; contain-intrinsic-size: 0 600px; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: var(--sans); padding: var(--space-3xl) var(--space-2xl); line-height: 1.5; }
-  main { max-width: 1120px; margin: 0 auto; }
+  body {
+    background: var(--page-bg); color: var(--page-fg);
+    font-family: var(--sans); line-height: 1.5;
+    padding: 56px 32px 96px;
+  }
+  main { max-width: 1280px; margin: 0 auto; }
 
-  header { margin-bottom: var(--space-4xl); padding-bottom: var(--space-2xl); border-bottom: 1px solid var(--border); }
-  header h1 { font-size: 32px; font-weight: 900; letter-spacing: -0.02em; }
-  header h1 .brand { color: var(--brand-green); }
-  header p { color: var(--text-muted); margin-top: var(--space-sm); font-family: var(--mono); font-size: 13px; }
+  header {
+    display: flex; align-items: flex-end; justify-content: space-between; gap: 32px;
+    padding-bottom: 28px; margin-bottom: 32px;
+    border-bottom: 1px solid var(--page-rule);
+  }
+  header h1 { font-size: 44px; font-weight: 900; letter-spacing: -0.025em; color: var(--section-fg); }
+  header h1 .slash { color: var(--page-fg); opacity: 0.35; margin: 0 4px; font-weight: 500; }
+  header .stats {
+    font-family: var(--mono); font-size: 12px; color: var(--page-muted);
+    text-align: right; line-height: 1.7;
+  }
+  header .stats strong { color: var(--section-fg); font-weight: 700; }
 
-  section { margin-bottom: var(--space-4xl); }
-  section > h2 { font-size: 13px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-muted); margin-bottom: var(--space-lg); }
+  /* Anatomy — show the system, not just the swatches */
+  .anatomy {
+    background: var(--card-bg); border-radius: 14px;
+    padding: 24px 28px; margin-bottom: 56px;
+    box-shadow: var(--card-shadow);
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 32px;
+    align-items: center;
+  }
+  .anatomy h2 {
+    font-size: 11px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 0.18em; color: var(--page-muted); margin-bottom: 8px;
+  }
+  .anatomy p {
+    font-size: 14px; line-height: 1.55; color: var(--page-fg);
+    max-width: 56ch;
+  }
+  .anatomy p code {
+    font-family: var(--mono); font-size: 12px;
+    background: var(--page-bg); padding: 1px 5px; border-radius: 3px;
+    color: var(--section-fg);
+  }
+  .anatomy-flow {
+    font-family: var(--mono); font-size: 11px; line-height: 1.85;
+    color: var(--page-fg); white-space: pre;
+  }
+  .anatomy-flow .arrow { color: var(--page-muted); }
+  .anatomy-flow .lane { color: var(--section-fg); font-weight: 700; }
 
-  /* Color grid */
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-md); }
-  .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; transition: background 120ms ease, transform 120ms ease; }
-  .card:hover { background: var(--bg-card-hover); transform: translateY(-1px); }
-  .color-card .swatch { aspect-ratio: 16 / 9; }
-  .meta { padding: var(--space-md) var(--space-lg); display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); font-family: var(--mono); font-size: 12px; }
-  .meta .name { color: var(--text); }
-  .meta .value { color: var(--text-muted); }
+  section { margin-bottom: 56px; }
+  .section-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin-bottom: 18px;
+  }
+  .section-head h2 {
+    font-size: 13px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 0.16em; color: var(--page-muted);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .section-head h2 .tier {
+    font-family: var(--mono); font-size: 9px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.12em;
+    color: var(--section-fg); background: var(--page-bg);
+    border: 1px solid var(--page-rule);
+    padding: 2px 6px; border-radius: 4px;
+  }
+  .section-head .badge {
+    font-family: var(--mono); font-size: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--page-muted);
+    padding: 4px 8px; border: 1px solid var(--page-rule); border-radius: 999px;
+    background: var(--card-bg);
+  }
 
-  /* Spacing list */
-  .space-list { display: flex; flex-direction: column; gap: var(--space-sm); }
-  .space-row { display: grid; grid-template-columns: 100px 1fr 160px; align-items: center; gap: var(--space-lg); padding: var(--space-md) var(--space-lg); background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; }
-  .space-row .name { font-family: var(--mono); font-size: 12px; }
-  .space-bar { height: 12px; background: var(--brand-green); border-radius: 999px; max-width: 100%; }
-  .space-row .value { font-family: var(--mono); font-size: 12px; color: var(--text-muted); text-align: right; }
+  /* Named cards (Primary Colors, Secondary Colors) */
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+  }
+  .card {
+    background: var(--card-bg);
+    border-radius: 14px; overflow: hidden;
+    box-shadow: var(--card-shadow);
+    display: flex; flex-direction: column;
+  }
+  .swatch {
+    aspect-ratio: 5 / 3;
+    display: flex; align-items: flex-end;
+    padding: 14px 16px;
+    font-family: var(--mono); font-size: 13px; font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+  .card .meta { padding: 16px 18px 18px; }
+  .card .name {
+    font-size: 17px; font-weight: 700;
+    color: var(--page-fg); margin-bottom: 2px;
+  }
+  .card .slug {
+    font-family: var(--mono); font-size: 12px; color: var(--page-muted);
+    display: block; margin-bottom: 14px;
+  }
+  .card dl {
+    display: grid; grid-template-columns: 70px 1fr; gap: 4px 12px;
+    font-size: 11px;
+    padding-top: 12px; border-top: 1px solid var(--page-rule);
+  }
+  .card dt {
+    font-family: var(--mono); color: var(--page-muted);
+    text-transform: uppercase; letter-spacing: 0.08em; font-size: 10px;
+    align-self: center;
+  }
+  .card dd {
+    font-family: var(--mono); color: var(--page-fg);
+    word-break: break-all;
+  }
+  .card .platforms {
+    margin-top: 12px; padding-top: 12px;
+    border-top: 1px solid var(--page-rule);
+    display: grid; gap: 4px;
+    font-family: var(--mono); font-size: 11px;
+  }
+  .card .platforms .row {
+    display: grid; grid-template-columns: 56px 1fr; gap: 10px; align-items: baseline;
+  }
+  .card .platforms .lane {
+    text-transform: uppercase; letter-spacing: 0.08em; font-size: 9px; font-weight: 700;
+    color: var(--page-muted);
+  }
+  .card .platforms .ref { color: var(--page-fg); word-break: break-all; }
 
-  /* Typography list */
-  .type-list { display: flex; flex-direction: column; gap: var(--space-md); }
-  .type-card { padding: var(--space-2xl); }
-  .type-sample { color: var(--text); margin-bottom: var(--space-lg); }
-  .type-card .meta { padding: 0; border-top: 1px dashed var(--border); padding-top: var(--space-md); }
+  /* Scale strip (Brown 50–1000, Blue 50–1000) */
+  .scale {
+    display: flex;
+    border-radius: 14px; overflow: hidden;
+    box-shadow: var(--card-shadow);
+    margin-bottom: 14px;
+  }
+  .scale-cell {
+    flex: 1; aspect-ratio: 1 / 1.7;
+    display: flex; flex-direction: column;
+    align-items: flex-start; justify-content: space-between;
+    padding: 14px 10px;
+    font-family: var(--mono);
+  }
+  .scale-cell .step { font-size: 14px; font-weight: 800; letter-spacing: 0.03em; }
+  .scale-cell .hex {
+    font-size: 10px; opacity: 0.72;
+    letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .scale-table {
+    width: 100%; border-collapse: collapse;
+    font-family: var(--mono); font-size: 12px;
+    background: var(--card-bg); border-radius: 12px; overflow: hidden;
+    box-shadow: var(--card-shadow);
+  }
+  .scale-table thead th {
+    text-align: left; padding: 10px 14px;
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--page-muted);
+    border-bottom: 1px solid var(--page-rule);
+    background: var(--page-bg);
+  }
+  .scale-table tbody td { padding: 10px 14px; color: var(--page-fg); }
+  .scale-table tbody tr { border-bottom: 1px solid var(--page-rule); }
+  .scale-table tbody tr:last-child { border-bottom: none; }
+  .scale-table .swatch-dot {
+    display: inline-block; width: 12px; height: 12px;
+    border-radius: 999px; margin-right: 10px; vertical-align: -2px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+  }
+  .scale-table .muted { color: var(--page-muted); }
 
-  footer { color: var(--text-muted); font-family: var(--mono); font-size: 11px; padding-top: var(--space-xl); border-top: 1px solid var(--border); }
+  /* Typography blocks */
+  .type-grid { display: grid; gap: 24px; }
+  .type-block {
+    background: var(--card-bg); border-radius: 14px; overflow: hidden;
+    box-shadow: var(--card-shadow); padding: 28px 28px 0;
+  }
+  .type-sample {
+    font-size: 38px; line-height: 1.15; font-weight: 500;
+    color: var(--section-fg); letter-spacing: -0.015em;
+    margin-bottom: 16px;
+  }
+  .type-meta {
+    display: flex; align-items: baseline; justify-content: space-between;
+    padding-bottom: 16px; border-bottom: 1px solid var(--page-rule);
+    margin-bottom: 0;
+  }
+  .type-meta .family {
+    font-family: var(--mono); font-size: 13px; font-weight: 700;
+    color: var(--page-fg);
+  }
+  .type-meta .count {
+    font-family: var(--mono); font-size: 10px; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--page-muted);
+  }
+  .type-block .scale-table {
+    margin: 0 -28px; width: calc(100% + 56px);
+    border-radius: 0; box-shadow: none;
+  }
+
+  /* Number tiles (radius / spacing visualisation) */
+  .num-grid {
+    display: flex; flex-wrap: wrap; gap: 16px;
+    background: var(--card-bg); border-radius: 14px; padding: 24px;
+    box-shadow: var(--card-shadow); margin-bottom: 16px;
+    align-items: flex-end;
+  }
+  .num-tile {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 8px; min-width: 64px;
+  }
+  .num-swatch {
+    width: 64px; height: 64px;
+    background: var(--section-fg);
+  }
+  .num-step {
+    font-family: var(--mono); font-size: 11px; font-weight: 700;
+    color: var(--page-fg); letter-spacing: 0.04em;
+  }
+  .num-value {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--page-muted); letter-spacing: 0.06em;
+  }
+
+  /* Text-style cards (composed typography specs) */
+  .ts-grid { display: grid; gap: 16px; }
+  .ts-card {
+    background: var(--card-bg); border-radius: 14px;
+    box-shadow: var(--card-shadow);
+    display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 0;
+    align-items: stretch;
+  }
+  .ts-sample {
+    padding: 32px 32px; color: var(--page-fg);
+    border-right: 1px solid var(--page-rule);
+    display: flex; align-items: center; min-height: 120px;
+  }
+  .ts-meta { padding: 20px 24px; font-family: var(--mono); font-size: 11px; }
+  .ts-meta .slug {
+    display: block; font-weight: 700; color: var(--section-fg);
+    font-size: 12px; margin-bottom: 14px;
+    word-break: break-all;
+  }
+  .ts-spec, .ts-extra {
+    display: grid; grid-template-columns: 110px 1fr; gap: 4px 12px;
+  }
+  .ts-spec { padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid var(--page-rule); }
+  .ts-spec dt, .ts-extra dt {
+    text-transform: uppercase; letter-spacing: 0.08em; font-size: 10px;
+    color: var(--page-muted); align-self: center;
+  }
+  .ts-spec dd, .ts-extra dd { color: var(--page-fg); word-break: break-all; }
+  @media (max-width: 720px) {
+    .ts-card { grid-template-columns: 1fr; }
+    .ts-sample { border-right: 0; border-bottom: 1px solid var(--page-rule); }
+  }
+
+  footer {
+    font-family: var(--mono); font-size: 11px;
+    color: var(--page-muted);
+    margin-top: 80px; padding-top: 24px;
+    border-top: 1px solid var(--page-rule);
+  }
+  footer code { color: var(--section-fg); }
 </style>
 </head>
 <body>
 <main>
   <header>
-    <h1>Turtle Keyboard <span class="brand">/</span> Design Tokens</h1>
-    <p>13 colors · 8 dimensions · 3 text styles · generated from <code>design-system/tokens.json</code></p>
+    <h1>Turtle Keyboard<span class="slash">/</span>Design Tokens</h1>
+    <div class="stats">
+      <strong>42</strong> colors across <strong>10</strong> collections<br>
+      synced from <code>design-system/token.json</code>
+    </div>
   </header>
 
+  <div class="anatomy">
+    <div>
+      <h2>Anatomy</h2>
+      <p>
+        Figma Variables are exported per collection as <code>Value.tokens*.json</code>,
+        merged into a single <code>token.json</code> by <code>merge-figma.mjs</code>,
+        and emitted to four platform targets by <code>build.mjs</code>. Each token
+        below shows its generated reference on every target — the bridge from
+        design to code is the whole point.
+      </p>
+    </div>
+<div class="anatomy-flow">Figma Variables
+  <span class="arrow">↓ export per collection</span>
+Value.tokens*.json
+  <span class="arrow">↓ merge-figma.mjs</span>
+token.json  <span class="arrow">(W3C DTCG)</span>
+  <span class="arrow">↓ build.mjs</span>
+  <span class="lane">├── Android</span>  <span class="arrow">R.color.<em>{slug}</em></span>
+  <span class="lane">├── iOS    </span>  <span class="arrow">BrandToken.<em>{slug}</em></span>
+  <span class="lane">├── Landing</span>  <span class="arrow">var(--<em>{slug}</em>)</span>
+  <span class="lane">└── Preview</span>  <span class="arrow">you are here</span></div>
+  </div>
+
+
   <section>
-    <h2>Color</h2>
-    <div class="grid">
-        <article class="card color-card">
-          <div class="swatch" style="background: #008658"></div>
+    <div class="section-head">
+      <h2>Brand <span class="tier">Foundation</span></h2>
+      <span class="badge">10 tokens</span>
+    </div>
+    <div class="card-grid">
+        <article class="card">
+          <div class="swatch" style="background: #8AD788; color: #0F0F0F;">#8AD788</div>
           <div class="meta">
-            <code class="name">brand.green</code>
-            <code class="value">#008658</code>
+            <div class="name">10</div>
+            <code class="slug">brand.10</code>
+            <dl>
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:524</dd>
+              <dt>Scopes</dt><dd>ALL_FILLS, STROKE, EFFECT_COLOR</dd>
+            </dl>
+            <div class="platforms">
+              <div class="row"><span class="lane">Android</span><span class="ref">R.color.brand_10</span></div>
+              <div class="row"><span class="lane">iOS</span><span class="ref">BrandToken.brand10</span></div>
+              <div class="row"><span class="lane">CSS</span><span class="ref">var(--brand-10)</span></div>
+            </div>
           </div>
         </article>
-        <article class="card color-card">
-          <div class="swatch" style="background: #0E5C2C"></div>
+        <article class="card">
+          <div class="swatch" style="background: #B6E3AA; color: #0F0F0F;">#B6E3AA</div>
           <div class="meta">
-            <code class="name">brand.green-deep</code>
-            <code class="value">#0E5C2C</code>
+            <div class="name">11</div>
+            <code class="slug">brand.11</code>
+            <dl>
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:525</dd>
+              <dt>Scopes</dt><dd>ALL_FILLS, STROKE, EFFECT_COLOR</dd>
+            </dl>
+            <div class="platforms">
+              <div class="row"><span class="lane">Android</span><span class="ref">R.color.brand_11</span></div>
+              <div class="row"><span class="lane">iOS</span><span class="ref">BrandToken.brand11</span></div>
+              <div class="row"><span class="lane">CSS</span><span class="ref">var(--brand-11)</span></div>
+            </div>
           </div>
         </article>
-        <article class="card color-card">
-          <div class="swatch" style="background: #D9CBA0"></div>
+        <article class="card">
+          <div class="swatch" style="background: #002755; color: #FFFFFF;">#002755</div>
           <div class="meta">
-            <code class="name">brand.dot-gold</code>
-            <code class="value">#D9CBA0</code>
+            <div class="name">02</div>
+            <code class="slug">brand.02</code>
+            <dl>
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:516</dd>
+              <dt>Scopes</dt><dd>ALL_FILLS, STROKE, EFFECT_COLOR</dd>
+            </dl>
+            <div class="platforms">
+              <div class="row"><span class="lane">Android</span><span class="ref">R.color.brand_02</span></div>
+              <div class="row"><span class="lane">iOS</span><span class="ref">BrandToken.brand02</span></div>
+              <div class="row"><span class="lane">CSS</span><span class="ref">var(--brand-02)</span></div>
+            </div>
           </div>
         </article>
-        <article class="card color-card">
-          <div class="swatch" style="background: #F1F5E8"></div>
+        <article class="card">
+          <div class="swatch" style="background: #004869; color: #FFFFFF;">#004869</div>
           <div class="meta">
-            <code class="name">onboard.bg</code>
-            <code class="value">#F1F5E8</code>
+            <div class="name">03</div>
+            <code class="slug">brand.03</code>
+            <dl>
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:517</dd>
+              <dt>Scopes</dt><dd>ALL_FILLS, STROKE, EFFECT_COLOR</dd>
+            </dl>
+            <div class="platforms">
+              <div class="row"><span class="lane">Android</span><span class="ref">R.color.brand_03</span></div>
+              <div class="row"><span class="lane">iOS</span><span class="ref">BrandToken.brand03</span></div>
+              <div class="row"><span class="lane">CSS</span><span class="ref">var(--brand-03)</span></div>
+            </div>
           </div>
         </article>
-        <article class="card color-card">
-          <div class="swatch" style="background: #DDE7F4"></div>
+        <article class="card">
+          <div class="swatch" style="background: #00717B; color: #FFFFFF;">#00717B</div>
           <div class="meta">
-            <code class="name">onboard.hero-top</code>
-            <code class="value">#DDE7F4</code>
+            <div class="name">04</div>
+            <code class="slug">brand.04</code>
+            <dl>
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:518</dd>
+              <dt>Scopes</dt><dd>ALL_FILLS, STROKE, EFFECT_COLOR</dd>
+            </dl>
+            <div class="platforms">
+              <div class="row"><span class="lane">Android</span><span class="ref">R.color.brand_04</span></div>
+              <div class="row"><span class="lane">iOS</span><span class="ref">BrandToken.brand04</span></div>
+              <div class="row"><span class="lane">CSS</span><span class="ref">var(--brand-04)</span></div>
+            </div>
           </div>
         </article>
-        <article class="card color-card">
-          <div class="swatch" style="background: #F3EAF6"></div>
+        <article class="card">
+          <div class="swatch" style="background: #008E7B; color: #FFFFFF;">#008E7B</div>
           <div class="meta">
-            <code class="name">onboard.hero-mid</code>
-            <code class="value">#F3EAF6</code>
+            <div class="name">05</div>
+            <code class="slug">brand.05</code>
+            <dl>
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:519</dd>
+              <dt>Scopes</dt><dd>ALL_FILLS, STROKE, EFFECT_COLOR</dd>
+            </dl>
+            <div class="platforms">
+              <div class="row"><span class="lane">Android</span><span class="ref">R.color.brand_05</span></div>
+              <div class="row"><span class="lane">iOS</span><span class="ref">BrandToken.brand05</span></div>
+              <div class="row"><span class="lane">CSS</span><span class="ref">var(--brand-05)</span></div>
+            </div>
           </div>
         </article>
-        <article class="card color-card">
-          <div class="swatch" style="background: #E8F0E2"></div>
+        <article class="card">
+          <div class="swatch" style="background: #009F69; color: #FFFFFF;">#009F69</div>
           <div class="meta">
-            <code class="name">onboard.hero-bottom</code>
-            <code class="value">#E8F0E2</code>
+            <div class="name">Main Brand</div>
+            <code class="slug">brand.main-brand</code>
+            <dl>
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:520</dd>
+              <dt>Scopes</dt><dd>ALL_FILLS, STROKE, EFFECT_COLOR</dd>
+            </dl>
+            <div class="platforms">
+              <div class="row"><span class="lane">Android</span><span class="ref">R.color.brand_main_brand</span></div>
+              <div class="row"><span class="lane">iOS</span><span class="ref">BrandToken.brandMainBrand</span></div>
+              <div class="row"><span class="lane">CSS</span><span class="ref">var(--brand-main-brand)</span></div>
+            </div>
           </div>
         </article>
-        <article class="card color-card">
-          <div class="swatch" style="background: #0C0C0C"></div>
+        <article class="card">
+          <div class="swatch" style="background: #22AE63; color: #FFFFFF;">#22AE63</div>
           <div class="meta">
-            <code class="name">onboard.title</code>
-            <code class="value">#0C0C0C</code>
+            <div class="name">07</div>
+            <code class="slug">brand.07</code>
+            <dl>
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:521</dd>
+              <dt>Scopes</dt><dd>ALL_FILLS, STROKE, EFFECT_COLOR</dd>
+            </dl>
+            <div class="platforms">
+              <div class="row"><span class="lane">Android</span><span class="ref">R.color.brand_07</span></div>
+              <div class="row"><span class="lane">iOS</span><span class="ref">BrandToken.brand07</span></div>
+              <div class="row"><span class="lane">CSS</span><span class="ref">var(--brand-07)</span></div>
+            </div>
           </div>
         </article>
-        <article class="card color-card">
-          <div class="swatch" style="background: #6B6B6B"></div>
+        <article class="card">
+          <div class="swatch" style="background: #44BD64; color: #FFFFFF;">#44BD64</div>
           <div class="meta">
-            <code class="name">onboard.subtitle</code>
-            <code class="value">#6B6B6B</code>
+            <div class="name">08</div>
+            <code class="slug">brand.08</code>
+            <dl>
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:522</dd>
+              <dt>Scopes</dt><dd>ALL_FILLS, STROKE, EFFECT_COLOR</dd>
+            </dl>
+            <div class="platforms">
+              <div class="row"><span class="lane">Android</span><span class="ref">R.color.brand_08</span></div>
+              <div class="row"><span class="lane">iOS</span><span class="ref">BrandToken.brand08</span></div>
+              <div class="row"><span class="lane">CSS</span><span class="ref">var(--brand-08)</span></div>
+            </div>
           </div>
         </article>
-        <article class="card color-card">
-          <div class="swatch" style="background: #0C0C0C"></div>
+        <article class="card">
+          <div class="swatch" style="background: #66CA6C; color: #FFFFFF;">#66CA6C</div>
           <div class="meta">
-            <code class="name">onboard.cta-bg</code>
-            <code class="value">#0C0C0C</code>
-          </div>
-        </article>
-        <article class="card color-card">
-          <div class="swatch" style="background: #FFFFFF"></div>
-          <div class="meta">
-            <code class="name">onboard.cta-text</code>
-            <code class="value">#FFFFFF</code>
-          </div>
-        </article>
-        <article class="card color-card">
-          <div class="swatch" style="background: #0C0C0C"></div>
-          <div class="meta">
-            <code class="name">onboard.dot-active</code>
-            <code class="value">#0C0C0C</code>
-          </div>
-        </article>
-        <article class="card color-card">
-          <div class="swatch" style="background: #CDD3C2"></div>
-          <div class="meta">
-            <code class="name">onboard.dot-inactive</code>
-            <code class="value">#CDD3C2</code>
+            <div class="name">09</div>
+            <code class="slug">brand.09</code>
+            <dl>
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:523</dd>
+              <dt>Scopes</dt><dd>ALL_FILLS, STROKE, EFFECT_COLOR</dd>
+            </dl>
+            <div class="platforms">
+              <div class="row"><span class="lane">Android</span><span class="ref">R.color.brand_09</span></div>
+              <div class="row"><span class="lane">iOS</span><span class="ref">BrandToken.brand09</span></div>
+              <div class="row"><span class="lane">CSS</span><span class="ref">var(--brand-09)</span></div>
+            </div>
           </div>
         </article>
     </div>
   </section>
 
   <section>
-    <h2>Spacing</h2>
-    <div class="space-list">
-        <div class="space-row">
-          <code class="name">space.xs</code>
-          <div class="space-bar" style="width: 4px;"></div>
-          <code class="value">4dp · 4px</code>
+    <div class="section-head">
+      <h2>Low green <span class="tier">Foundation · Scale</span></h2>
+      <span class="badge">5 steps</span>
+    </div>
+    <div class="scale">
+        <div class="scale-cell" style="background: #E4FFD2; color: #0F0F0F;">
+          <span class="step">01</span>
+          <span class="hex">E4FFD2</span>
         </div>
-        <div class="space-row">
-          <code class="name">space.sm</code>
-          <div class="space-bar" style="width: 8px;"></div>
-          <code class="value">8dp · 8px</code>
+        <div class="scale-cell" style="background: #F7FFF1; color: #0F0F0F;">
+          <span class="step">02</span>
+          <span class="hex">F7FFF1</span>
         </div>
-        <div class="space-row">
-          <code class="name">space.md</code>
-          <div class="space-bar" style="width: 12px;"></div>
-          <code class="value">12dp · 12px</code>
+        <div class="scale-cell" style="background: #FAFFF3; color: #0F0F0F;">
+          <span class="step">03</span>
+          <span class="hex">FAFFF3</span>
         </div>
-        <div class="space-row">
-          <code class="name">space.lg</code>
-          <div class="space-bar" style="width: 16px;"></div>
-          <code class="value">16dp · 16px</code>
+        <div class="scale-cell" style="background: #FFFDFC; color: #0F0F0F;">
+          <span class="step">05</span>
+          <span class="hex">FFFDFC</span>
         </div>
-        <div class="space-row">
-          <code class="name">space.xl</code>
-          <div class="space-bar" style="width: 20px;"></div>
-          <code class="value">20dp · 20px</code>
+        <div class="scale-cell" style="background: #DAEFCC; color: #0F0F0F;">
+          <span class="step">12</span>
+          <span class="hex">DAEFCC</span>
         </div>
-        <div class="space-row">
-          <code class="name">space.2xl</code>
-          <div class="space-bar" style="width: 24px;"></div>
-          <code class="value">24dp · 24px</code>
+    </div>
+    <table class="scale-table">
+      <thead><tr><th>Step</th><th>Slug</th><th>Hex</th><th>Android</th><th>iOS</th><th>CSS</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="swatch-dot" style="background: #E4FFD2;"></span>01</td>
+          <td>low-green.01</td>
+          <td>#E4FFD2</td>
+          <td class="muted">R.color.low_green_01</td>
+          <td class="muted">BrandToken.lowGreen01</td>
+          <td class="muted">var(--low-green-01)</td>
+        </tr>
+        <tr>
+          <td><span class="swatch-dot" style="background: #F7FFF1;"></span>02</td>
+          <td>low-green.02</td>
+          <td>#F7FFF1</td>
+          <td class="muted">R.color.low_green_02</td>
+          <td class="muted">BrandToken.lowGreen02</td>
+          <td class="muted">var(--low-green-02)</td>
+        </tr>
+        <tr>
+          <td><span class="swatch-dot" style="background: #FAFFF3;"></span>03</td>
+          <td>low-green.03</td>
+          <td>#FAFFF3</td>
+          <td class="muted">R.color.low_green_03</td>
+          <td class="muted">BrandToken.lowGreen03</td>
+          <td class="muted">var(--low-green-03)</td>
+        </tr>
+        <tr>
+          <td><span class="swatch-dot" style="background: #FFFDFC;"></span>05</td>
+          <td>low-green.05</td>
+          <td>#FFFDFC</td>
+          <td class="muted">R.color.low_green_05</td>
+          <td class="muted">BrandToken.lowGreen05</td>
+          <td class="muted">var(--low-green-05)</td>
+        </tr>
+        <tr>
+          <td><span class="swatch-dot" style="background: #DAEFCC;"></span>12</td>
+          <td>low-green.12</td>
+          <td>#DAEFCC</td>
+          <td class="muted">R.color.low_green_12</td>
+          <td class="muted">BrandToken.lowGreen12</td>
+          <td class="muted">var(--low-green-12)</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Grey <span class="tier">Foundation · Scale</span></h2>
+      <span class="badge">7 steps</span>
+    </div>
+    <div class="scale">
+        <div class="scale-cell" style="background: #979C9E; color: #FFFFFF;">
+          <span class="step">01</span>
+          <span class="hex">979C9E</span>
         </div>
-        <div class="space-row">
-          <code class="name">space.3xl</code>
-          <div class="space-bar" style="width: 32px;"></div>
-          <code class="value">32dp · 32px</code>
+        <div class="scale-cell" style="background: #A5AAAB; color: #FFFFFF;">
+          <span class="step">02</span>
+          <span class="hex">A5AAAB</span>
         </div>
-        <div class="space-row">
-          <code class="name">space.4xl</code>
-          <div class="space-bar" style="width: 40px;"></div>
-          <code class="value">40dp · 40px</code>
+        <div class="scale-cell" style="background: #B3B8B8; color: #FFFFFF;">
+          <span class="step">03</span>
+          <span class="hex">B3B8B8</span>
         </div>
+        <div class="scale-cell" style="background: #C0C5C4; color: #0F0F0F;">
+          <span class="step">04</span>
+          <span class="hex">C0C5C4</span>
+        </div>
+        <div class="scale-cell" style="background: #CED2D0; color: #0F0F0F;">
+          <span class="step">05</span>
+          <span class="hex">CED2D0</span>
+        </div>
+        <div class="scale-cell" style="background: #DCDFDD; color: #0F0F0F;">
+          <span class="step">07</span>
+          <span class="hex">DCDFDD</span>
+        </div>
+        <div class="scale-cell" style="background: #EAECEA; color: #0F0F0F;">
+          <span class="step">08</span>
+          <span class="hex">EAECEA</span>
+        </div>
+    </div>
+    <table class="scale-table">
+      <thead><tr><th>Step</th><th>Slug</th><th>Hex</th><th>Android</th><th>iOS</th><th>CSS</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="swatch-dot" style="background: #979C9E;"></span>01</td>
+          <td>grey.01</td>
+          <td>#979C9E</td>
+          <td class="muted">R.color.grey_01</td>
+          <td class="muted">BrandToken.grey01</td>
+          <td class="muted">var(--grey-01)</td>
+        </tr>
+        <tr>
+          <td><span class="swatch-dot" style="background: #A5AAAB;"></span>02</td>
+          <td>grey.02</td>
+          <td>#A5AAAB</td>
+          <td class="muted">R.color.grey_02</td>
+          <td class="muted">BrandToken.grey02</td>
+          <td class="muted">var(--grey-02)</td>
+        </tr>
+        <tr>
+          <td><span class="swatch-dot" style="background: #B3B8B8;"></span>03</td>
+          <td>grey.03</td>
+          <td>#B3B8B8</td>
+          <td class="muted">R.color.grey_03</td>
+          <td class="muted">BrandToken.grey03</td>
+          <td class="muted">var(--grey-03)</td>
+        </tr>
+        <tr>
+          <td><span class="swatch-dot" style="background: #C0C5C4;"></span>04</td>
+          <td>grey.04</td>
+          <td>#C0C5C4</td>
+          <td class="muted">R.color.grey_04</td>
+          <td class="muted">BrandToken.grey04</td>
+          <td class="muted">var(--grey-04)</td>
+        </tr>
+        <tr>
+          <td><span class="swatch-dot" style="background: #CED2D0;"></span>05</td>
+          <td>grey.05</td>
+          <td>#CED2D0</td>
+          <td class="muted">R.color.grey_05</td>
+          <td class="muted">BrandToken.grey05</td>
+          <td class="muted">var(--grey-05)</td>
+        </tr>
+        <tr>
+          <td><span class="swatch-dot" style="background: #DCDFDD;"></span>07</td>
+          <td>grey.07</td>
+          <td>#DCDFDD</td>
+          <td class="muted">R.color.grey_07</td>
+          <td class="muted">BrandToken.grey07</td>
+          <td class="muted">var(--grey-07)</td>
+        </tr>
+        <tr>
+          <td><span class="swatch-dot" style="background: #EAECEA;"></span>08</td>
+          <td>grey.08</td>
+          <td>#EAECEA</td>
+          <td class="muted">R.color.grey_08</td>
+          <td class="muted">BrandToken.grey08</td>
+          <td class="muted">var(--grey-08)</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Black <span class="tier">Foundation · Scale</span></h2>
+      <span class="badge">7 steps</span>
+    </div>
+    <div class="scale">
+        <div class="scale-cell" style="background: #000000; color: #FFFFFF;">
+          <span class="step">01</span>
+          <span class="hex">000000</span>
+        </div>
+        <div class="scale-cell" style="background: #222222; color: #FFFFFF;">
+          <span class="step">02</span>
+          <span class="hex">222222</span>
+        </div>
+        <div class="scale-cell" style="background: #444444; color: #FFFFFF;">
+          <span class="step">03</span>
+          <span class="hex">444444</span>
+        </div>
+        <div class="scale-cell" style="background: #666666; color: #FFFFFF;">
+          <span class="step">04</span>
+          <span class="hex">666666</span>
+        </div>
+        <div class="scale-cell" style="background: #888888; color: #FFFFFF;">
+          <span class="step">05</span>
+          <span class="hex">888888</span>
+        </div>
+        <div class="scale-cell" style="background: #AAAAAA; color: #FFFFFF;">
+          <span class="step">06</span>
+          <span class="hex">AAAAAA</span>
+        </div>
+        <div class="scale-cell" style="background: #CCCCCC; color: #0F0F0F;">
+          <span class="step">07</span>
+          <span class="hex">CCCCCC</span>
+        </div>
+    </div>
+    <table class="scale-table">
+      <thead><tr><th>Step</th><th>Slug</th><th>Hex</th><th>Android</th><th>iOS</th><th>CSS</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="swatch-dot" style="background: #000000;"></span>01</td>
+          <td>black.01</td>
+          <td>#000000</td>
+          <td class="muted">R.color.black_01</td>
+          <td class="muted">BrandToken.black01</td>
+          <td class="muted">var(--black-01)</td>
+        </tr>
+        <tr>
+          <td><span class="swatch-dot" style="background: #222222;"></span>02</td>
+          <td>black.02</td>
+          <td>#222222</td>
+          <td class="muted">R.color.black_02</td>
+          <td class="muted">BrandToken.black02</td>
+          <td class="muted">var(--black-02)</td>
+        </tr>
+        <tr>
+          <td><span class="swatch-dot" style="background: #444444;"></span>03</td>
+          <td>black.03</td>
+          <td>#444444</td>
+          <td class="muted">R.color.black_03</td>
+          <td class="muted">BrandToken.black03</td>
+          <td class="muted">var(--black-03)</td>
+        </tr>
+        <tr>
+          <td><span class="swatch-dot" style="background: #666666;"></span>04</td>
+          <td>black.04</td>
+          <td>#666666</td>
+          <td class="muted">R.color.black_04</td>
+          <td class="muted">BrandToken.black04</td>
+          <td class="muted">var(--black-04)</td>
+        </tr>
+        <tr>
+          <td><span class="swatch-dot" style="background: #888888;"></span>05</td>
+          <td>black.05</td>
+          <td>#888888</td>
+          <td class="muted">R.color.black_05</td>
+          <td class="muted">BrandToken.black05</td>
+          <td class="muted">var(--black-05)</td>
+        </tr>
+        <tr>
+          <td><span class="swatch-dot" style="background: #AAAAAA;"></span>06</td>
+          <td>black.06</td>
+          <td>#AAAAAA</td>
+          <td class="muted">R.color.black_06</td>
+          <td class="muted">BrandToken.black06</td>
+          <td class="muted">var(--black-06)</td>
+        </tr>
+        <tr>
+          <td><span class="swatch-dot" style="background: #CCCCCC;"></span>07</td>
+          <td>black.07</td>
+          <td>#CCCCCC</td>
+          <td class="muted">R.color.black_07</td>
+          <td class="muted">BrandToken.black07</td>
+          <td class="muted">var(--black-07)</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>brand <span class="tier">Foundation</span></h2>
+      <span class="badge">3 tokens</span>
+    </div>
+    <div class="card-grid">
+        <article class="card">
+          <div class="swatch" style="background: #008658; color: #FFFFFF;">#008658</div>
+          <div class="meta">
+            <div class="name">green</div>
+            <code class="slug">brand.green</code>
+            <dl>
+              <dt>Figma&nbsp;ID</dt><dd>—</dd>
+              <dt>Scopes</dt><dd>—</dd>
+            </dl>
+            <div class="platforms">
+              <div class="row"><span class="lane">Android</span><span class="ref">R.color.brand_green</span></div>
+              <div class="row"><span class="lane">iOS</span><span class="ref">BrandToken.brandGreen</span></div>
+              <div class="row"><span class="lane">CSS</span><span class="ref">var(--brand-green)</span></div>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <div class="swatch" style="background: #0E5C2C; color: #FFFFFF;">#0E5C2C</div>
+          <div class="meta">
+            <div class="name">green-deep</div>
+            <code class="slug">brand.green-deep</code>
+            <dl>
+              <dt>Figma&nbsp;ID</dt><dd>—</dd>
+              <dt>Scopes</dt><dd>—</dd>
+            </dl>
+            <div class="platforms">
+              <div class="row"><span class="lane">Android</span><span class="ref">R.color.brand_green_deep</span></div>
+              <div class="row"><span class="lane">iOS</span><span class="ref">BrandToken.brandGreenDeep</span></div>
+              <div class="row"><span class="lane">CSS</span><span class="ref">var(--brand-green-deep)</span></div>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <div class="swatch" style="background: #D9CBA0; color: #0F0F0F;">#D9CBA0</div>
+          <div class="meta">
+            <div class="name">dot-gold</div>
+            <code class="slug">brand.dot-gold</code>
+            <dl>
+              <dt>Figma&nbsp;ID</dt><dd>—</dd>
+              <dt>Scopes</dt><dd>—</dd>
+            </dl>
+            <div class="platforms">
+              <div class="row"><span class="lane">Android</span><span class="ref">R.color.brand_dot_gold</span></div>
+              <div class="row"><span class="lane">iOS</span><span class="ref">BrandToken.brandDotGold</span></div>
+              <div class="row"><span class="lane">CSS</span><span class="ref">var(--brand-dot-gold)</span></div>
+            </div>
+          </div>
+        </article>
     </div>
   </section>
 
   <section>
-    <h2>Typography</h2>
-    <div class="type-list">
-        <article class="card type-card">
-          <div class="type-sample" style="font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-weight: 900; font-size: 28px; line-height: 1.1; letter-spacing: 0;">
-            The quick brown fox jumps over the lazy dog
-          </div>
+    <div class="section-head">
+      <h2>onboard <span class="tier">Foundation</span></h2>
+      <span class="badge">10 tokens</span>
+    </div>
+    <div class="card-grid">
+        <article class="card">
+          <div class="swatch" style="background: #F1F5E8; color: #0F0F0F;">#F1F5E8</div>
           <div class="meta">
-            <code class="name">text.display</code>
-            <code class="value">900 · 28px · 1.1 lh</code>
+            <div class="name">bg</div>
+            <code class="slug">onboard.bg</code>
+            <dl>
+              <dt>Figma&nbsp;ID</dt><dd>—</dd>
+              <dt>Scopes</dt><dd>—</dd>
+            </dl>
+            <div class="platforms">
+              <div class="row"><span class="lane">Android</span><span class="ref">R.color.onboard_bg</span></div>
+              <div class="row"><span class="lane">iOS</span><span class="ref">BrandToken.onboardBg</span></div>
+              <div class="row"><span class="lane">CSS</span><span class="ref">var(--onboard-bg)</span></div>
+            </div>
           </div>
         </article>
-        <article class="card type-card">
-          <div class="type-sample" style="font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-weight: 400; font-size: 15px; line-height: 1.4; letter-spacing: 0;">
-            The quick brown fox jumps over the lazy dog
-          </div>
+        <article class="card">
+          <div class="swatch" style="background: #DDE7F4; color: #0F0F0F;">#DDE7F4</div>
           <div class="meta">
-            <code class="name">text.body</code>
-            <code class="value">400 · 15px · 1.4 lh</code>
+            <div class="name">hero-top</div>
+            <code class="slug">onboard.hero-top</code>
+            <dl>
+              <dt>Figma&nbsp;ID</dt><dd>—</dd>
+              <dt>Scopes</dt><dd>—</dd>
+            </dl>
+            <div class="platforms">
+              <div class="row"><span class="lane">Android</span><span class="ref">R.color.onboard_hero_top</span></div>
+              <div class="row"><span class="lane">iOS</span><span class="ref">BrandToken.onboardHeroTop</span></div>
+              <div class="row"><span class="lane">CSS</span><span class="ref">var(--onboard-hero-top)</span></div>
+            </div>
           </div>
         </article>
-        <article class="card type-card">
-          <div class="type-sample" style="font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-weight: 500; font-size: 16px; line-height: 1; letter-spacing: 0.02em;">
-            The quick brown fox jumps over the lazy dog
-          </div>
+        <article class="card">
+          <div class="swatch" style="background: #F3EAF6; color: #0F0F0F;">#F3EAF6</div>
           <div class="meta">
-            <code class="name">text.button</code>
-            <code class="value">500 · 16px · 1 lh · 0.02em tracking</code>
+            <div class="name">hero-mid</div>
+            <code class="slug">onboard.hero-mid</code>
+            <dl>
+              <dt>Figma&nbsp;ID</dt><dd>—</dd>
+              <dt>Scopes</dt><dd>—</dd>
+            </dl>
+            <div class="platforms">
+              <div class="row"><span class="lane">Android</span><span class="ref">R.color.onboard_hero_mid</span></div>
+              <div class="row"><span class="lane">iOS</span><span class="ref">BrandToken.onboardHeroMid</span></div>
+              <div class="row"><span class="lane">CSS</span><span class="ref">var(--onboard-hero-mid)</span></div>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <div class="swatch" style="background: #E8F0E2; color: #0F0F0F;">#E8F0E2</div>
+          <div class="meta">
+            <div class="name">hero-bottom</div>
+            <code class="slug">onboard.hero-bottom</code>
+            <dl>
+              <dt>Figma&nbsp;ID</dt><dd>—</dd>
+              <dt>Scopes</dt><dd>—</dd>
+            </dl>
+            <div class="platforms">
+              <div class="row"><span class="lane">Android</span><span class="ref">R.color.onboard_hero_bottom</span></div>
+              <div class="row"><span class="lane">iOS</span><span class="ref">BrandToken.onboardHeroBottom</span></div>
+              <div class="row"><span class="lane">CSS</span><span class="ref">var(--onboard-hero-bottom)</span></div>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <div class="swatch" style="background: #0C0C0C; color: #FFFFFF;">#0C0C0C</div>
+          <div class="meta">
+            <div class="name">title</div>
+            <code class="slug">onboard.title</code>
+            <dl>
+              <dt>Figma&nbsp;ID</dt><dd>—</dd>
+              <dt>Scopes</dt><dd>—</dd>
+            </dl>
+            <div class="platforms">
+              <div class="row"><span class="lane">Android</span><span class="ref">R.color.onboard_title</span></div>
+              <div class="row"><span class="lane">iOS</span><span class="ref">BrandToken.onboardTitle</span></div>
+              <div class="row"><span class="lane">CSS</span><span class="ref">var(--onboard-title)</span></div>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <div class="swatch" style="background: #6B6B6B; color: #FFFFFF;">#6B6B6B</div>
+          <div class="meta">
+            <div class="name">subtitle</div>
+            <code class="slug">onboard.subtitle</code>
+            <dl>
+              <dt>Figma&nbsp;ID</dt><dd>—</dd>
+              <dt>Scopes</dt><dd>—</dd>
+            </dl>
+            <div class="platforms">
+              <div class="row"><span class="lane">Android</span><span class="ref">R.color.onboard_subtitle</span></div>
+              <div class="row"><span class="lane">iOS</span><span class="ref">BrandToken.onboardSubtitle</span></div>
+              <div class="row"><span class="lane">CSS</span><span class="ref">var(--onboard-subtitle)</span></div>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <div class="swatch" style="background: #0C0C0C; color: #FFFFFF;">#0C0C0C</div>
+          <div class="meta">
+            <div class="name">cta-bg</div>
+            <code class="slug">onboard.cta-bg</code>
+            <dl>
+              <dt>Figma&nbsp;ID</dt><dd>—</dd>
+              <dt>Scopes</dt><dd>—</dd>
+            </dl>
+            <div class="platforms">
+              <div class="row"><span class="lane">Android</span><span class="ref">R.color.onboard_cta_bg</span></div>
+              <div class="row"><span class="lane">iOS</span><span class="ref">BrandToken.onboardCtaBg</span></div>
+              <div class="row"><span class="lane">CSS</span><span class="ref">var(--onboard-cta-bg)</span></div>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <div class="swatch" style="background: #FFFFFF; color: #0F0F0F;">#FFFFFF</div>
+          <div class="meta">
+            <div class="name">cta-text</div>
+            <code class="slug">onboard.cta-text</code>
+            <dl>
+              <dt>Figma&nbsp;ID</dt><dd>—</dd>
+              <dt>Scopes</dt><dd>—</dd>
+            </dl>
+            <div class="platforms">
+              <div class="row"><span class="lane">Android</span><span class="ref">R.color.onboard_cta_text</span></div>
+              <div class="row"><span class="lane">iOS</span><span class="ref">BrandToken.onboardCtaText</span></div>
+              <div class="row"><span class="lane">CSS</span><span class="ref">var(--onboard-cta-text)</span></div>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <div class="swatch" style="background: #0C0C0C; color: #FFFFFF;">#0C0C0C</div>
+          <div class="meta">
+            <div class="name">dot-active</div>
+            <code class="slug">onboard.dot-active</code>
+            <dl>
+              <dt>Figma&nbsp;ID</dt><dd>—</dd>
+              <dt>Scopes</dt><dd>—</dd>
+            </dl>
+            <div class="platforms">
+              <div class="row"><span class="lane">Android</span><span class="ref">R.color.onboard_dot_active</span></div>
+              <div class="row"><span class="lane">iOS</span><span class="ref">BrandToken.onboardDotActive</span></div>
+              <div class="row"><span class="lane">CSS</span><span class="ref">var(--onboard-dot-active)</span></div>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <div class="swatch" style="background: #CDD3C2; color: #0F0F0F;">#CDD3C2</div>
+          <div class="meta">
+            <div class="name">dot-inactive</div>
+            <code class="slug">onboard.dot-inactive</code>
+            <dl>
+              <dt>Figma&nbsp;ID</dt><dd>—</dd>
+              <dt>Scopes</dt><dd>—</dd>
+            </dl>
+            <div class="platforms">
+              <div class="row"><span class="lane">Android</span><span class="ref">R.color.onboard_dot_inactive</span></div>
+              <div class="row"><span class="lane">iOS</span><span class="ref">BrandToken.onboardDotInactive</span></div>
+              <div class="row"><span class="lane">CSS</span><span class="ref">var(--onboard-dot-inactive)</span></div>
+            </div>
           </div>
         </article>
     </div>
   </section>
 
-  <footer>AUTO-GENERATED by design-system/build.mjs — edit tokens.json, regenerate, commit.</footer>
+  <section>
+    <div class="section-head">
+      <h2>Typography <span class="tier">Foundation · Text styles</span></h2>
+      <span class="badge">46 styles</span>
+    </div>
+    <div class="ts-grid">
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'Funnel Display', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 36px; font-weight: 400; line-height: 42px; letter-spacing: -5px">Heading 1 - 36</div>
+          <div class="ts-meta">
+            <code class="slug">typography.funnel-display.heading-1-36</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>Funnel Display</dd><dt>font-style</dt><dd>Bold</dd><dt>font-size</dt><dd>36</dd><dt>line-height</dt><dd>42</dd><dt>letter-spacing</dt><dd>-5</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:545</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'Funnel Display', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 30px; font-weight: 400; line-height: 34px; letter-spacing: -3px">Heading 2 - 30</div>
+          <div class="ts-meta">
+            <code class="slug">typography.funnel-display.heading-2-30</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>Funnel Display</dd><dt>font-style</dt><dd>Bold</dd><dt>font-size</dt><dd>30</dd><dt>line-height</dt><dd>34</dd><dt>letter-spacing</dt><dd>-3</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:552</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'Funnel Display', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 26px; font-weight: 400; line-height: 29px; letter-spacing: -3px">Heading 3 - 26</div>
+          <div class="ts-meta">
+            <code class="slug">typography.funnel-display.heading-3-26</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>Funnel Display</dd><dt>font-style</dt><dd>Bold</dd><dt>font-size</dt><dd>26</dd><dt>line-height</dt><dd>29</dd><dt>letter-spacing</dt><dd>-3</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:559</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'Funnel Display', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 22px; font-weight: 400; line-height: 25px; letter-spacing: -4px">Title 1 - 22</div>
+          <div class="ts-meta">
+            <code class="slug">typography.funnel-display.title-1-22</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>Funnel Display</dd><dt>font-style</dt><dd>Bold</dd><dt>font-size</dt><dd>22</dd><dt>line-height</dt><dd>25</dd><dt>letter-spacing</dt><dd>-4</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:566</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'Funnel Display', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 18px; font-weight: 400; line-height: 20px; letter-spacing: -3px">Title 2 - 18</div>
+          <div class="ts-meta">
+            <code class="slug">typography.funnel-display.title-2-18</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>Funnel Display</dd><dt>font-style</dt><dd>Bold</dd><dt>font-size</dt><dd>18</dd><dt>line-height</dt><dd>20</dd><dt>letter-spacing</dt><dd>-3</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:573</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'Funnel Display', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; font-weight: 400; line-height: 16px; letter-spacing: -2px">Title 2 - 14</div>
+          <div class="ts-meta">
+            <code class="slug">typography.funnel-display.title-2-14</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>Funnel Display</dd><dt>font-style</dt><dd>Bold</dd><dt>font-size</dt><dd>14</dd><dt>line-height</dt><dd>16</dd><dt>letter-spacing</dt><dd>-2</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:580</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'Funnel Display', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 12px; font-weight: 400; line-height: 14px; letter-spacing: -2px">Title 4 - 12</div>
+          <div class="ts-meta">
+            <code class="slug">typography.funnel-display.title-4-12</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>Funnel Display</dd><dt>font-style</dt><dd>Bold</dd><dt>font-size</dt><dd>12</dd><dt>line-height</dt><dd>14</dd><dt>letter-spacing</dt><dd>-2</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:587</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 36px; font-weight: 400; line-height: 45px; letter-spacing: -1px">H1 - Bold - 36</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.heading-1-36.h1-bold-36</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>Bold</dd><dt>font-size</dt><dd>36</dd><dt>line-height</dt><dd>45</dd><dt>letter-spacing</dt><dd>-1</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:594</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 36px; font-weight: 400; line-height: 45px; letter-spacing: -1px">H1 - Semibold - 36</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.heading-1-36.h1-semibold-36</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>SemiBold</dd><dt>font-size</dt><dd>36</dd><dt>line-height</dt><dd>45</dd><dt>letter-spacing</dt><dd>-1</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:601</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 36px; font-weight: 400; line-height: 45px; letter-spacing: -1px">H1 -Medium - 36</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.heading-1-36.h1-medium-36</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>Medium</dd><dt>font-size</dt><dd>36</dd><dt>line-height</dt><dd>45</dd><dt>letter-spacing</dt><dd>-1</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:608</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 36px; font-weight: 400; line-height: 45px; letter-spacing: -1px">H1 -Regular - 36</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.heading-1-36.h1-regular-36</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>Regular</dd><dt>font-size</dt><dd>36</dd><dt>line-height</dt><dd>45</dd><dt>letter-spacing</dt><dd>-1</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:615</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 32px; font-weight: 400; line-height: 45px; letter-spacing: -1px">Heading 2 - Bold - 32</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.heading-2-32.heading-2-bold-32</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>Bold</dd><dt>font-size</dt><dd>32</dd><dt>line-height</dt><dd>45</dd><dt>letter-spacing</dt><dd>-1</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:622</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 32px; font-weight: 400; line-height: 45px; letter-spacing: -1px">Medium</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.heading-2-32.heading-2-medium-32.medium</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>Medium</dd><dt>font-size</dt><dd>32</dd><dt>line-height</dt><dd>45</dd><dt>letter-spacing</dt><dd>-1</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:636</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 32px; font-weight: 400; line-height: 45px; letter-spacing: -1px">Regular</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.heading-2-32.heading-2-medium-32.regular</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>Regular</dd><dt>font-size</dt><dd>32</dd><dt>line-height</dt><dd>45</dd><dt>letter-spacing</dt><dd>-1</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:643</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 28px; font-weight: 400; line-height: 30px; letter-spacing: -3px">Heading 3 - Bold - 28</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.heading-3-28.heading-3-bold-28</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>Bold</dd><dt>font-size</dt><dd>28</dd><dt>line-height</dt><dd>30</dd><dt>letter-spacing</dt><dd>-3</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:650</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 28px; font-weight: 400; line-height: 30px; letter-spacing: -3px">Heading 3 - Semibold - 28</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.heading-3-28.heading-3-semibold-28</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>SemiBold</dd><dt>font-size</dt><dd>28</dd><dt>line-height</dt><dd>30</dd><dt>letter-spacing</dt><dd>-3</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:657</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 28px; font-weight: 400; line-height: 30px; letter-spacing: -3px">Heading 3 - Medium - 28</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.heading-3-28.heading-3-medium-28</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>Medium</dd><dt>font-size</dt><dd>28</dd><dt>line-height</dt><dd>30</dd><dt>letter-spacing</dt><dd>-3</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:664</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 28px; font-weight: 400; line-height: 30px; letter-spacing: -3px">Heading 3 - Regular - 28</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.heading-3-28.heading-3-regular-28</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>Regular</dd><dt>font-size</dt><dd>28</dd><dt>line-height</dt><dd>30</dd><dt>letter-spacing</dt><dd>-3</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:671</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 26px; font-weight: 400; line-height: 34px; letter-spacing: -3px">Title 1 - Bold - 26</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.title-1-28.title-1-bold-26</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>Bold</dd><dt>font-size</dt><dd>26</dd><dt>line-height</dt><dd>34</dd><dt>letter-spacing</dt><dd>-3</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:678</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 26px; font-weight: 400; line-height: 34px; letter-spacing: -1px">Title 1 - Semibold - 26</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.title-1-28.title-1-semibold-26</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>SemiBold</dd><dt>font-size</dt><dd>26</dd><dt>line-height</dt><dd>34</dd><dt>letter-spacing</dt><dd>-1</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:685</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 26px; font-weight: 400; line-height: 34px; letter-spacing: -1px">Title 1 - Medium - 26</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.title-1-28.title-1-medium-26</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>Medium</dd><dt>font-size</dt><dd>26</dd><dt>line-height</dt><dd>34</dd><dt>letter-spacing</dt><dd>-1</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:692</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 26px; font-weight: 400; line-height: 34px; letter-spacing: -1px">Title 1 - Regular - 26</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.title-1-28.title-1-regular-26</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>Regular</dd><dt>font-size</dt><dd>26</dd><dt>line-height</dt><dd>34</dd><dt>letter-spacing</dt><dd>-1</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:699</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 24px; font-weight: 400; line-height: 34px; letter-spacing: -6px">Title 2 - Bold - 24</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.title-2-24.title-2-bold-24</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>Bold</dd><dt>font-size</dt><dd>24</dd><dt>line-height</dt><dd>34</dd><dt>letter-spacing</dt><dd>-6</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:706</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 24px; font-weight: 400; line-height: 34px; letter-spacing: -6px">Title 2 - Semibold - 24</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.title-2-24.title-2-semibold-24</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>SemiBold</dd><dt>font-size</dt><dd>24</dd><dt>line-height</dt><dd>34</dd><dt>letter-spacing</dt><dd>-6</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:713</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 24px; font-weight: 400; line-height: 34px; letter-spacing: -6px">Title 2 - Medium - 24</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.title-2-24.title-2-medium-24</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>Medium</dd><dt>font-size</dt><dd>24</dd><dt>line-height</dt><dd>34</dd><dt>letter-spacing</dt><dd>-6</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:720</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 24px; font-weight: 400; line-height: 34px; letter-spacing: -6px">Title 2 - Regular - 24</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.title-2-24.title-2-regular-24</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>Regular</dd><dt>font-size</dt><dd>24</dd><dt>line-height</dt><dd>34</dd><dt>letter-spacing</dt><dd>-6</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:727</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 22px; font-weight: 400; line-height: 32px; letter-spacing: -4px">Title 3 - Bold - 22</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.title-3-22.title-3-bold-22</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>Bold</dd><dt>font-size</dt><dd>22</dd><dt>line-height</dt><dd>32</dd><dt>letter-spacing</dt><dd>-4</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:734</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 22px; font-weight: 400; line-height: 32px; letter-spacing: -4px">Title 3 - Semibold - 24</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.title-3-22.title-3-semibold-24</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>SemiBold</dd><dt>font-size</dt><dd>22</dd><dt>line-height</dt><dd>32</dd><dt>letter-spacing</dt><dd>-4</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:741</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 22px; font-weight: 400; line-height: 32px; letter-spacing: -4px">Title 3 - Medium - 24</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.title-3-22.title-3-medium-24</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>Medium</dd><dt>font-size</dt><dd>22</dd><dt>line-height</dt><dd>32</dd><dt>letter-spacing</dt><dd>-4</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:748</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 22px; font-weight: 400; line-height: 32px; letter-spacing: -4px">Title 3 - Regular - 24</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.title-3-22.title-3-regular-24</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>Regular</dd><dt>font-size</dt><dd>22</dd><dt>line-height</dt><dd>32</dd><dt>letter-spacing</dt><dd>-4</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:755</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 18px; font-weight: 400; line-height: 26px; letter-spacing: -4px">Subtitle 1 - Bold - 18</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.subtitle-1-18.subtitle-1-bold-18</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>Bold</dd><dt>font-size</dt><dd>18</dd><dt>line-height</dt><dd>26</dd><dt>letter-spacing</dt><dd>-4</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:762</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 18px; font-weight: 400; line-height: 26px; letter-spacing: -4px">Subtitle 1 - Semibold - 18</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.subtitle-1-18.subtitle-1-semibold-18</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>SemiBold</dd><dt>font-size</dt><dd>18</dd><dt>line-height</dt><dd>26</dd><dt>letter-spacing</dt><dd>-4</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:769</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 18px; font-weight: 400; line-height: 26px; letter-spacing: -4px">Subtitle 1 - Medium - 18</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.subtitle-1-18.subtitle-1-medium-18</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>Medium</dd><dt>font-size</dt><dd>18</dd><dt>line-height</dt><dd>26</dd><dt>letter-spacing</dt><dd>-4</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:776</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 18px; font-weight: 400; line-height: 26px; letter-spacing: -4px">Subtitle 1 - Regular - 18</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.subtitle-1-18.subtitle-1-regular-18</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>Regular</dd><dt>font-size</dt><dd>18</dd><dt>line-height</dt><dd>26</dd><dt>letter-spacing</dt><dd>-4</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:783</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 16px; font-weight: 400; line-height: 26px; letter-spacing: 0px">Subtitle 2 - Bold - 16</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.subtitle-2-16.subtitle-2-bold-16</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>Bold</dd><dt>font-size</dt><dd>16</dd><dt>line-height</dt><dd>26</dd><dt>letter-spacing</dt><dd>0</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:790</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 16px; font-weight: 400; line-height: 24px; letter-spacing: -4px">Subtitle 2 - Semibold - 16</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.subtitle-2-16.subtitle-2-semibold-16</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>SemiBold</dd><dt>font-size</dt><dd>16</dd><dt>line-height</dt><dd>24</dd><dt>letter-spacing</dt><dd>-4</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:797</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 16px; font-weight: 400; line-height: 24px; letter-spacing: 0px">Subtitle 2 - Medium - 16</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.subtitle-2-16.subtitle-2-medium-16</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>Medium</dd><dt>font-size</dt><dd>16</dd><dt>line-height</dt><dd>24</dd><dt>letter-spacing</dt><dd>0</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:804</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 16px; font-weight: 400; letter-spacing: 0px">Subtitle 2 - Regular - 16</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.subtitle-2-16.subtitle-2-regular-16</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>Regular</dd><dt>font-size</dt><dd>16</dd><dt>letter-spacing</dt><dd>0</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:811</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; font-weight: 400; line-height: 22px; letter-spacing: -2px">Paragraph 1 - Bold - 14</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.paragraph-1-14.paragraph-1-bold-14</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>Bold</dd><dt>font-size</dt><dd>14</dd><dt>line-height</dt><dd>22</dd><dt>letter-spacing</dt><dd>-2</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:817</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; font-weight: 400; line-height: 22px; letter-spacing: -2px">Paragraph 1 - Semibold - 14</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.paragraph-1-14.paragraph-1-semibold-14</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>SemiBold</dd><dt>font-size</dt><dd>14</dd><dt>line-height</dt><dd>22</dd><dt>letter-spacing</dt><dd>-2</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:824</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; font-weight: 400; line-height: 22px; letter-spacing: -2px">Paragraph 1 - Medium - 14</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.paragraph-1-14.paragraph-1-medium-14</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>Medium</dd><dt>font-size</dt><dd>14</dd><dt>line-height</dt><dd>22</dd><dt>letter-spacing</dt><dd>-2</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:831</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; font-weight: 400; line-height: 22px; letter-spacing: -2px">Paragraph 1 - Regular - 14</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.paragraph-1-14.paragraph-1-regular-14</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>Regular</dd><dt>font-size</dt><dd>14</dd><dt>line-height</dt><dd>22</dd><dt>letter-spacing</dt><dd>-2</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:838</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 12px; font-weight: 400; line-height: 18px; letter-spacing: 0px">Paragraph 2 - Bold - 12</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.paragraph-2-12.paragraph-2-bold-12</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>Bold</dd><dt>font-size</dt><dd>12</dd><dt>line-height</dt><dd>18</dd><dt>letter-spacing</dt><dd>0</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:845</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 12px; font-weight: 400; line-height: 18px; letter-spacing: 0px">Paragraph 2 - Semibold - 14</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.paragraph-2-12.paragraph-2-semibold-14</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>SemiBold</dd><dt>font-size</dt><dd>12</dd><dt>line-height</dt><dd>18</dd><dt>letter-spacing</dt><dd>0</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:852</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 12px; font-weight: 400; line-height: 18px; letter-spacing: 0px">Paragraph 2 - Medium - 14</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.paragraph-2-12.paragraph-2-medium-14</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>Medium</dd><dt>font-size</dt><dd>12</dd><dt>line-height</dt><dd>18</dd><dt>letter-spacing</dt><dd>0</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:859</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+        <article class="ts-card">
+          <div class="ts-sample" style="font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 12px; font-weight: 400; line-height: 18px; letter-spacing: 0px">Paragraph 2 - Regular - 14</div>
+          <div class="ts-meta">
+            <code class="slug">typography.dm-sans.paragraph-2-12.paragraph-2-regular-14</code>
+            <dl class="ts-spec"><dt>font-family</dt><dd>DM Sans</dd><dt>font-style</dt><dd>Regular</dd><dt>font-size</dt><dd>12</dd><dt>line-height</dt><dd>18</dd><dt>letter-spacing</dt><dd>0</dd><dt>paragraph-spacing</dt><dd>0</dd><dt>paragraph-indent</dt><dd>0</dd></dl>
+            <dl class="ts-extra">
+              <dt>Figma&nbsp;ID</dt><dd>VariableID:17:866</dd>
+              <dt>Scopes</dt><dd>FONT_FAMILY</dd>
+            </dl>
+          </div>
+        </article>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Typography <span class="tier">Foundation · Numbers</span></h2>
+      <span class="badge">5 values</span>
+    </div>
+    <div class="num-grid">
+        <div class="num-tile">
+          <div class="num-swatch" style="width: 8px;"></div>
+          <div class="num-step">letter-spacing</div>
+          <div class="num-value">-1px</div>
+        </div>
+        <div class="num-tile">
+          <div class="num-swatch" style="width: 8px;"></div>
+          <div class="num-step">paragraph-spacing</div>
+          <div class="num-value">0px</div>
+        </div>
+        <div class="num-tile">
+          <div class="num-swatch" style="width: 8px;"></div>
+          <div class="num-step">paragraph-indent</div>
+          <div class="num-value">0px</div>
+        </div>
+        <div class="num-tile">
+          <div class="num-swatch" style="width: 64px;"></div>
+          <div class="num-step">font-size</div>
+          <div class="num-value">32px</div>
+        </div>
+        <div class="num-tile">
+          <div class="num-swatch" style="width: 90px;"></div>
+          <div class="num-step">line-height</div>
+          <div class="num-value">45px</div>
+        </div>
+    </div>
+    <table class="scale-table">
+      <thead><tr><th>Step</th><th>Slug</th><th>Value</th><th>Android</th><th>iOS</th><th>CSS</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>letter-spacing</td>
+          <td>typography.dm-sans.heading-2-32.heading-2-medium-32.letter-spacing</td>
+          <td>-1px</td>
+          <td class="muted">R.color.typography_dm_sans_heading_2_32_heading_2_medium_32_letter_spacing</td>
+          <td class="muted">BrandToken.typographyDmSansHeading232Heading2Medium32LetterSpacing</td>
+          <td class="muted">var(--typography-dm-sans-heading-2-32-heading-2-medium-32-letter-spacing)</td>
+        </tr>
+        <tr>
+          <td>paragraph-spacing</td>
+          <td>typography.dm-sans.heading-2-32.heading-2-medium-32.paragraph-spacing</td>
+          <td>0px</td>
+          <td class="muted">R.color.typography_dm_sans_heading_2_32_heading_2_medium_32_paragraph_spacing</td>
+          <td class="muted">BrandToken.typographyDmSansHeading232Heading2Medium32ParagraphSpacing</td>
+          <td class="muted">var(--typography-dm-sans-heading-2-32-heading-2-medium-32-paragraph-spacing)</td>
+        </tr>
+        <tr>
+          <td>paragraph-indent</td>
+          <td>typography.dm-sans.heading-2-32.heading-2-medium-32.paragraph-indent</td>
+          <td>0px</td>
+          <td class="muted">R.color.typography_dm_sans_heading_2_32_heading_2_medium_32_paragraph_indent</td>
+          <td class="muted">BrandToken.typographyDmSansHeading232Heading2Medium32ParagraphIndent</td>
+          <td class="muted">var(--typography-dm-sans-heading-2-32-heading-2-medium-32-paragraph-indent)</td>
+        </tr>
+        <tr>
+          <td>font-size</td>
+          <td>typography.dm-sans.heading-2-32.heading-2-medium-32.font-size</td>
+          <td>32px</td>
+          <td class="muted">R.color.typography_dm_sans_heading_2_32_heading_2_medium_32_font_size</td>
+          <td class="muted">BrandToken.typographyDmSansHeading232Heading2Medium32FontSize</td>
+          <td class="muted">var(--typography-dm-sans-heading-2-32-heading-2-medium-32-font-size)</td>
+        </tr>
+        <tr>
+          <td>line-height</td>
+          <td>typography.dm-sans.heading-2-32.heading-2-medium-32.line-height</td>
+          <td>45px</td>
+          <td class="muted">R.color.typography_dm_sans_heading_2_32_heading_2_medium_32_line_height</td>
+          <td class="muted">BrandToken.typographyDmSansHeading232Heading2Medium32LineHeight</td>
+          <td class="muted">var(--typography-dm-sans-heading-2-32-heading-2-medium-32-line-height)</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Radius <span class="tier">Foundation · Numbers</span></h2>
+      <span class="badge">8 values</span>
+    </div>
+    <div class="num-grid">
+        <div class="num-tile">
+          <div class="num-swatch" style="border-radius: 2px;"></div>
+          <div class="num-step">2</div>
+          <div class="num-value">2px</div>
+        </div>
+        <div class="num-tile">
+          <div class="num-swatch" style="border-radius: 6px;"></div>
+          <div class="num-step">6</div>
+          <div class="num-value">6px</div>
+        </div>
+        <div class="num-tile">
+          <div class="num-swatch" style="border-radius: 10px;"></div>
+          <div class="num-step">10</div>
+          <div class="num-value">10px</div>
+        </div>
+        <div class="num-tile">
+          <div class="num-swatch" style="border-radius: 14px;"></div>
+          <div class="num-step">14</div>
+          <div class="num-value">14px</div>
+        </div>
+        <div class="num-tile">
+          <div class="num-swatch" style="border-radius: 18px;"></div>
+          <div class="num-step">18</div>
+          <div class="num-value">18px</div>
+        </div>
+        <div class="num-tile">
+          <div class="num-swatch" style="border-radius: 22px;"></div>
+          <div class="num-step">22</div>
+          <div class="num-value">22px</div>
+        </div>
+        <div class="num-tile">
+          <div class="num-swatch" style="border-radius: 26px;"></div>
+          <div class="num-step">26</div>
+          <div class="num-value">26px</div>
+        </div>
+        <div class="num-tile">
+          <div class="num-swatch" style="border-radius: 30px;"></div>
+          <div class="num-step">30</div>
+          <div class="num-value">30px</div>
+        </div>
+    </div>
+    <table class="scale-table">
+      <thead><tr><th>Step</th><th>Slug</th><th>Value</th><th>Android</th><th>iOS</th><th>CSS</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>2</td>
+          <td>radius.2</td>
+          <td>2px</td>
+          <td class="muted">R.color.radius_2</td>
+          <td class="muted">BrandToken.radius2</td>
+          <td class="muted">var(--radius-2)</td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td>radius.6</td>
+          <td>6px</td>
+          <td class="muted">R.color.radius_6</td>
+          <td class="muted">BrandToken.radius6</td>
+          <td class="muted">var(--radius-6)</td>
+        </tr>
+        <tr>
+          <td>10</td>
+          <td>radius.10</td>
+          <td>10px</td>
+          <td class="muted">R.color.radius_10</td>
+          <td class="muted">BrandToken.radius10</td>
+          <td class="muted">var(--radius-10)</td>
+        </tr>
+        <tr>
+          <td>14</td>
+          <td>radius.14</td>
+          <td>14px</td>
+          <td class="muted">R.color.radius_14</td>
+          <td class="muted">BrandToken.radius14</td>
+          <td class="muted">var(--radius-14)</td>
+        </tr>
+        <tr>
+          <td>18</td>
+          <td>radius.18</td>
+          <td>18px</td>
+          <td class="muted">R.color.radius_18</td>
+          <td class="muted">BrandToken.radius18</td>
+          <td class="muted">var(--radius-18)</td>
+        </tr>
+        <tr>
+          <td>22</td>
+          <td>radius.22</td>
+          <td>22px</td>
+          <td class="muted">R.color.radius_22</td>
+          <td class="muted">BrandToken.radius22</td>
+          <td class="muted">var(--radius-22)</td>
+        </tr>
+        <tr>
+          <td>26</td>
+          <td>radius.26</td>
+          <td>26px</td>
+          <td class="muted">R.color.radius_26</td>
+          <td class="muted">BrandToken.radius26</td>
+          <td class="muted">var(--radius-26)</td>
+        </tr>
+        <tr>
+          <td>30</td>
+          <td>radius.30</td>
+          <td>30px</td>
+          <td class="muted">R.color.radius_30</td>
+          <td class="muted">BrandToken.radius30</td>
+          <td class="muted">var(--radius-30)</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Space <span class="tier">Foundation · Numbers</span></h2>
+      <span class="badge">8 values</span>
+    </div>
+    <div class="num-grid">
+        <div class="num-tile">
+          <div class="num-swatch" style="width: 8px;"></div>
+          <div class="num-step">xs</div>
+          <div class="num-value">4px</div>
+        </div>
+        <div class="num-tile">
+          <div class="num-swatch" style="width: 16px;"></div>
+          <div class="num-step">sm</div>
+          <div class="num-value">8px</div>
+        </div>
+        <div class="num-tile">
+          <div class="num-swatch" style="width: 24px;"></div>
+          <div class="num-step">md</div>
+          <div class="num-value">12px</div>
+        </div>
+        <div class="num-tile">
+          <div class="num-swatch" style="width: 32px;"></div>
+          <div class="num-step">lg</div>
+          <div class="num-value">16px</div>
+        </div>
+        <div class="num-tile">
+          <div class="num-swatch" style="width: 40px;"></div>
+          <div class="num-step">xl</div>
+          <div class="num-value">20px</div>
+        </div>
+        <div class="num-tile">
+          <div class="num-swatch" style="width: 48px;"></div>
+          <div class="num-step">2xl</div>
+          <div class="num-value">24px</div>
+        </div>
+        <div class="num-tile">
+          <div class="num-swatch" style="width: 64px;"></div>
+          <div class="num-step">3xl</div>
+          <div class="num-value">32px</div>
+        </div>
+        <div class="num-tile">
+          <div class="num-swatch" style="width: 80px;"></div>
+          <div class="num-step">4xl</div>
+          <div class="num-value">40px</div>
+        </div>
+    </div>
+    <table class="scale-table">
+      <thead><tr><th>Step</th><th>Slug</th><th>Value</th><th>Android</th><th>iOS</th><th>CSS</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>xs</td>
+          <td>space.xs</td>
+          <td>4px</td>
+          <td class="muted">R.color.space_xs</td>
+          <td class="muted">BrandToken.spaceXs</td>
+          <td class="muted">var(--space-xs)</td>
+        </tr>
+        <tr>
+          <td>sm</td>
+          <td>space.sm</td>
+          <td>8px</td>
+          <td class="muted">R.color.space_sm</td>
+          <td class="muted">BrandToken.spaceSm</td>
+          <td class="muted">var(--space-sm)</td>
+        </tr>
+        <tr>
+          <td>md</td>
+          <td>space.md</td>
+          <td>12px</td>
+          <td class="muted">R.color.space_md</td>
+          <td class="muted">BrandToken.spaceMd</td>
+          <td class="muted">var(--space-md)</td>
+        </tr>
+        <tr>
+          <td>lg</td>
+          <td>space.lg</td>
+          <td>16px</td>
+          <td class="muted">R.color.space_lg</td>
+          <td class="muted">BrandToken.spaceLg</td>
+          <td class="muted">var(--space-lg)</td>
+        </tr>
+        <tr>
+          <td>xl</td>
+          <td>space.xl</td>
+          <td>20px</td>
+          <td class="muted">R.color.space_xl</td>
+          <td class="muted">BrandToken.spaceXl</td>
+          <td class="muted">var(--space-xl)</td>
+        </tr>
+        <tr>
+          <td>2xl</td>
+          <td>space.2xl</td>
+          <td>24px</td>
+          <td class="muted">R.color.space_2xl</td>
+          <td class="muted">BrandToken.space2xl</td>
+          <td class="muted">var(--space-2xl)</td>
+        </tr>
+        <tr>
+          <td>3xl</td>
+          <td>space.3xl</td>
+          <td>32px</td>
+          <td class="muted">R.color.space_3xl</td>
+          <td class="muted">BrandToken.space3xl</td>
+          <td class="muted">var(--space-3xl)</td>
+        </tr>
+        <tr>
+          <td>4xl</td>
+          <td>space.4xl</td>
+          <td>40px</td>
+          <td class="muted">R.color.space_4xl</td>
+          <td class="muted">BrandToken.space4xl</td>
+          <td class="muted">var(--space-4xl)</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <footer>AUTO-GENERATED by <code>design-system/build.mjs</code> — every Figma re-export rewrites this page.</footer>
 </main>
 </body>
 </html>

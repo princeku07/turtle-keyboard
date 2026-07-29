@@ -1,15 +1,25 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, JetBrains_Mono, Fraunces } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Coastal Minimalism type pairing (design.txt §3):
+// Geist for headings & copy, JetBrains Mono to anchor /commands.
+const geist = Geist({
+  variable: "--font-geist",
   subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const jetbrains = JetBrains_Mono({
+  variable: "--font-jetbrains",
   subsets: ["latin"],
+});
+
+// Fraunces — a warm, high-contrast serif used for the Logbook's editorial
+// headings. Scoped to the blog so the product pages stay geometric-sans.
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
+  subsets: ["latin"],
+  axes: ["opsz", "SOFT"],
 });
 
 export const metadata: Metadata = {
@@ -19,7 +29,7 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://www.turtlekeyboard.com"),
   title: "Turtle Keyboard — slash is the new hey siri.",
   description:
-    "An open-source AI keyboard for iOS and Android. Every model — image, text, voice — one slash command away, inside any app you already use.",
+    "The open-source AI keyboard that turns any text field into a command line. Type a slash to bring polls, quizzes, AI, and your favorite tools into any chat.",
 };
 
 export default function RootLayout({
@@ -30,7 +40,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geist.variable} ${jetbrains.variable} ${fraunces.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

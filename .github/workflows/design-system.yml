@@ -25,8 +25,5 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Install deps
-        run: npm install --no-save ajv
-
-      - name: Validate + drift-check
+      - name: Merge + build + drift-check
         run: node .github/scripts/design-system-check.mjs

@@ -21,7 +21,6 @@ import com.prince.turtlekeyboard.ai.AiErrorMessages;
 import com.prince.turtlekeyboard.ai.AlphaMatte;
 import com.prince.turtlekeyboard.ai.GifEncoder;
 import com.prince.turtlekeyboard.ai.ImageHistory;
-import com.prince.turtlekeyboard.ai.LmStudioAiClient;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -164,7 +163,8 @@ public class GifIntegration implements KeyboardIntegration {
         // Picker was pre-launched when the user entered prompt mode (same hook
         // as /edit and /style), so the image is already staged by now.
         // Consume-and-clear so a re-dispatch doesn't reuse a stale image.
-        IntegrationContext.PickedImage picked = LmStudioAiClient.consumeStagedEditImage();
+        IntegrationContext.PickedImage picked = com.prince.turtlekeyboard.TurtleApp
+                .from(ctx.appContext()).stagingPipeline().consumeEditImageAsPicked();
         if (picked == null) {
             ctx.showBanner("Pick a photo first", FAIL_BANNER_MS);
             return;

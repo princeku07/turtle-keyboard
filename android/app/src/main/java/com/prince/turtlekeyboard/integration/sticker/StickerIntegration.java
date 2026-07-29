@@ -21,7 +21,6 @@ import com.prince.kbd.core.KeyboardIntegration;
 import com.prince.turtlekeyboard.ai.AiErrorMessages;
 import com.prince.turtlekeyboard.ai.AlphaMatte;
 import com.prince.turtlekeyboard.ai.ImageHistory;
-import com.prince.turtlekeyboard.ai.LmStudioAiClient;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -67,7 +66,7 @@ import java.util.concurrent.Executors;
  * with distinguishing labels so the History screen can show every stage from
  * one /sticker call when you're debugging.
  *
- * <p>This integration replaces the previous {@code LmStudioAiClient} branch
+ * <p>This integration replaces the previous {@code TurtleAiClient} branch
  * for {@code /sticker}, which produced a single-pass opaque image. Old
  * stickers in the user's history still display correctly — only newly
  * generated stickers go through the matte pipeline.
@@ -163,8 +162,8 @@ public class StickerIntegration implements KeyboardIntegration {
         // Either way, pass 2 (handled in runMattePass) swaps the background
         // to black on the pass-1 output and the client recovers per-pixel
         // alpha via difference matting.
-        IntegrationContext.PickedImage picked =
-                LmStudioAiClient.consumeStagedEditImage();
+        IntegrationContext.PickedImage picked = com.prince.turtlekeyboard.TurtleApp
+                .from(ctx.appContext()).stagingPipeline().consumeEditImageAsPicked();
         final boolean photoMode = picked != null;
         final String promptAsset = photoMode ? "sticker_photo" : "sticker";
         final String systemPrompt = AssetPrompts.load(ctx.appContext(), promptAsset);

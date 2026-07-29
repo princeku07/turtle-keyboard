@@ -34,12 +34,7 @@ public class TurtleKeyboardView extends KeyboardView {
         void onModeKeyLongPress();
     }
 
-    public interface BackspaceLongPressListener {
-        void onBackspaceLongPress();
-    }
-
     private ModeKeyLongPressListener modeKeyLongPressListener;
-    private BackspaceLongPressListener backspaceLongPressListener;
 
     private final Paint facePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint labelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -90,19 +85,11 @@ public class TurtleKeyboardView extends KeyboardView {
         this.modeKeyLongPressListener = l;
     }
 
-    public void setBackspaceLongPressListener(BackspaceLongPressListener l) {
-        this.backspaceLongPressListener = l;
-    }
-
     @Override
     protected boolean onLongPress(Keyboard.Key popupKey) {
         int code = codeOf(popupKey);
         if (code == CODE_MODE && modeKeyLongPressListener != null) {
             modeKeyLongPressListener.onModeKeyLongPress();
-            return true;
-        }
-        if (code == CODE_BACKSPACE && backspaceLongPressListener != null) {
-            backspaceLongPressListener.onBackspaceLongPress();
             return true;
         }
         // Long-press on a letter key with a single popupCharacter commits the alt directly.
@@ -115,6 +102,11 @@ public class TurtleKeyboardView extends KeyboardView {
             if (l != null) {
                 performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
                 l.onKey(alt, new int[]{ alt });
+                // Returning true sets KeyboardView's mAbortKey, so the UP event skips
+                // detectAndSendKey() — the only place the framework calls onRelease. Without
+                // it the IME never dismisses the key-preview popup shown on onPress, so the
+                // bubble sticks. Fire onRelease ourselves to dismiss it.
+                l.onRelease(code);
                 return true;
             }
         }
@@ -189,8 +181,11 @@ public class TurtleKeyboardView extends KeyboardView {
             labelPaint.setColor(prevColor);
         }
 
+        // Skip the corner hint when the label already shows a secondary glyph (e.g. the
+        // ". ," punctuation key), otherwise the alternate would render twice.
+        boolean labelHasSecondary = key.label != null && key.label.length() > 1;
         if (key.popupCharacters != null && key.popupCharacters.length() > 0
-                && !isFunctionKey(key)) {
+                && !isFunctionKey(key) && !labelHasSecondary) {
             char hint = key.popupCharacters.charAt(0);
             float x = right - dp(6);
             float y = top + dp(13);

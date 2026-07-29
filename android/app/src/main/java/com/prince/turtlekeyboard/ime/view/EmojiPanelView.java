@@ -19,8 +19,11 @@ import android.widget.BaseAdapter;
 import android.widget.FrameLayout;
 import android.widget.GridView;
 import android.widget.HorizontalScrollView;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+
+import com.prince.turtlekeyboard.R;
 
 import androidx.annotation.Nullable;
 
@@ -28,6 +31,7 @@ import com.prince.turtlekeyboard.ai.ImageHistory;
 import com.prince.turtlekeyboard.emoji.EmojiData;
 import com.prince.turtlekeyboard.emoji.EmojiSearchIndex;
 import com.prince.turtlekeyboard.emoji.RecentEmojiStore;
+import com.prince.turtlekeyboard.input.InputTarget;
 import com.prince.turtlekeyboard.theme.KeyboardTheme;
 
 import java.io.File;
@@ -41,11 +45,12 @@ import java.util.concurrent.Executors;
  * grid) and a Search mode (search bar + compressed grid with the hardware keys re-shown
  * below). Glyphs render via EmojiCompat for consistency across Android 7+.
  */
-public class EmojiPanelView extends LinearLayout {
+public class EmojiPanelView extends LinearLayout implements InputTarget {
 
     public interface OnEmojiPickListener { void onPick(String emoji); }
     public interface OnCloseListener { void onClose(); }
     public interface OnGifPickListener { void onPick(File gifFile); }
+    public interface OnGifAddListener { void onAdd(); }
 
     /** Callbacks the IME uses to re-show the keys and route typed characters into search. */
     public interface OnSearchStateListener {
@@ -73,10 +78,10 @@ public class EmojiPanelView extends LinearLayout {
     private final LinearLayout normalBar;
     private final LinearLayout searchBar;
 
-    private final TextView searchTabButton;
+    private final ImageView searchTabButton;
     private final LinearLayout tabsRow;
     private final HorizontalScrollView tabsScroll;
-    private final TextView abcButton;
+    private final ImageView closeButton;
 
     private final TextView searchBackButton;
     private final TextView searchDisplay;
@@ -91,6 +96,8 @@ public class EmojiPanelView extends LinearLayout {
     @Nullable private OnCloseListener closeListener;
     @Nullable private OnSearchStateListener searchStateListener;
     @Nullable private OnGifPickListener gifPickListener;
+    @Nullable private OnGifAddListener gifAddListener;
+    @Nullable private InputTarget.ActiveChangeListener inputModeListener;
     private EmojiData.Category currentCategory = EmojiData.Category.SMILEYS;
 
     private final ExecutorService gifIo = Executors.newSingleThreadExecutor();
@@ -132,26 +139,27 @@ public class EmojiPanelView extends LinearLayout {
         normalBar.setGravity(Gravity.CENTER_VERTICAL);
         normalBar.setBackgroundColor(BG);
 
-        searchTabButton = new TextView(context);
-        searchTabButton.setText("🔍");
-        searchTabButton.setGravity(Gravity.CENTER);
-        searchTabButton.setIncludeFontPadding(false);
-        searchTabButton.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f);
-        searchTabButton.setAlpha(0.7f);
-        searchTabButton.setClickable(true);
-        searchTabButton.setFocusable(true);
-        searchTabButton.setOnClickListener(v -> {
+        closeButton = new ImageView(context);
+        closeButton.setImageResource(R.drawable.ic_arrow_back_24);
+        closeButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        closeButton.setPadding(dp(8), dp(8), dp(8), dp(8));
+        closeButton.setClickable(true);
+        closeButton.setFocusable(true);
+        closeButton.setOnClickListener(v -> {
             v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
-            enterSearchMode();
+            // Exit search first so the host's close path sees browse-mode geometry.
+            if (inSearchMode) exitSearchMode();
+            animateOut(() -> { if (closeListener != null) closeListener.onClose(); });
         });
-        LayoutParams searchTabLp = new LayoutParams(dp(40), dp(40));
-        normalBar.addView(searchTabButton, searchTabLp);
+        LayoutParams closeLp = new LayoutParams(dp(40), dp(40));
+        closeLp.leftMargin = dp(4);
+        normalBar.addView(closeButton, closeLp);
 
         View headDivider = new View(context);
         headDivider.setBackgroundColor(TAB_DIVIDER);
         LayoutParams hdLp = new LayoutParams(dp(1), dp(24));
-        hdLp.leftMargin = dp(2);
-        hdLp.rightMargin = dp(2);
+        hdLp.leftMargin = dp(4);
+        hdLp.rightMargin = dp(4);
         normalBar.addView(headDivider, hdLp);
 
         tabsScroll = new HorizontalScrollView(context);
@@ -168,28 +176,23 @@ public class EmojiPanelView extends LinearLayout {
         tailDivider.setBackgroundColor(TAB_DIVIDER);
         LayoutParams tdLp = new LayoutParams(dp(1), dp(24));
         tdLp.leftMargin = dp(4);
-        tdLp.rightMargin = dp(4);
+        tdLp.rightMargin = dp(2);
         normalBar.addView(tailDivider, tdLp);
 
-        abcButton = new TextView(context);
-        abcButton.setText("ABC");
-        abcButton.setTextColor(TEXT_PRIMARY);
-        abcButton.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f);
-        abcButton.setTypeface(abcButton.getTypeface(), Typeface.BOLD);
-        abcButton.setGravity(Gravity.CENTER);
-        abcButton.setPadding(dp(12), dp(6), dp(12), dp(6));
-        abcButton.setClickable(true);
-        abcButton.setFocusable(true);
-        abcButton.setBackground(pillBackground(0x14FFFFFF, dp(14)));
-        abcButton.setOnClickListener(v -> {
+        searchTabButton = new ImageView(context);
+        searchTabButton.setImageResource(R.drawable.ic_search_24);
+        searchTabButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        searchTabButton.setPadding(dp(8), dp(8), dp(8), dp(8));
+        searchTabButton.setAlpha(0.7f);
+        searchTabButton.setClickable(true);
+        searchTabButton.setFocusable(true);
+        searchTabButton.setOnClickListener(v -> {
             v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
-            // Exit search first so the host's close path sees browse-mode geometry.
-            if (inSearchMode) exitSearchMode();
-            animateOut(() -> { if (closeListener != null) closeListener.onClose(); });
+            enterSearchMode();
         });
-        LayoutParams abcLp = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
-        abcLp.rightMargin = dp(8);
-        normalBar.addView(abcButton, abcLp);
+        LayoutParams searchTabLp = new LayoutParams(dp(40), dp(40));
+        searchTabLp.rightMargin = dp(4);
+        normalBar.addView(searchTabButton, searchTabLp);
 
         searchBar = new LinearLayout(context);
         searchBar.setOrientation(HORIZONTAL);
@@ -268,6 +271,13 @@ public class EmojiPanelView extends LinearLayout {
                 if (gifPickListener != null) gifPickListener.onPick(file);
             });
         });
+        gifGrid.setOnAddClick(() -> {
+            // Mirrors typing `/gif`: close the panel, then let the host start the command.
+            animateOut(() -> {
+                if (closeListener != null) closeListener.onClose();
+                if (gifAddListener != null) gifAddListener.onAdd();
+            });
+        });
 
         cardContainer.addView(body,
                 new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
@@ -336,6 +346,10 @@ public class EmojiPanelView extends LinearLayout {
         this.gifPickListener = l;
     }
 
+    public void setOnGifAddListener(@Nullable OnGifAddListener l) {
+        this.gifAddListener = l;
+    }
+
     public boolean isInSearchMode() { return inSearchMode; }
 
     public void setBrowseHeightPx(int px) {
@@ -350,9 +364,7 @@ public class EmojiPanelView extends LinearLayout {
     }
 
     public void applyTheme(KeyboardTheme theme) {
-        // Only the ABC close pill tracks the theme accent; surface stays black.
-        abcButton.setBackground(pillBackground(theme == null
-                ? 0x14FFFFFF : (theme.accent & 0x00FFFFFF) | 0x33000000, dp(14)));
+        // Icon buttons sit on the black surface; nothing theme-tracked to update right now.
     }
 
     private void buildTabs() {
@@ -415,46 +427,56 @@ public class EmojiPanelView extends LinearLayout {
     private void enterSearchMode() {
         if (inSearchMode) return;
         inSearchMode = true;
-        beginCoordinatedTransition();
-        normalBar.setVisibility(GONE);
-        searchBar.setVisibility(VISIBLE);
+        // Snap height + grid contents in one layout pass; visual smoothness comes from
+        // the bar crossfade on the panel and the keys sliding up from below.
         query.setLength(0);
         renderQuery();
-
-        // Shrink so the hardware keys can re-appear below.
-        ViewGroup.LayoutParams lp = getLayoutParams();
-        if (lp != null) {
-            lp.height = dp(SEARCH_HEIGHT_DP);
-            setLayoutParams(lp);
-        }
+        setPanelHeight(dp(SEARCH_HEIGHT_DP));
+        crossfadeBars(normalBar, searchBar);
         if (searchStateListener != null) searchStateListener.onEnterSearch();
+        if (inputModeListener != null) inputModeListener.onActiveChanged(this, true);
     }
 
     private void exitSearchMode() {
         if (!inSearchMode) return;
         inSearchMode = false;
-        beginCoordinatedTransition();
-        searchBar.setVisibility(GONE);
-        normalBar.setVisibility(VISIBLE);
-        query.setLength(0);
-
-        ViewGroup.LayoutParams lp = getLayoutParams();
-        if (lp != null) {
-            lp.height = browseHeightPx;
-            setLayoutParams(lp);
-        }
+        // Hide keys + snap height + restore grid in the same frame so IME-window height
+        // goes 312→240 in one reflow. Doing them in separate ticks makes keys visibly
+        // jump down (panel grows, pushes keys 68dp before they're hidden) and triggers
+        // two IME window resizes back-to-back.
         if (searchStateListener != null) searchStateListener.onExitSearch();
+        query.setLength(0);
         selectCategory(currentCategory);
+        setPanelHeight(browseHeightPx);
+        crossfadeBars(searchBar, normalBar);
+        if (inputModeListener != null) inputModeListener.onActiveChanged(this, false);
     }
 
-    /** Stage an AutoTransition on the IME root so height + bar swap + key re-show animate together. */
-    private void beginCoordinatedTransition() {
-        View root = getRootView();
-        if (!(root instanceof ViewGroup)) return;
-        androidx.transition.AutoTransition t = new androidx.transition.AutoTransition();
-        t.setDuration(180);
-        t.setInterpolator(new android.view.animation.DecelerateInterpolator(1.4f));
-        androidx.transition.TransitionManager.beginDelayedTransition((ViewGroup) root, t);
+    public void setOnInputActiveChangedListener(@Nullable InputTarget.ActiveChangeListener l) {
+        this.inputModeListener = l;
+    }
+
+    @Override public void appendChar(char c) { appendQueryChar(c); }
+    @Override public void onBackspace() { backspaceQuery(); }
+
+    private void setPanelHeight(int px) {
+        ViewGroup.LayoutParams lp = getLayoutParams();
+        if (lp == null || lp.height == px) return;
+        lp.height = px;
+        setLayoutParams(lp);
+    }
+
+    /** Property-animator crossfade in place — no layout pass, no transition-framework capture. */
+    private void crossfadeBars(View out, View in) {
+        out.animate().cancel();
+        in.animate().cancel();
+        in.setAlpha(0f);
+        in.setVisibility(VISIBLE);
+        in.animate().alpha(1f).setDuration(180).start();
+        out.animate().alpha(0f).setDuration(180).withEndAction(() -> {
+            out.setVisibility(GONE);
+            out.setAlpha(1f);
+        }).start();
     }
 
     public void appendQueryChar(char c) {
@@ -497,20 +519,12 @@ public class EmojiPanelView extends LinearLayout {
         }
     }
 
-    private GradientDrawable pillBackground(int color, int radius) {
-        GradientDrawable d = new GradientDrawable();
-        d.setShape(GradientDrawable.RECTANGLE);
-        d.setColor(color);
-        d.setCornerRadius(radius);
-        return d;
-    }
-
     private int dp(int v) {
         return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v,
                 getResources().getDisplayMetrics());
     }
 
-    private static class TabView extends TextView {
+    private static class TabView extends androidx.appcompat.widget.AppCompatTextView {
         final EmojiData.Category category;
 
         TabView(Context ctx, EmojiData.Category c) {
