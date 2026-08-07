@@ -17,6 +17,11 @@
 		HH000016HH000016HH000016 /* ModelRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000008HH000008HH000008 /* ModelRegistry.swift */; };
 		HH000017HH000017HH000017 /* CommandRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000009HH000009HH000009 /* CommandRouter.swift */; };
 		HH000020HH000020HH000020 /* GoogleProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000012HH000012HH000012 /* GoogleProvider.swift */; };
+		HH000481HH000481HH000481 /* InferenceTier.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000480HH000480HH000480 /* InferenceTier.swift */; };
+		HH000483HH000483HH000483 /* InferenceMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000482HH000482HH000482 /* InferenceMode.swift */; };
+		HH000484HH000484HH000484 /* InferenceMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000482HH000482HH000482 /* InferenceMode.swift */; };
+		HH000486HH000486HH000486 /* LocalTextEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000485HH000485HH000485 /* LocalTextEngine.swift */; };
+		HH000488HH000488HH000488 /* AppleOnDeviceProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000487HH000487HH000487 /* AppleOnDeviceProvider.swift */; };
 		HH000025HH000025HH000025 /* PromptLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000024HH000024HH000024 /* PromptLoader.swift */; };
 		HH000034HH000034HH000034 /* OrgImageRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000033HH000033HH000033 /* OrgImageRenderer.swift */; };
 		HH000036HH000036HH000036 /* VoiceInputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000035HH000035HH000035 /* VoiceInputController.swift */; };
@@ -145,6 +150,10 @@
 		HH000008HH000008HH000008 /* ModelRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelRegistry.swift; sourceTree = "<group>"; };
 		HH000009HH000009HH000009 /* CommandRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandRouter.swift; sourceTree = "<group>"; };
 		HH000012HH000012HH000012 /* GoogleProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleProvider.swift; sourceTree = "<group>"; };
+		HH000480HH000480HH000480 /* InferenceTier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InferenceTier.swift; sourceTree = "<group>"; };
+		HH000482HH000482HH000482 /* InferenceMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InferenceMode.swift; sourceTree = "<group>"; };
+		HH000485HH000485HH000485 /* LocalTextEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalTextEngine.swift; sourceTree = "<group>"; };
+		HH000487HH000487HH000487 /* AppleOnDeviceProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleOnDeviceProvider.swift; sourceTree = "<group>"; };
 		HH000024HH000024HH000024 /* PromptLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptLoader.swift; sourceTree = "<group>"; };
 		HH000033HH000033HH000033 /* OrgImageRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrgImageRenderer.swift; sourceTree = "<group>"; };
 		HH000035HH000035HH000035 /* VoiceInputController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceInputController.swift; sourceTree = "<group>"; };
@@ -301,6 +310,10 @@
 				HH000008HH000008HH000008 /* ModelRegistry.swift */,
 				HH000009HH000009HH000009 /* CommandRouter.swift */,
 				HH000012HH000012HH000012 /* GoogleProvider.swift */,
+				HH000487HH000487HH000487 /* AppleOnDeviceProvider.swift */,
+				HH000485HH000485HH000485 /* LocalTextEngine.swift */,
+				HH000480HH000480HH000480 /* InferenceTier.swift */,
+				HH000482HH000482HH000482 /* InferenceMode.swift */,
 				HH000024HH000024HH000024 /* PromptLoader.swift */,
 				HH000440HH000440HH000440 /* StylePresets.swift */,
 				HH000442HH000442HH000442 /* AlphaMatte.swift */,
@@ -610,6 +623,7 @@
 				HH000115HH000115HH000115 /* SlackClient.swift in Sources */,
 				HH000142HH000142HH000142 /* PersonalizationViewController.swift in Sources */,
 				HH000144HH000144HH000144 /* PersonalizationKeys.swift in Sources */,
+				HH000484HH000484HH000484 /* InferenceMode.swift in Sources */,
 				HH000150HH000150HH000150 /* Secrets.swift in Sources */,
 				HH000322HH000322HH000322 /* KeyboardTheme.swift in Sources */,
 				HH000325HH000325HH000325 /* KeyboardThemeManager.swift in Sources */,
@@ -638,6 +652,10 @@
 				HH000016HH000016HH000016 /* ModelRegistry.swift in Sources */,
 				HH000017HH000017HH000017 /* CommandRouter.swift in Sources */,
 				HH000020HH000020HH000020 /* GoogleProvider.swift in Sources */,
+				HH000488HH000488HH000488 /* AppleOnDeviceProvider.swift in Sources */,
+				HH000486HH000486HH000486 /* LocalTextEngine.swift in Sources */,
+				HH000481HH000481HH000481 /* InferenceTier.swift in Sources */,
+				HH000483HH000483HH000483 /* InferenceMode.swift in Sources */,
 				HH000025HH000025HH000025 /* PromptLoader.swift in Sources */,
 				HH000441HH000441HH000441 /* StylePresets.swift in Sources */,
 				HH000443HH000443HH000443 /* AlphaMatte.swift in Sources */,

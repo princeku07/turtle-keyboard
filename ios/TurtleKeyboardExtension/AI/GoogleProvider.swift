@@ -157,6 +157,16 @@ final class GoogleProvider: AIProvider {
             throw ProviderError.badResponse("No HTTP response")
         }
         guard (200..<300).contains(http.statusCode) else {
+            // Drain a little of the error body before throwing. Gemini puts
+            // the actual reason in there ("API key not valid", quota
+            // exhausted, unknown model) and a bare status code is not enough
+            // to debug from. Mirrors `validate(_:data:)` on the one-shot path.
+            var snippet = ""
+            for try await line in bytes.lines {
+                snippet += line
+                if snippet.count >= 400 { break }
+            }
+            NSLog("🐢[Gemini] stream HTTP %d %@", http.statusCode, snippet)
             throw ProviderError.http(http.statusCode)
         }
 

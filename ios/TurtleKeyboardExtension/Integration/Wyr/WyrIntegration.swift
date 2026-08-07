@@ -16,7 +16,6 @@ final class WyrIntegration: KeyboardIntegration {
 
     static let routeKey = "wyr"
 
-    private static let busyBannerMs = 30_000
     private static let failBannerMs = 2_500
 
     func commands() -> [CommandSpec] {
@@ -38,7 +37,7 @@ final class WyrIntegration: KeyboardIntegration {
             return
         }
 
-        ctx.showBanner("Creating game…", autoHideMs: busyBannerMs)
+        ctx.showBusy("Creating game…")
 
         let llmPrompt = systemPrompt + "\n\nTheme:\n" + userPrompt
         ctx.llm.complete(

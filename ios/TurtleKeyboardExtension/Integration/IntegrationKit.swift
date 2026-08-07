@@ -90,9 +90,33 @@ struct CommandSpec {
 /// so Notion / future Linear etc. can talk to the same model the rest of the
 /// keyboard uses without depending on the concrete `CommandRouter`.
 protocol LlmService: AnyObject {
+
+    /// Unrouted: the caller owns the entire prompt string and it goes
+    /// straight to the cloud model. Use this only when there is no slash
+    /// command to plan around.
     func complete(prompt: String,
                   onText: @escaping (String) -> Void,
                   onError: @escaping (String) -> Void)
+
+    /// Routed: runs `command` through the keyboard's tier plan
+    /// (`CommandRouter`), so it is served on-device when the device and the
+    /// user's `InferenceMode` allow, and escalates to cloud only when the
+    /// cheaper tier can't do the job. `prompt` is just the user's text —
+    /// the router owns the system prompt.
+    func complete(command: String,
+                  prompt: String,
+                  onText: @escaping (String) -> Void,
+                  onError: @escaping (String) -> Void)
+}
+
+extension LlmService {
+    /// Conformers that predate tier routing still answer the unrouted way.
+    func complete(command: String,
+                  prompt: String,
+                  onText: @escaping (String) -> Void,
+                  onError: @escaping (String) -> Void) {
+        complete(prompt: prompt, onText: onText, onError: onError)
+    }
 }
 
 // MARK: - IntegrationContext
@@ -115,6 +139,19 @@ protocol IntegrationContext: AnyObject {
 
     /// Transient notice above the keyboard. Auto-hides after `autoHideMs`.
     func showBanner(_ text: String, autoHideMs: Int)
+
+    /// Claim the keyboard's generating overlay for a long-running operation.
+    ///
+    /// Call this the moment an integration kicks off async work — a model
+    /// call, a network round trip — so the user sees the same "AI is working"
+    /// surface every other command shows instead of a keyboard that looks
+    /// idle. `message` replaces the overlay's text.
+    ///
+    /// There is no matching `hideBusy`: the first terminal callback
+    /// (`commitText`, `showBanner`, `showPanel`, `hidePanel`, `openScreen`)
+    /// releases the overlay, because every integration path already ends in
+    /// one of those. A watchdog releases it regardless if none ever arrives.
+    func showBusy(_ message: String)
 
     /// Persistent storage for both keyboard and integration UI.
     var store: SplitStore { get }

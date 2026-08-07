@@ -23,6 +23,10 @@ enum PersonalizationKeys {
     /// owned by `KeyboardThemeManager.preferenceKey`; mirrored here so the
     /// host app and the keyboard can read/write through the same name.
     static let themePreference    = "personalization.theme.preference"
+    /// Where AI commands are allowed to run: "auto" | "onDeviceOnly" |
+    /// "cloudOnly". Read by `CommandRouter` before it walks a command's tier
+    /// plan — see `InferenceMode` in `AI/InferenceTier.swift`.
+    static let inferenceMode      = "personalization.inference.mode"
 
     /// Whether the integration with `id` is currently enabled. Defaults
     /// to true when the key has never been written.

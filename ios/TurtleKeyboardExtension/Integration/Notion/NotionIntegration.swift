@@ -51,7 +51,7 @@ final class NotionIntegration: KeyboardIntegration {
             return
         }
 
-        ctx.showBanner("📓 Creating Notion page…", autoHideMs: 1200)
+        ctx.showBusy("📓 Creating Notion page…")
         let llm = ctx.llm
 
         NotionLlmBridge.structure(userPrompt: trimmed, llm: llm) { result in

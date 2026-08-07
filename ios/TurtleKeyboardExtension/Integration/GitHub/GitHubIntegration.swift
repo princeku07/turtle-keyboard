@@ -61,32 +61,32 @@ final class GitHubIntegration: KeyboardIntegration {
 
         switch cmd.action {
         case .overview:
-            ctx.showBanner("🐙 \(o)/\(r) — overview…", autoHideMs: bannerMs)
+            ctx.showBusy("🐙 \(o)/\(r) — overview…")
             run(base, token: token, owner: o, repo: r, ctx: ctx,
                 notFound: "\(o)/\(r) not found") { formatOverview($0, owner: o, repo: r) }
 
         case .commit:
-            ctx.showBanner("🐙 \(o)/\(r) — latest commit…", autoHideMs: bannerMs)
+            ctx.showBusy("🐙 \(o)/\(r) — latest commit…")
             run("\(base)/commits?per_page=1", token: token, owner: o, repo: r, ctx: ctx,
                 notFound: "\(o)/\(r) not found") { formatLatestCommit($0, owner: o, repo: r) }
 
         case .issues:
-            ctx.showBanner("🐙 \(o)/\(r) — open issues…", autoHideMs: bannerMs)
+            ctx.showBusy("🐙 \(o)/\(r) — open issues…")
             run("\(base)/issues?state=open&per_page=10", token: token, owner: o, repo: r, ctx: ctx,
                 notFound: "\(o)/\(r) not found") { formatIssueList($0, owner: o, repo: r) }
 
         case .prs:
-            ctx.showBanner("🐙 \(o)/\(r) — open PRs…", autoHideMs: bannerMs)
+            ctx.showBusy("🐙 \(o)/\(r) — open PRs…")
             run("\(base)/pulls?state=open&per_page=10", token: token, owner: o, repo: r, ctx: ctx,
                 notFound: "\(o)/\(r) not found") { formatPRList($0, owner: o, repo: r) }
 
         case .release:
-            ctx.showBanner("🐙 \(o)/\(r) — latest release…", autoHideMs: bannerMs)
+            ctx.showBusy("🐙 \(o)/\(r) — latest release…")
             run("\(base)/releases/latest", token: token, owner: o, repo: r, ctx: ctx,
                 notFound: "No releases in \(o)/\(r)") { formatRelease($0, owner: o, repo: r) }
 
         case .issue(let n):
-            ctx.showBanner("🐙 \(o)/\(r)#\(n)…", autoHideMs: bannerMs)
+            ctx.showBusy("🐙 \(o)/\(r)#\(n)…")
             run("\(base)/issues/\(n)", token: token, owner: o, repo: r, ctx: ctx,
                 notFound: "#\(n) not found in \(o)/\(r)") { formatIssue($0, owner: o, repo: r) }
         }

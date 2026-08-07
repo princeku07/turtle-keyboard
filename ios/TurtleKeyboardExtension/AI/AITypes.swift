@@ -2,13 +2,20 @@ import Foundation
 
 // MARK: - Provider ID
 
-/// Backend identifier. Currently single-tenant on Google's Generative
-/// Language API ("Gemini") — the multi-provider stack was simplified
-/// down after Flash/Pro proved sufficient for every command. The enum
-/// stays as a single-case enum so future providers can be re-added
-/// without a wide signature change.
+/// Backend identifier. One case per `ExecutionTier` — see `InferenceTier.swift`
+/// for how the router picks between them.
 enum ProviderID: String, Codable, CaseIterable {
+    /// Gemini over HTTPS. Spends tokens; the only tier that can generate
+    /// images or answer from current web knowledge.
     case google
+    /// Apple's on-device foundation model (FoundationModels, iOS 26+).
+    /// Free, offline, no tokens.
+    case apple
+    /// No model at all — `LocalTextEngine`'s deterministic text passes.
+    case local
+
+    /// Only cloud backends need a user-supplied key.
+    var needsAPIKey: Bool { self == .google }
 }
 
 // MARK: - Model capability
@@ -103,6 +110,19 @@ enum ProviderError: LocalizedError {
     case network(URLError)
     case unknown(Error)
 
+    // MARK: Tier-routing errors  (see InferenceTier.swift)
+
+    /// The on-device model can't run here — no Apple Intelligence, model
+    /// still downloading, or pre-iOS-26. Escalatable.
+    case onDeviceUnavailable(String)
+    /// The on-device model declined the content. Deliberately **not**
+    /// escalatable — see `AppleOnDeviceProvider.map(_:)`.
+    case onDeviceRefused(String)
+    /// `LocalTextEngine` had nothing it was confident about. Escalatable.
+    case noLocalImprovement
+    /// The command has no non-cloud path but the user chose On-device mode.
+    case requiresCloud(String)
+
     var errorDescription: String? {
         switch self {
         case .missingAPIKey(let p):
@@ -111,6 +131,14 @@ enum ProviderError: LocalizedError {
             return "/\(c) is not supported by the selected model"
         case .badResponse(let msg):
             return "Unexpected response: \(msg)"
+        case .onDeviceUnavailable(let why):
+            return why
+        case .onDeviceRefused(let why):
+            return "\(why) — switch to Cloud in Personalization to send it"
+        case .noLocalImprovement:
+            return "Nothing to fix"
+        case .requiresCloud(let c):
+            return "/\(c) needs cloud AI — set Inference to Auto in Personalization"
         case .http(let code):
             return "HTTP \(code) from AI provider — try again"
         case .network(let e):

@@ -3,14 +3,20 @@ import Foundation
 import UIKit
 
 /// Owns the full `/poll` flow:
-///   1. Load the shared system prompt from `commands/prompts/poll.txt`.
-///   2. Ask the keyboard's LLM to shape the user's terse prompt into
-///      `{question, options}` JSON.
-///   3. POST to `turtle-worker` `/poll` via `PollClient`.
-///   4. Commit the returned shareable App Link URL into the host field.
+///   1. Route the shaping step through `CommandRouter`, which turns the
+///      user's terse prompt into `{question, options}` JSON on the cheapest
+///      tier that can do it — Apple's on-device model first (free, offline,
+///      guided generation), cloud only if that's unavailable or the draft
+///      fails validation.
+///   2. POST to `turtle-worker` `/poll` via `PollClient`.
+///   3. Commit the returned shareable App Link URL into the host field.
 ///
-/// Mirrors Android's `PollIntegration`. No round trip through `CommandRouter`;
-/// owns its own prompt and dispatch.
+/// Mirrors Android's `PollIntegration`. The system prompt lives in
+/// `commands/prompts/poll.txt` and is owned by `CommandRouter.systemPrompt`,
+/// so both tiers shape polls the same way.
+///
+/// Note step 2 always hits the network: a poll is a shareable artifact, so
+/// `InferenceMode.onDeviceOnly` keeps the *inference* local, not the poll.
 final class PollIntegration: KeyboardIntegration {
 
     let id = "poll"
@@ -18,7 +24,6 @@ final class PollIntegration: KeyboardIntegration {
     /// URL route key — matches `https://www.turtlekeyboard.com/poll/<id>`.
     static let routeKey = "poll"
 
-    private static let busyBannerMs = 30_000
     private static let failBannerMs = 2_500
     private static let emptyBannerMs = 2_200
 
@@ -38,19 +43,20 @@ final class PollIntegration: KeyboardIntegration {
                            autoHideMs: emptyBannerMs)
             return
         }
-        guard let systemPrompt = PromptLoader.load(id: "poll"), !systemPrompt.isEmpty else {
-            // Build-time copy of commands/prompts/poll.txt didn't happen.
-            // Clean rebuild after wiring the Run Script's inputPaths/outputPaths fixes it.
+        // The router falls back to an inline prompt if the asset is missing,
+        // but a missing asset means the Run Script's inputPaths/outputPaths
+        // aren't wired — say so rather than silently running the fallback.
+        guard PromptLoader.load(id: "poll")?.isEmpty == false else {
             ctx.showBanner("Poll prompt missing — clean rebuild needed",
                            autoHideMs: failBannerMs)
             return
         }
 
-        ctx.showBanner("Creating poll…", autoHideMs: busyBannerMs)
+        ctx.showBusy("Creating poll…")
 
-        let llmPrompt = systemPrompt + "\n\nUser message:\n" + trimmed
         ctx.llm.complete(
-            prompt: llmPrompt,
+            command: "poll",
+            prompt: trimmed,
             onText: { text in
                 handleModelText(rawJson: text, ctx: ctx)
             },

@@ -50,7 +50,7 @@ final class SlackIntegration: KeyboardIntegration {
             return
         }
 
-        ctx.showBanner("💬 Sending to #\(resolved.channelName)…", autoHideMs: 1000)
+        ctx.showBusy("💬 Sending to #\(resolved.channelName)…")
 
         Task {
             do {

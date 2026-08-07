@@ -48,9 +48,51 @@ enum ModelRegistry {
         isFree: false
     )
 
+    // MARK: - Non-cloud tiers
+    //
+    // Pseudo-models: they carry no provider-native model ID because the
+    // backend isn't addressable over HTTP. They exist so the tier system can
+    // reuse the same `AIModel` → capability-check → provider dispatch path as
+    // the cloud models. See `InferenceTier.swift`.
+
+    /// Apple's on-device foundation model. Free and offline — no image
+    /// capability, because iOS exposes no headless on-device image generation.
+    static let appleOnDevice = AIModel(
+        id: "apple-on-device",
+        displayName: "Apple On-Device",
+        provider: .apple,
+        capabilities: [.textEdit, .chat, .translation],
+        isFree: true
+    )
+
+    /// `LocalTextEngine` — deterministic spelling + mechanics, no model.
+    /// `.textEdit` only, and in practice only `/fix` (see
+    /// `LocalTextEngine.supportedCommands`).
+    static let localDeterministic = AIModel(
+        id: "turtle-local-text",
+        displayName: "Offline (no model)",
+        provider: .local,
+        capabilities: [.textEdit],
+        isFree: true
+    )
+
     static let all: [AIModel] = [
         geminiFlash, geminiImage, geminiImagePro,
+        appleOnDevice, localDeterministic,
     ]
+
+    /// The model that serves a command on a given tier, or nil when that tier
+    /// has no backend for it.
+    static func model(for command: String, tier: ExecutionTier) -> AIModel? {
+        switch tier {
+        case .deterministic:
+            return LocalTextEngine.supportedCommands.contains(command) ? localDeterministic : nil
+        case .onDevice:
+            return appleOnDevice
+        case .cloud:
+            return nil   // resolved from `CommandRouter.defaultRoutes`
+        }
+    }
 
     static func find(id: String) -> AIModel? {
         all.first { $0.id == id }

@@ -32,6 +32,11 @@ class KeyboardViewController: UIInputViewController {
     /// knows the field is already being filled (vs. needing a one-shot
     /// insert because the provider didn't stream).
     private var streamInsertStarted = false
+    /// Exactly what the streaming path has typed into the host field so far.
+    /// Used to reconcile against the provider's final text — a stream that
+    /// revises itself mid-flight would otherwise leave truncated output in the
+    /// user's message. Only ever mutated on the main queue.
+    private var streamInsertedText = ""
 
     /// PNG bytes of the image picked for the active `/edit` session, or
     /// `nil` when nothing is staged. Cleared after the command sends, when
@@ -244,6 +249,14 @@ class KeyboardViewController: UIInputViewController {
     /// kept around afterwards so subsequent generations don't pay the
     /// layer-allocation cost.
     private var generatingWave:      GeneratingWaveView?
+    /// True while an integration holds the generating overlay via
+    /// `IntegrationContext.showBusy(_:)`. Distinguishes "this local command
+    /// kicked off async work" from "this local command already finished".
+    private var integrationBusy      = false
+    /// Backstop for a claimed overlay whose integration never reports back.
+    /// A permanently-covered command bar is unrecoverable without switching
+    /// keyboards, so this is worth the eight lines.
+    private var integrationBusyWatchdog: Timer?
     private var previewOverlay:      UIView?
     private var previewImageView:    UIImageView?
     private var pendingPreviewImage: UIImage?
@@ -582,6 +595,12 @@ class KeyboardViewController: UIInputViewController {
         // Stash the in-progress slash draft so the next keyboard mount
         // (returning from another app) picks it up where the user left off.
         persistDraftState()
+        // Drop a claimed overlay. The integration's callback still fires into
+        // a detached context and harmlessly no-ops, but if this same instance
+        // is remounted we'd otherwise come back to a stale aurora over the
+        // command bar — and `isGenerating` stuck true blocks `sendCommand`
+        // entirely until the watchdog fires.
+        endIntegrationBusy()
     }
 
     override func textDidChange(_ textInput: UITextInput?) {
@@ -3252,7 +3271,7 @@ class KeyboardViewController: UIInputViewController {
         // aurora-style wave overlay that fills the entire command-bar
         // slot. Mirrors Android's GeneratingLoaderView and reads as a
         // first-class "AI is working" state.
-        showGeneratingWave(message: cmd.loadingMessage)
+        showGeneratingWave(message: loadingMessage(for: cmd))
 
         // Buffer holds the slash text; nothing was typed into the host field,
         // so there's nothing to delete from the proxy.
@@ -3313,6 +3332,47 @@ class KeyboardViewController: UIInputViewController {
         generatingWave?.isHidden = true
     }
 
+    // MARK: - Integration busy state
+
+    /// An integration claimed the overlay for async work. Called on the main
+    /// thread from `KeyboardIntegrationContext.showBusy(_:)`.
+    func beginIntegrationBusy(_ message: String) {
+        integrationBusy = true
+        isGenerating    = true
+        // Same "· on-device" / "" annotation the AI commands get, so a
+        // `/poll` served by Apple's model reads as free. Commands with no
+        // non-cloud tier resolve to cloud, whose suffix is empty.
+        let suffix = activeCommand
+            .map { CommandRouter.shared.plannedTier(for: $0.rawValue).bannerSuffix } ?? ""
+        showGeneratingWave(message: message + suffix)
+
+        integrationBusyWatchdog?.invalidate()
+        integrationBusyWatchdog = Timer.scheduledTimer(withTimeInterval: 45.0,
+                                                       repeats: false) { [weak self] _ in
+            guard let self = self, self.integrationBusy else { return }
+            self.endGenerating()
+            self.showBanner("⚠️ Timed out — try again")
+        }
+    }
+
+    /// Release an overlay an integration claimed. No-op when it never did,
+    /// so terminal callbacks can call this unconditionally.
+    func endIntegrationBusy() {
+        guard integrationBusy else { return }
+        endGenerating()
+    }
+
+    /// Single teardown for the generating state, whichever path claimed it.
+    private func endGenerating() {
+        integrationBusyWatchdog?.invalidate()
+        integrationBusyWatchdog = nil
+        integrationBusy = false
+        // Must precede `hideCommandBar`, which guards on `!isGenerating`.
+        isGenerating = false
+        hideGeneratingWave()
+        hideCommandBar()
+    }
+
     // MARK: - Command execution
 
     /// Token-streaming path for text commands. Hides the generating wave
@@ -3320,6 +3380,7 @@ class KeyboardViewController: UIInputViewController {
     /// delta straight into the field so the result "types itself" in.
     private func streamTextCommand(_ cmd: SlashCommand, prompt: String, context: String) {
         streamInsertStarted = false
+        streamInsertedText = ""
         Task { @MainActor in
             do {
                 let result = try await CommandRouter.shared.executeStreaming(
@@ -3338,17 +3399,32 @@ class KeyboardViewController: UIInputViewController {
                                 self.hideGeneratingWave()
                                 self.hideCommandBar()
                             }
+                            self.streamInsertedText += delta
                             self.textDocumentProxy.insertText(delta)
                         }
                     })
 
                 isGenerating = false
                 hideGeneratingWave()
-                if case .text(let full) = result, !streamInsertStarted {
-                    // No delta ever arrived (provider fell back to one-shot,
-                    // or an empty stream) — insert the whole thing.
-                    hideCommandBar()
-                    textDocumentProxy.insertText(full)
+                if case .text(let full) = result {
+                    if !streamInsertStarted {
+                        // No delta ever arrived (provider fell back to one-shot,
+                        // or an empty stream) — insert the whole thing.
+                        hideCommandBar()
+                        textDocumentProxy.insertText(full)
+                    } else if streamInsertedText != full {
+                        // The stream revised text it had already emitted, so
+                        // what's in the field is not what the provider
+                        // ultimately produced. Delete exactly what we typed and
+                        // replace it, rather than leaving the user with
+                        // truncated output. Apple's on-device snapshots are
+                        // cumulative and normally append-only, so this is a
+                        // safety net, not the common path.
+                        for _ in 0..<streamInsertedText.count {
+                            textDocumentProxy.deleteBackward()
+                        }
+                        textDocumentProxy.insertText(full)
+                    }
                 }
                 showBanner(completionBanner(for: cmd))
             } catch {
@@ -3361,17 +3437,25 @@ class KeyboardViewController: UIInputViewController {
     }
 
     private func executeCommand(_ cmd: SlashCommand, prompt: String) {
-        // Local commands handled by integrations — no AI hop, no overlay.
+        // Local commands are handled by integrations. Most are instant (mount
+        // a panel, save a split) and should never flash the overlay — but
+        // some do real async work behind the scenes: `/poll` and `/wyr` run a
+        // model *and* a Worker round trip, `/notion` and `/slack` post to an
+        // API. Those look identical to a frozen keyboard without it.
+        //
+        // So the overlay `sendCommand` already mounted stays up through the
+        // handler call, and who tears it down depends on what the handler
+        // does: claim it with `ctx.showBusy(_:)` and it lives until the work
+        // reports back; return without claiming it and it comes down below,
+        // in this same runloop turn, before a frame is ever committed.
         if cmd.isLocal {
-            isGenerating = false
-            hideGeneratingWave()
-            hideCommandBar()
             // `/history` is keyboard-local but has no integration handler
             // (its UI is the in-keyboard image grid). Same panel the
             // Quick Panel tap path lands on — and same async-defer
             // fix-up so we never tear down the command bar / mount the
             // panel during the Send button's touch dispatch.
             if cmd == .history {
+                endGenerating()
                 DispatchQueue.main.async { [weak self] in
                     self?.showHistoryPanel()
                 }
@@ -3380,6 +3464,7 @@ class KeyboardViewController: UIInputViewController {
             if let spec = integrationRegistry.command(named: cmd.rawValue) {
                 spec.handler(prompt, integrationContext)
             }
+            if !integrationBusy { endGenerating() }
             return
         }
 
@@ -3510,10 +3595,26 @@ class KeyboardViewController: UIInputViewController {
         return t.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    /// Wave-overlay text, annotated with the tier the command is about to run
+    /// on so the user knows up front whether this one is free.
+    private func loadingMessage(for cmd: SlashCommand) -> String {
+        guard !cmd.isLocal else { return cmd.loadingMessage }
+        let tier = CommandRouter.shared.plannedTier(for: cmd.rawValue)
+        return cmd.loadingMessage + tier.bannerSuffix
+    }
+
     private func completionBanner(for cmd: SlashCommand) -> String {
         // Moved to SlashCommand.completionBanner; keeping this wrapper so
         // the existing call site doesn't change.
-        cmd.completionBanner
+        //
+        // AI commands additionally advertise which tier served them ("·
+        // on-device", "· offline") so the user can see at a glance when a
+        // result was free. Local/integration commands never reach the router,
+        // so `lastServedTier` would be stale for them.
+        guard !cmd.isLocal, let tier = CommandRouter.shared.lastServedTier else {
+            return cmd.completionBanner
+        }
+        return cmd.completionBanner + tier.bannerSuffix
     }
 
     // MARK: - Suggestions UI  (/reply returns 3 tappable options)
@@ -3917,7 +4018,8 @@ class KeyboardViewController: UIInputViewController {
         })
     }
 
-    private func showBanner(_ text: String, sticky: Bool = false) {
+    private func showBanner(_ text: String, sticky: Bool = false,
+                            autoHideAfter: TimeInterval = 2.0) {
         // Single sink for the warning haptic: every ⚠️ banner is a
         // validation / not-allowed state, and routing the feedback here
         // (rather than at each call site) guarantees exactly one buzz even
@@ -3934,7 +4036,7 @@ class KeyboardViewController: UIInputViewController {
         // dismiss — a 2 s flash was too easy to miss for the keyboard's most
         // common blocker.
         if sticky { hideBannerTimer = nil; return }
-        hideBannerTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: false) { [weak self] _ in
+        hideBannerTimer = Timer.scheduledTimer(withTimeInterval: autoHideAfter, repeats: false) { [weak self] _ in
             UIView.animate(withDuration: 0.2, animations: {
                 self?.bannerContainer.alpha = 0
             }, completion: { _ in
@@ -4089,7 +4191,12 @@ extension KeyboardViewController {
             .forEach { $0.removeFromSuperview() }
     }
 
-    func emitBanner(_ text: String) { showBanner(text) }
+    /// Integrations pick their own dwell time — an error the user has to read
+    /// needs longer than a "Copied 📋". Clamped so a stray value can't pin a
+    /// banner over the keys or blink it out before it's readable.
+    func emitBanner(_ text: String, autoHideMs: Int = 2_000) {
+        showBanner(text, autoHideAfter: min(max(Double(autoHideMs) / 1000, 1.0), 8.0))
+    }
 }
 
 // MARK: - IntegrationContext bridge
@@ -4109,18 +4216,46 @@ private final class KeyboardIntegrationContext: IntegrationContext {
         // App Group will be wired later — falls back to standard defaults
         // for now so saves persist across launches at minimum.
         self.store = UserDefaultsSplitStore(suiteName: SplitContract.storageSuiteName)
-        // Gemini is the only backend; the key is loaded from the
+        // Named commands go through `CommandRouter`'s tier plan; unrouted
+        // prompt blobs fall through to Gemini, whose key is loaded from the
         // build-time `.env` via `Secrets.geminiApiKey`. If no key is
-        // configured, requests will surface a clear error from
+        // configured, cloud requests surface a clear error from
         // `GeminiLlmService.complete`.
-        self.llm = GeminiLlmService(apiKey: Secrets.geminiApiKey)
+        self.llm = RoutedLlmService(apiKey: Secrets.geminiApiKey)
+    }
+
+    /// Release the generating overlay *now* if we're already on the main
+    /// thread, rather than hopping like the UI work below does.
+    ///
+    /// The hop matters: an integration that finishes synchronously (`/split`
+    /// mounting its panel) must release the overlay inside the same runloop
+    /// turn that mounted it, or the aurora gets one committed frame and the
+    /// user sees a flash on a command that did no work. The UI calls
+    /// themselves keep their `async` hop — `mountIntegrationPanel` during the
+    /// Send button's touch dispatch is a known crash.
+    private func releaseBusy() {
+        if Thread.isMainThread {
+            owner?.endIntegrationBusy()
+        } else {
+            DispatchQueue.main.async { self.owner?.endIntegrationBusy() }
+        }
+    }
+
+    func showBusy(_ message: String) {
+        if Thread.isMainThread {
+            owner?.beginIntegrationBusy(message)
+        } else {
+            DispatchQueue.main.async { self.owner?.beginIntegrationBusy(message) }
+        }
     }
 
     func showPanel(_ view: UIView) {
+        releaseBusy()
         DispatchQueue.main.async { self.owner?.mountIntegrationPanel(view) }
     }
 
     func hidePanel() {
+        releaseBusy()
         DispatchQueue.main.async { self.owner?.unmountIntegrationPanel() }
     }
 
@@ -4130,10 +4265,12 @@ private final class KeyboardIntegrationContext: IntegrationContext {
     func hideChip() {}
 
     func showBanner(_ text: String, autoHideMs: Int) {
-        DispatchQueue.main.async { self.owner?.emitBanner(text) }
+        releaseBusy()
+        DispatchQueue.main.async { self.owner?.emitBanner(text, autoHideMs: autoHideMs) }
     }
 
     func commitText(_ text: String) {
+        releaseBusy()
         DispatchQueue.main.async { self.owner?.textDocumentProxy.insertText(text) }
     }
 
@@ -4144,6 +4281,7 @@ private final class KeyboardIntegrationContext: IntegrationContext {
     }
 
     func openScreen(_ screenId: String) {
+        releaseBusy()
         let urlString = "turtlekeyboard://\(screenId)"
         guard let url = URL(string: urlString) else { return }
         // `extensionContext.open` is the only way a keyboard extension can
@@ -4158,6 +4296,54 @@ private final class KeyboardIntegrationContext: IntegrationContext {
     func openExternalURL(_ url: URL) {
         DispatchQueue.main.async {
             self.owner?.extensionContext?.open(url, completionHandler: nil)
+        }
+    }
+}
+
+/// `LlmService` that sends *named* commands through `CommandRouter`, so an
+/// integration's model call obeys the same tier plan (offline → on-device →
+/// cloud) and the same `InferenceMode` as the rest of the keyboard. `/poll`
+/// is the first caller: its shaping step runs free and offline on a device
+/// with Apple Intelligence, and the user's text never leaves the phone.
+///
+/// The unrouted `complete(prompt:)` path stays on Gemini — its callers (e.g.
+/// `NotionLlmBridge`) hand over a fully-assembled prompt with no command id
+/// to plan around.
+private final class RoutedLlmService: LlmService {
+
+    private let cloud: GeminiLlmService
+
+    init(apiKey: String) {
+        self.cloud = GeminiLlmService(apiKey: apiKey)
+    }
+
+    func complete(prompt: String,
+                  onText: @escaping (String) -> Void,
+                  onError: @escaping (String) -> Void) {
+        cloud.complete(prompt: prompt, onText: onText, onError: onError)
+    }
+
+    func complete(command: String,
+                  prompt: String,
+                  onText: @escaping (String) -> Void,
+                  onError: @escaping (String) -> Void) {
+        Task {
+            do {
+                let result = try await CommandRouter.shared.execute(
+                    command: command, prompt: prompt, context: "")
+                switch result {
+                case .text(let text):
+                    onText(text)
+                case .suggestions(let items):
+                    // No integration asks for chips today; join rather than
+                    // drop, so a future one degrades to readable text.
+                    onText(items.joined(separator: "\n"))
+                case .image, .imageData:
+                    onError("/\(command) returned an image, expected text")
+                }
+            } catch {
+                onError(error.localizedDescription)
+            }
         }
     }
 }

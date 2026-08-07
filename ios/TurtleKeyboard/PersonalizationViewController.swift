@@ -63,6 +63,9 @@ final class PersonalizationViewController: UIViewController {
         stack.addArrangedSubview(subtitle(
             "iOS keyboards can't detect the app you're typing in, so Turtle's personalization works per-integration rather than per-app. Toggles take effect the next time you switch to Turtle Keyboard."))
 
+        stack.addArrangedSubview(sectionHeader("AI"))
+        stack.addArrangedSubview(inferenceModeCard())
+
         stack.addArrangedSubview(sectionHeader("Integrations"))
         stack.addArrangedSubview(integrationCard(
             title: "💸 Split",
@@ -93,6 +96,56 @@ final class PersonalizationViewController: UIViewController {
             subtitle: "Show the 🎙 button in the slash-command bar so you can dictate prompts.",
             enabledKey: PersonalizationKeys.voiceEnabled))
         stack.addArrangedSubview(themePickerCard())
+    }
+
+    // MARK: - Inference mode picker
+
+    /// Where AI commands are allowed to run. Written straight into the shared
+    /// store the keyboard's `CommandRouter` reads before every command, so a
+    /// change here takes effect on the next command — no keyboard remount.
+    private func inferenceModeCard() -> UIView {
+        let card = makeCard()
+
+        let title = UILabel()
+        title.text = "Where AI runs"
+        title.font = .systemFont(ofSize: 16, weight: .semibold)
+        title.textColor = .white
+
+        let order: [InferenceMode] = [.auto, .onDeviceOnly, .cloudOnly]
+        let current = InferenceMode.current(store: store)
+
+        let blurb = subtitle(current.blurb)
+
+        let picker = UISegmentedControl(items: order.map(\.title))
+        picker.selectedSegmentTintColor = .white
+        picker.setTitleTextAttributes([.foregroundColor: UIColor.white], for: .normal)
+        picker.setTitleTextAttributes([.foregroundColor: brandGreen], for: .selected)
+        picker.selectedSegmentIndex = order.firstIndex(of: current) ?? 0
+        picker.addAction(UIAction { [weak self] _ in
+            guard let self = self else { return }
+            let pick = order[picker.selectedSegmentIndex]
+            InferenceMode.set(pick, store: self.store)
+            blurb.text = pick.blurb
+        }, for: .valueChanged)
+
+        let status = UILabel()
+        status.font = .systemFont(ofSize: 12, weight: .medium)
+        status.numberOfLines = 0
+        switch OnDeviceModel.availability {
+        case .available:
+            status.text = "✅ Apple Intelligence is ready — text commands run free on-device."
+            status.textColor = UIColor(red: 0.72, green: 1.0, blue: 0.78, alpha: 1.0)
+        case .unavailable(let why):
+            status.text = "⚠️ \(why). Text commands will use the cloud."
+            status.textColor = UIColor(red: 1.0, green: 0.90, blue: 0.65, alpha: 1.0)
+        }
+
+        let inner = UIStackView(arrangedSubviews: [title, blurb, picker, status])
+        inner.axis = .vertical
+        inner.spacing = 8
+        inner.translatesAutoresizingMaskIntoConstraints = false
+        embed(inner, in: card)
+        return card
     }
 
     // MARK: - Theme picker
