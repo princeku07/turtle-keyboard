@@ -11,11 +11,17 @@ final class SlackConnectViewController: UIViewController {
     private let store: SplitStore = UserDefaultsSplitStore(suiteName: SplitContract.storageSuiteName)
     private lazy var auth = SlackAuth(store: store, presentationAnchor: view.window)
 
-    private let statusLabel = UILabel()
+    private let statusView = ConnectionStatusView()
     private let actionButton = UIButton(type: .system)
     private let pickerLabel = UILabel()
     private let pickerStack = UIStackView()
     private var channels: [SlackChannel] = []
+    private var channelTask: Task<Void, Never>?
+
+    deinit {
+        channelTask?.cancel()
+        NotificationCenter.default.removeObserver(self)
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -24,9 +30,9 @@ final class SlackConnectViewController: UIViewController {
         navigationItem.leftBarButtonItem = UIBarButtonItem(
             title: "Done", style: .done, target: self, action: #selector(dismissTapped))
 
-        statusLabel.font = .systemFont(ofSize: 15)
-        statusLabel.textColor = .secondaryLabel
-        statusLabel.numberOfLines = 0
+        statusView.onRetry = { [weak self] in self?.refresh() }
+        NotificationCenter.default.addObserver(self, selector: #selector(networkChanged),
+                                               name: AppNetworkMonitor.didChange, object: nil)
 
         actionButton.setTitleColor(.white, for: .normal)
         actionButton.titleLabel?.font = .systemFont(ofSize: 15, weight: .semibold)
@@ -45,7 +51,7 @@ final class SlackConnectViewController: UIViewController {
 
         let scroll = UIScrollView()
         scroll.translatesAutoresizingMaskIntoConstraints = false
-        let stack = UIStackView(arrangedSubviews: [statusLabel, actionButton, pickerLabel, pickerStack])
+        let stack = UIStackView(arrangedSubviews: [statusView, actionButton, pickerLabel, pickerStack])
         stack.axis = .vertical
         stack.spacing = 14
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -71,15 +77,28 @@ final class SlackConnectViewController: UIViewController {
 
     private func refresh() {
         if !auth.isConfigured {
-            statusLabel.text = "Slack OAuth not configured.\nFill in client ID + secret — see OAUTH_SETUP_iOS.md."
-            actionButton.setTitle("How to set up", for: .normal)
+            statusView.render(.needsAttention, service: "Slack",
+                              detail: "Slack connection is temporarily unavailable.")
+            actionButton.setTitle("Unavailable", for: .normal)
+            actionButton.isEnabled = false
+            pickerLabel.isHidden = true
+            pickerStack.isHidden = true
+            return
+        }
+        if !AppNetworkMonitor.shared.isOnline {
+            statusView.render(.needsAttention, service: "Slack",
+                              detail: "You’re offline. Reconnect to the internet and try again.", canRetry: true)
+            actionButton.setTitle(auth.isSignedIn ? "Disconnect" : "Sign in to Slack", for: .normal)
+            actionButton.isEnabled = auth.isSignedIn
             pickerLabel.isHidden = true
             pickerStack.isHidden = true
             return
         }
         if !auth.isSignedIn {
-            statusLabel.text = "Sign in with Slack to enable /slack in the keyboard."
+            statusView.render(.notConnected, service: "Slack",
+                              detail: "Sign in to enable /slack in the keyboard.")
             actionButton.setTitle("Sign in to Slack", for: .normal)
+            actionButton.isEnabled = true
             pickerLabel.isHidden = true
             pickerStack.isHidden = true
             return
@@ -87,7 +106,7 @@ final class SlackConnectViewController: UIViewController {
         let team = auth.teamName ?? "your workspace"
         let channel = store.string(forKey: SlackKeys.defaultChannelName, fallback: "")
         let line = channel.isEmpty ? "Pick a default channel below" : "Default channel: #\(channel)"
-        statusLabel.text = "Connected to \(team).\n\(line)"
+        statusView.render(.connected, service: "Slack", detail: "\(team) · \(line)")
         actionButton.setTitle("Disconnect", for: .normal)
         pickerLabel.isHidden = false
         pickerStack.isHidden = false
@@ -96,8 +115,8 @@ final class SlackConnectViewController: UIViewController {
 
     @objc private func actionTapped() {
         if !auth.isConfigured {
-            showAlert(title: "Slack OAuth not configured",
-                      message: "Open OAUTH_SETUP_iOS.md, create a Slack app, paste client ID + secret into SlackAuth.swift and the redirect scheme into Info.plist.")
+            showAlert(title: "Slack unavailable",
+                      message: "Slack connection isn’t available right now. Please try again after updating Turtle.")
             return
         }
         if auth.isSignedIn {
@@ -107,15 +126,20 @@ final class SlackConnectViewController: UIViewController {
         }
         actionButton.isEnabled = false
         actionButton.setTitle("Signing in…", for: .normal)
+        statusView.render(.loading, service: "Slack", detail: "Waiting for Slack sign-in…")
         auth.signIn { [weak self] result in
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 self.actionButton.isEnabled = true
                 switch result {
-                case .success: self.refresh()
-                case .failure(let err):
+                case .success:
+                    HostPrivacySafeTelemetry.integrationConnected(.slack)
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
                     self.refresh()
-                    self.showAlert(title: "Sign-in failed", message: err.localizedDescription)
+                case .failure:
+                    self.statusView.render(.needsAttention, service: "Slack",
+                                           detail: "Couldn’t connect. Check your connection and try again.", canRetry: true)
+                    self.actionButton.setTitle("Try sign-in again", for: .normal)
                 }
             }
         }
@@ -124,18 +148,25 @@ final class SlackConnectViewController: UIViewController {
     private func loadChannels() {
         let token = store.string(forKey: SlackKeys.accessToken, fallback: "")
         guard !token.isEmpty else { return }
-        Task { @MainActor in
+        channelTask?.cancel()
+        statusView.render(.loading, service: "Slack", detail: "Loading your channels…")
+        channelTask = Task { @MainActor in
             do {
                 let result = try await SlackClient.listChannels(accessToken: token)
+                guard !Task.isCancelled else { return }
                 self.channels = result.sorted { $0.name < $1.name }
                 // Persist a name → id map so the keyboard can resolve
                 // #channel-name overrides.
                 for c in self.channels {
                     self.store.setString(c.id, forKey: SlackKeys.channelMapPrefix + c.name.lowercased())
                 }
+                let detail = result.isEmpty ? "Connected, but no available channels were found." : "Connected · Choose a default channel below."
+                self.statusView.render(.connected, service: "Slack", detail: detail, canRetry: result.isEmpty)
                 self.renderPicker()
             } catch {
-                self.showAlert(title: "Couldn't load channels", message: error.localizedDescription)
+                guard !Task.isCancelled else { return }
+                self.statusView.render(.needsAttention, service: "Slack",
+                                       detail: "Couldn’t load channels. Check your connection and retry.", canRetry: true)
             }
         }
     }
@@ -157,6 +188,7 @@ final class SlackConnectViewController: UIViewController {
             row.addAction(UIAction(handler: { [weak self] _ in
                 self?.store.setString(c.id, forKey: SlackKeys.defaultChannel)
                 self?.store.setString(c.name, forKey: SlackKeys.defaultChannelName)
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
                 self?.refresh()
             }), for: .touchUpInside)
             pickerStack.addArrangedSubview(row)
@@ -172,6 +204,7 @@ final class SlackConnectViewController: UIViewController {
     }
 
     @objc private func dismissTapped() { dismiss(animated: true) }
+    @objc private func networkChanged() { refresh() }
 
     private func showAlert(title: String, message: String) {
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)

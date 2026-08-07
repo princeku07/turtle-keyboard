@@ -49,7 +49,7 @@ final class GitHubAuth: NSObject {
 
         var errorDescription: String? {
             switch self {
-            case .notConfigured:      return "GitHub OAuth not configured — set GITHUB_OAUTH_CLIENT_ID / _SECRET in .env"
+            case .notConfigured:      return "GitHub connection is temporarily unavailable"
             case .userCancelled:      return "Sign-in cancelled"
             case .missingCode:        return "No auth code in redirect"
             case .stateMismatch:      return "State mismatch — possible CSRF, sign-in aborted"

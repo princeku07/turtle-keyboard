@@ -269,7 +269,7 @@ final class VoiceSessionManager {
                     && (ns.code == 203 || ns.code == 216 || ns.code == 1110) {
                     self.finalizeAndPublish()
                 } else {
-                    self.publishError("Mic error \(ns.code)")
+                    self.publishError("Voice input stopped. Please try again.")
                 }
             }
         }

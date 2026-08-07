@@ -99,9 +99,8 @@ final class PollIntegration: KeyboardIntegration {
                 let result = try await PollClient.createPoll(question: question, options: options)
                 await MainActor.run { ctx.commitText(result.url) }
             } catch {
-                let msg = error.localizedDescription
                 await MainActor.run {
-                    ctx.showBanner("Poll create failed: \(msg)", autoHideMs: failBannerMs)
+                    ctx.showBanner("Couldn’t create the poll. Please try again.", autoHideMs: failBannerMs)
                 }
             }
         }

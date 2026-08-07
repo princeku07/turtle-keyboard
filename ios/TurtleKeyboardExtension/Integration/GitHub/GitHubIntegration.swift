@@ -119,7 +119,7 @@ final class GitHubIntegration: KeyboardIntegration {
             let fail: (String) -> Void = { text in
                 DispatchQueue.main.async { ctx.showBanner(text, autoHideMs: bannerMs) }
             }
-            if let err = err { fail("⚠️ \(err.localizedDescription)"); return }
+            if err != nil { fail("⚠️ Couldn’t connect to GitHub. Please try again."); return }
             let status = (resp as? HTTPURLResponse)?.statusCode ?? -1
             switch status {
             case 404: fail("⚠️ \(notFound)"); return

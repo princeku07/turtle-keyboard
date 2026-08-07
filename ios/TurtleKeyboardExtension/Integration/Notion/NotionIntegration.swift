@@ -57,7 +57,7 @@ final class NotionIntegration: KeyboardIntegration {
         NotionLlmBridge.structure(userPrompt: trimmed, llm: llm) { result in
             switch result {
             case .failure(let error):
-                ctx.showBanner("⚠️ Notion: \(error.localizedDescription)", autoHideMs: 2500)
+                ctx.showBanner("⚠️ Couldn’t connect to Notion. Please try again.", autoHideMs: 2500)
             case .success(let parsed):
                 Task {
                     do {
@@ -74,7 +74,7 @@ final class NotionIntegration: KeyboardIntegration {
                         }
                     } catch {
                         await MainActor.run {
-                            ctx.showBanner("⚠️ Notion: \(error.localizedDescription)", autoHideMs: 2500)
+                            ctx.showBanner("⚠️ Couldn’t save to Notion. Please try again.", autoHideMs: 2500)
                         }
                     }
                 }

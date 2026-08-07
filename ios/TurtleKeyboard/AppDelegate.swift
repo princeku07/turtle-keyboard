@@ -25,7 +25,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
         window = UIWindow(frame: UIScreen.main.bounds)
         window?.tintColor = .systemGreen
-        window?.rootViewController = UINavigationController(rootViewController: ViewController())
+        if OnboardingState.isComplete {
+            window?.rootViewController = UINavigationController(rootViewController: ViewController())
+        } else {
+            HostPrivacySafeTelemetry.onboardingStarted()
+            let onboarding = OnboardingViewController()
+            onboarding.onComplete = { [weak self] in self?.showHomeAfterOnboarding() }
+            window?.rootViewController = onboarding
+        }
         window?.makeKeyAndVisible()
 
         // Spin up the headless voice manager. Once it's registered the
@@ -41,6 +48,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             DispatchQueue.main.async { _ = self.route(url: url) }
         }
         return true
+    }
+
+    private func showHomeAfterOnboarding() {
+        guard let window = window else { return }
+        let home = UINavigationController(rootViewController: ViewController())
+        UIView.transition(with: window, duration: 0.35, options: .transitionCrossDissolve) {
+            window.rootViewController = home
+        }
     }
 
     /// Swipe-to-Turtle path: the user tapped mic in the keyboard while

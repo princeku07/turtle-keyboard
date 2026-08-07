@@ -51,7 +51,7 @@ final class SlackAuth: NSObject {
 
         var errorDescription: String? {
             switch self {
-            case .notConfigured:    return "Slack OAuth not configured — see OAUTH_SETUP_iOS.md"
+            case .notConfigured:    return "Slack connection is temporarily unavailable"
             case .userCancelled:    return "Sign-in cancelled"
             case .missingCode:      return "No auth code in redirect"
             case .http(let c, let m): return "HTTP \(c): \(m)"

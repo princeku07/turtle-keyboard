@@ -14,7 +14,7 @@ final class GitHubConnectViewController: UIViewController {
     private let store: SplitStore = UserDefaultsSplitStore(suiteName: SplitContract.storageSuiteName)
     private lazy var auth = GitHubAuth(store: store, presentationAnchor: view.window)
 
-    private let statusLabel  = UILabel()
+    private let statusView   = ConnectionStatusView()
     private let actionButton = UIButton(type: .system)
     private let capabilities = UILabel()
     private let searchField  = UITextField()
@@ -23,6 +23,8 @@ final class GitHubConnectViewController: UIViewController {
     private var allRepos: [GitHubAuth.Repo] = []
     private var loadingRepos = false
 
+    deinit { NotificationCenter.default.removeObserver(self) }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .systemGroupedBackground
@@ -30,9 +32,12 @@ final class GitHubConnectViewController: UIViewController {
         navigationItem.leftBarButtonItem = UIBarButtonItem(
             title: "Done", style: .done, target: self, action: #selector(dismissTapped))
 
-        statusLabel.font = .systemFont(ofSize: 15)
-        statusLabel.textColor = .secondaryLabel
-        statusLabel.numberOfLines = 0
+        statusView.onRetry = { [weak self] in
+            guard let self = self else { return }
+            self.auth.isSignedIn ? self.loadRepos() : self.render()
+        }
+        NotificationCenter.default.addObserver(self, selector: #selector(networkChanged),
+                                               name: AppNetworkMonitor.didChange, object: nil)
 
         styleSolidButton(actionButton, title: "Sign in with GitHub", action: #selector(actionTapped))
 
@@ -52,7 +57,7 @@ final class GitHubConnectViewController: UIViewController {
         scroll.keyboardDismissMode = .interactive
         scroll.translatesAutoresizingMaskIntoConstraints = false
         let stack = UIStackView(arrangedSubviews: [
-            statusLabel, actionButton, capabilities, searchField, listStack,
+            statusView, actionButton, capabilities, searchField, listStack,
         ])
         stack.axis = .vertical
         stack.spacing = 14
@@ -82,16 +87,24 @@ final class GitHubConnectViewController: UIViewController {
 
     private func render() {
         if !auth.isConfigured {
-            statusLabel.text = "GitHub sign-in isn't set up yet, but you can still pin and use any PUBLIC repo below — just type owner/repo."
-            actionButton.setTitle("Sign in unavailable", for: .normal)
+            statusView.render(.needsAttention, service: "GitHub",
+                              detail: "Sign-in is temporarily unavailable. Public repositories can still be pinned.")
+            actionButton.setTitle("Unavailable", for: .normal)
             actionButton.isEnabled = false
+        } else if !AppNetworkMonitor.shared.isOnline {
+            statusView.render(.needsAttention, service: "GitHub",
+                              detail: "You’re offline. Reconnect to load repositories.", canRetry: true)
+            actionButton.setTitle(auth.isSignedIn ? "Disconnect" : "Sign in with GitHub", for: .normal)
+            actionButton.isEnabled = auth.isSignedIn
         } else if auth.isSignedIn {
             let who = auth.login.map { "@\($0)" } ?? "your account"
-            statusLabel.text = "Signed in as \(who) — your private repos are searchable below."
+            statusView.render(.connected, service: "GitHub",
+                              detail: "Signed in as \(who). Private repositories are available.")
             actionButton.setTitle("Disconnect", for: .normal)
             actionButton.isEnabled = true
         } else {
-            statusLabel.text = "Sign in to browse and pin your private repos. Public repos work without signing in."
+            statusView.render(.notConnected, service: "GitHub",
+                              detail: "Sign in for private repositories. Public repositories work without an account.")
             actionButton.setTitle("Sign in with GitHub", for: .normal)
             actionButton.isEnabled = true
         }
@@ -138,12 +151,22 @@ final class GitHubConnectViewController: UIViewController {
 
     private func loadRepos() {
         loadingRepos = true
+        statusView.render(.loading, service: "GitHub", detail: "Loading your repositories…")
         renderList()
         auth.fetchRepos { [weak self] result in
             guard let self = self else { return }
             self.loadingRepos = false
-            if case .success(let repos) = result { self.allRepos = repos }
-            self.renderList()
+            switch result {
+            case .success(let repos):
+                self.allRepos = repos
+                let detail = repos.isEmpty ? "Connected, but no repositories were found." : "Connected · \(repos.count) repositories loaded."
+                self.statusView.render(.connected, service: "GitHub", detail: detail, canRetry: repos.isEmpty)
+                self.renderList()
+            case .failure:
+                self.statusView.render(.needsAttention, service: "GitHub",
+                                       detail: "Couldn’t load repositories. Check your connection and retry.", canRetry: true)
+                self.renderList()
+            }
         }
     }
 
@@ -189,12 +212,20 @@ final class GitHubConnectViewController: UIViewController {
         }
         actionButton.isEnabled = false
         actionButton.setTitle("Signing in…", for: .normal)
+        statusView.render(.loading, service: "GitHub", detail: "Waiting for GitHub sign-in…")
         auth.signIn { [weak self] result in
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 switch result {
-                case .success: self.render(); self.loadRepos()
-                case .failure(let err): self.render(); self.showAlert(title: "Sign-in failed", message: err.localizedDescription)
+                case .success:
+                    HostPrivacySafeTelemetry.integrationConnected(.github)
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    self.render(); self.loadRepos()
+                case .failure:
+                    self.statusView.render(.needsAttention, service: "GitHub",
+                                           detail: "Couldn’t connect. Check your connection and try again.", canRetry: true)
+                    self.actionButton.setTitle("Try sign-in again", for: .normal)
+                    self.actionButton.isEnabled = true
                 }
             }
         }
@@ -208,6 +239,7 @@ final class GitHubConnectViewController: UIViewController {
         searchField.resignFirstResponder()
     }
     @objc private func dismissTapped() { dismiss(animated: true) }
+    @objc private func networkChanged() { render() }
 
     // MARK: - Pinned storage
 
@@ -221,6 +253,7 @@ final class GitHubConnectViewController: UIViewController {
     private func pin(_ repo: String) {
         var list = pinnedRepos().filter { $0.lowercased() != repo.lowercased() }
         list.insert(repo, at: 0); setPinned(list)
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
     private func togglePin(_ repo: String) {
         var list = pinnedRepos()

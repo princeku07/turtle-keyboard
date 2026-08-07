@@ -125,12 +125,12 @@ enum ProviderError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .missingAPIKey(let p):
-            return "No API key for \(p.rawValue) — add it in Settings"
+        case .missingAPIKey:
+            return "This AI service is temporarily unavailable"
         case .unsupportedCommand(let c):
             return "/\(c) is not supported by the selected model"
-        case .badResponse(let msg):
-            return "Unexpected response: \(msg)"
+        case .badResponse:
+            return "Turtle received an unexpected response. Please try again"
         case .onDeviceUnavailable(let why):
             return why
         case .onDeviceRefused(let why):
@@ -139,18 +139,18 @@ enum ProviderError: LocalizedError {
             return "Nothing to fix"
         case .requiresCloud(let c):
             return "/\(c) needs cloud AI — set Inference to Auto in Personalization"
-        case .http(let code):
-            return "HTTP \(code) from AI provider — try again"
+        case .http:
+            return "Turtle couldn’t complete that request. Please try again"
         case .network(let e):
             switch e.code {
             case .notConnectedToInternet: return "No internet connection"
             case .timedOut:               return "Request timed out — try again"
             case .cannotFindHost,
                  .cannotConnectToHost:    return "Cannot reach AI provider"
-            default:                      return e.localizedDescription
+            default:                      return "Check your connection and try again"
             }
-        case .unknown(let e):
-            return e.localizedDescription
+        case .unknown:
+            return "Something went wrong. Please try again"
         }
     }
 }

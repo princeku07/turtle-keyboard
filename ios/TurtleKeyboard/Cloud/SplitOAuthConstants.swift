@@ -30,12 +30,12 @@ enum SplitOAuthConstants {
 
         var errorDescription: String? {
             switch self {
-            case .notConfigured:        return "OAuth client ID not set — see OAUTH_SETUP_iOS.md"
+            case .notConfigured:        return "Cloud backup is temporarily unavailable"
             case .userCancelled:        return "Sign-in cancelled"
             case .missingCode:          return "No auth code in redirect"
             case .http(let code, let m):return "HTTP \(code): \(m)"
             case .noRefreshToken:       return "No refresh token stored — sign in again"
-            case .decode(let m):        return "Decode error: \(m)"
+            case .decode:               return "Cloud backup returned an unexpected response"
             }
         }
     }

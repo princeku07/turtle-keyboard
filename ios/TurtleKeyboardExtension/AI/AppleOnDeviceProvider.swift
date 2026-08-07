@@ -62,27 +62,6 @@ final class AppleOnDeviceProvider: AIProvider {
 
 #if canImport(FoundationModels)
 
-// MARK: - Guided generation schemas
-//
-// Must live at file scope — `@Generable` attaches an extension, and Swift
-// only permits extension macros on types declared at the top level.
-
-/// `/poll`'s output shape. Handing this to `respond(generating:)` constrains
-/// decoding to the schema, so the model *cannot* return a malformed poll —
-/// which is the difference between an on-device tier that usually works and
-/// one that's worth defaulting to on a 3B model.
-@available(iOS 26.0, *)
-@Generable(description: "A shareable poll: one question and its answer options.")
-struct OnDevicePollDraft {
-
-    @Guide(description: "The poll question, a single sentence ending in a question mark. No emoji.")
-    var question: String
-
-    @Guide(description: "Answer options, 1-4 words each. An emoji at the start of an option is fine.",
-           .count(2...6))
-    var options: [String]
-}
-
 @available(iOS 26.0, *)
 private extension AppleOnDeviceProvider {
 
@@ -105,9 +84,7 @@ private extension AppleOnDeviceProvider {
 
         let raw: String
         do {
-            if payload.command == "poll" {
-                raw = try await Self.pollJSON(session: session, prompt: userPrompt, options: options)
-            } else if let onDelta = onDelta {
+            if let onDelta = onDelta {
                 raw = try await Self.stream(session: session, prompt: userPrompt,
                                             options: options, onDelta: onDelta)
             } else {
@@ -160,35 +137,12 @@ private extension AppleOnDeviceProvider {
         return latest
     }
 
-    /// Guided generation for `/poll`. Constrained decoding fills
-    /// `OnDevicePollDraft` directly, so the only way this fails is the model
-    /// declining outright — no fence-stripping, no "did it emit valid JSON".
-    /// Re-serialised to the same `{question, options}` string the cloud tier
-    /// returns, because `PollIntegration` parses one wire format either way.
-    static func pollJSON(session: LanguageModelSession,
-                         prompt: String,
-                         options: GenerationOptions) async throws -> String {
-        let draft = try await session.respond(to: prompt,
-                                              generating: OnDevicePollDraft.self,
-                                              options: options).content
-        let payload: [String: Any] = ["question": draft.question, "options": draft.options]
-        guard let data = try? JSONSerialization.data(withJSONObject: payload),
-              let json = String(data: data, encoding: .utf8) else {
-            throw ProviderError.badResponse("Could not encode the on-device poll")
-        }
-        return json
-    }
-
     /// System prompt for a command. Shared verbatim with the cloud tier via
     /// `CommandRouter.systemPrompt(for:prompt:)` — except for `/poll`.
     ///
-    /// `/poll`'s shared prompt spends most of its words specifying a JSON
-    /// serialisation contract. Under guided generation the schema already
-    /// enforces that, and leaving the instruction in actively hurts: a small
-    /// model told "output ONLY a JSON object" while being decoded *into* a
-    /// schema tends to emit a JSON blob inside the `question` field. So the
-    /// on-device tier keeps the content rules and drops the format contract.
-    /// Keep this in sync with the content half of `commands/prompts/poll.txt`.
+    /// Poll responses use ordinary generation followed by strict validation.
+    /// This avoids FoundationModels compiler macros, which have proven
+    /// nondeterministic in clean command-line and CI builds.
     static func instructions(for payload: CommandPayload) -> String {
         guard payload.command == "poll" else {
             return CommandRouter.systemPrompt(for: payload.command, prompt: payload.prompt)
@@ -198,7 +152,9 @@ private extension AppleOnDeviceProvider {
         question and its answer options. The question is a single sentence \
         ending in a question mark, with no emoji. Give 2 to 6 options, each \
         1-4 words. Match the language and tone of the user's request; for \
-        couple, dating, or hangout prompts lean playful.
+        couple, dating, or hangout prompts lean playful. Return only a valid \
+        JSON object with keys "question" and "options". "options" must be an \
+        array of strings. Do not use Markdown fences.
         """
     }
 

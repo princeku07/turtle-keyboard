@@ -27,7 +27,7 @@ final class SplitDetailViewController: UIViewController {
     private let subtotalLabel = UILabel()
     private let emptyLabel = UILabel()
     private let cloudCard = UIView()
-    private let cloudStatusLabel = UILabel()
+    private let cloudStatusView = ConnectionStatusView()
     private let cloudActionButton = UIButton(type: .system)
     private let inviteButton = UIButton(type: .system)
     private let syncButton = UIButton(type: .system)
@@ -69,7 +69,12 @@ final class SplitDetailViewController: UIViewController {
         emptyLabel.numberOfLines = 0
         emptyLabel.textAlignment = .center
         content.addArrangedSubview(emptyLabel)
+
+        NotificationCenter.default.addObserver(self, selector: #selector(networkChanged),
+                                               name: AppNetworkMonitor.didChange, object: nil)
     }
+
+    deinit { NotificationCenter.default.removeObserver(self) }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
@@ -218,6 +223,12 @@ final class SplitDetailViewController: UIViewController {
             container.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             container.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -40),
         ])
+        UIAccessibility.post(notification: .announcement, argument: text)
+        if UIAccessibility.isReduceMotionEnabled {
+            container.alpha = 1
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { container.removeFromSuperview() }
+            return
+        }
         UIView.animate(withDuration: 0.18, animations: { container.alpha = 1 }) { _ in
             UIView.animate(withDuration: 0.18, delay: 1.2, options: [],
                            animations: { container.alpha = 0 },
@@ -229,6 +240,8 @@ final class SplitDetailViewController: UIViewController {
         dismiss(animated: true)
     }
 
+    @objc private func networkChanged() { refreshCloudUI() }
+
     // MARK: - Cloud sync UI
 
     private func buildCloudCard() -> UIView {
@@ -237,9 +250,7 @@ final class SplitDetailViewController: UIViewController {
         cloudCard.layer.cornerCurve = .continuous
         cloudCard.translatesAutoresizingMaskIntoConstraints = false
 
-        cloudStatusLabel.font = .systemFont(ofSize: 14)
-        cloudStatusLabel.textColor = .label
-        cloudStatusLabel.numberOfLines = 0
+        cloudStatusView.onRetry = { [weak self] in self?.syncTapped() }
 
         cloudActionButton.setTitleColor(.white, for: .normal)
         cloudActionButton.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
@@ -283,7 +294,7 @@ final class SplitDetailViewController: UIViewController {
         clearRow.spacing = 8
         clearRow.distribution = .fillEqually
 
-        let stack = UIStackView(arrangedSubviews: [cloudStatusLabel, buttonRow, clearRow])
+        let stack = UIStackView(arrangedSubviews: [cloudStatusView, buttonRow, clearRow])
         stack.axis = .vertical
         stack.spacing = 10
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -299,8 +310,10 @@ final class SplitDetailViewController: UIViewController {
 
     private func refreshCloudUI() {
         if !oauth.isConfigured {
-            cloudStatusLabel.text = "Cloud sync not configured.\nFill in OAuth client ID — see OAUTH_SETUP_iOS.md."
-            cloudActionButton.setTitle("How to set up", for: .normal)
+            cloudStatusView.render(.needsAttention, service: "Google",
+                                   detail: "Cloud backup is temporarily unavailable. Splits still stay on this device.")
+            cloudActionButton.setTitle("Unavailable", for: .normal)
+            cloudActionButton.isEnabled = false
             syncButton.isHidden = true
             inviteButton.isHidden = true
             clearMineButton.isHidden = true
@@ -308,10 +321,22 @@ final class SplitDetailViewController: UIViewController {
             return
         }
         let hasEntries = !history.all().isEmpty
+        cloudActionButton.isEnabled = true
+        if !AppNetworkMonitor.shared.isOnline {
+            cloudStatusView.render(.needsAttention, service: "Google",
+                                   detail: "You’re offline. Local splits remain available.", canRetry: oauth.isSignedIn)
+            cloudActionButton.setTitle(oauth.isSignedIn ? "Sign out" : "Sign in", for: .normal)
+            cloudActionButton.isEnabled = oauth.isSignedIn
+            syncButton.isHidden = true
+            inviteButton.isHidden = true
+            clearMineButton.isHidden = !hasEntries
+            clearAllButton.isHidden = true
+            return
+        }
         if oauth.isSignedIn {
             let email = oauth.accountEmail ?? "signed in"
             let role = sync.isOwner ? " · owner" : (sync.isMembershipOpen ? " · sharing" : "")
-            cloudStatusLabel.text = "Signed in as \(email)\(role)"
+            cloudStatusView.render(.connected, service: "Google", detail: "Signed in as \(email)\(role)")
             cloudActionButton.setTitle("Sign out", for: .normal)
             syncButton.isHidden = false
             inviteButton.isHidden = !sync.isOwner
@@ -322,7 +347,8 @@ final class SplitDetailViewController: UIViewController {
             clearMineButton.isHidden = !hasEntries
             clearAllButton.isHidden = !(sync.isOwner && hasEntries)
         } else {
-            cloudStatusLabel.text = "Sign in with Google to back up your splits to your own private spreadsheet."
+            cloudStatusView.render(.notConnected, service: "Google",
+                                   detail: "Sign in to back up splits to your private spreadsheet.")
             cloudActionButton.setTitle("Sign in", for: .normal)
             syncButton.isHidden = true
             inviteButton.isHidden = true
@@ -378,8 +404,8 @@ final class SplitDetailViewController: UIViewController {
     @objc private func cloudActionTapped() {
         if !oauth.isConfigured {
             let alert = UIAlertController(
-                title: "Cloud sync not configured",
-                message: "Open OAUTH_SETUP_iOS.md in the repo, follow the steps to create a Google Cloud OAuth client, then paste the client ID into SplitOAuth.swift and Info.plist.",
+                title: "Cloud backup unavailable",
+                message: "Cloud backup isn’t available right now. Your splits are still saved on this device.",
                 preferredStyle: .alert)
             alert.addAction(UIAlertAction(title: "OK", style: .default))
             present(alert, animated: true)
@@ -392,21 +418,30 @@ final class SplitDetailViewController: UIViewController {
         }
         cloudActionButton.isEnabled = false
         cloudActionButton.setTitle("Signing in…", for: .normal)
+        cloudStatusView.render(.loading, service: "Google", detail: "Waiting for Google sign-in…")
         oauth.signIn { [weak self] result in
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 self.cloudActionButton.isEnabled = true
                 switch result {
                 case .success:
+                    HostPrivacySafeTelemetry.integrationConnected(.google)
                     Task { @MainActor in
                         _ = await self.sync.ensureSheet()
-                        _ = await self.sync.fetchAndMerge()
+                        let fetched = await self.sync.fetchAndMerge()
                         self.reload()
-                        self.refreshCloudUI()
+                        if fetched {
+                            UINotificationFeedbackGenerator().notificationOccurred(.success)
+                            self.refreshCloudUI()
+                        } else {
+                            self.cloudStatusView.render(.needsAttention, service: "Google",
+                                                        detail: "Signed in, but backup couldn’t finish. Retry when you’re online.", canRetry: true)
+                        }
                     }
-                case .failure(let error):
-                    self.refreshCloudUI()
-                    self.showAlert(title: "Sign-in failed", message: error.localizedDescription)
+                case .failure:
+                    self.cloudStatusView.render(.needsAttention, service: "Google",
+                                                detail: "Couldn’t sign in. Check your connection and try again.", canRetry: true)
+                    self.cloudActionButton.setTitle("Try sign-in again", for: .normal)
                 }
             }
         }
@@ -415,13 +450,20 @@ final class SplitDetailViewController: UIViewController {
     @objc private func syncTapped() {
         syncButton.isEnabled = false
         syncButton.setTitle("Syncing…", for: .normal)
+        cloudStatusView.render(.loading, service: "Google", detail: "Syncing saved splits…")
         Task { @MainActor in
             _ = await sync.ensureSheet()
-            _ = await sync.fetchAndMerge()
+            let fetched = await sync.fetchAndMerge()
             syncButton.isEnabled = true
             syncButton.setTitle("Sync now", for: .normal)
             reload()
-            refreshCloudUI()
+            if fetched {
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                refreshCloudUI()
+            } else {
+                cloudStatusView.render(.needsAttention, service: "Google",
+                                       detail: "Sync couldn’t finish. Check your connection and retry.", canRetry: true)
+            }
         }
     }
 
@@ -439,8 +481,8 @@ final class SplitDetailViewController: UIViewController {
     ///                            the modal now).
     private func presentShareFlow() {
         if !oauth.isConfigured {
-            showAlert(title: "Cloud sync not configured",
-                      message: "Open OAUTH_SETUP_iOS.md, create a Google OAuth client, then paste the client ID into .env.")
+            showAlert(title: "Cloud backup unavailable",
+                      message: "Cloud backup isn’t available right now. Please try again after updating Turtle.")
             return
         }
         if !oauth.isSignedIn {
@@ -454,8 +496,8 @@ final class SplitDetailViewController: UIViewController {
                             self.refreshCloudUI()
                             self.presentShareFlow()
                         }
-                    case .failure(let e):
-                        self.showAlert(title: "Sign-in failed", message: e.localizedDescription)
+                    case .failure:
+                        self.showAlert(title: "Couldn’t sign in", message: "Please check your connection and try again.")
                     }
                 }
             }

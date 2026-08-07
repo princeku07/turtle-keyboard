@@ -19,13 +19,14 @@ final class PollSheetViewController: UIViewController {
     private let scroll = UIScrollView()
     private let content = UIStackView()
     private let questionLabel = UILabel()
-    private let statusLabel = UILabel()
+    private let statusView = ConnectionStatusView()
     private let optionsStack = UIStackView()
     private let footerLabel = UILabel()
 
     private var currentPoll: PollClient.Poll?
     private var hasVoted = false
     private var isVoting = false
+    private var requestTask: Task<Void, Never>?
 
     init(pollId: String) {
         self.pollId = pollId
@@ -66,9 +67,7 @@ final class PollSheetViewController: UIViewController {
         questionLabel.numberOfLines = 0
         questionLabel.text = "Loading…"
 
-        statusLabel.font = .systemFont(ofSize: 13)
-        statusLabel.textColor = .secondaryLabel
-        statusLabel.numberOfLines = 0
+        statusView.onRetry = { [weak self] in self?.refresh() }
 
         optionsStack.axis = .vertical
         optionsStack.spacing = 10
@@ -80,24 +79,40 @@ final class PollSheetViewController: UIViewController {
         footerLabel.text = "Poll ID · \(pollId)"
 
         content.addArrangedSubview(questionLabel)
-        content.addArrangedSubview(statusLabel)
+        content.addArrangedSubview(statusView)
         content.addArrangedSubview(optionsStack)
         content.addArrangedSubview(footerLabel)
 
         refresh()
+        NotificationCenter.default.addObserver(self, selector: #selector(networkChanged),
+                                               name: AppNetworkMonitor.didChange, object: nil)
+    }
+
+    deinit {
+        requestTask?.cancel()
+        NotificationCenter.default.removeObserver(self)
     }
 
     // MARK: - Networking
 
     private func refresh() {
-        statusLabel.text = "Fetching results…"
-        Task { @MainActor in
+        guard AppNetworkMonitor.shared.isOnline else {
+            statusView.render(.needsAttention, service: "Poll",
+                              detail: "You’re offline. Reconnect to view this poll.", canRetry: true)
+            return
+        }
+        requestTask?.cancel()
+        statusView.render(.loading, service: "Poll", detail: "Fetching the latest results…")
+        requestTask = Task { @MainActor in
             do {
                 let poll = try await PollClient.readPoll(id: pollId)
+                guard !Task.isCancelled else { return }
                 self.currentPoll = poll
                 self.render(poll: poll)
             } catch {
-                self.statusLabel.text = "Couldn't load poll: \(error.localizedDescription)"
+                guard !Task.isCancelled else { return }
+                self.statusView.render(.needsAttention, service: "Poll",
+                                       detail: "Couldn’t load this poll. Check your connection and retry.", canRetry: true)
             }
         }
     }
@@ -105,9 +120,10 @@ final class PollSheetViewController: UIViewController {
     private func vote(optionIndex: Int) {
         guard !isVoting, !hasVoted else { return }
         isVoting = true
-        statusLabel.text = "Submitting vote…"
+        statusView.render(.loading, service: "Poll", detail: "Submitting your vote…")
         let deviceId = ensureDeviceId()
-        Task { @MainActor in
+        requestTask?.cancel()
+        requestTask = Task { @MainActor in
             do {
                 try await PollClient.vote(pollId: pollId,
                                           optionIndex: optionIndex,
@@ -116,8 +132,10 @@ final class PollSheetViewController: UIViewController {
                 self.isVoting = false
                 self.refresh()
             } catch {
+                guard !Task.isCancelled else { return }
                 self.isVoting = false
-                self.statusLabel.text = "Vote failed: \(error.localizedDescription)"
+                self.statusView.render(.needsAttention, service: "Poll",
+                                       detail: "Your vote couldn’t be sent. Please try again.")
             }
         }
     }
@@ -135,9 +153,10 @@ final class PollSheetViewController: UIViewController {
     private func render(poll: PollClient.Poll) {
         questionLabel.text = poll.question
         let total = poll.options.reduce(0) { $0 + $1.votes }
-        statusLabel.text = total == 0
+        let detail = total == 0
             ? "No votes yet — be the first."
             : "\(total) vote\(total == 1 ? "" : "s") · tap an option to add yours."
+        statusView.render(.connected, service: "Poll", detail: detail)
 
         optionsStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         for (i, option) in poll.options.enumerated() {
@@ -181,6 +200,10 @@ final class PollSheetViewController: UIViewController {
         row.addAction(UIAction { [weak self] _ in
             self?.vote(optionIndex: index)
         }, for: .touchUpInside)
+        row.isAccessibilityElement = true
+        row.accessibilityTraits = hasVoted ? [.button, .notEnabled] : .button
+        row.accessibilityLabel = "\(option.label), \(option.votes) votes, \(pct) percent"
+        row.accessibilityHint = hasVoted ? "You have already voted" : "Double-tap to vote"
 
         // Visual treatment for already-voted state
         if hasVoted { row.alpha = 0.85 }
@@ -188,4 +211,11 @@ final class PollSheetViewController: UIViewController {
     }
 
     @objc private func dismissTapped() { dismiss(animated: true) }
+    @objc private func networkChanged() {
+        if AppNetworkMonitor.shared.isOnline && currentPoll == nil { refresh() }
+        else if !AppNetworkMonitor.shared.isOnline {
+            statusView.render(.needsAttention, service: "Poll",
+                              detail: "You’re offline. Results may be out of date.", canRetry: true)
+        }
+    }
 }

@@ -81,9 +81,8 @@ final class WyrIntegration: KeyboardIntegration {
                 let result = try await WyrClient.create(questions: questions)
                 await MainActor.run { ctx.commitText(result.url) }
             } catch {
-                let msg = error.localizedDescription
                 await MainActor.run {
-                    ctx.showBanner("Game create failed: \(msg)", autoHideMs: failBannerMs)
+                    ctx.showBanner("Couldn’t create the game. Please try again.", autoHideMs: failBannerMs)
                 }
             }
         }

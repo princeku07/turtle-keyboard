@@ -101,7 +101,7 @@ final class JoinSplitViewController: UIViewController {
                 case .success:
                     self.performJoin()
                 case .failure(let err):
-                    self.abort("Sign-in failed: \(err.localizedDescription)")
+                    self.abort("Couldn’t sign in. Please check your connection and try again.")
                 }
             }
         }

@@ -283,7 +283,9 @@ class KeyboardViewController: UIInputViewController {
     // Quick Panel — opened by double-tapping space (PRD §6.6). Lives in
     // the same overlay slot as integration panels (mutually exclusive).
     private var quickPanelView: QuickPanelView?
-    private lazy var integrationContext: IntegrationContext = KeyboardIntegrationContext(owner: self)
+    // Keep the concrete type so command activity can be attached before the
+    // value is passed to handlers as the `IntegrationContext` protocol.
+    private lazy var integrationContext = KeyboardIntegrationContext(owner: self)
     private lazy var personalizationStore: SplitStore =
         UserDefaultsSplitStore(suiteName: SplitContract.storageSuiteName)
 
@@ -538,6 +540,17 @@ class KeyboardViewController: UIInputViewController {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        if let defaults = UserDefaults(suiteName: SplitContract.storageSuiteName) {
+            if defaults.double(forKey: "privacy.deleteExtensionDataAt") > 0 {
+                if let bundleID = Bundle.main.bundleIdentifier {
+                    UserDefaults.standard.removePersistentDomain(forName: bundleID)
+                }
+                defaults.removeObject(forKey: "privacy.deleteExtensionDataAt")
+            }
+            defaults.set(Date().timeIntervalSince1970, forKey: "onboarding.keyboardSeenAt")
+            defaults.set(hasFullAccess, forKey: "onboarding.fullAccess")
+            defaults.set(Date().timeIntervalSince1970, forKey: "keyboard.lastHeartbeatAt")
+        }
         // Personalization toggles may have changed in the host app between
         // mounts. Re-cache so per-keystroke checks read in-memory.
         refreshPersonalizationCache()
@@ -605,6 +618,7 @@ class KeyboardViewController: UIInputViewController {
 
     override func textDidChange(_ textInput: UITextInput?) {
         super.textDidChange(textInput)
+        writeKeyboardHeartbeat()
         // Single dispatch path for the chip strip. `refreshSuggestions`
         // re-derives the right chips from the live proxy state.
         guard activeCommand == nil, !isGenerating else { return }
@@ -3375,6 +3389,62 @@ class KeyboardViewController: UIInputViewController {
 
     // MARK: - Command execution
 
+    private func writeKeyboardHeartbeat() {
+        guard let defaults = UserDefaults(suiteName: SplitContract.storageSuiteName) else { return }
+        let now = Date().timeIntervalSince1970
+        let previous = defaults.double(forKey: "keyboard.lastHeartbeatAt")
+        defaults.set(now, forKey: "keyboard.lastHeartbeatAt")
+        defaults.set(hasFullAccess, forKey: "onboarding.fullAccess")
+        if previous == 0 || now - previous > 300 { PrivacySafeTelemetry.keyboardHeartbeatDetected() }
+    }
+
+    fileprivate func markCommandSucceeded(_ command: String) {
+        guard let defaults = UserDefaults(suiteName: SplitContract.storageSuiteName) else { return }
+        defaults.set(command, forKey: "keyboard.lastSuccessfulCommand")
+        defaults.set(Date().timeIntervalSince1970, forKey: "keyboard.lastSuccessAt")
+        defaults.removeObject(forKey: "keyboard.lastFailureMessage")
+        PrivacySafeTelemetry.commandSucceeded(command)
+    }
+
+    fileprivate func markCommandFailed(_ command: String, message: String) {
+        guard let defaults = UserDefaults(suiteName: SplitContract.storageSuiteName) else { return }
+        defaults.set(command, forKey: "keyboard.lastFailedCommand")
+        defaults.set(message, forKey: "keyboard.lastFailureMessage")
+        defaults.set(Date().timeIntervalSince1970, forKey: "keyboard.lastFailureAt")
+        PrivacySafeTelemetry.commandFailed(command, category: telemetryFailureCategory(message))
+    }
+
+    private func telemetryFailureCategory(_ message: String) -> PrivacySafeTelemetry.FailureCategory {
+        let value = message.lowercased()
+        if value.contains("internet") || value.contains("connection") { return .offline }
+        if value.contains("timed out") { return .timeout }
+        if value.contains("sign in") || value.contains("session") { return .authentication }
+        if value.contains("unavailable") || value.contains("full access") { return .unavailable }
+        if value.contains("response") || value.contains("prepare") { return .invalidResponse }
+        if value.contains("cancel") { return .cancelled }
+        return .unknown
+    }
+
+    /// Only whitelisted, intentionally written error descriptions reach the
+    /// keyboard. Transport/framework errors can contain hosts, status codes,
+    /// or provider details that are useful in logs but confusing to users.
+    private func userFacingMessage(for error: Error) -> String {
+        if let providerError = error as? ProviderError {
+            return providerError.errorDescription ?? "Something went wrong. Please try again."
+        }
+        if let apiError = error as? APIError {
+            return apiError.errorDescription ?? "Something went wrong. Please try again."
+        }
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .notConnectedToInternet: return "No internet connection"
+            case .timedOut: return "That took too long. Please try again."
+            default: return "Check your connection and try again."
+            }
+        }
+        return "Something went wrong. Please try again."
+    }
+
     /// Token-streaming path for text commands. Hides the generating wave
     /// and command bar the instant the first chunk lands, then appends each
     /// delta straight into the field so the result "types itself" in.
@@ -3426,17 +3496,21 @@ class KeyboardViewController: UIInputViewController {
                         textDocumentProxy.insertText(full)
                     }
                 }
+                markCommandSucceeded(cmd.rawValue)
                 showBanner(completionBanner(for: cmd))
             } catch {
                 isGenerating = false
                 hideGeneratingWave()
                 hideCommandBar()
-                showBanner("⚠️ " + (error.localizedDescription))
+                let message = userFacingMessage(for: error)
+                markCommandFailed(cmd.rawValue, message: message)
+                showBanner("⚠️ " + message)
             }
         }
     }
 
     private func executeCommand(_ cmd: SlashCommand, prompt: String) {
+        PrivacySafeTelemetry.commandStarted(cmd.rawValue)
         // Local commands are handled by integrations. Most are instant (mount
         // a panel, save a split) and should never flash the overlay — but
         // some do real async work behind the scenes: `/poll` and `/wyr` run a
@@ -3462,6 +3536,7 @@ class KeyboardViewController: UIInputViewController {
                 return
             }
             if let spec = integrationRegistry.command(named: cmd.rawValue) {
+                integrationContext.begin(command: cmd.rawValue)
                 spec.handler(prompt, integrationContext)
             }
             if !integrationBusy { endGenerating() }
@@ -3498,8 +3573,10 @@ class KeyboardViewController: UIInputViewController {
                         hideCommandBar()
                         if let image = OrgImageRenderer.render(json: text) {
                             showImagePreview(image, command: cmd.rawValue, prompt: prompt)
+                            markCommandSucceeded(cmd.rawValue)
                         } else {
                             showBanner("⚠️ Layout render failed")
+                            markCommandFailed(cmd.rawValue, message: "Turtle couldn’t prepare that layout. Please try again.")
                         }
                     } else if cmd == .proofread {
                         // Proofread REPLACES the user's message in place
@@ -3514,10 +3591,12 @@ class KeyboardViewController: UIInputViewController {
                         textDocumentProxy.insertText(text)
                         hideCommandBar()
                         showBanner(completionBanner(for: cmd))
+                        markCommandSucceeded(cmd.rawValue)
                     } else {
                         textDocumentProxy.insertText(text)
                         hideCommandBar()
                         showBanner(completionBanner(for: cmd))
+                        markCommandSucceeded(cmd.rawValue)
                     }
 
                 case .image(let urlString):
@@ -3526,8 +3605,12 @@ class KeyboardViewController: UIInputViewController {
                         let data = try await downloadImageData(from: urlString)
                         if let image = UIImage(data: data) {
                             showImagePreview(image, command: cmd.rawValue, prompt: prompt)
+                            markCommandSucceeded(cmd.rawValue)
+                        } else {
+                            markCommandFailed(cmd.rawValue, message: "Turtle couldn’t prepare that image. Please try again.")
                         }
                     } catch {
+                        markCommandFailed(cmd.rawValue, message: "The image couldn’t be downloaded. Check your connection and try again.")
                         showBanner("⚠️ Image download failed")
                     }
 
@@ -3546,19 +3629,24 @@ class KeyboardViewController: UIInputViewController {
                                          sourceData: data,
                                          command: cmd.rawValue,
                                          prompt: prompt)
+                        markCommandSucceeded(cmd.rawValue)
                     } else {
-                        showBanner("⚠️ Image decode failed")
+                        markCommandFailed(cmd.rawValue, message: "Turtle couldn’t prepare that image. Please try again.")
+                        showBanner("⚠️ Couldn’t prepare that image. Please try again.")
                     }
 
                 case .suggestions(let items):
                     showSuggestions(items)
+                    markCommandSucceeded(cmd.rawValue)
                 }
 
             } catch {
                 isGenerating = false
                 hideGeneratingWave()
                 hideCommandBar()
-                showBanner("⚠️ " + (error.localizedDescription))
+                let message = userFacingMessage(for: error)
+                markCommandFailed(cmd.rawValue, message: message)
+                showBanner("⚠️ " + message)
             }
         }
     }
@@ -4210,6 +4298,7 @@ private final class KeyboardIntegrationContext: IntegrationContext {
     weak var owner: KeyboardViewController?
     let store: SplitStore
     let llm: LlmService
+    private var activityCommand: String?
 
     init(owner: KeyboardViewController) {
         self.owner = owner
@@ -4222,6 +4311,10 @@ private final class KeyboardIntegrationContext: IntegrationContext {
         // configured, cloud requests surface a clear error from
         // `GeminiLlmService.complete`.
         self.llm = RoutedLlmService(apiKey: Secrets.geminiApiKey)
+    }
+
+    func begin(command: String) {
+        activityCommand = command
     }
 
     /// Release the generating overlay *now* if we're already on the main
@@ -4251,6 +4344,7 @@ private final class KeyboardIntegrationContext: IntegrationContext {
 
     func showPanel(_ view: UIView) {
         releaseBusy()
+        if let command = activityCommand { owner?.markCommandSucceeded(command) }
         DispatchQueue.main.async { self.owner?.mountIntegrationPanel(view) }
     }
 
@@ -4266,11 +4360,19 @@ private final class KeyboardIntegrationContext: IntegrationContext {
 
     func showBanner(_ text: String, autoHideMs: Int) {
         releaseBusy()
+        if let command = activityCommand {
+            if text.hasPrefix("⚠️") {
+                owner?.markCommandFailed(command, message: String(text.dropFirst(2)).trimmingCharacters(in: .whitespaces))
+            } else {
+                owner?.markCommandSucceeded(command)
+            }
+        }
         DispatchQueue.main.async { self.owner?.emitBanner(text, autoHideMs: autoHideMs) }
     }
 
     func commitText(_ text: String) {
         releaseBusy()
+        if let command = activityCommand { owner?.markCommandSucceeded(command) }
         DispatchQueue.main.async { self.owner?.textDocumentProxy.insertText(text) }
     }
 
@@ -4339,10 +4441,10 @@ private final class RoutedLlmService: LlmService {
                     // drop, so a future one degrades to readable text.
                     onText(items.joined(separator: "\n"))
                 case .image, .imageData:
-                    onError("/\(command) returned an image, expected text")
+                    onError("Turtle couldn’t prepare that result. Please try again.")
                 }
             } catch {
-                onError(error.localizedDescription)
+                onError("Turtle couldn’t complete that request. Please try again.")
             }
         }
     }
@@ -4367,7 +4469,7 @@ private final class GeminiLlmService: LlmService {
     ) {
         let urlStr = "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent?key=\(apiKey)"
         guard let url = URL(string: urlStr) else {
-            onError("bad Gemini URL"); return
+            onError("AI is temporarily unavailable. Please try again later."); return
         }
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
@@ -4379,12 +4481,11 @@ private final class GeminiLlmService: LlmService {
         ]
         req.httpBody = try? JSONSerialization.data(withJSONObject: body)
         URLSession.shared.dataTask(with: req) { data, resp, err in
-            if let err = err { onError(err.localizedDescription); return }
+            if err != nil { onError("Check your connection and try again."); return }
             let status = (resp as? HTTPURLResponse)?.statusCode ?? -1
-            guard let data = data else { onError("empty response"); return }
+            guard let data = data else { onError("AI is temporarily unavailable. Please try again later."); return }
             if !(200..<300).contains(status) {
-                let body = String(data: data, encoding: .utf8)?.prefix(200) ?? ""
-                onError("gemini \(status): \(body)"); return
+                onError("AI is temporarily unavailable. Please try again later."); return
             }
             guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let candidates = json["candidates"] as? [[String: Any]],

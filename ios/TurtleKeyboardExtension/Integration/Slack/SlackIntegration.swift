@@ -70,7 +70,7 @@ final class SlackIntegration: KeyboardIntegration {
                 }
             } catch {
                 await MainActor.run {
-                    ctx.showBanner("⚠️ Slack: \(error.localizedDescription)", autoHideMs: 2500)
+                    ctx.showBanner("⚠️ Couldn’t send to Slack. Please try again.", autoHideMs: 2500)
                 }
             }
         }
