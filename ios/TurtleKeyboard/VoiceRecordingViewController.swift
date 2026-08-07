@@ -27,7 +27,7 @@ final class VoiceRecordingViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .white
+        view.backgroundColor = .systemGroupedBackground
         layoutCoachmark()
 
         // When the user swipes back to their original app, that's our
@@ -69,22 +69,23 @@ final class VoiceRecordingViewController: UIViewController {
 
     private func layoutCoachmark() {
         let card = UIView()
-        card.backgroundColor = .white
-        card.layer.cornerRadius = 28
+        card.backgroundColor = .secondarySystemGroupedBackground
+        card.layer.cornerRadius = 24
+        card.layer.cornerCurve = .continuous
         card.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(card)
 
         let title = UILabel()
         title.text = "Swipe back to your app"
-        title.font = .systemFont(ofSize: 28, weight: .semibold)
-        title.textColor = .black
+        title.font = .preferredFont(forTextStyle: .title1)
+        title.textColor = .label
         title.textAlignment = .center
         title.numberOfLines = 0
 
         let body = UILabel()
         body.text = "We wish you didn't have to open Turtle to use voice, but Apple now requires it to activate the microphone."
         body.font = .systemFont(ofSize: 15)
-        body.textColor = UIColor.black.withAlphaComponent(0.65)
+        body.textColor = .secondaryLabel
         body.textAlignment = .center
         body.numberOfLines = 0
 
@@ -96,14 +97,14 @@ final class VoiceRecordingViewController: UIViewController {
         hint.font = .systemFont(ofSize: 14, weight: .medium)
         hint.textColor = .white
         hint.textAlignment = .center
-        hint.backgroundColor = .black
+        hint.backgroundColor = .systemGreen
         hint.layer.cornerRadius = 18
         hint.layer.masksToBounds = true
         hint.numberOfLines = 0
 
         let close = UIButton(type: .system)
         close.setImage(UIImage(systemName: "xmark"), for: .normal)
-        close.tintColor = .black
+        close.tintColor = .secondaryLabel
         close.addTarget(self, action: #selector(cancelTapped), for: .touchUpInside)
 
         [title, body, illustration, hint, close].forEach {

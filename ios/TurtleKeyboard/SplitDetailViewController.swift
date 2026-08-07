@@ -13,8 +13,8 @@ import UIKit
 /// flips it to a true shared store with no code changes.
 final class SplitDetailViewController: UIViewController {
 
-    private let brandGreen = UIColor(red: 0.106, green: 0.369, blue: 0.125, alpha: 1.0)
-    private let cardGreen  = UIColor(red: 0.082, green: 0.502, blue: 0.239, alpha: 1.0)
+    private let brandGreen = UIColor.systemGreen
+    private let cardGreen  = UIColor.secondarySystemGroupedBackground
 
     private let store: SplitStore = UserDefaultsSplitStore(suiteName: SplitContract.storageSuiteName)
     private lazy var history = SplitHistory(store: store)
@@ -36,7 +36,7 @@ final class SplitDetailViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = brandGreen
+        view.backgroundColor = .systemGroupedBackground
         title = "Splits"
         navigationItem.leftBarButtonItem = UIBarButtonItem(
             title: "Done", style: .done, target: self, action: #selector(dismissTapped))
@@ -65,7 +65,7 @@ final class SplitDetailViewController: UIViewController {
         content.addArrangedSubview(buildCloudCard())
         emptyLabel.text = "No splits saved yet.\nUse /split <amount> in any chat to save your first one."
         emptyLabel.font = .systemFont(ofSize: 15)
-        emptyLabel.textColor = UIColor.white.withAlphaComponent(0.75)
+        emptyLabel.textColor = .secondaryLabel
         emptyLabel.numberOfLines = 0
         emptyLabel.textAlignment = .center
         content.addArrangedSubview(emptyLabel)
@@ -80,13 +80,14 @@ final class SplitDetailViewController: UIViewController {
     private func buildTotalsCard() -> UIView {
         let card = UIView()
         card.backgroundColor = cardGreen
-        card.layer.cornerRadius = 10
+        card.layer.cornerRadius = 12
+        card.layer.cornerCurve = .continuous
         card.translatesAutoresizingMaskIntoConstraints = false
 
         totalLabel.font = .systemFont(ofSize: 28, weight: .bold)
-        totalLabel.textColor = .white
+        totalLabel.textColor = .label
         subtotalLabel.font = .systemFont(ofSize: 13)
-        subtotalLabel.textColor = UIColor(red: 0.80, green: 0.91, blue: 0.78, alpha: 1.0)
+        subtotalLabel.textColor = .secondaryLabel
 
         let stack = UIStackView(arrangedSubviews: [totalLabel, subtotalLabel])
         stack.axis = .vertical
@@ -123,13 +124,14 @@ final class SplitDetailViewController: UIViewController {
     private func buildRow(entry: SplitHistory.Entry) -> UIView {
         let card = UIView()
         card.backgroundColor = cardGreen
-        card.layer.cornerRadius = 10
+        card.layer.cornerRadius = 12
+        card.layer.cornerCurve = .continuous
         card.translatesAutoresizingMaskIntoConstraints = false
 
         let amount = UILabel()
         amount.text = "₹\(SplitContract.formatAmount(entry.amount))"
         amount.font = .systemFont(ofSize: 18, weight: .bold)
-        amount.textColor = .white
+        amount.textColor = .label
 
         let per = entry.people > 0 ? entry.amount / Double(entry.people) : entry.amount
         let date = Date(timeIntervalSince1970: TimeInterval(entry.timestampMs) / 1000)
@@ -141,7 +143,7 @@ final class SplitDetailViewController: UIViewController {
         meta.text = "\(entry.people) \(entry.people == 1 ? "person" : "people") · ₹\(SplitContract.formatAmount(per)) each\n\(formatter.string(from: date))"
         meta.numberOfLines = 0
         meta.font = .systemFont(ofSize: 13)
-        meta.textColor = UIColor(red: 0.80, green: 0.91, blue: 0.78, alpha: 1.0)
+        meta.textColor = .secondaryLabel
 
         let copyBtn = UIButton(type: .system)
         styleSecondaryButton(copyBtn, title: "Copy")
@@ -231,32 +233,36 @@ final class SplitDetailViewController: UIViewController {
 
     private func buildCloudCard() -> UIView {
         cloudCard.backgroundColor = cardGreen
-        cloudCard.layer.cornerRadius = 10
+        cloudCard.layer.cornerRadius = 12
+        cloudCard.layer.cornerCurve = .continuous
         cloudCard.translatesAutoresizingMaskIntoConstraints = false
 
         cloudStatusLabel.font = .systemFont(ofSize: 14)
-        cloudStatusLabel.textColor = .white
+        cloudStatusLabel.textColor = .label
         cloudStatusLabel.numberOfLines = 0
 
-        cloudActionButton.setTitleColor(brandGreen, for: .normal)
+        cloudActionButton.setTitleColor(.white, for: .normal)
         cloudActionButton.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
-        cloudActionButton.backgroundColor = .white
-        cloudActionButton.layer.cornerRadius = 8
+        cloudActionButton.backgroundColor = .systemGreen
+        cloudActionButton.layer.cornerRadius = 10
+        cloudActionButton.layer.cornerCurve = .continuous
         cloudActionButton.contentEdgeInsets = UIEdgeInsets(top: 8, left: 14, bottom: 8, right: 14)
         cloudActionButton.addTarget(self, action: #selector(cloudActionTapped), for: .touchUpInside)
 
         syncButton.setTitle("Sync now", for: .normal)
-        syncButton.setTitleColor(.white, for: .normal)
+        syncButton.setTitleColor(.systemGreen, for: .normal)
         syncButton.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
-        syncButton.backgroundColor = UIColor.white.withAlphaComponent(0.18)
-        syncButton.layer.cornerRadius = 8
+        syncButton.backgroundColor = .tertiarySystemFill
+        syncButton.layer.cornerRadius = 10
+        syncButton.layer.cornerCurve = .continuous
         syncButton.contentEdgeInsets = UIEdgeInsets(top: 8, left: 14, bottom: 8, right: 14)
         syncButton.addTarget(self, action: #selector(syncTapped), for: .touchUpInside)
 
-        inviteButton.setTitleColor(.white, for: .normal)
+        inviteButton.setTitleColor(.systemGreen, for: .normal)
         inviteButton.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
-        inviteButton.backgroundColor = UIColor.white.withAlphaComponent(0.18)
-        inviteButton.layer.cornerRadius = 8
+        inviteButton.backgroundColor = .tertiarySystemFill
+        inviteButton.layer.cornerRadius = 10
+        inviteButton.layer.cornerCurve = .continuous
         inviteButton.contentEdgeInsets = UIEdgeInsets(top: 8, left: 14, bottom: 8, right: 14)
         inviteButton.addTarget(self, action: #selector(inviteTapped), for: .touchUpInside)
 
@@ -329,10 +335,11 @@ final class SplitDetailViewController: UIViewController {
     /// Pill styling that matches `syncButton` / `inviteButton`.
     private func styleSecondaryButton(_ button: UIButton, title: String) {
         button.setTitle(title, for: .normal)
-        button.setTitleColor(.white, for: .normal)
+        button.setTitleColor(.systemGreen, for: .normal)
         button.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
-        button.backgroundColor = UIColor.white.withAlphaComponent(0.18)
-        button.layer.cornerRadius = 8
+        button.backgroundColor = .tertiarySystemFill
+        button.layer.cornerRadius = 10
+        button.layer.cornerCurve = .continuous
         button.contentEdgeInsets = UIEdgeInsets(top: 8, left: 14, bottom: 8, right: 14)
     }
 

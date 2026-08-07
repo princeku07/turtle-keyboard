@@ -10,8 +10,8 @@ import UIKit
 /// `turtlekeyboard://poll/<id>` link or the in-app share link.
 final class PollSheetViewController: UIViewController {
 
-    private let brandGreen = UIColor(red: 0.106, green: 0.369, blue: 0.125, alpha: 1.0)
-    private let cardGreen  = UIColor(red: 0.082, green: 0.502, blue: 0.239, alpha: 1.0)
+    private let brandGreen = UIColor.systemGreen
+    private let cardGreen  = UIColor.secondarySystemGroupedBackground
 
     private let pollId: String
     private let store: SplitStore = UserDefaultsSplitStore(suiteName: SplitContract.storageSuiteName)
@@ -36,7 +36,7 @@ final class PollSheetViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = brandGreen
+        view.backgroundColor = .systemGroupedBackground
         title = "Poll"
         navigationItem.leftBarButtonItem = UIBarButtonItem(
             title: "Done", style: .done, target: self, action: #selector(dismissTapped))
@@ -62,19 +62,19 @@ final class PollSheetViewController: UIViewController {
         ])
 
         questionLabel.font = .boldSystemFont(ofSize: 22)
-        questionLabel.textColor = .white
+        questionLabel.textColor = .label
         questionLabel.numberOfLines = 0
         questionLabel.text = "Loading…"
 
         statusLabel.font = .systemFont(ofSize: 13)
-        statusLabel.textColor = UIColor.white.withAlphaComponent(0.8)
+        statusLabel.textColor = .secondaryLabel
         statusLabel.numberOfLines = 0
 
         optionsStack.axis = .vertical
         optionsStack.spacing = 10
 
         footerLabel.font = .systemFont(ofSize: 11)
-        footerLabel.textColor = UIColor.white.withAlphaComponent(0.6)
+        footerLabel.textColor = .tertiaryLabel
         footerLabel.numberOfLines = 0
         footerLabel.textAlignment = .center
         footerLabel.text = "Poll ID · \(pollId)"
@@ -148,14 +148,15 @@ final class PollSheetViewController: UIViewController {
     private func buildOptionRow(index: Int, option: PollClient.Option, total: Int) -> UIView {
         let row = UIControl()
         row.backgroundColor = cardGreen
-        row.layer.cornerRadius = 10
+        row.layer.cornerRadius = 12
+        row.layer.cornerCurve = .continuous
         row.translatesAutoresizingMaskIntoConstraints = false
         row.heightAnchor.constraint(greaterThanOrEqualToConstant: 56).isActive = true
 
         let label = UILabel()
         label.text = option.label
         label.font = .systemFont(ofSize: 15, weight: .semibold)
-        label.textColor = .white
+        label.textColor = .label
         label.numberOfLines = 0
         label.translatesAutoresizingMaskIntoConstraints = false
 
@@ -163,7 +164,7 @@ final class PollSheetViewController: UIViewController {
         let pct = total == 0 ? 0 : Int(round(Double(option.votes) / Double(total) * 100))
         count.text = "\(option.votes) · \(pct)%"
         count.font = .systemFont(ofSize: 13, weight: .medium)
-        count.textColor = UIColor.white.withAlphaComponent(0.85)
+        count.textColor = .secondaryLabel
         count.translatesAutoresizingMaskIntoConstraints = false
 
         row.addSubview(label)

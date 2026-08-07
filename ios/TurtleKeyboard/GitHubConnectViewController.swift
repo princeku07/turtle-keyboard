@@ -8,8 +8,8 @@ import UIKit
 /// repos, or type a full `owner/repo` to pin one that isn't listed.
 final class GitHubConnectViewController: UIViewController {
 
-    private let brandGreen = UIColor(red: 0.106, green: 0.369, blue: 0.125, alpha: 1.0)
-    private let cardGreen  = UIColor(red: 0.082, green: 0.502, blue: 0.239, alpha: 1.0)
+    private let brandGreen = UIColor.systemGreen
+    private let cardGreen  = UIColor.secondarySystemGroupedBackground
 
     private let store: SplitStore = UserDefaultsSplitStore(suiteName: SplitContract.storageSuiteName)
     private lazy var auth = GitHubAuth(store: store, presentationAnchor: view.window)
@@ -25,13 +25,13 @@ final class GitHubConnectViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = brandGreen
+        view.backgroundColor = .systemGroupedBackground
         title = "Connect GitHub"
         navigationItem.leftBarButtonItem = UIBarButtonItem(
             title: "Done", style: .done, target: self, action: #selector(dismissTapped))
 
         statusLabel.font = .systemFont(ofSize: 15)
-        statusLabel.textColor = .white
+        statusLabel.textColor = .secondaryLabel
         statusLabel.numberOfLines = 0
 
         styleSolidButton(actionButton, title: "Sign in with GitHub", action: #selector(actionTapped))
@@ -159,14 +159,15 @@ final class GitHubConnectViewController: UIViewController {
     private func actionRow(title: String, filled: Bool, _ tap: @escaping () -> Void) -> UIView {
         let row = UIControl()
         row.backgroundColor = filled ? brandGreen : cardGreen
-        row.layer.cornerRadius = 8
+        row.layer.cornerRadius = 12
+        row.layer.cornerCurve = .continuous
         row.layer.borderWidth = filled ? 1 : 0
-        row.layer.borderColor = UIColor.white.withAlphaComponent(0.25).cgColor
+        row.layer.borderColor = UIColor.separator.cgColor
         row.heightAnchor.constraint(equalToConstant: 46).isActive = true
         let label = UILabel()
         label.text = title
         label.font = .systemFont(ofSize: 14, weight: filled ? .semibold : .regular)
-        label.textColor = .white
+        label.textColor = filled ? .white : .label
         label.translatesAutoresizingMaskIntoConstraints = false
         label.isUserInteractionEnabled = false
         row.addSubview(label)
@@ -246,31 +247,33 @@ final class GitHubConnectViewController: UIViewController {
     private func capabilitiesText() -> NSAttributedString {
         let s = NSMutableAttributedString()
         let head = NSAttributedString(string: "In the keyboard: ", attributes: [
-            .font: UIFont.systemFont(ofSize: 13, weight: .semibold), .foregroundColor: UIColor.white])
+            .font: UIFont.systemFont(ofSize: 13, weight: .semibold), .foregroundColor: UIColor.label])
         let body = NSAttributedString(string: "type /github → tap a repo → choose what to fetch:\n📊 Overview · 🔨 Commit · 🐛 Issues · 🔀 PRs · 🏷️ Release. Or type owner/repo#42 for a specific issue or PR.", attributes: [
-            .font: UIFont.systemFont(ofSize: 13), .foregroundColor: UIColor.white.withAlphaComponent(0.85)])
+            .font: UIFont.systemFont(ofSize: 13), .foregroundColor: UIColor.secondaryLabel])
         s.append(head); s.append(body)
         return s
     }
 
     private func sectionLabel(_ text: String) -> UILabel {
         let l = UILabel(); l.text = text
-        l.font = .systemFont(ofSize: 13, weight: .semibold); l.textColor = .white; l.numberOfLines = 0
+        l.font = .systemFont(ofSize: 13, weight: .semibold); l.textColor = .label; l.numberOfLines = 0
         return l
     }
     private func mutedLabel(_ text: String) -> UILabel {
         let l = UILabel(); l.text = text
-        l.font = .systemFont(ofSize: 13); l.textColor = UIColor.white.withAlphaComponent(0.75); l.numberOfLines = 0
+        l.font = .systemFont(ofSize: 13); l.textColor = .secondaryLabel; l.numberOfLines = 0
         return l
     }
     private func styleField(_ field: UITextField) {
         field.font = .systemFont(ofSize: 15)
-        field.backgroundColor = .white
-        field.textColor = .black
+        field.backgroundColor = .secondarySystemGroupedBackground
+        field.textColor = .label
+        field.textColor = .label
         field.autocapitalizationType = .none
         field.autocorrectionType = .no
         field.clearButtonMode = .whileEditing
-        field.layer.cornerRadius = 8
+        field.layer.cornerRadius = 10
+        field.layer.cornerCurve = .continuous
         field.leftView = UIView(frame: CGRect(x: 0, y: 0, width: 12, height: 0))
         field.leftViewMode = .always
         field.heightAnchor.constraint(equalToConstant: 44).isActive = true
@@ -281,10 +284,11 @@ final class GitHubConnectViewController: UIViewController {
     }
     private func styleSolidButton(_ btn: UIButton, title: String, action: Selector) {
         btn.setTitle(title, for: .normal)
-        btn.setTitleColor(brandGreen, for: .normal)
+        btn.setTitleColor(.white, for: .normal)
         btn.titleLabel?.font = .systemFont(ofSize: 15, weight: .semibold)
-        btn.backgroundColor = .white
-        btn.layer.cornerRadius = 8
+        btn.backgroundColor = .systemGreen
+        btn.layer.cornerRadius = 10
+        btn.layer.cornerCurve = .continuous
         btn.contentEdgeInsets = UIEdgeInsets(top: 10, left: 16, bottom: 10, right: 16)
         btn.addTarget(self, action: action, for: .touchUpInside)
         btn.heightAnchor.constraint(equalToConstant: 44).isActive = true

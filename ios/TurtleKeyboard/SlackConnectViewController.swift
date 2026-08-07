@@ -5,8 +5,8 @@ import UIKit
 /// `name → id` map so the keyboard can resolve `#channel-name` overrides.
 final class SlackConnectViewController: UIViewController {
 
-    private let brandGreen = UIColor(red: 0.106, green: 0.369, blue: 0.125, alpha: 1.0)
-    private let cardGreen  = UIColor(red: 0.082, green: 0.502, blue: 0.239, alpha: 1.0)
+    private let brandGreen = UIColor.systemGreen
+    private let cardGreen  = UIColor.secondarySystemGroupedBackground
 
     private let store: SplitStore = UserDefaultsSplitStore(suiteName: SplitContract.storageSuiteName)
     private lazy var auth = SlackAuth(store: store, presentationAnchor: view.window)
@@ -19,25 +19,26 @@ final class SlackConnectViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = brandGreen
+        view.backgroundColor = .systemGroupedBackground
         title = "Connect Slack"
         navigationItem.leftBarButtonItem = UIBarButtonItem(
             title: "Done", style: .done, target: self, action: #selector(dismissTapped))
 
         statusLabel.font = .systemFont(ofSize: 15)
-        statusLabel.textColor = .white
+        statusLabel.textColor = .secondaryLabel
         statusLabel.numberOfLines = 0
 
-        actionButton.setTitleColor(brandGreen, for: .normal)
+        actionButton.setTitleColor(.white, for: .normal)
         actionButton.titleLabel?.font = .systemFont(ofSize: 15, weight: .semibold)
-        actionButton.backgroundColor = .white
-        actionButton.layer.cornerRadius = 8
+        actionButton.backgroundColor = .systemGreen
+        actionButton.layer.cornerRadius = 10
+        actionButton.layer.cornerCurve = .continuous
         actionButton.contentEdgeInsets = UIEdgeInsets(top: 10, left: 16, bottom: 10, right: 16)
         actionButton.addTarget(self, action: #selector(actionTapped), for: .touchUpInside)
 
         pickerLabel.text = "Default channel"
         pickerLabel.font = .systemFont(ofSize: 13, weight: .semibold)
-        pickerLabel.textColor = .white
+        pickerLabel.textColor = .secondaryLabel
 
         pickerStack.axis = .vertical
         pickerStack.spacing = 6
@@ -148,9 +149,10 @@ final class SlackConnectViewController: UIViewController {
             row.setTitle("  \(lock)\(c.name)", for: .normal)
             row.contentHorizontalAlignment = .leading
             row.titleLabel?.font = .systemFont(ofSize: 14, weight: c.id == currentId ? .bold : .regular)
-            row.setTitleColor(.white, for: .normal)
+            row.setTitleColor(c.id == currentId ? .white : .label, for: .normal)
             row.backgroundColor = c.id == currentId ? brandGreen : cardGreen
-            row.layer.cornerRadius = 6
+            row.layer.cornerRadius = 10
+            row.layer.cornerCurve = .continuous
             row.contentEdgeInsets = UIEdgeInsets(top: 10, left: 12, bottom: 10, right: 12)
             row.addAction(UIAction(handler: { [weak self] _ in
                 self?.store.setString(c.id, forKey: SlackKeys.defaultChannel)
@@ -163,7 +165,7 @@ final class SlackConnectViewController: UIViewController {
             let empty = UILabel()
             empty.text = "No channels found. Join one in Slack first."
             empty.font = .systemFont(ofSize: 13)
-            empty.textColor = UIColor.white.withAlphaComponent(0.75)
+            empty.textColor = .secondaryLabel
             empty.numberOfLines = 0
             pickerStack.addArrangedSubview(empty)
         }

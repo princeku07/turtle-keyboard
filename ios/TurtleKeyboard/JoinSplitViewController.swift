@@ -8,8 +8,8 @@ import UIKit
 /// at that sheet and pulls its rows.
 final class JoinSplitViewController: UIViewController {
 
-    private let brandGreen = UIColor(red: 0.106, green: 0.369, blue: 0.125, alpha: 1.0)
-    private let cardGreen  = UIColor(red: 0.082, green: 0.502, blue: 0.239, alpha: 1.0)
+    private let brandGreen = UIColor.systemGreen
+    private let cardGreen  = UIColor.secondarySystemGroupedBackground
     private let muted      = UIColor(red: 0.80, green: 0.91, blue: 0.78, alpha: 1.0)
 
     private let sheetId: String
@@ -33,12 +33,12 @@ final class JoinSplitViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = brandGreen
+        view.backgroundColor = .systemGroupedBackground
 
         let head = UILabel()
         head.text = "Connect to split book"
-        head.font = .systemFont(ofSize: 28, weight: .bold)
-        head.textColor = .white
+        head.font = .preferredFont(forTextStyle: .title1)
+        head.textColor = .label
         head.textAlignment = .center
         head.numberOfLines = 0
 
@@ -51,20 +51,20 @@ final class JoinSplitViewController: UIViewController {
         body.numberOfLines = 0
 
         statusLabel.font = .systemFont(ofSize: 13)
-        statusLabel.textColor = .white
+        statusLabel.textColor = .secondaryLabel
         statusLabel.textAlignment = .center
         statusLabel.numberOfLines = 0
 
         connectButton.setTitle("Connect", for: .normal)
-        connectButton.setTitleColor(brandGreen, for: .normal)
+        connectButton.setTitleColor(.white, for: .normal)
         connectButton.titleLabel?.font = .systemFont(ofSize: 16, weight: .semibold)
-        connectButton.backgroundColor = .white
+        connectButton.backgroundColor = .systemGreen
         connectButton.layer.cornerRadius = 10
         connectButton.contentEdgeInsets = UIEdgeInsets(top: 12, left: 18, bottom: 12, right: 18)
         connectButton.addTarget(self, action: #selector(connectTapped), for: .touchUpInside)
 
         cancelButton.setTitle("Cancel", for: .normal)
-        cancelButton.setTitleColor(.white, for: .normal)
+        cancelButton.setTitleColor(.systemGreen, for: .normal)
         cancelButton.titleLabel?.font = .systemFont(ofSize: 14)
         cancelButton.addTarget(self, action: #selector(cancelTapped), for: .touchUpInside)
 

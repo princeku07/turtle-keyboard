@@ -14,7 +14,7 @@ import WebKit
 /// a native renderer once `WyrClient.read(...)` lands.
 final class WyrSheetViewController: UIViewController {
 
-    private let brandGreen = UIColor(red: 0.106, green: 0.369, blue: 0.125, alpha: 1.0)
+    private let brandGreen = UIColor.systemGreen
 
     private let wyrId: String
     private var webView: WKWebView!
@@ -35,7 +35,7 @@ final class WyrSheetViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = brandGreen
+        view.backgroundColor = .systemGroupedBackground
         title = "Would You Rather"
         navigationItem.leftBarButtonItem = UIBarButtonItem(
             title: "Done", style: .done, target: self, action: #selector(dismissTapped))
@@ -45,11 +45,11 @@ final class WyrSheetViewController: UIViewController {
         cfg.allowsInlineMediaPlayback = true
         webView = WKWebView(frame: .zero, configuration: cfg)
         webView.translatesAutoresizingMaskIntoConstraints = false
-        webView.backgroundColor = .white
-        webView.scrollView.backgroundColor = .white
+        webView.backgroundColor = .systemBackground
+        webView.scrollView.backgroundColor = .systemBackground
 
         progress.translatesAutoresizingMaskIntoConstraints = false
-        progress.progressTintColor = UIColor(red: 0.082, green: 0.502, blue: 0.239, alpha: 1)
+        progress.progressTintColor = .systemGreen
         progress.trackTintColor = .clear
 
         view.addSubview(progress)

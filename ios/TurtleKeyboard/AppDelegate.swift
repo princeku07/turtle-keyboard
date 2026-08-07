@@ -18,7 +18,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
+        let navigationAppearance = UINavigationBarAppearance()
+        navigationAppearance.configureWithDefaultBackground()
+        UINavigationBar.appearance().standardAppearance = navigationAppearance
+        UINavigationBar.appearance().scrollEdgeAppearance = navigationAppearance
+
         window = UIWindow(frame: UIScreen.main.bounds)
+        window?.tintColor = .systemGreen
         window?.rootViewController = UINavigationController(rootViewController: ViewController())
         window?.makeKeyAndVisible()
 

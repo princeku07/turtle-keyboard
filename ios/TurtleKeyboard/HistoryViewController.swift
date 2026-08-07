@@ -12,7 +12,7 @@ final class HistoryViewController: UIViewController,
                                     UICollectionViewDataSource,
                                     UICollectionViewDelegate {
 
-    private let brandGreen = UIColor(red: 0.106, green: 0.369, blue: 0.125, alpha: 1.0)
+    private let brandGreen = UIColor.systemGreen
 
     private var entries: [ImageHistory.Entry] = []
     private let emptyLabel = UILabel()
@@ -20,7 +20,7 @@ final class HistoryViewController: UIViewController,
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = brandGreen
+        view.backgroundColor = .systemGroupedBackground
         title = "History"
         navigationItem.leftBarButtonItem = UIBarButtonItem(
             title: "Done", style: .done, target: self, action: #selector(dismissTapped))
@@ -31,7 +31,7 @@ final class HistoryViewController: UIViewController,
         emptyLabel.numberOfLines = 0
         emptyLabel.textAlignment = .center
         emptyLabel.font = .systemFont(ofSize: 15)
-        emptyLabel.textColor = UIColor.white.withAlphaComponent(0.75)
+        emptyLabel.textColor = .secondaryLabel
         emptyLabel.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(emptyLabel)
 
@@ -41,7 +41,7 @@ final class HistoryViewController: UIViewController,
         layout.sectionInset = UIEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
         collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
         collectionView.translatesAutoresizingMaskIntoConstraints = false
-        collectionView.backgroundColor = .clear
+        collectionView.backgroundColor = .systemGroupedBackground
         collectionView.dataSource = self
         collectionView.delegate = self
         collectionView.register(ThumbCell.self, forCellWithReuseIdentifier: ThumbCell.reuseID)
@@ -157,9 +157,10 @@ private final class ThumbCell: UICollectionViewCell {
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        contentView.layer.cornerRadius = 8
+        contentView.layer.cornerRadius = 12
+        contentView.layer.cornerCurve = .continuous
         contentView.clipsToBounds = true
-        contentView.backgroundColor = UIColor.white.withAlphaComponent(0.08)
+        contentView.backgroundColor = .secondarySystemGroupedBackground
 
         imageView.contentMode = .scaleAspectFill
         imageView.clipsToBounds = true

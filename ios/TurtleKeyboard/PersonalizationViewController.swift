@@ -16,8 +16,8 @@ import UIKit
 /// the keyboard extension at command-registration time.
 final class PersonalizationViewController: UIViewController {
 
-    private let brandGreen = UIColor(red: 0.106, green: 0.369, blue: 0.125, alpha: 1.0)
-    private let cardGreen  = UIColor(red: 0.082, green: 0.502, blue: 0.239, alpha: 1.0)
+    private let brandGreen = UIColor.systemGreen
+    private let cardGreen  = UIColor.secondarySystemGroupedBackground
 
     private let store: SplitStore = UserDefaultsSplitStore(suiteName: SplitContract.storageSuiteName)
     private lazy var notionAuth = NotionAuth(store: store, presentationAnchor: view.window)
@@ -27,7 +27,7 @@ final class PersonalizationViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = brandGreen
+        view.backgroundColor = .systemGroupedBackground
         title = "Personalization"
         navigationItem.leftBarButtonItem = UIBarButtonItem(
             title: "Done", style: .done, target: self, action: #selector(dismissTapped))
@@ -35,7 +35,7 @@ final class PersonalizationViewController: UIViewController {
         let scroll = UIScrollView()
         scroll.translatesAutoresizingMaskIntoConstraints = false
         stack.axis = .vertical
-        stack.spacing = 14
+        stack.spacing = 16
         stack.translatesAutoresizingMaskIntoConstraints = false
         scroll.addSubview(stack)
         view.addSubview(scroll)
@@ -109,7 +109,7 @@ final class PersonalizationViewController: UIViewController {
         let title = UILabel()
         title.text = "Where AI runs"
         title.font = .systemFont(ofSize: 16, weight: .semibold)
-        title.textColor = .white
+        title.textColor = .label
 
         let order: [InferenceMode] = [.auto, .onDeviceOnly, .cloudOnly]
         let current = InferenceMode.current(store: store)
@@ -117,9 +117,7 @@ final class PersonalizationViewController: UIViewController {
         let blurb = subtitle(current.blurb)
 
         let picker = UISegmentedControl(items: order.map(\.title))
-        picker.selectedSegmentTintColor = .white
-        picker.setTitleTextAttributes([.foregroundColor: UIColor.white], for: .normal)
-        picker.setTitleTextAttributes([.foregroundColor: brandGreen], for: .selected)
+        picker.selectedSegmentTintColor = .secondarySystemGroupedBackground
         picker.selectedSegmentIndex = order.firstIndex(of: current) ?? 0
         picker.addAction(UIAction { [weak self] _ in
             guard let self = self else { return }
@@ -134,10 +132,10 @@ final class PersonalizationViewController: UIViewController {
         switch OnDeviceModel.availability {
         case .available:
             status.text = "✅ Apple Intelligence is ready — text commands run free on-device."
-            status.textColor = UIColor(red: 0.72, green: 1.0, blue: 0.78, alpha: 1.0)
+            status.textColor = .systemGreen
         case .unavailable(let why):
             status.text = "⚠️ \(why). Text commands will use the cloud."
-            status.textColor = UIColor(red: 1.0, green: 0.90, blue: 0.65, alpha: 1.0)
+            status.textColor = .systemOrange
         }
 
         let inner = UIStackView(arrangedSubviews: [title, blurb, picker, status])
@@ -156,7 +154,7 @@ final class PersonalizationViewController: UIViewController {
         let title = UILabel()
         title.text = "Theme"
         title.font = .systemFont(ofSize: 16, weight: .semibold)
-        title.textColor = .white
+        title.textColor = .label
 
         let sub = subtitle("Auto follows the system Dark Mode setting. Turtle is the brand green look.")
 
@@ -170,9 +168,7 @@ final class PersonalizationViewController: UIViewController {
             }
         }
         let picker = UISegmentedControl(items: labels)
-        picker.selectedSegmentTintColor = .white
-        picker.setTitleTextAttributes([.foregroundColor: UIColor.white], for: .normal)
-        picker.setTitleTextAttributes([.foregroundColor: brandGreen], for: .selected)
+        picker.selectedSegmentTintColor = .secondarySystemGroupedBackground
 
         let current = KeyboardThemeManager.shared.preference(store: store)
         picker.selectedSegmentIndex = order.firstIndex(of: current) ?? 1
@@ -209,12 +205,12 @@ final class PersonalizationViewController: UIViewController {
         let titleLabel = UILabel()
         titleLabel.text = title
         titleLabel.font = .systemFont(ofSize: 16, weight: .semibold)
-        titleLabel.textColor = .white
+        titleLabel.textColor = .label
         titleLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
         let toggle = UISwitch()
         toggle.isOn = isEnabled(enabledKey)
-        toggle.onTintColor = UIColor(red: 0.20, green: 0.85, blue: 0.40, alpha: 1.0)
+        toggle.onTintColor = .systemGreen
         toggle.addAction(UIAction { [weak self] _ in
             self?.store.setInt(toggle.isOn ? 1 : 0, forKey: enabledKey)
         }, for: .valueChanged)
@@ -225,7 +221,7 @@ final class PersonalizationViewController: UIViewController {
         let sub = UILabel()
         sub.text = subtitle
         sub.font = .systemFont(ofSize: 13)
-        sub.textColor = UIColor.white.withAlphaComponent(0.85)
+        sub.textColor = .secondaryLabel
         sub.numberOfLines = 0
 
         let inner = UIStackView(arrangedSubviews: [header, sub])
@@ -236,10 +232,11 @@ final class PersonalizationViewController: UIViewController {
         if let screen = connectScreen, let connectTitle = connectTitle {
             let connect = UIButton(type: .system)
             connect.setTitle(connectTitle, for: .normal)
-            connect.setTitleColor(brandGreen, for: .normal)
+            connect.setTitleColor(.white, for: .normal)
             connect.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
-            connect.backgroundColor = .white
-            connect.layer.cornerRadius = 8
+            connect.backgroundColor = .systemGreen
+            connect.layer.cornerRadius = 10
+            connect.layer.cornerCurve = .continuous
             connect.contentEdgeInsets = UIEdgeInsets(top: 8, left: 14, bottom: 8, right: 14)
             connect.addAction(UIAction { [weak self] _ in
                 guard let nav = self?.navigationController else { return }
@@ -262,12 +259,12 @@ final class PersonalizationViewController: UIViewController {
         let titleLabel = UILabel()
         titleLabel.text = title
         titleLabel.font = .systemFont(ofSize: 16, weight: .semibold)
-        titleLabel.textColor = .white
+        titleLabel.textColor = .label
         titleLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
         let toggle = UISwitch()
         toggle.isOn = isEnabled(enabledKey)
-        toggle.onTintColor = UIColor(red: 0.20, green: 0.85, blue: 0.40, alpha: 1.0)
+        toggle.onTintColor = .systemGreen
         toggle.addAction(UIAction { [weak self] _ in
             self?.store.setInt(toggle.isOn ? 1 : 0, forKey: enabledKey)
         }, for: .valueChanged)
@@ -278,7 +275,7 @@ final class PersonalizationViewController: UIViewController {
         let sub = UILabel()
         sub.text = subtitle
         sub.font = .systemFont(ofSize: 13)
-        sub.textColor = UIColor.white.withAlphaComponent(0.85)
+        sub.textColor = .secondaryLabel
         sub.numberOfLines = 0
 
         let inner = UIStackView(arrangedSubviews: [header, sub])
@@ -293,7 +290,8 @@ final class PersonalizationViewController: UIViewController {
     private func makeCard() -> UIView {
         let card = UIView()
         card.backgroundColor = cardGreen
-        card.layer.cornerRadius = 10
+        card.layer.cornerRadius = 12
+        card.layer.cornerCurve = .continuous
         card.translatesAutoresizingMaskIntoConstraints = false
         return card
     }
@@ -312,16 +310,16 @@ final class PersonalizationViewController: UIViewController {
         let l = UILabel()
         l.text = text
         l.font = .systemFont(ofSize: 13)
-        l.textColor = UIColor.white.withAlphaComponent(0.75)
+        l.textColor = .secondaryLabel
         l.numberOfLines = 0
         return l
     }
 
     private func sectionHeader(_ text: String) -> UILabel {
         let l = UILabel()
-        l.text = text.uppercased()
+        l.text = text
         l.font = .systemFont(ofSize: 12, weight: .semibold)
-        l.textColor = UIColor.white.withAlphaComponent(0.55)
+        l.textColor = .secondaryLabel
         return l
     }
 
