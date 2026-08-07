@@ -14,7 +14,7 @@ import Foundation
 ///   space — literal label, rendered as the spacebar
 enum KeyRows {
 
-    enum Mode { case qwerty, symbols, symbolsShift }
+    enum Mode: Hashable { case qwerty, symbols, symbolsShift }
 
     // iPhone — 4 rows fit in ~334pt total.
     // Bottom row drops Apple's globe (next-keyboard) key in favour of a

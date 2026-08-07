@@ -1,4 +1,37 @@
 import Foundation
+import os.signpost
+
+// MARK: - Local performance instrumentation
+
+enum KeyboardPerformance {
+    static let log = OSLog(subsystem: "com.samarth.turtlekeyboard.keyboard",
+                           category: "Performance")
+
+    enum Budget {
+        static let warmPresentationMs = 100
+        static let coldPresentationMs = 250
+        static let keyInsertionMs = 16
+        static let suggestionMs = 30
+        static let mainThreadStallMs = 50
+        static let normalMemoryMB = 25
+        static let imageMemoryMB = 40
+        static let layoutSwitchMs = 50
+    }
+
+    static func begin(_ name: StaticString) -> OSSignpostID {
+        let id = OSSignpostID(log: log)
+        os_signpost(.begin, log: log, name: name, signpostID: id)
+        return id
+    }
+
+    static func end(_ name: StaticString, _ id: OSSignpostID) {
+        os_signpost(.end, log: log, name: name, signpostID: id)
+    }
+
+    static func event(_ name: StaticString) {
+        os_signpost(.event, log: log, name: name)
+    }
+}
 
 // MARK: - Provider ID
 
@@ -91,6 +124,7 @@ protocol AIProvider {
     /// to inserting the whole result at once.
     func executeStreaming(_ payload: CommandPayload,
                           onDelta: @escaping (String) -> Void) async throws -> CommandResult
+    func cancelAllRequests()
 }
 
 extension AIProvider {
@@ -98,6 +132,8 @@ extension AIProvider {
                           onDelta: @escaping (String) -> Void) async throws -> CommandResult {
         try await execute(payload)
     }
+
+    func cancelAllRequests() {}
 }
 
 // MARK: - Provider errors

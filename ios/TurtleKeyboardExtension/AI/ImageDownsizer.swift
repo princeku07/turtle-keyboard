@@ -41,6 +41,8 @@ enum ImageDownsizer {
     /// full-res frame never has to live in memory. Returns PNG bytes
     /// ready to ship to the AI provider.
     static func downsizedPNG(fromData data: Data) -> Data? {
+        let trace = KeyboardPerformance.begin("ImageDecode")
+        defer { KeyboardPerformance.end("ImageDecode", trace) }
         guard !data.isEmpty,
               let src = CGImageSourceCreateWithData(data as CFData, [
                   kCGImageSourceShouldCache: false,
@@ -69,6 +71,8 @@ enum ImageDownsizer {
     }
 
     private static func resize(_ image: UIImage, maxSide: CGFloat) -> UIImage {
+        let trace = KeyboardPerformance.begin("ImageRender")
+        defer { KeyboardPerformance.end("ImageRender", trace) }
         let size = image.size
         let longest = max(size.width, size.height)
         guard longest > maxSide, size.width > 0, size.height > 0 else { return image }

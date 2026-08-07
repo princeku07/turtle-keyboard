@@ -11,6 +11,19 @@ import Foundation
 enum SlackClient {
 
     private static let base = "https://slack.com/api"
+    private static let maxResponseBytes = 2_097_152
+    private static let session: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 20
+        config.timeoutIntervalForResource = 40
+        config.urlCache = nil
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
+        config.waitsForConnectivity = false
+        config.httpMaximumConnectionsPerHost = 2
+        return URLSession(configuration: config)
+    }()
+
+    static func cancelAllRequests() { session.getAllTasks { $0.forEach { $0.cancel() } } }
 
     enum SlackError: Error, LocalizedError {
         case http(Int, String)
@@ -131,7 +144,8 @@ enum SlackClient {
     }
 
     private static func execute(_ req: URLRequest) async throws -> [String: Any] {
-        let (data, resp) = try await URLSession.shared.data(for: req)
+        let (data, resp) = try await session.data(for: req)
+        guard data.count <= maxResponseBytes else { throw SlackError.api("response_too_large") }
         guard let http = resp as? HTTPURLResponse else {
             throw SlackError.http(0, "no response")
         }

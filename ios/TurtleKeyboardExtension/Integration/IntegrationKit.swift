@@ -107,9 +107,11 @@ protocol LlmService: AnyObject {
                   prompt: String,
                   onText: @escaping (String) -> Void,
                   onError: @escaping (String) -> Void)
+    func cancelAllRequests()
 }
 
 extension LlmService {
+    func cancelAllRequests() {}
     /// Conformers that predate tier routing still answer the unrouted way.
     func complete(command: String,
                   prompt: String,

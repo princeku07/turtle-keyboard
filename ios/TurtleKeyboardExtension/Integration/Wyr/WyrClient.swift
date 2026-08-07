@@ -5,6 +5,20 @@ import Foundation
 /// artifact type owns its decoding.
 enum WyrClient {
 
+    private static let maxResponseBytes = 1_048_576
+    private static let session: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 15
+        config.timeoutIntervalForResource = 30
+        config.urlCache = nil
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
+        config.waitsForConnectivity = false
+        config.httpMaximumConnectionsPerHost = 2
+        return URLSession(configuration: config)
+    }()
+
+    static func cancelAllRequests() { session.getAllTasks { $0.forEach { $0.cancel() } } }
+
     struct Question {
         let a: String
         let b: String
@@ -43,7 +57,10 @@ enum WyrClient {
         }
         req.timeoutInterval = 15
         req.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
-        let (data, resp) = try await URLSession.shared.data(for: req)
+        let (data, resp) = try await session.data(for: req)
+        guard data.count <= maxResponseBytes else {
+            throw PollClient.ClientError.malformedResponse
+        }
         let code = (resp as? HTTPURLResponse)?.statusCode ?? -1
         if !(200..<300).contains(code) {
             var workerCode = ""

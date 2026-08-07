@@ -170,6 +170,12 @@ final class CommandRouter {
         defaults.removeObject(forKey: "turtle_route_\(command)")
     }
 
+    func cancelAllRequests() {
+        googleProvider.cancelAllRequests()
+        appleProvider.cancelAllRequests()
+        localProvider.cancelAllRequests()
+    }
+
     // MARK: - Execution
 
     func execute(command: String, prompt: String, context: String,
@@ -193,6 +199,8 @@ final class CommandRouter {
     private func run(command: String, prompt: String, context: String,
                      referenceImage: Data?,
                      onDelta: ((String) -> Void)?) async throws -> CommandResult {
+        let routingTrace = KeyboardPerformance.begin("CommandRouting")
+        defer { KeyboardPerformance.end("CommandRouting", routingTrace) }
         lastServedTier = nil
 
         let plan = resolvedPlan(for: command)
@@ -201,11 +209,13 @@ final class CommandRouter {
         // (the privacy invariant applies to logs too). Without this a tier
         // that silently declines is invisible: `run` reports only the *last*
         // tier's error, so an on-device miss looks like a cloud failure.
+        #if DEBUG
         NSLog("🐢[Router] /%@ mode=%@ plan=[%@] appleIntelligence=%@",
               command,
               inferenceMode.rawValue,
               plan.map(\.debugName).joined(separator: " → "),
               OnDeviceModel.availability.reason ?? "available")
+        #endif
 
         guard !plan.isEmpty else { throw planError(for: command) }
 
@@ -254,10 +264,11 @@ final class CommandRouter {
                 throw CancellationError()
             } catch {
                 lastError = error
-                NSLog("🐢[Router] /%@ tier=%@ failed (escalatable=%@): %@",
+                #if DEBUG
+                NSLog("🐢[Router] /%@ tier=%@ failed (escalatable=%@)",
                       command, tier.debugName,
-                      Self.isEscalatable(error) ? "yes" : "no",
-                      error.localizedDescription)
+                      Self.isEscalatable(error) ? "yes" : "no")
+                #endif
                 guard !gate.didEmit, Self.isEscalatable(error) else { throw error }
                 continue
             }

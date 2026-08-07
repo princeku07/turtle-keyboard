@@ -101,12 +101,16 @@ enum OrgImageRenderer {
             let doc = try JSONDecoder().decode(OrgDocument.self, from: data)
             return render(doc: doc)
         } catch {
+            #if DEBUG
             NSLog("🐢[OrgRenderer] decode failed: %@", String(describing: error))
+            #endif
             return nil
         }
     }
 
     static func render(doc: OrgDocument) -> UIImage {
+        let trace = KeyboardPerformance.begin("ImageRender")
+        defer { KeyboardPerformance.end("ImageRender", trace) }
         let size = CGSize(width: canvas, height: canvas)
         let format = UIGraphicsImageRendererFormat()
         format.scale = 2

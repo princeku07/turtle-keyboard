@@ -52,6 +52,8 @@ enum ImageVariants {
     private static let stickerSide: CGFloat = 512
 
     static func make(_ source: UIImage, variant: Variant) -> Result? {
+        let trace = KeyboardPerformance.begin("ImageEncode")
+        defer { KeyboardPerformance.end("ImageEncode", trace) }
         switch variant {
         case .image:
             guard let data = source.pngData() else { return nil }

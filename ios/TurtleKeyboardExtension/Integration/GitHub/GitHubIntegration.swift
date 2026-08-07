@@ -28,6 +28,19 @@ final class GitHubIntegration: KeyboardIntegration {
     let id = "github"
 
     private static let bannerMs = 1_800
+    private static let maxResponseBytes = 2_097_152
+    private static let session: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 12
+        config.timeoutIntervalForResource = 30
+        config.urlCache = nil
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
+        config.waitsForConnectivity = false
+        config.httpMaximumConnectionsPerHost = 2
+        return URLSession(configuration: config)
+    }()
+
+    static func cancelAllRequests() { session.getAllTasks { $0.forEach { $0.cancel() } } }
 
     enum Action { case overview, commit, issues, prs, release, issue(Int) }
 
@@ -111,7 +124,7 @@ final class GitHubIntegration: KeyboardIntegration {
         req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         if !token.isEmpty { req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
 
-        URLSession.shared.dataTask(with: req) { data, resp, err in
+        session.dataTask(with: req) { data, resp, err in
             let insert: (String) -> Void = { text in
                 recordRecent("\(owner)/\(repo)", store: ctx.store)
                 DispatchQueue.main.async { ctx.commitText(text) }
@@ -129,6 +142,9 @@ final class GitHubIntegration: KeyboardIntegration {
             }
             guard (200..<300).contains(status), let data = data else {
                 fail("⚠️ GitHub error \(status)"); return
+            }
+            guard data.count <= maxResponseBytes else {
+                fail("⚠️ GitHub returned too much data"); return
             }
             guard let summary = format(data) else { fail("⚠️ Nothing to show"); return }
             insert(summary)

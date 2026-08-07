@@ -16,13 +16,21 @@ import ImageIO
 
 final class GoogleProvider: AIProvider {
     let id: ProviderID = .google
+    private let maxTextResponseBytes = 2_097_152
+    private let maxImageResponseBytes = 40 * 1_024 * 1_024
 
     private let session: URLSession = {
-        let cfg = URLSessionConfiguration.default
+        let cfg = URLSessionConfiguration.ephemeral
         cfg.timeoutIntervalForRequest  = 30
         cfg.timeoutIntervalForResource = 90
+        cfg.urlCache = nil
+        cfg.requestCachePolicy = .reloadIgnoringLocalCacheData
+        cfg.waitsForConnectivity = false
+        cfg.httpMaximumConnectionsPerHost = 2
         return URLSession(configuration: cfg)
     }()
+
+    func cancelAllRequests() { session.getAllTasks { $0.forEach { $0.cancel() } } }
 
     func execute(_ payload: CommandPayload) async throws -> CommandResult {
         // `/sticker` runs a bespoke two-pass matte pipeline — short-circuit
@@ -161,12 +169,14 @@ final class GoogleProvider: AIProvider {
             // the actual reason in there ("API key not valid", quota
             // exhausted, unknown model) and a bare status code is not enough
             // to debug from. Mirrors `validate(_:data:)` on the one-shot path.
-            var snippet = ""
+            var drainedBytes = 0
             for try await line in bytes.lines {
-                snippet += line
-                if snippet.count >= 400 { break }
+                drainedBytes += line.utf8.count
+                if drainedBytes >= 4_096 { break }
             }
-            NSLog("🐢[Gemini] stream HTTP %d %@", http.statusCode, snippet)
+            #if DEBUG
+            NSLog("🐢[Gemini] stream HTTP %d", http.statusCode)
+            #endif
             throw ProviderError.http(http.statusCode)
         }
 
@@ -192,6 +202,9 @@ final class GoogleProvider: AIProvider {
             guard !chunk.isEmpty else { continue }
             isFirstChunk = false
             accumulated += chunk
+            guard accumulated.utf8.count <= maxTextResponseBytes else {
+                throw ProviderError.badResponse("Response was too large")
+            }
             onDelta(chunk)
         }
 
@@ -303,7 +316,13 @@ final class GoogleProvider: AIProvider {
 
     private func fetch(_ request: URLRequest) async throws -> (Data, URLResponse) {
         do {
-            return try await session.data(for: request)
+            let result = try await session.data(for: request)
+            let limit = (request.httpBody?.count ?? 0) > 2_097_152
+                ? maxImageResponseBytes : maxTextResponseBytes
+            guard result.0.count <= limit else {
+                throw ProviderError.badResponse("Response was too large")
+            }
+            return result
         } catch let e as URLError { throw ProviderError.network(e) }
         catch { throw ProviderError.unknown(error) }
     }
@@ -313,8 +332,9 @@ final class GoogleProvider: AIProvider {
             throw ProviderError.badResponse("No HTTP response")
         }
         guard (200..<300).contains(http.statusCode) else {
-            let snippet = String(data: data, encoding: .utf8)?.prefix(400) ?? ""
-            NSLog("🐢[Gemini] HTTP %d %@", http.statusCode, String(snippet))
+            #if DEBUG
+            NSLog("🐢[Gemini] HTTP %d", http.statusCode)
+            #endif
             throw ProviderError.http(http.statusCode)
         }
     }
@@ -364,8 +384,10 @@ final class GoogleProvider: AIProvider {
                                             userPrompt: MattePrompts.swapWhiteToBlackSubject,
                                             reference: whitePng)
         } catch {
+            #if DEBUG
             NSLog("🐢[Gemini] sticker pass-2 failed (%@) — falling back to opaque pass-1",
                   String(describing: error))
+            #endif
             return .imageData(whitePng)
         }
 
@@ -375,8 +397,10 @@ final class GoogleProvider: AIProvider {
             return .imageData(whitePng)
         }
         guard onWhite.width == onBlack.width, onWhite.height == onBlack.height else {
+            #if DEBUG
             NSLog("🐢[Gemini] sticker matte dim mismatch %dx%d vs %dx%d — falling back",
                   onWhite.width, onWhite.height, onBlack.width, onBlack.height)
+            #endif
             return .imageData(whitePng)
         }
         guard let matted = AlphaMatte.differenceMatte(onWhite: onWhite, onBlack: onBlack),
@@ -433,8 +457,10 @@ final class GoogleProvider: AIProvider {
                                               userPrompt: MattePrompts.swapWhiteToBlackSheet,
                                               reference: whiteSheet)
         } catch {
+            #if DEBUG
             NSLog("🐢[Gemini] gif pass-2 failed (%@) — falling back to opaque sheet",
                   String(describing: error))
+            #endif
             return .imageData(whiteSheet)
         }
 
@@ -444,8 +470,10 @@ final class GoogleProvider: AIProvider {
             return .imageData(whiteSheet)
         }
         guard onWhite.width == onBlack.width, onWhite.height == onBlack.height else {
+            #if DEBUG
             NSLog("🐢[Gemini] gif matte dim mismatch %dx%d vs %dx%d — falling back",
                   onWhite.width, onWhite.height, onBlack.width, onBlack.height)
+            #endif
             return .imageData(whiteSheet)
         }
         guard let mattedSheet = AlphaMatte.differenceMatte(onWhite: onWhite, onBlack: onBlack) else {
@@ -456,8 +484,10 @@ final class GoogleProvider: AIProvider {
         let aspect = Double(mattedSheet.width) / Double(mattedSheet.height)
         let rows = SpriteSheetSlicer.gridRows(forAspect: aspect)
         let delayCs = SpriteSheetSlicer.frameDelayCentiseconds(forRows: rows)
+        #if DEBUG
         NSLog("🐢[Gemini] gif sheet %dx%d aspect=%.2f → 4x%d @ %dcs",
               mattedSheet.width, mattedSheet.height, aspect, rows, delayCs)
+        #endif
         guard let frames = SpriteSheetSlicer.slice(mattedSheet,
                                                     cols: SpriteSheetSlicer.cols,
                                                     rows: rows),
@@ -529,6 +559,8 @@ final class GoogleProvider: AIProvider {
 
     /// Decode raw bytes into a `CGImage`. Used by `/sticker` and `/gif`.
     static func decodeCGImage(from data: Data) -> CGImage? {
+        let trace = KeyboardPerformance.begin("ImageDecode")
+        defer { KeyboardPerformance.end("ImageDecode", trace) }
         guard let src = CGImageSourceCreateWithData(data as CFData, [
             kCGImageSourceShouldCache: false,
         ] as CFDictionary) else { return nil }
@@ -538,6 +570,8 @@ final class GoogleProvider: AIProvider {
     /// Encode a `CGImage` as PNG bytes via ImageIO. Preserves the alpha
     /// channel that `AlphaMatte` writes into the buffer.
     static func encodePNG(_ image: CGImage) -> Data? {
+        let trace = KeyboardPerformance.begin("ImageEncode")
+        defer { KeyboardPerformance.end("ImageEncode", trace) }
         let out = NSMutableData()
         guard let dest = CGImageDestinationCreateWithData(
             out, "public.png" as CFString, 1, nil

@@ -1,7 +1,12 @@
 import UIKit
 import PhotosUI
+import os.signpost
 
 class KeyboardViewController: UIInputViewController {
+
+    private var activeKeyInsertionSignpost: OSSignpostID?
+    private var didMeasureFirstKeypress = false
+    private var didRenderFirstKeyGrid = false
 
     // MARK: - Keyboard mode / shift state
 
@@ -78,8 +83,8 @@ class KeyboardViewController: UIInputViewController {
 
     private let textChecker = UITextChecker()
 
-    /// Frequency-based word suggester. Loads `commands/dict/en_unigrams.txt`
-    /// (shared with the Android keyboard) on a background queue and
+    /// Frequency-based word suggester. Loads the build-precompiled prefix
+    /// index copied from `commands/prompts/en_prefix_index.txt` and
     /// blends it with the per-user vocabulary that grows as the user
     /// types. Replaces the previous UITextChecker-only path.
     private let suggestionEngine = SuggestionEngine()
@@ -88,11 +93,30 @@ class KeyboardViewController: UIInputViewController {
     /// powers the typo-correction fallback so we keep this queue around
     /// for that work; the new engine's reads are cheap and run inline.
     private let suggestionQueue = DispatchQueue(label: "turtle.suggest", qos: .userInitiated)
+    private let imageDownloadSession: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 20
+        config.timeoutIntervalForResource = 45
+        config.urlCache = nil
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
+        config.waitsForConnectivity = false
+        config.httpMaximumConnectionsPerHost = 2
+        return URLSession(configuration: config)
+    }()
 
     /// In-flight suggestion calculation, kept here so we can cancel it
     /// when a new keystroke arrives mid-pass — that's the debounce that
     /// makes fast typing feel responsive instead of stuttery.
     private var suggestionWorkItem: DispatchWorkItem?
+    private var suggestionDebounceWorkItem: DispatchWorkItem?
+    private let suggestionDebounceDelay: TimeInterval = 0.032
+
+    /// Bounded mirror of the text immediately before the cursor. Normal key
+    /// presses update this in memory, so suggestions do not repeatedly pull
+    /// and scan an arbitrarily long host-field context.
+    private var typingContextTail = ""
+    private let typingContextLimit = 128
+    private var expectsLocalTextChange = false
 
     /// Hash of the last `documentContextBeforeInput` value we ran
     /// `refreshSuggestions` against. `processKey` calls us right after
@@ -230,6 +254,10 @@ class KeyboardViewController: UIInputViewController {
     /// height change can reposition them (just shift each row's y) instead of
     /// destroying + recreating every key button and its glass backing.
     private var keyRowViews:         [KeyRowView] = []
+    /// Lazily-built keyplanes. Each mode pays construction cost only once;
+    /// later QWERTY/symbol switches only toggle the cached row views.
+    private var keyRowsByMode: [KeyRows.Mode: [KeyRowView]] = [:]
+    private var cachedKeyplaneWidth: CGFloat = 0
     /// Strip of slash-command matches, mounted just below the command
     /// bar above the keys. Matches Android's `CommandSuggestionStripView`
     /// behaviour 1:1.
@@ -416,6 +444,8 @@ class KeyboardViewController: UIInputViewController {
     // MARK: - Lifecycle
 
     override func viewDidLoad() {
+        let initializationTrace = KeyboardPerformance.begin("KeyboardInitialization")
+        defer { KeyboardPerformance.end("KeyboardInitialization", initializationTrace) }
         super.viewDidLoad()
         view.backgroundColor = .clear
         // Multi-touch must be enabled at every level of the chain
@@ -503,7 +533,7 @@ class KeyboardViewController: UIInputViewController {
         // command bar (pill, prompt label, send, mic, suggestion chips).
         slashStrip?.applyTheme()
         restampCommandBarColors()
-        rebuildKeyboard()
+        buildKeyboard(forceRebuild: true)
     }
 
     /// Restamp every hardcoded `UIColor.white` / `barText` site in the
@@ -554,6 +584,7 @@ class KeyboardViewController: UIInputViewController {
         // Personalization toggles may have changed in the host app between
         // mounts. Re-cache so per-keystroke checks read in-memory.
         refreshPersonalizationCache()
+        resyncTypingContext()
         // If the user just returned from the Turtle host app after dictating,
         // a transcript is sitting in the App Group waiting to be inserted.
         // The Darwin notification handles the live case; this catches the
@@ -580,7 +611,7 @@ class KeyboardViewController: UIInputViewController {
     /// typed, so the user gets "Hello world" without ever tapping ⇧.
     private func autoEngageShiftIfNeeded() {
         guard mode == .qwerty, !isCapsLock else { return }
-        let before = textDocumentProxy.documentContextBeforeInput ?? ""
+        let before = typingContextTail
         let trimmed = before.trimmingCharacters(in: .whitespaces)
         let shouldShift: Bool
         if trimmed.isEmpty || before.isEmpty {
@@ -614,15 +645,31 @@ class KeyboardViewController: UIInputViewController {
         // command bar — and `isGenerating` stuck true blocks `sendCommand`
         // entirely until the watchdog fires.
         endIntegrationBusy()
+        suggestionDebounceWorkItem?.cancel()
+        suggestionWorkItem?.cancel()
+        imageDownloadSession.getAllTasks { $0.forEach { $0.cancel() } }
+        CommandRouter.shared.cancelAllRequests()
+        integrationContext.cancelAllRequests()
+        PollClient.cancelAllRequests()
+        WyrClient.cancelAllRequests()
+        SlackClient.cancelAllRequests()
+        NotionClient.cancelAllRequests()
+        GitHubIntegration.cancelAllRequests()
     }
 
     override func textDidChange(_ textInput: UITextInput?) {
         super.textDidChange(textInput)
         writeKeyboardHeartbeat()
-        // Single dispatch path for the chip strip. `refreshSuggestions`
-        // re-derives the right chips from the live proxy state.
+        if expectsLocalTextChange {
+            expectsLocalTextChange = false
+        } else {
+            // Cursor movement, selection replacement, dictation, or a host
+            // edit invalidates our local tail. These are the only cases that
+            // need a fresh proxy read.
+            resyncTypingContext()
+        }
         guard activeCommand == nil, !isGenerating else { return }
-        refreshSuggestions()
+        scheduleSuggestionRefresh()
     }
 
     // MARK: - Image preview overlay
@@ -1199,24 +1246,14 @@ class KeyboardViewController: UIInputViewController {
 
     // MARK: - Build keyboard
 
-    private func buildKeyboard() {
-        // Remove previous key rows. Persistent overlays that are mounted as
-        // siblings of the rows (command bar, banner, slash strip, preview,
-        // integration / quick / listening panels) must survive a rebuild —
-        // recomputeKeyboardHeight() calls into here after toggling chrome,
-        // and we'd otherwise yank a visible preview out from under the user.
-        keyboardContainer.subviews
-            .filter { $0 !== commandBar
-                   && $0 !== bannerContainer
-                   && $0 !== slashStrip
-                   && $0 !== cmdPresetStrip
-                   && $0 !== previewOverlay
-                   && $0 !== integrationPanelHost
-                   && $0 !== quickPanelView
-                   && $0 !== listeningOverlay
-                   && $0 !== keyPopupView
-                   && $0 !== accentPickerView }
-            .forEach { $0.removeFromSuperview() }
+    private func buildKeyboard(forceRebuild: Bool = false) {
+        let width = kbWidth
+        if forceRebuild || (cachedKeyplaneWidth > 0 && abs(cachedKeyplaneWidth - width) > 0.5) {
+            keyRowsByMode.values.flatMap { $0 }.forEach { $0.removeFromSuperview() }
+            keyRowsByMode.removeAll(keepingCapacity: true)
+        }
+        cachedKeyplaneWidth = width
+        keyRowsByMode.values.flatMap { $0 }.forEach { $0.isHidden = true }
 
         let rows = currentRows()
         // y-origin tracks the dynamic top chrome: strip + prompt bar if
@@ -1225,12 +1262,23 @@ class KeyboardViewController: UIInputViewController {
         // Track the row views so chrome height changes can REPOSITION them
         // (cheap) instead of tearing down + rebuilding all keys + glass
         // backings (expensive — see `repositionKeyRows`).
-        keyRowViews.removeAll(keepingCapacity: true)
-        for (i, keys) in rows.enumerated() {
-            let y = topOffset + rowGap + CGFloat(i) * (rowH + rowGap)
-            let row = buildRow(keys: keys, rowIndex: i, totalRows: rows.count, y: y)
-            keyboardContainer.addSubview(row)
-            keyRowViews.append(row)
+        if let cached = keyRowsByMode[mode] {
+            keyRowViews = cached
+            for (i, row) in cached.enumerated() {
+                row.frame.origin.y = topOffset + rowGap + CGFloat(i) * (rowH + rowGap)
+                row.isHidden = false
+            }
+        } else {
+            var built: [KeyRowView] = []
+            built.reserveCapacity(rows.count)
+            for (i, keys) in rows.enumerated() {
+                let y = topOffset + rowGap + CGFloat(i) * (rowH + rowGap)
+                let row = buildRow(keys: keys, rowIndex: i, totalRows: rows.count, y: y)
+                keyboardContainer.addSubview(row)
+                built.append(row)
+            }
+            keyRowsByMode[mode] = built
+            keyRowViews = built
         }
         if let strip = slashStrip {
             keyboardContainer.bringSubviewToFront(strip)
@@ -1273,6 +1321,10 @@ class KeyboardViewController: UIInputViewController {
         // Same for the accent picker if a rebuild fires while it's open.
         if let picker = accentPickerView, !picker.isHidden {
             keyboardContainer.bringSubviewToFront(picker)
+        }
+        if !didRenderFirstKeyGrid {
+            didRenderFirstKeyGrid = true
+            KeyboardPerformance.event("FirstKeyGridRendered")
         }
     }
 
@@ -1572,6 +1624,11 @@ class KeyboardViewController: UIInputViewController {
         // Commit the keystroke FIRST — that's what the user is waiting
         // for. Subjective responsiveness wins.
         guard let key = sender.accessibilityLabel else { return }
+        activeKeyInsertionSignpost = KeyboardPerformance.begin("KeyDownToInsertion")
+        if !didMeasureFirstKeypress {
+            didMeasureFirstKeypress = true
+            KeyboardPerformance.event("FirstKeypress")
+        }
         // Spacebar is the one exception to insert-on-press: defer it to
         // touch-up so a horizontal slide becomes caret control instead of
         // typing a space. Only in normal typing — inside a slash command
@@ -1902,13 +1959,19 @@ class KeyboardViewController: UIInputViewController {
         case "🌐":   advanceToNextInputMode(); return
         case "⇧":    handleShift(); return
         case "?123":
+            let trace = KeyboardPerformance.begin("LayoutSwitch")
             mode = .symbols; isCapsLock = false; isShiftedOnce = false
-            rebuildKeyboard(); return
+            rebuildKeyboard()
+            KeyboardPerformance.end("LayoutSwitch", trace); return
         case "ABC":
+            let trace = KeyboardPerformance.begin("LayoutSwitch")
             mode = .qwerty; isCapsLock = false; isShiftedOnce = false
-            rebuildKeyboard(); return
+            rebuildKeyboard()
+            KeyboardPerformance.end("LayoutSwitch", trace); return
         case "=\\<":
-            mode = .symbolsShift; rebuildKeyboard(); return
+            let trace = KeyboardPerformance.begin("LayoutSwitch")
+            mode = .symbolsShift; rebuildKeyboard()
+            KeyboardPerformance.end("LayoutSwitch", trace); return
         default: break
         }
 
@@ -1923,7 +1986,7 @@ class KeyboardViewController: UIInputViewController {
         // the start of the text field (empty or whitespace-only context). A
         // mid-sentence "/" types as a normal character.
         if key == "/" {
-            let pre = (proxy.documentContextBeforeInput ?? "")
+            let pre = typingContextTail
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             if pre.isEmpty {
                 slashBuffer = "/"
@@ -1937,8 +2000,10 @@ class KeyboardViewController: UIInputViewController {
             // Return commits the word right before the cursor — feed
             // it to the suggestion engine so it accrues personal
             // frequency (same as Android's `learn(...)` call site).
-            learnWordBeforeCursor()
+            let committed = cachedTypingWords()
             proxy.insertText("\n")
+            recordLocalInsert("\n")
+            deferLearning(word: committed.current, previous: committed.previous)
             hideCommandBar()
             // New line → next char starts a new "sentence". Re-engage
             // auto-shift so the user doesn't have to tap ⇧ again.
@@ -1950,13 +2015,12 @@ class KeyboardViewController: UIInputViewController {
             // (e.g. user cleared the field entirely) — re-engage shift.
             autoEngageShiftIfNeeded()
         case "space":
-            // Space commits the word: autocorrect an obvious typo first, then
-            // learn whatever now stands, then insert the space.
-            let correction = autocorrectWordBeforeCursorIfNeeded()
-            learnWordBeforeCursor()
+            // Insert first. Learning, bigram persistence, and UITextChecker
+            // run after the touch path so a space never waits on them.
+            let committed = cachedTypingWords()
             proxy.insertText(" ")
-            // Arm the one-keystroke backspace-undo (checked at processKey top).
-            pendingAutocorrect = correction
+            recordLocalInsert(" ")
+            deferWordCommit(word: committed.current, previous: committed.previous)
             handleSpaceDoubleTap()
             updateCommandDetection()
             // Space after sentence-end punctuation kicks auto-shift on.
@@ -1971,6 +2035,7 @@ class KeyboardViewController: UIInputViewController {
                 if isShiftedOnce && !isCapsLock {
                     isShiftedOnce = false
                     proxy.insertText(text)
+                    recordLocalInsert(text)
                     updateCommandDetection()
                     // Just shift state changed — in-place refresh, not
                     // a full keyboard rebuild.
@@ -1978,6 +2043,7 @@ class KeyboardViewController: UIInputViewController {
                 }
             }
             proxy.insertText(text)
+            recordLocalInsert(text)
             updateCommandDetection()
         }
     }
@@ -2120,19 +2186,56 @@ class KeyboardViewController: UIInputViewController {
         // Cheap fast-path bail-out if we're in slash mode — the buffer
         // owns the text, the host field never saw a partial word here.
         guard slashBuffer == nil else { return }
-        let context = (textDocumentProxy.documentContextBeforeInput ?? "") as NSString
-        let range = context.range(of: "\\S+$", options: .regularExpression)
-        guard range.location != NSNotFound else { return }
-        let word = context.substring(with: range)
+        let words = cachedTypingWords()
+        guard !words.current.isEmpty else { return }
+        let word = words.current
         suggestionEngine.learn(word)
         // Learn the bigram (previous word → this word) so the strip can predict
         // the NEXT word from context, not just prefix-match the current one.
-        let pairRange = context.range(of: "(\\S+)\\s+(\\S+)$", options: .regularExpression)
-        if pairRange.location != NSNotFound {
-            let toks = context.substring(with: pairRange)
-                .split(whereSeparator: { $0 == " " || $0 == "\n" || $0 == "\t" }).map(String.init)
-            if toks.count >= 2 {
-                suggestionEngine.learnBigram(previous: toks[toks.count - 2], current: toks[toks.count - 1])
+        if let previous = words.previous {
+            suggestionEngine.learnBigram(previous: previous, current: word)
+        }
+    }
+
+    private func deferLearning(word: String, previous: String?) {
+        guard !word.isEmpty else { return }
+        suggestionQueue.async { [weak self] in
+            guard let self = self else { return }
+            self.suggestionEngine.learn(word)
+            if let previous = previous {
+                self.suggestionEngine.learnBigram(previous: previous, current: word)
+            }
+        }
+    }
+
+    private func deferWordCommit(word: String, previous: String?) {
+        guard !word.isEmpty else { return }
+        let allowsCorrection: Bool
+        switch textDocumentProxy.keyboardType {
+        case .some(.emailAddress), .some(.URL), .some(.numberPad), .some(.phonePad),
+             .some(.decimalPad), .some(.namePhonePad), .some(.asciiCapableNumberPad):
+            allowsCorrection = false
+        default:
+            allowsCorrection = true
+        }
+        suggestionQueue.async { [weak self] in
+            guard let self = self else { return }
+            self.suggestionEngine.learn(word)
+            if let previous = previous {
+                self.suggestionEngine.learnBigram(previous: previous, current: word)
+            }
+            guard allowsCorrection, let fix = self.autocorrectionCandidate(for: word) else { return }
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self,
+                      self.typingContextTail.hasSuffix(word + " ") else { return }
+                for _ in 0..<(word.count + 1) {
+                    self.textDocumentProxy.deleteBackward()
+                    self.recordLocalBackspace()
+                }
+                self.textDocumentProxy.insertText(fix + " ")
+                self.recordLocalInsert(fix + " ")
+                self.pendingAutocorrect = (word, fix)
+                self.scheduleSuggestionRefresh(immediate: true)
             }
         }
     }
@@ -2157,13 +2260,15 @@ class KeyboardViewController: UIInputViewController {
             return nil
         default: break
         }
-        let context = (textDocumentProxy.documentContextBeforeInput ?? "") as NSString
-        let range = context.range(of: "\\S+$", options: .regularExpression)
-        guard range.location != NSNotFound else { return nil }
-        let word = context.substring(with: range)
+        let word = cachedTypingWords().current
+        guard !word.isEmpty else { return nil }
         guard let fix = autocorrectionCandidate(for: word) else { return nil }
-        for _ in 0..<word.count { textDocumentProxy.deleteBackward() }
+        for _ in 0..<word.count {
+            textDocumentProxy.deleteBackward()
+            recordLocalBackspace()
+        }
         textDocumentProxy.insertText(fix)
+        recordLocalInsert(fix)
         return (word, fix)
     }
 
@@ -2192,8 +2297,12 @@ class KeyboardViewController: UIInputViewController {
         let before = textDocumentProxy.documentContextBeforeInput ?? ""
         let suffix = ac.corrected + " "
         if before.hasSuffix(suffix) {
-            for _ in 0..<suffix.count { textDocumentProxy.deleteBackward() }
+            for _ in 0..<suffix.count {
+                textDocumentProxy.deleteBackward()
+                recordLocalBackspace()
+            }
             textDocumentProxy.insertText(ac.original)
+            recordLocalInsert(ac.original)
         } else {
             // Field changed unexpectedly — fall back to a normal backspace.
             handleBackspace()
@@ -2229,6 +2338,7 @@ class KeyboardViewController: UIInputViewController {
         // ignored it and left the selection intact), so the user's tap
         // looked like a no-op when text was highlighted.
         textDocumentProxy.deleteBackward()
+        recordLocalBackspace()
     }
 
     private func handleShift() {
@@ -2259,6 +2369,7 @@ class KeyboardViewController: UIInputViewController {
             // not "type two spaces". (Native iOS would have inserted a
             // period here; we hide that gesture behind the panel.)
             textDocumentProxy.deleteBackward()
+            recordLocalBackspace()
             lastSpaceTap = 0
             showQuickPanel()
         } else { lastSpaceTap = now }
@@ -2455,24 +2566,20 @@ class KeyboardViewController: UIInputViewController {
             return
         }
 
-        // No active slash command. Always refresh the chip strip —
-        // `refreshSuggestions` is now synchronous and cheap (no
-        // background dispatch), and we want a deterministic update on
-        // every keystroke whether or not `textDidChange` fires.
+        // No active slash command. Coalesce bursts of fast typing before
+        // doing suggestion work; character insertion has already completed.
         let wasInSlashMode = suggestionMode == .slashCommand || activeCommand != nil
         if wasInSlashMode {
             hideCommandBar()
         }
-        refreshSuggestions()
+        scheduleSuggestionRefresh()
     }
 
     // MARK: - Word suggestions (in-keyboard autocomplete strip)
 
-    // Single entry point for the chip strip. Runs synchronously on the
-    // main thread — the new suggestion engine's prefix lookup is fast
-    // enough (~1-2 ms over 82k words) that the prior off-main debounce
-    // added more lag than it saved. Synchronous also means we can't
-    // race a fresh keystroke with a stale background result.
+    // Suggestion work is debounced behind the key insertion path. The actual
+    // lookup is bounded and short; stale work is cancelled before it touches
+    // UIKit.
     //
     // Fallback chain (each step only runs if the previous is empty):
     //   1. Engine prefix match on the current word (≥2 chars)
@@ -2495,11 +2602,61 @@ class KeyboardViewController: UIInputViewController {
         integrationPanelHost?.isHidden == false
     }
 
+    private func scheduleSuggestionRefresh(immediate: Bool = false) {
+        suggestionDebounceWorkItem?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.refreshSuggestions() }
+        suggestionDebounceWorkItem = work
+        if immediate {
+            DispatchQueue.main.async(execute: work)
+        } else {
+            DispatchQueue.main.asyncAfter(deadline: .now() + suggestionDebounceDelay, execute: work)
+        }
+    }
+
+    private func resyncTypingContext() {
+        typingContextTail = String((textDocumentProxy.documentContextBeforeInput ?? "")
+            .suffix(typingContextLimit))
+        lastRefreshedContextHash = nil
+    }
+
+    private func recordLocalInsert(_ text: String) {
+        expectsLocalTextChange = true
+        typingContextTail.append(contentsOf: text)
+        if typingContextTail.count > typingContextLimit {
+            typingContextTail = String(typingContextTail.suffix(typingContextLimit))
+        }
+        if let trace = activeKeyInsertionSignpost {
+            KeyboardPerformance.end("KeyDownToInsertion", trace)
+            activeKeyInsertionSignpost = nil
+        }
+    }
+
+    private func recordLocalBackspace() {
+        expectsLocalTextChange = true
+        if !typingContextTail.isEmpty { typingContextTail.removeLast() }
+        if let trace = activeKeyInsertionSignpost {
+            KeyboardPerformance.end("KeyDownToInsertion", trace)
+            activeKeyInsertionSignpost = nil
+        }
+    }
+
+    private func cachedTypingWords() -> (current: String, previous: String?) {
+        let endsInSeparator = typingContextTail.last?.isWhitespace ?? true
+        let tokens = typingContextTail.split(whereSeparator: { $0.isWhitespace })
+        if endsInSeparator {
+            return ("", tokens.last.map(String.init))
+        }
+        return (tokens.last.map(String.init) ?? "",
+                tokens.count >= 2 ? String(tokens[tokens.count - 2]) : nil)
+    }
+
     private func refreshSuggestions() {
+        let lookupTrace = KeyboardPerformance.begin("SuggestionLookup")
+        defer { KeyboardPerformance.end("SuggestionLookup", lookupTrace) }
         guard activeCommand == nil, !isGenerating else { return }
         guard !isIntegrationPanelShown else { return }
 
-        let contextString = textDocumentProxy.documentContextBeforeInput ?? ""
+        let contextString = typingContextTail
         // Dedupe: `processKey` calls us right after `insertText`, then
         // UIKit fires `textDidChange` which calls us again with the same
         // context. Skipping the second pass cuts the per-keystroke
@@ -2508,11 +2665,8 @@ class KeyboardViewController: UIInputViewController {
         if contextHash == lastRefreshedContextHash { return }
         lastRefreshedContextHash = contextHash
 
-        let context = contextString as NSString
-        let range = context.range(of: "\\S+$", options: .regularExpression)
-        let currentWord: String = range.location != NSNotFound
-            ? context.substring(with: range)
-            : ""
+        let cachedWords = cachedTypingWords()
+        let currentWord = cachedWords.current
 
         // Slash composition uses its own strip — don't fight it.
         if currentWord.hasPrefix("/") {
@@ -2529,14 +2683,7 @@ class KeyboardViewController: UIInputViewController {
 
         // The word immediately before the cursor's word — the bigram context.
         // Read only the tail so this stays cheap on long fields.
-        let tail = String(contextString.suffix(64))
-        let tailTokens = tail.split(whereSeparator: { $0 == " " || $0 == "\n" || $0 == "\t" }).map(String.init)
-        let previousWord: String?
-        if currentWord.isEmpty {
-            previousWord = tailTokens.last                                  // just hit space
-        } else {
-            previousWord = tailTokens.count >= 2 ? tailTokens[tailTokens.count - 2] : nil
-        }
+        let previousWord = cachedWords.previous
 
         var picks: [String] = []
         var step1Empty = true
@@ -2641,10 +2788,7 @@ class KeyboardViewController: UIInputViewController {
                       self.activeCommand == nil, !self.isGenerating else { return }
                 // Stale-result guard — bail if the user has typed past
                 // the word we were computing for.
-                let now = (self.textDocumentProxy.documentContextBeforeInput ?? "") as NSString
-                let nowRange = now.range(of: "\\S+$", options: .regularExpression)
-                let nowWord = nowRange.location != NSNotFound
-                    ? now.substring(with: nowRange) : ""
+                let nowWord = self.cachedTypingWords().current
                 guard nowWord == word else { return }
                 self.showWordSuggestions(picks)
             }
@@ -2695,7 +2839,7 @@ class KeyboardViewController: UIInputViewController {
             return false
         }
         let kind = FieldKind.from(InputContext(proxy: proxy))
-        let text = textDocumentProxy.documentContextBeforeInput ?? ""
+        let text = typingContextTail
         let cmds = ContextualSuggester.suggestions(fieldText: text, kind: kind)
             .filter { SlashCommand(rawValue: $0.name) != nil }
         guard !cmds.isEmpty else { return false }
@@ -2705,6 +2849,8 @@ class KeyboardViewController: UIInputViewController {
 
     private func showSuggestedShortcuts(_ shortcuts: [SuggestedShortcut],
                                         mode: SuggestionMode = .suggestedShortcuts) {
+        let uiTrace = KeyboardPerformance.begin("SuggestionUIUpdate")
+        defer { KeyboardPerformance.end("SuggestionUIUpdate", uiTrace) }
         guard !isIntegrationPanelShown else { return }
         suggestionMode   = mode
         pendingShortcuts = shortcuts
@@ -2739,6 +2885,8 @@ class KeyboardViewController: UIInputViewController {
     }
 
     private func showWordSuggestions(_ items: [String]) {
+        let uiTrace = KeyboardPerformance.begin("SuggestionUIUpdate")
+        defer { KeyboardPerformance.end("SuggestionUIUpdate", uiTrace) }
         // Integration panel is mounted — don't fire the chip strip
         // even if a stale async path tries to. See
         // `isIntegrationPanelShown`'s doc-comment for why.
@@ -2796,20 +2944,22 @@ class KeyboardViewController: UIInputViewController {
     }
 
     private func replaceCurrentWord(with replacement: String) {
-        let context = (textDocumentProxy.documentContextBeforeInput ?? "") as NSString
-        let range = context.range(of: "\\S+$", options: .regularExpression)
+        let currentWord = cachedTypingWords().current
         // Empty field / no word at cursor → tap = plain insert, with
         // trailing space so the user can keep typing the next word.
         // This is the empty-field "frequent words" chip path; without
         // it, tapping a chip on an empty field used to silently no-op.
-        guard range.location != NSNotFound else {
+        guard !currentWord.isEmpty else {
             textDocumentProxy.insertText(replacement + " ")
+            recordLocalInsert(replacement + " ")
             return
         }
-
-        let currentWord = context.substring(with: range)
-        for _ in 0..<currentWord.count { textDocumentProxy.deleteBackward() }
+        for _ in 0..<currentWord.count {
+            textDocumentProxy.deleteBackward()
+            recordLocalBackspace()
+        }
         textDocumentProxy.insertText(replacement + " ")
+        recordLocalInsert(replacement + " ")
     }
 
     // MARK: - Command bar  (isHidden only — height and preferredContentSize never change)
@@ -3656,7 +3806,10 @@ class KeyboardViewController: UIInputViewController {
             throw ProviderError.badResponse("Invalid image URL")
         }
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
+            let (data, _) = try await imageDownloadSession.data(from: url)
+            guard data.count <= 25 * 1_024 * 1_024 else {
+                throw ProviderError.badResponse("Image was too large")
+            }
             return data
         } catch let e as URLError { throw ProviderError.network(e) }
         catch { throw ProviderError.unknown(error) }
@@ -4317,6 +4470,8 @@ private final class KeyboardIntegrationContext: IntegrationContext {
         activityCommand = command
     }
 
+    func cancelAllRequests() { llm.cancelAllRequests() }
+
     /// Release the generating overlay *now* if we're already on the main
     /// thread, rather than hopping like the UI work below does.
     ///
@@ -4425,6 +4580,11 @@ private final class RoutedLlmService: LlmService {
         cloud.complete(prompt: prompt, onText: onText, onError: onError)
     }
 
+    func cancelAllRequests() {
+        cloud.cancelAllRequests()
+        CommandRouter.shared.cancelAllRequests()
+    }
+
     func complete(command: String,
                   prompt: String,
                   onText: @escaping (String) -> Void,
@@ -4456,11 +4616,24 @@ private final class RoutedLlmService: LlmService {
 private final class GeminiLlmService: LlmService {
     private let apiKey: String
     private let model: String
+    private let maxResponseBytes = 2_097_152
+    private let session: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 30
+        config.timeoutIntervalForResource = 60
+        config.urlCache = nil
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
+        config.waitsForConnectivity = false
+        config.httpMaximumConnectionsPerHost = 2
+        return URLSession(configuration: config)
+    }()
 
     init(apiKey: String, model: String = "gemini-2.5-flash-lite") {
         self.apiKey = apiKey
         self.model = model
     }
+
+    func cancelAllRequests() { session.getAllTasks { $0.forEach { $0.cancel() } } }
 
     func complete(
         prompt: String,
@@ -4480,10 +4653,13 @@ private final class GeminiLlmService: LlmService {
             "generationConfig": ["maxOutputTokens": 1024, "temperature": 0.7],
         ]
         req.httpBody = try? JSONSerialization.data(withJSONObject: body)
-        URLSession.shared.dataTask(with: req) { data, resp, err in
+        session.dataTask(with: req) { [maxResponseBytes] data, resp, err in
             if err != nil { onError("Check your connection and try again."); return }
             let status = (resp as? HTTPURLResponse)?.statusCode ?? -1
             guard let data = data else { onError("AI is temporarily unavailable. Please try again later."); return }
+            guard data.count <= maxResponseBytes else {
+                onError("AI returned too much data. Please try again."); return
+            }
             if !(200..<300).contains(status) {
                 onError("AI is temporarily unavailable. Please try again later."); return
             }
@@ -4492,8 +4668,7 @@ private final class GeminiLlmService: LlmService {
                   let content = candidates.first?["content"] as? [String: Any],
                   let parts = content["parts"] as? [[String: Any]],
                   let text = parts.first?["text"] as? String else {
-                let snippet = String(data: data, encoding: .utf8)?.prefix(200) ?? ""
-                onError("unexpected gemini shape: \(snippet)"); return
+                onError("AI returned an unexpected response. Please try again."); return
             }
             onText(text.trimmingCharacters(in: .whitespacesAndNewlines))
         }.resume()
@@ -5203,7 +5378,7 @@ private final class ListeningAuroraRenderer: NSObject, MTKViewDelegate {
 
 fileprivate final class SuggestionEngine {
 
-    private static let dictAsset = "en_unigrams"
+    private static let dictAsset = "en_prefix_index"
     /// Per-bucket cap for the prefix index. 50 covers the vast majority
     /// of real autocomplete queries — by definition the top-50 most
     /// frequent words for any 2-char prefix include practically every
@@ -5283,7 +5458,9 @@ fileprivate final class SuggestionEngine {
             let ms = Int((CFAbsoluteTimeGetCurrent() - t0) * 1000)
             let bucketCount = index?.count ?? 0
             let totalEntries = index?.values.reduce(0) { $0 + $1.count } ?? 0
+            #if DEBUG
             NSLog("TurtleSuggest: dict ready in \(ms)ms (\(bucketCount) buckets, \(totalEntries) entries)")
+            #endif
             cb?()
         }
     }
@@ -5409,11 +5586,10 @@ fileprivate final class SuggestionEngine {
         return prefixIndex
     }
 
-    /// Parse the bundled `<word> <freq>` file once and build the 2-char
-    /// prefix bucket index: each bucket holds its top-`bucketTopK` words
-    /// sorted by frequency desc. The raw 82k-entry word list and
-    /// frequency dict are dropped after the buckets are built — only
-    /// the trimmed index stays resident.
+    /// Decode the precompiled binary property list directly into the final
+    /// two-character buckets. The 82k-word source list is never opened by
+    /// the keyboard process, eliminating its cold-start parse, sort, and
+    /// temporary allocation spike.
     private static func loadPrefixIndex() -> [String: [String]]? {
         // Try Bundle.main first (the extension's own bundle when called
         // from the appex process). Fall back to Bundle(for:) which
@@ -5424,39 +5600,19 @@ fileprivate final class SuggestionEngine {
             url = Bundle(for: SuggestionEngine.self).url(forResource: Self.dictAsset, withExtension: "txt")
         }
         guard let url = url else {
-            NSLog("TurtleSuggest: en_unigrams.txt NOT FOUND in bundle (main=\(Bundle.main.bundlePath))")
+            #if DEBUG
+            NSLog("TurtleSuggest: en_prefix_index.txt NOT FOUND in bundle")
+            #endif
             return nil
         }
-        guard let data = try? Data(contentsOf: url),
-              let text = String(data: data, encoding: .utf8) else {
-            NSLog("TurtleSuggest: failed to read \(url.path)")
+        guard let data = try? Data(contentsOf: url, options: [.mappedIfSafe]),
+              let plist = try? PropertyListSerialization.propertyList(
+                from: data, options: [], format: nil),
+              let index = plist as? [String: [String]] else {
+            #if DEBUG
+            NSLog("TurtleSuggest: failed to decode precompiled index")
+            #endif
             return nil
-        }
-        // Stream the file into per-bucket lists in a single pass — we
-        // never materialise the full 82k-entry word list or frequency
-        // dict, which keeps peak load-time memory close to the
-        // steady-state ceiling instead of spiking ~6 MB above it.
-        var rawBuckets: [String: [(String, Int64)]] = [:]
-        rawBuckets.reserveCapacity(676)  // 26 × 26 worst case for lowercase ASCII
-        text.enumerateLines { line, _ in
-            guard let sp = line.firstIndex(of: " ") else { return }
-            let word = String(line[..<sp])
-            guard word.count >= 2 else { return }
-            let freq = Int64(line[line.index(after: sp)...]) ?? 0
-            guard freq > 0 else { return }
-            let key = String(word.prefix(2))
-            rawBuckets[key, default: []].append((word, freq))
-        }
-        // Sort each bucket by frequency desc and trim to top-K. After
-        // this loop the raw bucket arrays (which can hold thousands of
-        // entries for popular prefixes) are released — only the trimmed
-        // K-sized slice survives.
-        var index = [String: [String]](minimumCapacity: rawBuckets.count)
-        for (key, words) in rawBuckets {
-            let ranked = words.sorted { $0.1 > $1.1 }
-                .prefix(bucketTopK)
-                .map { $0.0 }
-            index[key] = Array(ranked)
         }
         return index
     }
