@@ -110,6 +110,17 @@
 		HH000472HH000472HH000472 /* GitHubIntegration.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000471HH000471HH000471 /* GitHubIntegration.swift */; };
 		HH000476HH000476HH000476 /* GitHubAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000477HH000477HH000477 /* GitHubAuth.swift */; };
 		HH000478HH000478HH000478 /* GitHubConnectViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000479HH000479HH000479 /* GitHubConnectViewController.swift */; };
+		HH000913HH000913HH000913 /* TurtleKeyboardWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000912HH000912HH000912 /* TurtleKeyboardWidgetBundle.swift */; };
+		HH000915HH000915HH000915 /* RecentCreationsWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000914HH000914HH000914 /* RecentCreationsWidget.swift */; };
+		HH000917HH000917HH000917 /* HistoryThumbnails.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000916HH000916HH000916 /* HistoryThumbnails.swift */; };
+		HH000920HH000920HH000920 /* ImageHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000371HH000371HH000371 /* ImageHistory.swift */; };
+		HH000911HH000911HH000911 /* TurtleKeyboardWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = HH000908HH000908HH000908 /* TurtleKeyboardWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		HH000922HH000922HH000922 /* WidgetPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000921HH000921HH000921 /* WidgetPalette.swift */; };
+		HH000924HH000924HH000924 /* SplitBalanceWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000923HH000923HH000923 /* SplitBalanceWidget.swift */; };
+		HH000926HH000926HH000926 /* SetupStatusWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000925HH000925HH000925 /* SetupStatusWidget.swift */; };
+		HH000928HH000928HH000928 /* KeyboardHomeState.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000927HH000927HH000927 /* KeyboardHomeState.swift */; };
+		HH000929HH000929HH000929 /* KeyboardHomeState.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000927HH000927HH000927 /* KeyboardHomeState.swift */; };
+		HH000930HH000930HH000930 /* SplitTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = HH000045HH000045HH000045 /* SplitTypes.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -119,6 +130,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = DD000001DD000001DD000001;
 			remoteInfo = TurtleKeyboardExtension;
+		};
+		HH000909HH000909HH000909 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AA000001AA000001AA000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = HH000900HH000900HH000900;
+			remoteInfo = TurtleKeyboardWidget;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -130,6 +148,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				FF000001FF000001FF000001 /* TurtleKeyboardExtension.appex in Embed Foundation Extensions */,
+				HH000911HH000911HH000911 /* TurtleKeyboardWidget.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -224,6 +243,16 @@
 		HH000471HH000471HH000471 /* GitHubIntegration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubIntegration.swift; sourceTree = "<group>"; };
 		HH000477HH000477HH000477 /* GitHubAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubAuth.swift; sourceTree = "<group>"; };
 		HH000479HH000479HH000479 /* GitHubConnectViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubConnectViewController.swift; sourceTree = "<group>"; };
+		HH000912HH000912HH000912 /* TurtleKeyboardWidgetBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TurtleKeyboardWidgetBundle.swift; sourceTree = "<group>"; };
+		HH000914HH000914HH000914 /* RecentCreationsWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentCreationsWidget.swift; sourceTree = "<group>"; };
+		HH000916HH000916HH000916 /* HistoryThumbnails.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryThumbnails.swift; sourceTree = "<group>"; };
+		HH000918HH000918HH000918 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		HH000919HH000919HH000919 /* TurtleKeyboardWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TurtleKeyboardWidget.entitlements; sourceTree = "<group>"; };
+		HH000908HH000908HH000908 /* TurtleKeyboardWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = TurtleKeyboardWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		HH000921HH000921HH000921 /* WidgetPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetPalette.swift; sourceTree = "<group>"; };
+		HH000923HH000923HH000923 /* SplitBalanceWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitBalanceWidget.swift; sourceTree = "<group>"; };
+		HH000925HH000925HH000925 /* SetupStatusWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupStatusWidget.swift; sourceTree = "<group>"; };
+		HH000927HH000927HH000927 /* KeyboardHomeState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardHomeState.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -241,6 +270,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		HH000905HH000905HH000905 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -249,6 +285,7 @@
 			children = (
 				CC000001CC000001CC000001 /* TurtleKeyboard */,
 				EE000001EE000001EE000001 /* TurtleKeyboardExtension */,
+				HH000907HH000907HH000907 /* TurtleKeyboardWidget */,
 				AA000003AA000003AA000003 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -258,6 +295,7 @@
 			children = (
 				CC000007CC000007CC000007 /* TurtleKeyboard.app */,
 				EE000005EE000005EE000005 /* TurtleKeyboardExtension.appex */,
+				HH000908HH000908HH000908 /* TurtleKeyboardWidget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -266,6 +304,7 @@
 			isa = PBXGroup;
 			children = (
 				CC000002CC000002CC000002 /* AppDelegate.swift */,
+				HH000927HH000927HH000927 /* KeyboardHomeState.swift */,
 				CC000004CC000004CC000004 /* ViewController.swift */,
 				HH000061HH000061HH000061 /* SplitDetailViewController.swift */,
 				HH000203HH000203HH000203 /* JoinSplitViewController.swift */,
@@ -465,6 +504,21 @@
 			path = GitHub;
 			sourceTree = "<group>";
 		};
+		HH000907HH000907HH000907 /* TurtleKeyboardWidget */ = {
+			isa = PBXGroup;
+			children = (
+				HH000912HH000912HH000912 /* TurtleKeyboardWidgetBundle.swift */,
+				HH000914HH000914HH000914 /* RecentCreationsWidget.swift */,
+				HH000916HH000916HH000916 /* HistoryThumbnails.swift */,
+				HH000921HH000921HH000921 /* WidgetPalette.swift */,
+				HH000923HH000923HH000923 /* SplitBalanceWidget.swift */,
+				HH000925HH000925HH000925 /* SetupStatusWidget.swift */,
+				HH000918HH000918HH000918 /* Info.plist */,
+				HH000919HH000919HH000919 /* TurtleKeyboardWidget.entitlements */,
+			);
+			path = TurtleKeyboardWidget;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -481,6 +535,7 @@
 			);
 			dependencies = (
 				FF000003FF000003FF000003 /* PBXTargetDependency */,
+				HH000910HH000910HH000910 /* PBXTargetDependency */,
 			);
 			name = TurtleKeyboard;
 			productName = TurtleKeyboard;
@@ -505,6 +560,23 @@
 			productReference = EE000005EE000005EE000005 /* TurtleKeyboardExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		HH000900HH000900HH000900 /* TurtleKeyboardWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = HH000901HH000901HH000901 /* Build configuration list for PBXNativeTarget "TurtleKeyboardWidget" */;
+			buildPhases = (
+				HH000904HH000904HH000904 /* Sources */,
+				HH000905HH000905HH000905 /* Frameworks */,
+				HH000906HH000906HH000906 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = TurtleKeyboardWidget;
+			productName = TurtleKeyboardWidget;
+			productReference = HH000908HH000908HH000908 /* TurtleKeyboardWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -519,6 +591,9 @@
 						CreatedOnToolsVersion = 15.0;
 					};
 					DD000001DD000001DD000001 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+					HH000900HH000900HH000900 = {
 						CreatedOnToolsVersion = 15.0;
 					};
 				};
@@ -538,6 +613,7 @@
 			targets = (
 				BB000001BB000001BB000001 /* TurtleKeyboard */,
 				DD000001DD000001DD000001 /* TurtleKeyboardExtension */,
+				HH000900HH000900HH000900 /* TurtleKeyboardWidget */,
 			);
 		};
 /* End PBXProject section */
@@ -551,6 +627,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		DD000006DD000006DD000006 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		HH000906HH000906HH000906 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -600,6 +683,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				CC000003CC000003CC000003 /* AppDelegate.swift in Sources */,
+				HH000928HH000928HH000928 /* KeyboardHomeState.swift in Sources */,
 				CC000005CC000005CC000005 /* ViewController.swift in Sources */,
 				HH000060HH000060HH000060 /* SplitDetailViewController.swift in Sources */,
 				HH000062HH000062HH000062 /* SplitTypes.swift in Sources */,
@@ -711,6 +795,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		HH000904HH000904HH000904 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				HH000913HH000913HH000913 /* TurtleKeyboardWidgetBundle.swift in Sources */,
+				HH000915HH000915HH000915 /* RecentCreationsWidget.swift in Sources */,
+				HH000917HH000917HH000917 /* HistoryThumbnails.swift in Sources */,
+				HH000920HH000920HH000920 /* ImageHistory.swift in Sources */,
+				HH000922HH000922HH000922 /* WidgetPalette.swift in Sources */,
+				HH000924HH000924HH000924 /* SplitBalanceWidget.swift in Sources */,
+				HH000926HH000926HH000926 /* SetupStatusWidget.swift in Sources */,
+				HH000930HH000930HH000930 /* SplitTypes.swift in Sources */,
+				HH000929HH000929HH000929 /* KeyboardHomeState.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -718,6 +818,11 @@
 			isa = PBXTargetDependency;
 			target = DD000001DD000001DD000001 /* TurtleKeyboardExtension */;
 			targetProxy = FF000002FF000002FF000002 /* PBXContainerItemProxy */;
+		};
+		HH000910HH000910HH000910 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = HH000900HH000900HH000900 /* TurtleKeyboardWidget */;
+			targetProxy = HH000909HH000909HH000909 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -921,6 +1026,56 @@
 			};
 			name = Release;
 		};
+		HH000902HH000902HH000902 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
+				CODE_SIGN_ENTITLEMENTS = TurtleKeyboardWidget/TurtleKeyboardWidget.entitlements;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = AHV2R8U5DW;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = TurtleKeyboardWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.samarth.turtlekeyboard.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		HH000903HH000903HH000903 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
+				CODE_SIGN_ENTITLEMENTS = TurtleKeyboardWidget/TurtleKeyboardWidget.entitlements;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = AHV2R8U5DW;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = TurtleKeyboardWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.samarth.turtlekeyboard.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -947,6 +1102,15 @@
 			buildConfigurations = (
 				GG000002GG000002GG000002 /* Debug */,
 				GG000003GG000003GG000003 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		HH000901HH000901HH000901 /* Build configuration list for PBXNativeTarget "TurtleKeyboardWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				HH000902HH000902HH000902 /* Debug */,
+				HH000903HH000903HH000903 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

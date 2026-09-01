@@ -54,12 +54,13 @@ The slash command parser, API calls, and command routing are **not yet implement
 **Deployment target:** iOS 15.0  
 **Build:** Open `ios/TurtleKeyboard.xcodeproj` in Xcode; sign with your Apple Developer team, then build & run.
 
-Two targets in the Xcode project:
+Three targets in the Xcode project:
 
 | Target | Bundle ID | Type |
 |---|---|---|
 | `TurtleKeyboard` | `com.samarth.turtlekeyboard` | Host app (onboarding) |
 | `TurtleKeyboardExtension` | `com.samarth.turtlekeyboard.keyboard` | Keyboard extension |
+| `TurtleKeyboardWidget` | `com.samarth.turtlekeyboard.widget` | Home + Lock Screen widgets (WidgetKit) |
 
 ### Architecture
 
@@ -74,7 +75,8 @@ Mirrors the Android project 1-to-1:
   - Banner is a `UIView` above the keys; `preferredContentSize` is updated to include/exclude its 32 pt height.
   - `RequestsOpenAccess = true` in `Info.plist` enables Full Access (required for future network calls to the backend API).
 
-The slash command parser, multi-provider AI stack, and per-integration command handlers **are implemented on iOS** — see `ios/CLAUDE.md` for the full file map. Highlights: `TurtleKeyboardExtension/Command/SlashCommand.swift` (command enum), `AI/CommandRouter.swift` (model routing), `Integration/{Split,Notion,Slack}/` (local commands + OAuth-gated cloud calls), `Keyboard/QuickPanelView.swift` (double-tap-space picker), `Voice/VoiceInputController.swift` (mic key).
+The slash command parser, multi-provider AI stack, and per-integration command handlers **are implemented on iOS** — see `ios/CLAUDE.md` for the full file map. Highlights: `TurtleKeyboardExtension/Command/SlashCommand.swift` (command enum), `AI/CommandRouter.swift` (model routing), `Integration/{Split,Notion,Slack}/` (local commands + OAuth-gated cloud calls), `Keyboard/QuickPanelView.swift` (double-tap-space picker), `Voice/VoiceInputController.swift` (mic key),
+and `TurtleKeyboardWidget/` (three widgets: recent `/cap` + `/org` output, Split balance, setup status).
 
 ---
 

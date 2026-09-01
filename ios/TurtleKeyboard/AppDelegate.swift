@@ -1,4 +1,7 @@
 import UIKit
+#if canImport(WidgetKit)
+import WidgetKit
+#endif
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -67,6 +70,21 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func applicationDidBecomeActive(_ application: UIApplication) {
         VoiceSessionManager.shared.writeHeartbeat()
         presentVoiceCoachmarkIfRequested()
+        reloadWidgets()
+    }
+
+    /// Enabling the keyboard and granting Full Access both happen in
+    /// Settings, outside every Turtle process, so there's no event the
+    /// Setup Status widget can hang a reload on. Foregrounding the app is
+    /// the closest proxy — it's where the user lands right after flipping
+    /// those switches. Cheap, and far rarer than a keyboard mount, so it
+    /// doesn't eat the system's daily reload budget.
+    private func reloadWidgets() {
+        #if canImport(WidgetKit)
+        if #available(iOS 14.0, *) {
+            WidgetCenter.shared.reloadAllTimelines()
+        }
+        #endif
     }
 
     private func presentVoiceCoachmarkIfRequested() {
@@ -102,6 +120,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     ///   • `turtlekeyboard://personalization`         → PersonalizationViewController
     ///   • `turtlekeyboard://poll/<id>`               → PollSheetViewController
     ///   • `turtlekeyboard://wyr/<id>`                → WyrSheetViewController
+    ///   • `turtlekeyboard://history[?ts=<ms>]`       → HistoryViewController
     @discardableResult
     private func route(url: URL) -> Bool {
         guard url.scheme == "turtlekeyboard" else { return false }
@@ -123,6 +142,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             return true
         case "personalization", "personalize":
             present(PersonalizationViewController())
+            return true
+        case "history":
+            // Entry point for the Recent Creations widget. The widget
+            // appends `?ts=<timestampMs>` identifying the tapped image;
+            // the grid doesn't scroll-to-entry yet, so the id is ignored
+            // and we just open History.
+            present(HistoryViewController())
             return true
         case "poll":
             guard let id = artifactId(in: url) else { return false }

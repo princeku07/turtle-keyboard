@@ -5,17 +5,19 @@
 Never open anything inside `TurtleKeyboard.xcodeproj/`. The pbxproj is hand-edited
 (safe ID prefix `HH`) when adding files; everything else there is Xcode scaffolding.
 
-Two targets in the Xcode project:
+Three targets in the Xcode project:
 
 | Target | Bundle ID | Type |
 |---|---|---|
 | `TurtleKeyboard` | `com.samarth.turtlekeyboard` | Host app (onboarding + Connect screens + Personalization) |
 | `TurtleKeyboardExtension` | `com.samarth.turtlekeyboard.keyboard` | Keyboard extension (`UIInputViewController`) |
+| `TurtleKeyboardWidget` | `com.samarth.turtlekeyboard.widget` | Home Screen + Lock Screen widgets (WidgetKit + SwiftUI) |
 
-Both targets share the App Group `group.com.samarth.turtlekeyboard.split` (see
-`*.entitlements` files at the target root). Tokens, splits, and personalization
-toggles live in the shared `UserDefaults` suite — the extension reads what the
-host app writes.
+All three targets share the App Group `group.com.samarth.turtlekeyboard.split`
+(see `*.entitlements` files at the target root). Tokens, splits, and
+personalization toggles live in the shared `UserDefaults` suite — the extension
+reads what the host app writes. The widget reads the shared image history the
+keyboard writes.
 
 ---
 
@@ -24,6 +26,7 @@ host app writes.
 | File | What it is |
 |---|---|
 | `AppDelegate.swift` | App entry. Routes `turtlekeyboard://join?...` deep links into `JoinSplitViewController`. |
+| `KeyboardHomeState.swift` | `OnboardingState` keys + the `KeyboardHomeState.current()` derivation of whether the keyboard is enabled / Full Access is on. Extracted from `ViewController.swift` so the widget target can compile it. |
 | `ViewController.swift` | Onboarding screen — Enable / Switch keyboard, plus tiles into Split, Notion, Slack, Personalization. |
 | `SplitDetailViewController.swift` | Split history list + cloud card (sign in, sync, invite/QR, stop sharing). |
 | `JoinSplitViewController.swift` | Receives the joiner side of the `turtlekeyboard://join` deep link and points the local Split store at the owner's sheet. |
@@ -143,6 +146,63 @@ Pluggable model stack. Adding a model = drop a file here + register it in
 
 ---
 
+## Widgets — `TurtleKeyboardWidget/`
+
+WidgetKit + SwiftUI. Three widgets, all reading state the keyboard and host
+app already write into the App Group — no network call, no backend hop.
+
+| File | What it is |
+|---|---|
+| `TurtleKeyboardWidgetBundle.swift` | `@main` `WidgetBundle`. Add new widgets to its `body`. |
+| `RecentCreationsWidget.swift` | Gallery of recent `/cap` + `/org` output. Small = one image full-bleed; medium = 4-up; large = 3×3. Taps → `turtlekeyboard://history`. |
+| `SplitBalanceWidget.swift` | Last bill split + what each person owes. Small, medium, and Lock Screen inline / rectangular (iOS 16+). Taps → `turtlekeyboard://split-detail`. |
+| `SetupStatusWidget.swift` | Whether the keyboard is added and Full Access is on, as a two-line checklist. Collapses to a quiet confirmation once ready. Taps open the app root. |
+| `HistoryThumbnails.swift` | Memory-safe image reader. Wraps `ImageHistory.list()` and downsamples each PNG through ImageIO. |
+| `WidgetPalette.swift` | Brand colours mirrored from `BrandTokens.swift` (that file is UIColor-typed; this target is SwiftUI-only) + the `turtleContainerBackground` compatibility helper. |
+| `Info.plist` | `NSExtensionPointIdentifier = com.apple.widgetkit-extension`. |
+| `TurtleKeyboardWidget.entitlements` | App Group membership (must match the other two targets). |
+
+### Files shared into this target
+
+Rather than re-read the App Group with a second copy of each format, the
+widget compiles the existing owners of that state:
+
+| File | Owned by | Why the widget needs it |
+|---|---|---|
+| `AI/ImageHistory.swift` | keyboard extension | App Group id, history directory name, PNG + sidecar format |
+| `Integration/Split/SplitTypes.swift` | keyboard extension | `SplitHistory` log format, `SplitContract.formatAmount` |
+| `TurtleKeyboard/KeyboardHomeState.swift` | host app | the "is Turtle actually working" derivation |
+
+`KeyboardHomeState` and `OnboardingState` used to be file-private inside
+`ViewController.swift`; they were moved out verbatim when `SetupStatusWidget`
+needed the same rule. The rule is subtle enough (heartbeat vs. legacy
+seen-at, 30-day staleness, failure-newer-than-success) that a second copy in
+the widget would have drifted.
+
+### Widget constraints worth knowing
+
+- **A widget can't type.** iOS gives it no access to the field the user is in,
+  so this surface is a gallery + launcher, not a second way to run commands.
+  Tapping deep-links to `turtlekeyboard://history`, routed in `AppDelegate`.
+- **~30 MB memory ceiling** — tighter than the keyboard's. `ImageHistory`
+  stores full-resolution PNGs; a 1024×1024 entry decodes to ~4 MB, so the nine
+  images a large widget shows would blow the budget and iOS would render a
+  blank placeholder. `HistoryThumbnails` therefore *never* decodes full-res:
+  `CGImageSourceCreateWithURL` keeps the file memory-mapped and
+  `CGImageSourceCreateThumbnailAtIndex` decodes straight to the target size.
+- **Refresh is budgeted.** Each widget is nudged at its own write site —
+  `ImageHistory.record` reloads the gallery, `SplitHistory.add` reloads Split
+  Balance, and `AppDelegate.applicationDidBecomeActive` reloads everything
+  (the closest proxy for "user just came back from the Settings toggles" that
+  Setup Status depends on). The providers' own `.after` policies are safety
+  nets for a dropped reload, not the primary path — don't shorten them, the
+  system enforces a daily reload budget.
+- **Interactivity needs iOS 17+**, Lock Screen accessories 16+, Control Center
+  controls 18+. The target is built at 15.0, so tap-to-open is the only
+  interaction available across the supported range.
+
+---
+
 ## Build
 
 ```bash
@@ -224,7 +284,19 @@ Single file (~2500 lines). Key sections in order:
 - `RequestsOpenAccess` in the extension `Info.plist` must stay `true` for HTTP requests to LM Studio / fal *and* for `SFSpeechRecognizer` to work. iOS will additionally require the user to flip "Allow Full Access" in Settings.
 - The `192.168.1.10` ATS exception in both `Info.plist` files is required for plaintext HTTP to the LAN LM Studio endpoint. Don't broaden it.
 - `OrgImageRenderer` is synchronous and runs on the main thread — fine because Core Graphics on a 500×500 canvas is sub-millisecond. Do **not** reintroduce a WKWebView path inside the keyboard extension; rAF is paused on detached webviews and the process is too memory-constrained for an in-hierarchy one.
-- App Group ID is `group.com.samarth.turtlekeyboard.split` in both `.entitlements` files. The extension and host must agree on this string or the shared `UserDefaults(suiteName:)` reads return defaults and OAuth tokens look "missing" from the keyboard.
+- The widget must never decode a history PNG at full resolution — always go
+  through `HistoryThumbnails`. A widget extension has roughly 30 MB; one
+  full-res decode per grid cell exceeds it and iOS renders a blank widget
+  instead of showing an error.
+- Each widget's `kind` string is duplicated at its reload site —
+  `"TurtleRecentCreations"` in `ImageHistory.reloadWidgets()`,
+  `"TurtleSplitBalance"` in `SplitHistory.reloadWidgets()`. Rename one and you
+  must rename the other, or that widget silently stops refreshing.
+- `KeyboardHomeState.swift` is compiled into both the host app and the widget,
+  but `OnboardingState.isComplete` / `.complete()` read `UserDefaults.standard`,
+  which is per-process. The widget would always see `false`, so nothing there
+  calls them. Anything genuinely shared must go through the App Group suite.
+- App Group ID is `group.com.samarth.turtlekeyboard.split` in all three `.entitlements` files. The three targets must agree on this string or the shared `UserDefaults(suiteName:)` reads return defaults and OAuth tokens look "missing" from the keyboard.
 - pbxproj IDs use the `HH` prefix when added by hand. Pick the next free `HHxxxxxxHHxxxxxxHHxxxxxx` triple. The pbxproj sections that need every new file: `PBXBuildFile`, `PBXFileReference`, the relevant `PBXGroup`, and the `Sources` (or `Resources`) build phase of the owning target.
 
 ---

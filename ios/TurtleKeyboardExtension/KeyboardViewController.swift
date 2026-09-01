@@ -2,7 +2,11 @@ import UIKit
 import PhotosUI
 import os.signpost
 
-class KeyboardViewController: UIInputViewController {
+class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
+
+    /// Lets `playInputClick()` follow the user's system Keyboard Feedback
+    /// setting. No custom sound is loaded by the extension.
+    var enableInputClicksWhenVisible: Bool { true }
 
     private var activeKeyInsertionSignpost: OSSignpostID?
     private var didMeasureFirstKeypress = false
@@ -160,16 +164,22 @@ class KeyboardViewController: UIInputViewController {
     // keys feel ~7% taller than native. iPad stays slightly shorter
     // because the 5-row keyboard has to fit a tighter input-view
     // height on iPad mini (~290pt portrait).
-    private var rowH:        CGFloat { isPad ? 44 : 42 }
-    // iPhone inter-row gap matches Apple's portrait system keyboard
-    // (12pt). The previous 7pt made the rows ~15pt higher on screen by
-    // the bottom row than native, so muscle-memory taps for the lower
-    // letter rows and the spacebar landed below where the key actually
-    // was. iPad uses 6pt because its keys are larger and the extra
-    // gap looks loose at iPad density.
-    private var rowGap:      CGFloat { isPad ? 6  : 12 }
+    private var rowH: CGFloat {
+        if isPad {
+            // Full-size iPads use the taller system keycaps users expect;
+            // floating/narrow keyboards step down so five rows still fit.
+            if kbWidth >= 1_000 { return 54 }
+            if kbWidth >= 700 { return 50 }
+            return 44
+        }
+        // Landscape phones have far less vertical room than portrait.
+        return kbWidth > 500 ? 36 : 42
+    }
+    // Native-style compact vertical rhythm. Landscape phones tighten
+    // further; iPads gain one point so the larger caps remain distinct.
+    private var rowGap:      CGFloat { isPad ? 7 : (kbWidth > 500 ? 5 : 6) }
     private var commandBarH: CGFloat { isPad ? 46 : 50 }
-    private var keyGap:      CGFloat { isPad ? 8  : 6 }
+    private var keyGap:      CGFloat { isPad ? 7 : 6 }
     private var bottomPad:   CGFloat { isPad ? 4  : 6 }
 
     // Command-bar internals shrink on iPhone — the prompt label needs to
@@ -204,7 +214,13 @@ class KeyboardViewController: UIInputViewController {
     // Total keyboard height — always commandBarH + rowsH
     private var totalH: CGFloat { commandBarH + rowsH }
 
-    private var kbWidth: CGFloat { UIScreen.main.bounds.width }
+    /// Use the extension's live width, not the physical screen. This is
+    /// essential for rotation, Stage Manager, Slide Over and floating iPad
+    /// keyboards, where `UIScreen.main.bounds.width` is the wrong keyplane.
+    private var kbWidth: CGFloat {
+        let live = viewIfLoaded?.bounds.width ?? 0
+        return live > 0 ? live : UIScreen.main.bounds.width
+    }
 
     // MARK: - UI references
 
@@ -1375,53 +1391,43 @@ class KeyboardViewController: UIInputViewController {
             // slash-command composition a held key would fight the buffer.
             return self.slashBuffer == nil && self.keyHasAccents(label)
         }
-        let isBottom   = rowIndex == totalRows - 1
-        let isModifier = rowIndex == totalRows - 2
-        let isMiddle   = keys.count == 9 && !isBottom && !isModifier
+        let isBottom = rowIndex == totalRows - 1
 
-        var widths: [CGFloat]; var xOffset: CGFloat
-
-        if isBottom {
-            // iPad bottom row: 5 keys [🌐, ?123, space, ?123, ↵]
-            // iPhone bottom row: 4 keys [?123, space, /, ↵] — the globe
-            // is dropped in favour of a dedicated `/` (the slash-command
-            // trigger); space slides left into the freed slot. Widths
-            // still sum to 100, with space dominant and `/` sized like a
-            // compact special key.
-            let props: [CGFloat]
-            if isPad {
-                props = [9, 13, 48, 13, 17]                     // iPad [🌐, ?123, space, ?123, ↵]
-            } else if keys.count == 5 {
-                // iPhone [?123, 🌐, space, /, ↵]. The two compact specials
-                // (globe + slash) flank the dominant spacebar; ?123 and ↵
-                // take the wider outer slots, matching Apple's portrait row
-                // proportions while keeping both the next-keyboard control
-                // and the slash-command trigger one tap away.
-                props = [15, 11, 47, 12, 15]
-            } else if keys.count == 4 {
-                props = [17, 60, 8, 15]                         // legacy iPhone [?123, space, /, ↵]
-            } else {
-                props = [8, 12, 7, 42, 7, 24]                  // legacy 6-key fallback
+        // Width is expressed as native-style relative key units. Function
+        // keys grow without making letters narrower unpredictably, while the
+        // home row retains Apple's familiar inset on iPhone.
+        let weights: [CGFloat] = keys.map { key in
+            if isBottom {
+                switch key {
+                case "space": return isPad ? 7.0 : 5.4
+                case "🌐":    return isPad ? 1.15 : 1.05
+                case "?123", "ABC": return isPad ? 1.8 : 1.7
+                case "↵":     return isPad ? 2.2 : 1.8
+                default:      return 1
+                }
             }
-            let avail = w - keyGap * CGFloat(keys.count + 1)
-            widths = props.map { avail * $0 / 100 }
-            xOffset = keyGap
-        } else if isModifier {
-            let sideW   = w * 0.135
-            let avail   = w - 2 * sideW - keyGap * CGFloat(keys.count + 1)
-            let letterW = avail / CGFloat(keys.count - 2)
-            widths = keys.indices.map { i in i == 0 || i == keys.count - 1 ? sideW : letterW }
-            xOffset = keyGap
-        } else if isMiddle {
-            let indent = w * 0.055
-            let avail  = w - 2 * indent - keyGap * CGFloat(keys.count - 1)
-            widths = Array(repeating: avail / CGFloat(keys.count), count: keys.count)
-            xOffset = indent
-        } else {
-            let avail = w - keyGap * CGFloat(keys.count + 1)
-            widths = Array(repeating: avail / CGFloat(keys.count), count: keys.count)
-            xOffset = keyGap
+            if isPad {
+                switch key {
+                case "tab":  return 1.35
+                case "caps": return 1.65
+                case "↵":    return 1.65
+                case "⇧":    return 1.75
+                case "⌫":    return 1.35
+                default:     return 1
+                }
+            }
+            if rowIndex == totalRows - 2, key == "⇧" || key == "⌫" {
+                return 1.45
+            }
+            return 1
         }
+
+        let homeRowInset: CGFloat = (!isPad && keys.count == 9 && !isBottom)
+            ? w * 0.055 : keyGap
+        let available = w - homeRowInset * 2 - keyGap * CGFloat(max(0, keys.count - 1))
+        let unit = available / max(1, weights.reduce(0, +))
+        let widths = weights.map { $0 * unit }
+        var xOffset = homeRowInset
 
         // Every theme renders keys as Liquid Glass tiles (see
         // Keyboard/LiquidGlass.swift). Translucent themes (dark / light)
@@ -1501,7 +1507,6 @@ class KeyboardViewController: UIInputViewController {
         // check or by a `UIVisualEffectView` sibling.
         let btn           = UIButton(type: .custom)
         let isShiftActive = label == "⇧" && (isCapsLock || isShiftedOnce)
-        let c16  = UIImage.SymbolConfiguration(pointSize: 16, weight: .medium)
         let c15  = UIImage.SymbolConfiguration(pointSize: 15, weight: .medium)
         let c15r = UIImage.SymbolConfiguration(pointSize: 15, weight: .regular)
 
@@ -1513,8 +1518,12 @@ class KeyboardViewController: UIInputViewController {
             btn.setImage(UIImage(systemName: "globe", withConfiguration: c15r), for: .normal)
             btn.tintColor = specialText; btn.backgroundColor = keySpecial
         case "↵":
-            btn.setImage(UIImage(systemName: "return", withConfiguration: c16), for: .normal)
-            btn.tintColor = specialText; btn.backgroundColor = keySpecial
+            btn.setTitle(returnKeyTitle(), for: .normal)
+            btn.titleLabel?.font = .systemFont(ofSize: isPad ? 15 : 14, weight: .regular)
+            btn.titleLabel?.adjustsFontSizeToFitWidth = true
+            btn.titleLabel?.minimumScaleFactor = 0.72
+            btn.setTitleColor(specialText, for: .normal)
+            btn.backgroundColor = keySpecial
         case "⇧" where isShiftActive:
             btn.setImage(UIImage(systemName: isCapsLock ? "capslock.fill" : "shift.fill",
                                  withConfiguration: c15), for: .normal)
@@ -1545,7 +1554,7 @@ class KeyboardViewController: UIInputViewController {
             // The previous `.light` weight made glyphs feel spindly and
             // hard to read at a glance — bumping to `.regular` gives them
             // the same visual presence as the native keyboard.
-            btn.titleLabel?.font = .systemFont(ofSize: 23, weight: .regular)
+            btn.titleLabel?.font = .systemFont(ofSize: isPad ? 22 : 23, weight: .regular)
             btn.setTitleColor(normalText, for: .normal)
             btn.backgroundColor = keyNormal
         }
@@ -1566,6 +1575,26 @@ class KeyboardViewController: UIInputViewController {
         // from delivering touches to it at all.
         btn.isUserInteractionEnabled = false
         return btn
+    }
+
+    /// Mirrors the host field's Return-key intent so muscle memory carries
+    /// across Messages, Safari, Mail, forms and search fields.
+    private func returnKeyTitle() -> String {
+        switch textDocumentProxy.returnKeyType ?? .default {
+        case .go:       return "Go"
+        case .google:   return "Google"
+        case .join:     return "Join"
+        case .next:     return "Next"
+        case .route:    return "Route"
+        case .search:   return "Search"
+        case .send:     return "Send"
+        case .yahoo:    return "Yahoo"
+        case .done:     return "Done"
+        case .emergencyCall: return "Emergency"
+        case .continue: return "Continue"
+        case .default:  return "return"
+        @unknown default: return "return"
+        }
     }
 
     // MARK: - Backspace repeat
@@ -1624,6 +1653,7 @@ class KeyboardViewController: UIInputViewController {
         // Commit the keystroke FIRST — that's what the user is waiting
         // for. Subjective responsiveness wins.
         guard let key = sender.accessibilityLabel else { return }
+        UIDevice.current.playInputClick()
         activeKeyInsertionSignpost = KeyboardPerformance.begin("KeyDownToInsertion")
         if !didMeasureFirstKeypress {
             didMeasureFirstKeypress = true

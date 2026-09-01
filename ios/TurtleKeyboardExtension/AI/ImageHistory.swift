@@ -1,6 +1,9 @@
 import Foundation
 #if os(iOS)
 import UIKit
+#if canImport(WidgetKit)
+import WidgetKit
+#endif
 
 // MARK: - ImageHistory
 //
@@ -56,6 +59,7 @@ enum ImageHistory {
         }
 
         prune(dir: dir)
+        reloadWidgets()
         return Entry(timestampMs: ts, command: command, prompt: prompt, pngURL: pngURL)
     }
 
@@ -91,9 +95,26 @@ enum ImageHistory {
         for url in files {
             try? FileManager.default.removeItem(at: url)
         }
+        reloadWidgets()
     }
 
     // MARK: - Internals
+
+    /// Nudge the Recent Creations widget after the store changes.
+    ///
+    /// The widget's own timeline refresh is an hourly safety net, so
+    /// without this a new /cap would sit invisible on the Home Screen for
+    /// up to an hour. Fire-and-forget and off the critical path — the
+    /// system coalesces reloads and enforces its own daily budget, and
+    /// this runs after the PNG is already on disk, so it costs the
+    /// command's latency budget nothing.
+    private static func reloadWidgets() {
+        #if canImport(WidgetKit)
+        if #available(iOS 14.0, *) {
+            WidgetCenter.shared.reloadTimelines(ofKind: "TurtleRecentCreations")
+        }
+        #endif
+    }
 
     private static func historyDirectory() -> URL? {
         let fm = FileManager.default

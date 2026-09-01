@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(WidgetKit)
+import WidgetKit
+#endif
 
 // MARK: - SplitContract
 
@@ -132,6 +135,7 @@ final class SplitHistory {
             }
         }
         store.setString(next, forKey: SplitKeys.history)
+        Self.reloadWidgets()
         return ts
     }
 
@@ -153,6 +157,19 @@ final class SplitHistory {
 
     func clear() {
         store.setString("", forKey: SplitKeys.history)
+        Self.reloadWidgets()
+    }
+
+    /// Nudge the Split Balance widget after the log changes. The widget's
+    /// own timeline refresh is an hourly safety net, so without this a fresh
+    /// /split would sit stale on the Home Screen. Kind string must match
+    /// `SplitBalanceWidget.kind`.
+    private static func reloadWidgets() {
+        #if canImport(WidgetKit)
+        if #available(iOS 14.0, *) {
+            WidgetCenter.shared.reloadTimelines(ofKind: "TurtleSplitBalance")
+        }
+        #endif
     }
 }
 

@@ -39,44 +39,6 @@ enum HostPrivacySafeTelemetry {
     }
 }
 
-private enum KeyboardHomeState {
-    case notConfigured
-    case keyboardEnabled
-    case fullAccessRequired
-    case ready(lastCommand: String?)
-    case actionNeeded(message: String)
-
-    static func current() -> KeyboardHomeState {
-        guard let defaults = UserDefaults(suiteName: OnboardingState.appGroupID) else {
-            return .notConfigured
-        }
-        let heartbeat = defaults.double(forKey: "keyboard.lastHeartbeatAt")
-        let legacySeen = defaults.double(forKey: OnboardingState.keyboardSeenKey)
-        let lastSeen = max(heartbeat, legacySeen)
-        guard lastSeen > 0 else { return .notConfigured }
-
-        if Date().timeIntervalSince1970 - lastSeen > 30 * 24 * 60 * 60 {
-            return .actionNeeded(message: "Turtle hasn’t checked in recently. Open it once from any text field.")
-        }
-
-        guard defaults.object(forKey: OnboardingState.fullAccessKey) != nil else {
-            return .keyboardEnabled
-        }
-        guard defaults.bool(forKey: OnboardingState.fullAccessKey) else {
-            return .fullAccessRequired
-        }
-
-        let successAt = defaults.double(forKey: "keyboard.lastSuccessAt")
-        let failureAt = defaults.double(forKey: "keyboard.lastFailureAt")
-        if failureAt > successAt,
-           Date().timeIntervalSince1970 - failureAt < 24 * 60 * 60 {
-            let message = defaults.string(forKey: "keyboard.lastFailureMessage")
-                ?? "A recent command needs your attention."
-            return .actionNeeded(message: message)
-        }
-        return .ready(lastCommand: defaults.string(forKey: "keyboard.lastSuccessfulCommand"))
-    }
-}
 
 /// The host app is a companion to the keyboard, so its home screen follows the
 /// same structure as Apple's Settings apps: setup first, then the things a
@@ -1079,21 +1041,6 @@ final class ConnectionStatusView: UIView {
 }
 
 // MARK: - First-run onboarding
-
-enum OnboardingState {
-    private static let completionKey = "onboarding.completed.v1"
-    static let appGroupID = "group.com.samarth.turtlekeyboard.split"
-    static let keyboardSeenKey = "onboarding.keyboardSeenAt"
-    static let fullAccessKey = "onboarding.fullAccess"
-
-    static var isComplete: Bool {
-        UserDefaults.standard.bool(forKey: completionKey)
-    }
-
-    static func complete() {
-        UserDefaults.standard.set(true, forKey: completionKey)
-    }
-}
 
 final class OnboardingViewController: UIViewController, UITextFieldDelegate {
     var onComplete: (() -> Void)?
